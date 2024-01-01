@@ -7,10 +7,10 @@ exclude: |
                 src/app/|
                 src/core/|
                 src/dewarping/|
-                src/imageprox/|
+                src/imageproc/|
                 src/foundation/|
-                src/math/|
-            )$
+                src/math/
+            )
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
