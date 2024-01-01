@@ -15,7 +15,7 @@
 	},
 	"containerEnv": {
 		// libGL error: No matching fbConfigs or visuals found
-		"LIBGL_ALWAYS_INDIRECT": 1
+		"LIBGL_ALWAYS_INDIRECT": "1"
 	},
 	"customizations": {
 		"vscode": {
