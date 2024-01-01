@@ -1,5 +1,12 @@
 {
-	"image": "mcr.microsoft.com/devcontainers/universal:2",
+	"name": "Ubuntu",
+	"build": {
+		"dockerfile": "Dockerfile",
+		// Update 'VARIANT' to pick an Ubuntu version
+		"args": {
+			"VARIANT": "ubuntu-22.04"
+		}
+	},
 	"features": {
 		"ghcr.io/devcontainers/features/python:1": {
 			"version": "os-provided",
