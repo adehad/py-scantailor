@@ -1,160 +1,76 @@
+# https://github.com/github/gitignore/blob/main/Python.gitignore
+
+# Project Specific
 CMakeLists.txt.user
 build/
-build-*/
-cmake-build-*/
-out/
-bin/
-lib/
-*.dir/
+src/_version.py
 
-# CMake (generated). Tracked helper modules live under cmake/.
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile
-*.cmake
-!CMakeLists.txt
-!cmake/**/*.cmake
-*.cbp
-CTestTestfile.cmake
-_deps/
-install_manifest.txt
-compile_commands.json
-CMakeUserPresets.json
 
-# C/C++ build artifacts
-*.o
-*.obj
-*.a
-*.lib
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
 *.so
-*.so.*
-*.dylib
-*.dll
-*.exe
-*.out
-*.app
-*.i
-*.ii
-*.s
-*.S
-*.gcno
-*.gcda
-*.gcov
 
-# Qt
-*.pro.user
-*.pro.user.*
-*.qmlc
-*.jsc
-moc_*.cpp
-moc_*.h
-qrc_*.cpp
-ui_*.h
-*.qm
-.qmake.stash
-*.autosave
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Qt Creator
-*.creator
-*.creator.user
-*.files
-*.includes
-*.config
+# Installer logs
+pip-log.txt
 
-# Editors / IDEs
-.cursor/
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
-*~
-*.swp
-*.swo
-.*.sw?
-.clangd
-.cache/clangd/
-*.code-workspace
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
 
-# Visual Studio (CMake "Open Folder")
-.vs/
-CMakeSettings.json
-CppProperties.json
 
-# Operating system junk
-.DS_Store
-.DS_Store?
-._*
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-.directory
-
-# Debuggers / profiling
-*.core
-/core
-*.stackdump
-*.pdb
-*.ilk
-*.exp
-*.idb
-*.pgc
-*.pgd
-perf.data
-perf.data.old
-
-# Ctags / cscope
-tags
-TAGS
-GTAGS
-GRTAGS
-GPATH
-cscope.out
-
-# Generated docs
-doc/html/
-doc/latex/
-docs/_build/
-*.dox
-
-# Tests / coverage output
-Testing/
-test_results/
-coverage/
-lcov.info
-
-# Packaging / distribution artifacts
-*.tar
-*.tar.gz
-*.zip
-*.rar
-*.deb
-*.rpm
-*.msi
-*.AppImage
-*.flatpak
-packaging/build/
-
-# flatpak-builder output (local smoke builds / CI)
-.flatpak-builder/
-flatpak/.flatpak-builder/
-repo/
-build-dir/
-
-# Patch / merge leftovers
-*.orig
-*.rej
-
-# Local env / CMake overrides
-.env
-.env.local
-*.local
-local.cmake
-
-# Misc
+# Django stuff:
 *.log
-*.tmp
-*.temp
-*.bak
-*.cache
-.cache/
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# javascript
+node_modules
+package-lock.json
+.vscode/symbols.json
+
+# Sphinx documentation
+docs/_build/
+
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+__pypackages__/

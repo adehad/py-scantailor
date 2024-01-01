@@ -1,0 +1,81 @@
+[project]
+name = "scantailor"
+description = "Python port of the ScanTailor Application"
+authors = [{ name = "Adel H", email = "26027314+adehad@users.noreply.github.com" }]
+dependencies = [
+    "pyside6>=6.6.1",
+]
+requires-python = ">=3.10,<3.13"
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+dynamic = ["version"]
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+sources = ["src"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/_version.py" # Do not commit to source
+
+[tool.pdm]
+package-type = "library"
+
+[tool.pdm.dev-dependencies]
+test = ["pytest"]
+docs = ["furo", "sphinx", "sphinx_copybutton"]
+
+########################################################################################
+# External Tool Config
+########################################################################################
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+namespace_packages = true
+show_error_codes = true
+strict_optional = true
+warn_unused_configs = true
+
+[tool.coverage.run]
+branch = true
+parallel = true
+omit = ["src/scantailor/__about__.py"]
+
+[tool.coverage.report]
+exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
+
+[tool.ruff]
+select = [
+  "E",   # pycodestyle
+  "W",   # pycodestyle
+  "F",   # pyflakes
+  "I",   # isort
+  "UP",  # pyupgrade
+  "D",   # docstrings
+  "RUF", # ruff
+]
+ignore = []
+
+# Same as Black.
+line-length = 88
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+# Assume Python 3.10. (minimum supported)
+target-version = "py310"
+
+# The source code paths to consider, e.g., when resolving first- vs. third-party imports
+src = ["scantailor", "tests"]
+
+[tool.ruff.isort]
+known-first-party = ["scantailor", "tests"]
+
+[tool.ruff.pydocstyle]
+# Use Google-style docstrings.
+convention = "google"
