@@ -13,6 +13,8 @@
 			"optimize": true
 		}
 	},
+	// Use 'postCreateCommand' to run commands after the container is created.
+	"postCreateCommand": "./.devcontainer/post_create.sh",
 	"containerEnv": {
 		// libGL error: No matching fbConfigs or visuals found
 		"LIBGL_ALWAYS_INDIRECT": "1"
@@ -87,7 +89,8 @@
 				"trond-snekvik.simple-rst",
 				"wayou.vscode-todo-highlight",
 				"ms-azuretools.vscode-docker",
-				"charliermarsh.ruff"
+				"charliermarsh.ruff",
+				"tamasfe.even-better-toml"
 			]
 		}
 	}
