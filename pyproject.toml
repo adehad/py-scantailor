@@ -27,8 +27,25 @@ version-file = "src/_version.py" # Do not commit to source
 package-type = "library"
 
 [tool.pdm.dev-dependencies]
-test = ["pytest"]
-docs = ["furo", "sphinx", "sphinx_copybutton"]
+test = [
+    # Test specific frameworks
+    "pytest",
+    "pytest-cov",
+]
+docs = [
+    "furo",
+    "sphinx",
+    "sphinx_copybutton",
+    # https://github.com/python-babel/babel/issues/990#issuecomment-1481568645
+    "babel<2.12",
+]
+
+
+[tool.pdm.scripts]
+cov = "pytest -vv --cov-report=term-missing --cov-config=pyproject.toml --cov=src/scan_tailor --cov=tests {args}"
+no-cov = {composite = ["cov --no-cov {args}"]}
+docs = "sphinx-build -a -n -v -W --keep-going -b html --color -d build/docs/doctree docs/ build/docs/out"
+
 
 ########################################################################################
 # External Tool Config
@@ -51,13 +68,13 @@ exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
 
 [tool.ruff]
 select = [
-  "E",   # pycodestyle
-  "W",   # pycodestyle
-  "F",   # pyflakes
-  "I",   # isort
-  "UP",  # pyupgrade
-  "D",   # docstrings
-  "RUF", # ruff
+    "E",   # pycodestyle
+    "W",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "D",   # docstrings
+    "RUF", # ruff
 ]
 ignore = []
 

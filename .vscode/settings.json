@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "**/src/scantailor/translations/*.ts": "xml",
+        "**/src/scantailor/**/*.ui": "xml"
+    }
+}
