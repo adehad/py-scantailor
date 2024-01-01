@@ -1,87 +1,87 @@
 {
-  "image": "mcr.microsoft.com/devcontainers/universal:2",
-  "features": {
-    "ghcr.io/devcontainers/features/python": {
-      "version": "os-provided",
-      "optimize": true
-    },
-    "containerEnv" : {
-      // libGL error: No matching fbConfigs or visuals found
-      "LIBGL_ALWAYS_INDIRECT": 1
-    },
-    "customizations": {
-  		"vscode": {
-  			"settings": {
-  				"[python]": {
-  					"editor.defaultFormatter": "charliermarsh.ruff",
-  					"editor.wordBasedSuggestions": "off",
-  					"editor.formatOnSave": true,
-  					"editor.codeActionsOnSave": {
-  						"source.organizeImports": "explicit",
-  						"source.fixAll": "explicit"
-  					}
-  				},
-  				"editor.rulers": [
-  					80, // default color or as customized (with "editorRuler.foreground")
-  					{
-  						"column": 88,
-  						"color": "#ff000065"
-  					}
-  				],
-  				"mypy-type-checker.args": [
-  					// "--follow-imports=silent",
-  					"--ignore-missing-imports",
-  					"--show-column-numbers",
-  					"--no-pretty",
-  					"--show-error-codes"
-  				],
-  				"files.exclude": {
-  					"**/__pycache__": true,
-  					"**/*.egg": true,
-  					"**/*.egg-info/": true,
-  					"**/*.eggs": true,
-  					"**/*.pyc": true,
-  					"**/.mypy_cache": true,
-  					"**/.pytest_cache": true
-  				},
-  				"search.exclude": {
-  					"**/.tox": true,
-  					"**/.venv": true,
-  					"**/build/lib/*": true,
-  					"**/dist/*": true
-  				},
-  				"files.watcherExclude": {
-  					"**/.git/**": true,
-  					"**/node_modules/**": true,
-  					"**/.hg/store/**": true,
-  					"**/.tox/**": true,
-  					"**/.venv/**": true
-  				},
-  				"python.testing.pytestArgs": [
-  					"--no-cov",
-  					"-v",
-  					"tests/"
-  				],
-  				"python.testing.pytestEnabled": true,
-  				"python.testing.pytestPath": "pytest"
-  			},
-  			// Add the IDs of extensions you want installed when the container is created.
-  			"extensions": [
-  				"njpwerner.autodocstring",
-  				"yzhang.markdown-all-in-one",
-  				"ms-python.python",
-          "mutantdino.resourcemonitor",
-          "usernamehw.errorlens",
-          "GitHub.vscode-github-actions",
-  				"littlefoxteam.vscode-python-test-adapter",
-  				"ms-vscode-remote.remote-containers",
-  				"hbenl.vscode-test-explorer",
-  				"trond-snekvik.simple-rst",
-  				"wayou.vscode-todo-highlight",
-  				"ms-azuretools.vscode-docker",
-  				"charliermarsh.ruff"
-  			]
-  		}
-  	}
-  }
+	"image": "mcr.microsoft.com/devcontainers/universal:2",
+	"features": {
+		"ghcr.io/devcontainers/features/python:1": {
+			"version": "os-provided",
+			"optimize": true
+		}
+	},
+	"containerEnv": {
+		// libGL error: No matching fbConfigs or visuals found
+		"LIBGL_ALWAYS_INDIRECT": 1
+	},
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"[python]": {
+					"editor.defaultFormatter": "charliermarsh.ruff",
+					"editor.wordBasedSuggestions": "off",
+					"editor.formatOnSave": true,
+					"editor.codeActionsOnSave": {
+						"source.organizeImports": "explicit",
+						"source.fixAll": "explicit"
+					}
+				},
+				"editor.rulers": [
+					80, // default color or as customized (with "editorRuler.foreground")
+					{
+						"column": 88,
+						"color": "#ff000065"
+					}
+				],
+				"mypy-type-checker.args": [
+					// "--follow-imports=silent",
+					"--ignore-missing-imports",
+					"--show-column-numbers",
+					"--no-pretty",
+					"--show-error-codes"
+				],
+				"files.exclude": {
+					"**/__pycache__": true,
+					"**/*.egg": true,
+					"**/*.egg-info/": true,
+					"**/*.eggs": true,
+					"**/*.pyc": true,
+					"**/.mypy_cache": true,
+					"**/.pytest_cache": true
+				},
+				"search.exclude": {
+					"**/.tox": true,
+					"**/.venv": true,
+					"**/build/lib/*": true,
+					"**/dist/*": true
+				},
+				"files.watcherExclude": {
+					"**/.git/**": true,
+					"**/node_modules/**": true,
+					"**/.hg/store/**": true,
+					"**/.tox/**": true,
+					"**/.venv/**": true
+				},
+				"python.testing.pytestArgs": [
+					"--no-cov",
+					"-v",
+					"tests/"
+				],
+				"python.testing.pytestEnabled": true,
+				"python.testing.pytestPath": "pytest"
+			},
+			// Add the IDs of extensions you want installed when the container is created.
+			"extensions": [
+				"njpwerner.autodocstring",
+				"yzhang.markdown-all-in-one",
+				"ms-python.python",
+				"mutantdino.resourcemonitor",
+				"usernamehw.errorlens",
+				"GitHub.vscode-github-actions",
+				"littlefoxteam.vscode-python-test-adapter",
+				"ms-vscode-remote.remote-containers",
+				"hbenl.vscode-test-explorer",
+				"trond-snekvik.simple-rst",
+				"wayou.vscode-todo-highlight",
+				"ms-azuretools.vscode-docker",
+				"charliermarsh.ruff"
+			]
+		}
+	}
 }
