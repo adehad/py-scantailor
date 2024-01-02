@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "App GUI",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "module": "scantailor",
             "env": {
@@ -16,14 +16,14 @@
         },
         {
             "name": "ScanTailor Translations",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "module": "scantailor.translations.__init__",
             "justMyCode": true
         },
         {
             "name": "Pytest.",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "module": "pytest",
             "args": [

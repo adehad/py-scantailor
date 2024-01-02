@@ -9,6 +9,8 @@ build/
 app.pro
 _version.py
 
+**/scantailor_*.qm
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
