@@ -1,6 +1,17 @@
 {
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit"
+        },
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "diffEditor.ignoreTrimWhitespace": false,
+        "editor.wordBasedSuggestions": "off"
+    },
     "files.associations": {
         "**/src/scantailor/translations/*.ts": "xml",
-        "**/src/scantailor/**/*.ui": "xml"
+        "**/src/scantailor/**/*.ui": "xml",
+        "**/*.spec": "python",
+        "**/pdm.lock": "toml",
     }
 }

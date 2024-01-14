@@ -3,9 +3,21 @@
 The ScanTailor version that merges the features of the `ScanTailor Featured` and `ScanTailor Enhanced` versions,
 brings new ones and fixes.
 
-### Video demonstration of an older version
-[![image](https://github.com/ScanTailor-Advanced/scantailor-advanced/assets/6695517/d0e1dbbe-0e97-4d72-a011-28b171cad939)](https://vimeo.com/12524529) 
-If the video doesn't play, you may to have to login into your vimeo account.
+## Python Remake
+
+Goal:
+1. Improve the maintainability by using a more accessible programming language - ie Python.
+2. Provide a better developer experience through a devcontainer - auto-formatting, debugging etc. should be primary focus.
+
+Much bigger task than I originally thought.
+- [ ] The translations won't work as they are also covering the stuff in the .cpp files.
+- [x] Should take inspiration from: https://github.com/JackLilhammers/pyside6-boilerplate/tree/main -- Made my own fork and used it as a grounds to get familiar and upgrade to more modern Python: https://github.com/adehad/pyside6-boilerplate
+- [x] Using the pdm post_install hook to run the ui class generaion would be ideal. -- we can use the loader class, for the translations, we can generate however
+- [ ] generate the translations via the devcontainer, this worked fine in the template, but we can do it a bit differently here
+- [ ] The translations should also become a Qt resource, with proper prefixins as shown here: https://www.pythonguis.com/tutorials/packaging-data-files-pyside6-with-qresource-system/
+- [x] Run app via debugger -- I mean it didn't do anything and there are things to sort, out but it is a start
+- [ ] figure out how to get the custom widgets working: https://doc.qt.io/qtforpython-6/tutorials/basictutorial/uifiles.html#custom-widgets-in-qt-designer, it probably wwill involve some faff with re-writing it in Python, but I think it just needs the signals, slots and core ui dimensions and then the actual functionality can be later
+
 
 ## Contents:
 * [Description](#description)

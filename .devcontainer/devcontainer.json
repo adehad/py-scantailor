@@ -9,7 +9,7 @@
 	},
 	"features": {
 		"ghcr.io/devcontainers/features/python:1": {
-			"version": "os-provided",
+			"version": "3.12",
 			"optimize": true
 		}
 	},
@@ -72,6 +72,7 @@
 					"-v",
 					"tests/"
 				],
+				"python.defaultInterpreterPath": "./.venv/bin/python",
 				"python.testing.pytestEnabled": true,
 				"python.testing.pytestPath": "pytest"
 			},
