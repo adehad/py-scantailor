@@ -1,0 +1,35 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "App GUI",
+            "type": "python",
+            "request": "launch",
+            "module": "scantailor",
+            "env": {
+                // "LANGUAGE": "es_ES"
+            },
+            "justMyCode": true
+        },
+        {
+            "name": "ScanTailor Translations",
+            "type": "python",
+            "request": "launch",
+            "module": "scantailor.translations.__init__",
+            "justMyCode": true
+        },
+        {
+            "name": "Pytest.",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "--no-cov", // coverage affects breakpoints
+            ],
+            "justMyCode": true
+        }
+    ]
+}
