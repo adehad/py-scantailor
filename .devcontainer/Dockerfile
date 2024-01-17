@@ -1,8 +1,9 @@
 # See here for image contents: https://github.com/devcontainers/images/blob/main/src/base-ubuntu/.devcontainer/Dockerfile
 
-# [Choice] Ubuntu version: https://github.com/devcontainers/images/tree/main/src/base-ubuntu
-ARG VARIANT="ubuntu-22.04"
-FROM mcr.microsoft.com/vscode/devcontainers/base:${VARIANT}
+# https://hub.docker.com/_/python
+ARG VARIANT="bookworm"
+ARG PYTHON="3.12"
+FROM python:${PYTHON}-${VARIANT}
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends  \
@@ -10,7 +11,8 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     qt6-tools-dev \
     qt6-tools-dev-tools \
     qt6-wayland \
-    qt6-l10n-tools
+    qt6-l10n-tools \
+    qtchooser
 
 RUN qtchooser -install qt6 $(which qmake6)
 
