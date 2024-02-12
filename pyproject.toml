@@ -80,6 +80,17 @@ exclude = '''(?x)(
 )'''
 
 [tool.ruff]
+# The source code paths to consider, e.g., when resolving first- vs. third-party imports
+src = ["scantailor", "tests"]
+extend-exclude = ["./src/scantailor/_ui/*_ui.py"]
+
+# Assume Python 3.12. (minimum supported)
+target-version = "py312"
+
+# Same as Black.
+line-length = 88
+
+[tool.ruff.lint]
 select = [
     "E",   # pydocstyle
     "W",   # pydocstyle
@@ -90,24 +101,14 @@ select = [
     "RUF", # ruff
 ]
 ignore = []
-extend-exclude = ["./src/scantailor/_ui/*_ui.py"]
-
-# Same as Black.
-line-length = 88
 
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-# Assume Python 3.12. (minimum supported)
-target-version = "py312"
-
-# The source code paths to consider, e.g., when resolving first- vs. third-party imports
-src = ["scantailor", "tests"]
-
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["scantailor", "tests"]
 required-imports = ["from __future__ import annotations"]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 # Use Google-style docstrings.
 convention = "google"
