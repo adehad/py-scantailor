@@ -3184,7 +3184,7 @@ QToolButton:pressed {
                        <item>
                         <widget class="QCheckBox" name="higherSearchSensitivityCB">
                          <property name="text">
-                          <string>Higher search sensivity</string>
+                          <string>Higher search sensitivity</string>
                          </property>
                         </widget>
                        </item>
