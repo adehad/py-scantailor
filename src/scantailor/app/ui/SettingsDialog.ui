@@ -357,7 +357,7 @@
                <item row="1" column="1">
                 <widget class="QDoubleSpinBox" name="selectContentDeviationCoefSB">
                  <property name="toolTip">
-                  <string>Deviation multiplier: a higher value means lower sensivity.</string>
+                  <string>Deviation multiplier: a higher value means lower sensitivity.</string>
                  </property>
                  <property name="minimum">
                   <double>0.100000000000000</double>
@@ -380,7 +380,7 @@
                <item row="0" column="1">
                 <widget class="QDoubleSpinBox" name="deskewDeviationCoefSB">
                  <property name="toolTip">
-                  <string>Deviation multiplier: a higher value means lower sensivity.</string>
+                  <string>Deviation multiplier: a higher value means lower sensitivity.</string>
                  </property>
                  <property name="minimum">
                   <double>0.100000000000000</double>
@@ -428,7 +428,7 @@
                <item row="2" column="1">
                 <widget class="QDoubleSpinBox" name="marginsDeviationCoefSB">
                  <property name="toolTip">
-                  <string>Deviation multiplier: a higher value means lower sensivity.</string>
+                  <string>Deviation multiplier: a higher value means lower sensitivity.</string>
                  </property>
                  <property name="minimum">
                   <double>0.100000000000000</double>

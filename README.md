@@ -12,7 +12,7 @@ Goal:
 Much bigger task than I originally thought.
 - [ ] The translations won't work as they are also covering the stuff in the .cpp files.
 - [x] Should take inspiration from: https://github.com/JackLilhammers/pyside6-boilerplate/tree/main -- Made my own fork and used it as a grounds to get familiar and upgrade to more modern Python: https://github.com/adehad/pyside6-boilerplate
-- [x] Using the pdm post_install hook to run the ui class generaion would be ideal. -- we can use the loader class, for the translations, we can generate however
+- [x] Using the pdm post_install hook to run the ui class generation would be ideal. -- we can use the loader class, for the translations, we can generate however
 - [ ] generate the translations via the devcontainer, this worked fine in the template, but we can do it a bit differently here
 - [ ] The translations should also become a Qt resource, with proper prefixins as shown here: https://www.pythonguis.com/tutorials/packaging-data-files-pyside6-with-qresource-system/
 - [x] Run app via debugger -- I mean it didn't do anything and there are things to sort, out but it is a start

@@ -1,4 +1,5 @@
 """Main Entrypoint for the application."""
+from __future__ import annotations
 
 from PySide6 import QtWidgets
 
