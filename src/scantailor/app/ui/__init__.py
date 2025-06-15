@@ -1,4 +1,5 @@
 """UI Elements & Screens."""
+
 from __future__ import annotations
 
 import pathlib

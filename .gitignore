@@ -43,6 +43,7 @@ MANIFEST
 # Python venv
 .venv
 .pdm-build
+.pdm-python
 
 # Installer logs
 pip-log.txt
