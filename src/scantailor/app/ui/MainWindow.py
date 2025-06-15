@@ -6,9 +6,6 @@ import pathlib
 
 from loguru import logger as _LOG
 from PySide6 import QtCore, QtGui, QtWidgets
-from PySide6.QtGui import (
-    QCloseEvent,
-)
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -171,6 +168,7 @@ class MainWindowManager:
         self.actionSaveProject.triggered.connect(self.saveProjectTriggered)
         self.actionSaveProjectAs.triggered.connect(self.saveProjectAsTriggered)
         self.actionCloseProject.triggered.connect(self.closeProject)
+        self.actionQuit.triggered.connect(self.quit)
 
         # if self.settings.value("mainWindow/maximized") == False:
         #    if not self.restoreGeometry(geom.toByteArray()):
@@ -317,10 +315,9 @@ class MainWindowManager:
         """Close project."""
         _LOG.info("Close project")
 
-    def closeEvent(self, event: QCloseEvent) -> None:
+    def quit(self, _clicked: bool) -> None:
         """Handle close event."""
-        _LOG.info("Close event")
-        event.accept()
+        _LOG.info("Quit")
         QtWidgets.QApplication.instance().quit()  # type: ignore[union-attr]
 
     def show(self):
