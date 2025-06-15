@@ -6,7 +6,8 @@ from scantailor.app.ui import MainWindow
 
 
 def test_main_window_opens(qtbot: QtBot):
-    window = MainWindow.MainWindow()
+    manager = MainWindow.MainWindowManager()
+    window = manager.ui
     qtbot.addWidget(window)
     window.show()
     qtbot.wait_active(window)

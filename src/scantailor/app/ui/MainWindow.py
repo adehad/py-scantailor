@@ -24,16 +24,19 @@ from scantailor.app.ui import UI_FOLDER, load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
 
 
-class MainWindow(QtWidgets.QMainWindow):
-    """Main Application window for ScanTailor."""
+class MainWindowManager:
+    """Controller Class for the Main Application window for ScanTailor.
+
+    Note: This class is not a QMainWindow.
+    When using QtUiLoader to load a QMainWindow based .ui file, and setting the parent
+    as a QMainWindow, we get weird behavior.
+    e.g. https://stackoverflow.com/questions/53828666/pyside2-qmainwindow-loaded-from-ui-file-not-triggering-window-events
+    """
 
     def __init__(self):
         """Application Initialize."""
         super().__init__()
-        self.ui = load_ui_widget(UI_FOLDER / "MainWindow.ui", self)
-        self.setCentralWidget(self.ui)
-
-        # self.findChildren(QtWidgets.QDockWidget)
+        self.ui = load_ui_widget(UI_FOLDER / "MainWindow.ui")
 
         self.pages = None  # std::make_shared<ProjectPages>()
         self.stages = (
@@ -61,37 +64,37 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actionPrevPageQ = get_cwidget(self.ui, QtGui.QAction, "actionPrevPageQ")
         self.actionNextPageW = get_cwidget(self.ui, QtGui.QAction, "actionNextPageW")
         self.actionPrevSelectedPage = get_cwidget(
-            self, QtGui.QAction, "actionPrevSelectedPage"
+            self.ui, QtGui.QAction, "actionPrevSelectedPage"
         )
         self.actionNextSelectedPage = get_cwidget(
-            self, QtGui.QAction, "actionNextSelectedPage"
+            self.ui, QtGui.QAction, "actionNextSelectedPage"
         )
         self.actionPrevSelectedPageQ = get_cwidget(
-            self, QtGui.QAction, "actionPrevSelectedPageQ"
+            self.ui, QtGui.QAction, "actionPrevSelectedPageQ"
         )
         self.actionNextSelectedPageW = get_cwidget(
-            self, QtGui.QAction, "actionNextSelectedPageW"
+            self.ui, QtGui.QAction, "actionNextSelectedPageW"
         )
         self.actionGotoPage = get_cwidget(self.ui, QtGui.QAction, "actionGotoPage")
         self.actionAbout = get_cwidget(self.ui, QtGui.QAction, "actionAbout")
         self.actionReloadPage = get_cwidget(self.ui, QtGui.QAction, "actionReloadPage")
         self.actionSwitchFilter1 = get_cwidget(
-            self, QtGui.QAction, "actionSwitchFilter1"
+            self.ui, QtGui.QAction, "actionSwitchFilter1"
         )
         self.actionSwitchFilter2 = get_cwidget(
-            self, QtGui.QAction, "actionSwitchFilter2"
+            self.ui, QtGui.QAction, "actionSwitchFilter2"
         )
         self.actionSwitchFilter3 = get_cwidget(
-            self, QtGui.QAction, "actionSwitchFilter3"
+            self.ui, QtGui.QAction, "actionSwitchFilter3"
         )
         self.actionSwitchFilter4 = get_cwidget(
-            self, QtGui.QAction, "actionSwitchFilter4"
+            self.ui, QtGui.QAction, "actionSwitchFilter4"
         )
         self.actionSwitchFilter5 = get_cwidget(
-            self, QtGui.QAction, "actionSwitchFilter5"
+            self.ui, QtGui.QAction, "actionSwitchFilter5"
         )
         self.actionSwitchFilter6 = get_cwidget(
-            self, QtGui.QAction, "actionSwitchFilter6"
+            self.ui, QtGui.QAction, "actionSwitchFilter6"
         )
         self.selectionModeBtn = get_cwidget(self.ui, QToolButton, "selectionModeBtn")
         self.focusButton = get_cwidget(self.ui, QToolButton, "focusButton")
@@ -109,7 +112,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui, QtGui.QAction, "actionSaveProject"
         )
         self.actionSaveProjectAs = get_cwidget(
-            self, QtGui.QAction, "actionSaveProjectAs"
+            self.ui, QtGui.QAction, "actionSaveProjectAs"
         )
         self.actionCloseProject = get_cwidget(
             self.ui, QtGui.QAction, "actionCloseProject"
@@ -119,11 +122,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.filterOptions = get_cwidget(self.ui, QWidget, "filterOptions")
         self.imageViewFrame = get_cwidget(self.ui, QWidget, "imageViewFrame")
         self.scrollAreaWidgetContents = get_cwidget(
-            self, QWidget, "scrollAreaWidgetContents"
+            self.ui, QWidget, "scrollAreaWidgetContents"
         )
         self.scrollArea = get_cwidget(self.ui, QScrollArea, "scrollArea")
         self.magnifyThumbnailsBtn = get_cwidget(
-            self, QToolButton, "magnifyThumbnailsBtn"
+            self.ui, QToolButton, "magnifyThumbnailsBtn"
         )
         self.sortingOrderBtn = get_cwidget(self.ui, QToolButton, "sortingOrderBtn")
 
@@ -166,7 +169,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actionSaveProject.triggered.connect(self.saveProjectTriggered)
         self.actionSaveProjectAs.triggered.connect(self.saveProjectAsTriggered)
         self.actionCloseProject.triggered.connect(self.closeProject)
-        self.actionQuit.triggered.connect(self.close)
 
         # if self.settings.value("mainWindow/maximized") == False:
         #    if not self.restoreGeometry(geom.toByteArray()):
@@ -196,10 +198,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def openProject(self, _checked: bool) -> None:
         """Open project."""
         project_file, _project_filter = QFileDialog.getOpenFileName(
-            self,
-            self.tr("Open Project"),
+            self.ui,
+            self.ui.tr("Open Project"),
             str(pathlib.Path().cwd()),
-            f"{self.tr('Scan Tailor Projects')} (*.ScanTailor)",
+            f"{self.ui.tr('Scan Tailor Projects')} (*.ScanTailor)",
         )
         if any(project_file):
             _LOG.info(f"Opening project: {project_file}")

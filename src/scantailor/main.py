@@ -5,7 +5,7 @@ from __future__ import annotations
 from PySide6 import QtCore, QtWidgets
 
 from .app._ui import resources_rc
-from .app.ui.MainWindow import MainWindow
+from .app.ui.MainWindow import MainWindowManager
 from .translations import load_translation
 
 assert resources_rc, "The import ensures we load in the resources for the rest of Qt."
@@ -23,7 +23,7 @@ def main() -> int:
     setup_qcore()
     app = QtWidgets.QApplication([])
     load_translation(app)
-    main_window = MainWindow()
+    main_window = MainWindowManager()
     main_window.show()
     return app.exec()
 
