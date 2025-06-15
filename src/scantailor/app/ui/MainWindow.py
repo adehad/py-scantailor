@@ -23,6 +23,8 @@ from PySide6.QtWidgets import (
 from scantailor.app.ui import UI_FOLDER, load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
 
+from .AboutDialog import AboutDialog
+
 
 class MainWindowManager:
     """Controller Class for the Main Application window for ScanTailor.
@@ -236,7 +238,8 @@ class MainWindowManager:
 
     def showAboutDialog(self) -> None:
         """Show about dialog."""
-        _LOG.info("Show about dialog")
+        _LOG.info("Show About Dialog")
+        AboutDialog(self.ui).show()
 
     def reloadCurrentPage(self) -> None:
         """Reload current page."""
