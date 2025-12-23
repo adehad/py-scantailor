@@ -119,3 +119,38 @@ Examples:
 - `Migrate binarization algorithms`
 - `Port page split filter`
 - `Add project JSON schema`
+
+## Code Review Focus
+
+CI/pre-commit already enforces: formatting, imports, type hint presence, docstring presence.
+
+**Reviewers should focus on what linters can't catch:**
+
+### Architecture & Design
+- Is this the right abstraction? Question over-engineering
+- Is this a C++ pattern that should be more Pythonic?
+- Filter classes must be stateless; Settings classes must be thread-safe
+- Are we using Python stdlib where C++ had manual implementations?
+
+### Thread Safety (Critical for filters/)
+- Settings with mutable state must use `threading.Lock`
+- Lock should protect minimal critical section only
+- Watch for: nested locks (deadlock), lock held during I/O or image processing
+
+### Image Processing (imageproc/)
+- Check dtype handling (uint8, float32, bool)
+- Avoid mutating input arrays - make copies when needed
+- Memory usage for large images
+- Document expected input/output dtypes in docstrings
+
+### Quality Checks
+- Docstring **content** helpful? (not just present)
+- Args descriptions meaningful, not restating parameter names?
+- Complex algorithms have WHY comments?
+- Magic numbers explained?
+
+### Test Quality
+- Test names describe scenario AND expected outcome?
+- Edge cases covered (empty, boundary, error)?
+- Assertions checking the right thing?
+- Avoid: no-assertion tests, exact float comparisons, duplicated tests
