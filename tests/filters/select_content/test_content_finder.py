@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from scantailor.filters.select_content import (
     ContentDetectionResult,

@@ -178,9 +178,7 @@ class Filter:
         self.set_params(page_id, params)
         return params
 
-    def set_manual_content(
-        self, page_id: PageId, content_box: ContentBox
-    ) -> Params:
+    def set_manual_content(self, page_id: PageId, content_box: ContentBox) -> Params:
         """Set content box manually.
 
         Args:
