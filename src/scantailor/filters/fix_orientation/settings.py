@@ -57,9 +57,7 @@ class Settings(BaseModel):
         with self._lock:
             return image_id in self.rotations
 
-    def apply_rotation(
-        self, image_id: ImageId, rotation: OrthogonalRotation
-    ) -> None:
+    def apply_rotation(self, image_id: ImageId, rotation: OrthogonalRotation) -> None:
         """Set the rotation for a single image.
 
         Args:
