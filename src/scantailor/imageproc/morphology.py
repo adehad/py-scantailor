@@ -38,7 +38,7 @@ def _get_structuring_element(
         "ellipse": cv2.MORPH_ELLIPSE,
         "cross": cv2.MORPH_CROSS,
     }
-    return cv2.getStructuringElement(shape_map[shape], size)
+    return np.asarray(cv2.getStructuringElement(shape_map[shape], size), dtype=np.uint8)
 
 
 def dilate(
@@ -59,7 +59,8 @@ def dilate(
         NDArray[np.uint8]: Dilated image.
     """
     kernel = _get_structuring_element(shape, kernel_size)
-    return cv2.dilate(image, kernel, iterations=iterations)
+    result = cv2.dilate(image, kernel, iterations=iterations)
+    return np.asarray(result, dtype=np.uint8)
 
 
 def erode(
@@ -80,7 +81,8 @@ def erode(
         NDArray[np.uint8]: Eroded image.
     """
     kernel = _get_structuring_element(shape, kernel_size)
-    return cv2.erode(image, kernel, iterations=iterations)
+    result = cv2.erode(image, kernel, iterations=iterations)
+    return np.asarray(result, dtype=np.uint8)
 
 
 def open_morph(
@@ -101,7 +103,8 @@ def open_morph(
         NDArray[np.uint8]: Opened image.
     """
     kernel = _get_structuring_element(shape, kernel_size)
-    return cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel)
+    result = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel)
+    return np.asarray(result, dtype=np.uint8)
 
 
 def close_morph(
@@ -122,4 +125,5 @@ def close_morph(
         NDArray[np.uint8]: Closed image.
     """
     kernel = _get_structuring_element(shape, kernel_size)
-    return cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
+    result = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
+    return np.asarray(result, dtype=np.uint8)

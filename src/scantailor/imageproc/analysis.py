@@ -92,7 +92,7 @@ def find_skew(
         binary = gray * 255
 
     # Reduce image size for faster processing
-    reduced = _reduce_image(binary, factor=2)
+    reduced = _reduce_image(np.asarray(binary, dtype=np.uint8), factor=2)
 
     # Phase 1: Coarse search with 1-degree steps
     coarse_step = 1.0
@@ -118,7 +118,7 @@ def find_skew(
 
     # Phase 2: Fine binary search around best angle
     # Use original (less reduced) image for fine search
-    fine_reduced = _reduce_image(binary, factor=1)
+    fine_reduced = _reduce_image(np.asarray(binary, dtype=np.uint8), factor=1)
     half_range = coarse_step / 2.0
 
     while half_range >= accuracy:
@@ -154,15 +154,18 @@ def _reduce_image(image: NDArray[np.uint8], factor: int) -> NDArray[np.uint8]:
     Returns:
         Reduced image.
     """
-    result = image
+    result: NDArray[np.uint8] = image.copy()
     for _ in range(factor):
         if result.shape[0] < 4 or result.shape[1] < 4:
             break
         # Use area interpolation for downscaling binary images
-        result = cv2.resize(
-            result,
-            (result.shape[1] // 2, result.shape[0] // 2),
-            interpolation=cv2.INTER_AREA,
+        result = np.asarray(
+            cv2.resize(
+                result,
+                (result.shape[1] // 2, result.shape[0] // 2),
+                interpolation=cv2.INTER_AREA,
+            ),
+            dtype=np.uint8,
         )
     return result
 
@@ -247,7 +250,7 @@ def _apply_shear(
         borderValue=0,
     )
 
-    return result
+    return np.asarray(result, dtype=np.uint8)
 
 
 def connected_components(
@@ -267,7 +270,15 @@ def connected_components(
         - stats: Stats matrix with columns [x, y, width, height, area]
         - centroids: Centroid matrix with columns [x, y]
     """
-    return cv2.connectedComponentsWithStats(image, connectivity=connectivity)
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+        image, connectivity=connectivity
+    )
+    return (
+        num_labels,
+        np.asarray(labels, dtype=np.int32),
+        np.asarray(stats, dtype=np.int32),
+        np.asarray(centroids, dtype=np.float64),
+    )
 
 
 def distance_transform(
@@ -291,4 +302,5 @@ def distance_transform(
         "l2": cv2.DIST_L2,
         "c": cv2.DIST_C,
     }
-    return cv2.distanceTransform(image, dist_types[distance_type], maskSize=5)
+    result = cv2.distanceTransform(image, dist_types[distance_type], maskSize=5)
+    return np.asarray(result, dtype=np.float32)

@@ -53,11 +53,11 @@ def rotate_orthogonal(
     if degrees == 0:
         return image.copy()
     if degrees == 90:
-        return cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+        return np.asarray(cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE), dtype=np.uint8)
     if degrees == 180:
-        return cv2.rotate(image, cv2.ROTATE_180)
+        return np.asarray(cv2.rotate(image, cv2.ROTATE_180), dtype=np.uint8)
     # 270 degrees
-    return cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    return np.asarray(cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE), dtype=np.uint8)
 
 
 def scale(
@@ -84,4 +84,5 @@ def scale(
         return image.copy()
 
     interp = _get_interpolation_flag(interpolation)
-    return cv2.resize(image, None, fx=scale_x, fy=scale_y, interpolation=interp)
+    result = cv2.resize(image, None, fx=scale_x, fy=scale_y, interpolation=interp)
+    return np.asarray(result, dtype=np.uint8)
