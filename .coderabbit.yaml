@@ -1,10 +1,17 @@
+---
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 language: en-US
-tone_instructions: ''
+
+# CRITICAL: Set architectural context for all reviews
+tone_instructions: "Senior engineer reviewing a C++ to Python migration. Be thorough, question C++ patterns, verify thread safety. Production-quality standards."
+
 early_access: false
 enable_free_tier: true
+
 reviews:
-  profile: chill
+  # Assertive profile for stricter enforcement during migration
+  profile: assertive
+
   request_changes_workflow: false
   high_level_summary: true
   high_level_summary_placeholder: '@coderabbitai summary'
@@ -24,14 +31,29 @@ reviews:
   auto_apply_labels: false
   suggested_reviewers: true
   auto_assign_reviewers: false
-  poem: true
+  poem: false
+
   labeling_instructions: []
-  path_filters: [
-    "!src/scantailor/app/_ui/**"
-  ]
-  path_instructions: []
+
+  path_filters:
+    - "!src/scantailor/app/_ui/**"
+    - "!**/*.pyc"
+    - "!**/__pycache__/**"
+    - "!dist/**"
+    - "!build/**"
+    - "!*.egg-info/**"
+
+  # All coding standards and review guidance are in AGENTS.md (single source of truth)
+  # CI handles: formatting, imports, type hints, docstring presence
+  path_instructions:
+    - path: "**/*.py"
+      instructions: |
+        Apply all guidelines from AGENTS.md in the repository root.
+        Focus on the "Code Review Focus" section - review what linters cannot catch.
+
   abort_on_close: true
   disable_cache: false
+
   auto_review:
     enabled: true
     auto_incremental_review: true
@@ -39,93 +61,74 @@ reviews:
     labels: []
     drafts: false
     base_branches: []
+
   finishing_touches:
     docstrings:
       enabled: true
     unit_tests:
       enabled: true
+
+  # TOOLS: Default is enabled=true for all tools
+  # Only specify tools we need to DISABLE or CONFIGURE
   tools:
     ast-grep:
-      rule_dirs: []
-      util_dirs: []
       essential_rules: true
-      packages: []
-    shellcheck:
-      enabled: true
+
     ruff:
       enabled: true
-    markdownlint:
-      enabled: true
-    github-checks:
-      enabled: true
-      timeout_ms: 90000
-    languagetool:
-      enabled: true
-      enabled_rules: []
-      disabled_rules: []
-      enabled_categories: []
-      disabled_categories: []
-      enabled_only: false
-      level: default
-    biome:
-      enabled: true
-    hadolint:
-      enabled: true
-    swiftlint:
-      enabled: true
-    phpstan:
-      enabled: true
-      level: default
-    golangci-lint:
-      enabled: true
-    yamllint:
-      enabled: true
-    gitleaks:
-      enabled: true
-    checkov:
-      enabled: true
-    detekt:
-      enabled: true
+      config_file: "pyproject.toml"
+
+    # DISABLE irrelevant language-specific tools
     eslint:
-      enabled: true
+      enabled: false
+    biome:
+      enabled: false
+    swiftlint:
+      enabled: false
+    phpstan:
+      enabled: false
+    golangci-lint:
+      enabled: false
+    detekt:
+      enabled: false
     rubocop:
-      enabled: true
+      enabled: false
     buf:
-      enabled: true
+      enabled: false
     regal:
-      enabled: true
-    actionlint:
-      enabled: true
+      enabled: false
     pmd:
-      enabled: true
+      enabled: false
     cppcheck:
-      enabled: true
-    semgrep:
-      enabled: true
-    circleci:
-      enabled: true
+      enabled: false
     clippy:
-      enabled: true
+      enabled: false
     sqlfluff:
-      enabled: true
+      enabled: false
     prismaLint:
-      enabled: true
-    pylint:
-      enabled: true
+      enabled: false
     oxc:
-      enabled: true
+      enabled: false
     shopifyThemeCheck:
-      enabled: true
+      enabled: false
     luacheck:
-      enabled: true
+      enabled: false
     brakeman:
-      enabled: true
-    dotenvLint:
-      enabled: true
+      enabled: false
     htmlhint:
-      enabled: true
-    checkmake:
-      enabled: true
+      enabled: false
+    hadolint:
+      enabled: false
+    checkov:
+      enabled: false
+    flake8:
+      enabled: false
+    circleci:
+      enabled: false
+
+# Implicitly enabled (defaults): pylint, gitleaks, yamllint, markdownlint,
+# languagetool, github-checks, semgrep, shellcheck, actionlint, checkmake, dotenvLint
+
 chat:
   auto_reply: true
   integrations:
@@ -133,6 +136,7 @@ chat:
       usage: auto
     linear:
       usage: auto
+
 knowledge_base:
   opt_out: false
   web_search:
@@ -149,6 +153,7 @@ knowledge_base:
     team_keys: []
   pull_requests:
     scope: auto
+
 code_generation:
   docstrings:
     language: en-US
