@@ -11,13 +11,27 @@ from scantailor.core.models import (
     PageId,
     SubPage,
 )
+from scantailor.core.project import (
+    DpiStatus,
+    ImageInfo,
+    ImageMetadata,
+    LayoutDirection,
+    PageInfo,
+    Project,
+)
 
 __all__ = [
-    "Dpi",
-    "ImageId",
-    "Margins",
+    Dpi.__name__,
+    DpiStatus.__name__,
+    ImageId.__name__,
+    ImageInfo.__name__,
+    ImageMetadata.__name__,
+    "LayoutDirection",
+    Margins.__name__,
     "OrthogonalDegrees",
-    "OrthogonalRotation",
-    "PageId",
-    "SubPage",
+    OrthogonalRotation.__name__,
+    PageId.__name__,
+    PageInfo.__name__,
+    Project.__name__,
+    SubPage.__name__,
 ]
