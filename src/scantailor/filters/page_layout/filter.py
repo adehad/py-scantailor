@@ -132,9 +132,7 @@ class Filter:
         """
         self.set_margins(page_id, Margins.uniform(margin_mm))
 
-    def apply_to_pages(
-        self, page_ids: list[PageId], params: Params
-    ) -> None:
+    def apply_to_pages(self, page_ids: list[PageId], params: Params) -> None:
         """Apply parameters to multiple pages.
 
         Args:
@@ -143,9 +141,7 @@ class Filter:
         """
         self._settings.apply_params_to_pages(page_ids, params)
 
-    def apply_margins_to_pages(
-        self, page_ids: list[PageId], margins: Margins
-    ) -> None:
+    def apply_margins_to_pages(self, page_ids: list[PageId], margins: Margins) -> None:
         """Apply margins to multiple pages.
 
         Args:
