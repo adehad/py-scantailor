@@ -57,3 +57,48 @@ def binarize_sauvola(
     threshold = threshold_sauvola(image, window_size=window_size, k=k)
     binary = (image > threshold).astype(np.uint8) * 255
     return binary
+
+
+def binarize_wolf(
+    image: NDArray[np.uint8],
+    window_size: int = 25,
+    k: float = 0.5,
+) -> NDArray[np.uint8]:
+    """Binarize an image using Wolf's adaptive thresholding.
+
+    Wolf's method is a modification of Sauvola's that uses the minimum
+    and maximum grayscale values in addition to mean and standard deviation.
+    It's more robust for low-contrast images.
+
+    Args:
+        image (NDArray[np.uint8]): Grayscale input image.
+        window_size (int): Size of the local window (must be odd).
+        k (float): Sensitivity parameter (typically 0.3-0.5).
+
+    Returns:
+        NDArray[np.uint8]: Binary image (0 or 255).
+    """
+    # Ensure window_size is odd
+    if window_size % 2 == 0:
+        window_size += 1
+
+    # Compute local mean using box filter
+    mean = cv2.blur(image.astype(np.float64), (window_size, window_size))
+
+    # Compute local standard deviation
+    sq_mean = cv2.blur((image.astype(np.float64)) ** 2, (window_size, window_size))
+    std = np.sqrt(np.maximum(sq_mean - mean**2, 0))
+
+    # Get min value of image
+    min_val = float(np.min(image))
+
+    # Get max standard deviation
+    max_std = float(np.max(std))
+    if max_std < 1e-6:
+        max_std = 1.0
+
+    # Wolf's formula: T = (1-k)*mean + k*min + k*(std/max_std)*(mean - min)
+    threshold = (1 - k) * mean + k * min_val + k * (std / max_std) * (mean - min_val)
+
+    binary = (image > threshold).astype(np.uint8) * 255
+    return binary
