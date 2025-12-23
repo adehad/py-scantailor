@@ -149,10 +149,7 @@ def _remove_shadows(binary: NDArray[np.uint8]) -> NDArray[np.uint8]:
     return np.asarray(result, dtype=np.uint8)
 
 
-
-def _despeckle(
-    binary: NDArray[np.uint8], min_area: int = 50
-) -> NDArray[np.uint8]:
+def _despeckle(binary: NDArray[np.uint8], min_area: int = 50) -> NDArray[np.uint8]:
     """Remove small noise specks from a binary image."""
     # Find connected components
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(

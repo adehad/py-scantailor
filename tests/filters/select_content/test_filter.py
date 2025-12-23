@@ -203,7 +203,9 @@ class TestFilterProcess:
         image = np.zeros((200, 300), dtype=np.uint8)
 
         # Pre-set to disabled
-        filter.set_params(page_id, Params(page_detection_mode=PageDetectionMode.DISABLED))
+        filter.set_params(
+            page_id, Params(page_detection_mode=PageDetectionMode.DISABLED)
+        )
 
         result = filter.process(image, page_id)
 
@@ -273,7 +275,10 @@ class TestFilterManualOperations:
         filter.set_manual_content(page_id, ContentBox(x=10, y=10, width=50, height=50))
         filter.reset_content_to_auto(page_id)
 
-        assert filter.get_params(page_id).content_detection_mode == ContentDetectionMode.AUTO
+        assert (
+            filter.get_params(page_id).content_detection_mode
+            == ContentDetectionMode.AUTO
+        )
 
     def test_reset_page_to_auto(self):
         """reset_page_to_auto should set AUTO mode."""
@@ -292,7 +297,10 @@ class TestFilterManualOperations:
 
         filter.disable_content_detection(page_id)
 
-        assert filter.get_params(page_id).content_detection_mode == ContentDetectionMode.DISABLED
+        assert (
+            filter.get_params(page_id).content_detection_mode
+            == ContentDetectionMode.DISABLED
+        )
 
     def test_disable_page_detection(self):
         """disable_page_detection should set DISABLED mode."""
@@ -301,7 +309,9 @@ class TestFilterManualOperations:
 
         filter.disable_page_detection(page_id)
 
-        assert filter.get_params(page_id).page_detection_mode == PageDetectionMode.DISABLED
+        assert (
+            filter.get_params(page_id).page_detection_mode == PageDetectionMode.DISABLED
+        )
 
     def test_get_content_box(self):
         """get_content_box should return the content box."""

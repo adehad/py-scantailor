@@ -93,9 +93,7 @@ class Params(BaseModel):
 
     def with_auto_page(self) -> Params:
         """Return new params with page detection set to AUTO."""
-        return self.model_copy(
-            update={"page_detection_mode": PageDetectionMode.AUTO}
-        )
+        return self.model_copy(update={"page_detection_mode": PageDetectionMode.AUTO})
 
     def with_disabled_content(self) -> Params:
         """Return new params with content detection disabled."""

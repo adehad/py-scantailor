@@ -163,9 +163,7 @@ class PageBox(BaseModel):
         return (self.x, self.y, self.width, self.height)
 
     @classmethod
-    def from_ltrb(
-        cls, left: float, top: float, right: float, bottom: float
-    ) -> PageBox:
+    def from_ltrb(cls, left: float, top: float, right: float, bottom: float) -> PageBox:
         """Create a box from left, top, right, bottom coordinates."""
         return cls(x=left, y=top, width=right - left, height=bottom - top)
 
