@@ -8,7 +8,6 @@ from scantailor.core import ImageId, PageId, SubPage
 from scantailor.filters.select_content import (
     ContentBox,
     ContentDetectionMode,
-    PageBox,
     Params,
     Settings,
 )
