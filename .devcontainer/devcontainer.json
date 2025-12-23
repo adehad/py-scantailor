@@ -33,20 +33,12 @@
 						"color": "#ff000065"
 					}
 				],
-				"mypy-type-checker.args": [
-					// "--follow-imports=silent",
-					"--ignore-missing-imports",
-					"--show-column-numbers",
-					"--no-pretty",
-					"--show-error-codes"
-				],
 				"files.exclude": {
 					"**/__pycache__": true,
 					"**/*.egg": true,
 					"**/*.egg-info/": true,
 					"**/*.eggs": true,
 					"**/*.pyc": true,
-					"**/.mypy_cache": true,
 					"**/.pytest_cache": true
 				},
 				"search.exclude": {
