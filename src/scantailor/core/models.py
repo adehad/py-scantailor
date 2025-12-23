@@ -62,6 +62,7 @@ class ImageId(BaseModel, frozen=True):
         return self.page - 1 if self.page > 0 else 0
 
     def __hash__(self) -> int:
+        """Return hash for use in sets and dicts."""
         return hash((self.file_path, self.page))
 
 
@@ -73,6 +74,7 @@ class SubPage(IntEnum):
     RIGHT_PAGE = 2
 
     def __str__(self) -> str:
+        """Return string representation (e.g., 'left-page')."""
         return self.name.lower().replace("_", "-")
 
     @classmethod
@@ -101,6 +103,7 @@ class PageId(BaseModel, frozen=True):
         return self.image_id.is_null()
 
     def __hash__(self) -> int:
+        """Return hash for use in sets and dicts."""
         return hash((self.image_id, self.sub_page))
 
     def __lt__(self, other: PageId) -> bool:
@@ -161,7 +164,11 @@ class OrthogonalRotation(BaseModel):
         return (width, height)
 
     def unrotate_dimensions(self, width: float, height: float) -> tuple[float, float]:
-        """Reverse rotation on dimensions, returning (original_width, original_height)."""
+        """Reverse rotation on dimensions.
+
+        Returns:
+            tuple[float, float]: The (original_width, original_height).
+        """
         return self.rotate_dimensions(width, height)
 
     def rotate_point(
