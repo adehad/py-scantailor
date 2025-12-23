@@ -33,7 +33,7 @@ def parse_xml_project(path: Path, content: str) -> Project:
         ValueError: If the XML is invalid or missing required elements.
     """
     # Import here to avoid circular imports
-    from scantailor.core.project import ImageInfo, ImageMetadata, Project
+    from scantailor.core.project import Project
 
     root = ET.fromstring(content)
 
@@ -174,7 +174,7 @@ def _parse_image_element(
     Returns:
         ImageInfo | None: The parsed image info, or None if invalid.
     """
-    from scantailor.core.project import ImageInfo, ImageMetadata
+    from scantailor.core.project import ImageInfo
 
     file_id = _parse_int_attr(image_el, "fileId")
     file_image = _parse_int_attr(image_el, "fileImage") or 0

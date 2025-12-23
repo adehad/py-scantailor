@@ -7,14 +7,13 @@ Handles loading, saving, and managing ScanTailor projects. Supports:
 
 from __future__ import annotations
 
-import json
 from enum import IntEnum
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from scantailor.core.models import Dpi, ImageId, Margins, PageId, SubPage
+from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 
 LayoutDirection = Literal["LTR", "RTL"]
 
@@ -147,14 +146,24 @@ class Project(BaseModel):
             else:
                 # Two pages
                 if self.layout_direction == "LTR":
-                    pages.append(PageId(image_id=image_info.id, sub_page=SubPage.LEFT_PAGE))
-                    pages.append(PageId(image_id=image_info.id, sub_page=SubPage.RIGHT_PAGE))
+                    pages.append(
+                        PageId(image_id=image_info.id, sub_page=SubPage.LEFT_PAGE)
+                    )
+                    pages.append(
+                        PageId(image_id=image_info.id, sub_page=SubPage.RIGHT_PAGE)
+                    )
                 else:  # RTL
-                    pages.append(PageId(image_id=image_info.id, sub_page=SubPage.RIGHT_PAGE))
-                    pages.append(PageId(image_id=image_info.id, sub_page=SubPage.LEFT_PAGE))
+                    pages.append(
+                        PageId(image_id=image_info.id, sub_page=SubPage.RIGHT_PAGE)
+                    )
+                    pages.append(
+                        PageId(image_id=image_info.id, sub_page=SubPage.LEFT_PAGE)
+                    )
         return pages
 
-    def add_image(self, image_id: ImageId, metadata: ImageMetadata | None = None) -> ImageInfo:
+    def add_image(
+        self, image_id: ImageId, metadata: ImageMetadata | None = None
+    ) -> ImageInfo:
         """Add an image to the project.
 
         Args:
