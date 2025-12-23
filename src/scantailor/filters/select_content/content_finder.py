@@ -79,7 +79,7 @@ def find_content_box(
     )
 
     # Remove shadows using morphological operations
-    binary = _remove_shadows(binary)
+    binary = _remove_shadows(np.asarray(binary, dtype=np.uint8))
 
     # Despeckle to remove noise
     binary = _despeckle(binary, min_area=50)
@@ -146,7 +146,8 @@ def _remove_shadows(binary: NDArray[np.uint8]) -> NDArray[np.uint8]:
     # Subtract shadows from binary
     result = cv2.subtract(binary, shadows)
 
-    return result
+    return np.asarray(result, dtype=np.uint8)
+
 
 
 def _despeckle(
