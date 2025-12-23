@@ -7,7 +7,11 @@ soft margins (to align pages with each other).
 
 from __future__ import annotations
 
-from scantailor.filters.page_layout.alignment import Alignment, HorizontalAlignment, VerticalAlignment
+from scantailor.filters.page_layout.alignment import (
+    Alignment,
+    HorizontalAlignment,
+    VerticalAlignment,
+)
 from scantailor.filters.page_layout.filter import Filter
 from scantailor.filters.page_layout.params import Params
 from scantailor.filters.page_layout.settings import Settings
