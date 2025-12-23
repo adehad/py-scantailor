@@ -69,9 +69,7 @@ class Settings(BaseModel):
         with self._lock:
             self.params[page_id] = params
 
-    def set_angle(
-        self, page_id: PageId, angle: float, mode: str | None = None
-    ) -> None:
+    def set_angle(self, page_id: PageId, angle: float, mode: str | None = None) -> None:
         """Set just the deskew angle for a page.
 
         Args:
@@ -82,15 +80,11 @@ class Settings(BaseModel):
         """
         from scantailor.filters.deskew.params import AutoManualMode
 
-        actual_mode = (
-            AutoManualMode(mode) if mode else AutoManualMode.MANUAL
-        )
+        actual_mode = AutoManualMode(mode) if mode else AutoManualMode.MANUAL
         with self._lock:
             self.params[page_id] = Params(deskew_angle_deg=angle, mode=actual_mode)
 
-    def apply_params_to_pages(
-        self, page_ids: Iterable[PageId], params: Params
-    ) -> None:
+    def apply_params_to_pages(self, page_ids: Iterable[PageId], params: Params) -> None:
         """Set the parameters for multiple pages.
 
         Args:
