@@ -90,9 +90,7 @@ class Settings(BaseModel):
             existing = self.params.get(page_id, Params())
             self.params[page_id] = existing.with_alignment(alignment)
 
-    def apply_params_to_pages(
-        self, page_ids: Iterable[PageId], params: Params
-    ) -> None:
+    def apply_params_to_pages(self, page_ids: Iterable[PageId], params: Params) -> None:
         """Set the parameters for multiple pages.
 
         Args:

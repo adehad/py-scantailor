@@ -92,7 +92,9 @@ class Params(BaseModel):
         Returns:
             New Params instance with updated margins.
         """
-        return self.model_copy(update={"hard_margins_mm": margins, "auto_margins": False})
+        return self.model_copy(
+            update={"hard_margins_mm": margins, "auto_margins": False}
+        )
 
     def with_alignment(self, alignment: Alignment) -> Params:
         """Return a new Params with updated alignment.
