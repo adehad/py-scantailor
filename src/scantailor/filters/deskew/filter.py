@@ -150,7 +150,7 @@ class Filter:
 
         # Convert to grayscale if needed
         if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            gray = np.asarray(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), dtype=np.uint8)
         else:
             gray = image
 
@@ -264,4 +264,4 @@ class Filter:
             borderValue=border_value,
         )
 
-        return rotated
+        return np.asarray(rotated, dtype=np.uint8)
