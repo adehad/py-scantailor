@@ -186,9 +186,7 @@ class Filter:
         """
         self._settings.set_params(page_id, Params())
 
-    def apply_to_pages(
-        self, page_ids: list[PageId], params: Params
-    ) -> None:
+    def apply_to_pages(self, page_ids: list[PageId], params: Params) -> None:
         """Apply parameters to multiple pages.
 
         Args:
