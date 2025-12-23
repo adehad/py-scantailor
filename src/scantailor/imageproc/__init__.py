@@ -16,6 +16,7 @@ from scantailor.imageproc.analysis import (
 from scantailor.imageproc.binarize import (
     binarize_otsu,
     binarize_sauvola,
+    binarize_wolf,
 )
 from scantailor.imageproc.geometry import (
     rotate_orthogonal,
@@ -26,6 +27,7 @@ from scantailor.imageproc.morphology import (
     dilate,
     erode,
     open_morph,
+    remove_small_components,
 )
 
 __all__ = [
@@ -37,6 +39,7 @@ __all__ = [
     # Binarization
     binarize_otsu.__name__,
     binarize_sauvola.__name__,
+    binarize_wolf.__name__,
     # Geometry
     rotate_orthogonal.__name__,
     scale.__name__,
@@ -45,4 +48,5 @@ __all__ = [
     dilate.__name__,
     erode.__name__,
     open_morph.__name__,
+    remove_small_components.__name__,
 ]
