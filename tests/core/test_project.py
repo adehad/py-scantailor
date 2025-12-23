@@ -48,7 +48,9 @@ class TestImageMetadata:
         assert metadata.is_dpi_ok() is True
 
     def test_dpi_status_undefined(self):
-        metadata = ImageMetadata(width=100, height=100, dpi=Dpi(horizontal=0, vertical=0))
+        metadata = ImageMetadata(
+            width=100, height=100, dpi=Dpi(horizontal=0, vertical=0)
+        )
         assert metadata.horizontal_dpi_status() == DpiStatus.UNDEFINED
         assert metadata.is_dpi_ok() is False
 
@@ -154,9 +156,7 @@ class TestProject:
     def test_get_pages_two_page_images_ltr(self):
         project = Project(layout_direction="LTR")
         image_id = ImageId(file_path=Path("/scan.tiff"))
-        project.images.append(
-            ImageInfo(id=image_id, num_sub_pages=2)
-        )
+        project.images.append(ImageInfo(id=image_id, num_sub_pages=2))
 
         pages = project.get_pages()
         assert len(pages) == 2
@@ -166,9 +166,7 @@ class TestProject:
     def test_get_pages_two_page_images_rtl(self):
         project = Project(layout_direction="RTL")
         image_id = ImageId(file_path=Path("/scan.tiff"))
-        project.images.append(
-            ImageInfo(id=image_id, num_sub_pages=2)
-        )
+        project.images.append(ImageInfo(id=image_id, num_sub_pages=2))
 
         pages = project.get_pages()
         assert len(pages) == 2
