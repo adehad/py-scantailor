@@ -71,9 +71,7 @@ class Filter:
         """
         return self._settings.get_rotation_for(image_id)
 
-    def set_rotation(
-        self, image_id: ImageId, rotation: OrthogonalRotation
-    ) -> None:
+    def set_rotation(self, image_id: ImageId, rotation: OrthogonalRotation) -> None:
         """Set the rotation for an image.
 
         Args:
