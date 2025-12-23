@@ -29,7 +29,7 @@ def binarize_otsu(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
         NDArray[np.uint8]: Binary image (0 or 255).
     """
     _, binary = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    return binary
+    return np.asarray(binary, dtype=np.uint8)
 
 
 def binarize_sauvola(
