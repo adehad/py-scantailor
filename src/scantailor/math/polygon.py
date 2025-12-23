@@ -273,6 +273,7 @@ def _segments_intersect(
     Returns:
         bool: True if segments intersect, False otherwise.
     """
+
     # Using the orientation method
     def orientation(
         a: NDArray[np.floating], b: NDArray[np.floating], c: NDArray[np.floating]
@@ -291,10 +292,9 @@ def _segments_intersect(
         a: NDArray[np.floating], b: NDArray[np.floating], c: NDArray[np.floating]
     ) -> bool:
         """Check if point b lies on segment ac (assumes collinear)."""
-        return (
-            min(a[0], c[0]) <= b[0] <= max(a[0], c[0])
-            and min(a[1], c[1]) <= b[1] <= max(a[1], c[1])
-        )
+        return min(a[0], c[0]) <= b[0] <= max(a[0], c[0]) and min(a[1], c[1]) <= b[
+            1
+        ] <= max(a[1], c[1])
 
     o1 = orientation(p1, p2, p3)
     o2 = orientation(p1, p2, p4)

@@ -329,9 +329,7 @@ class LineSegment(BaseModel):
         return self.point_at(t)
 
 
-def point_to_line_distance(
-    point: NDArray[np.floating], line: Line2D
-) -> float:
+def point_to_line_distance(point: NDArray[np.floating], line: Line2D) -> float:
     """Calculate perpendicular distance from a point to a line.
 
     Args:
