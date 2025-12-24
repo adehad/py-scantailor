@@ -14,6 +14,7 @@ from scantailor.imageproc.analysis import (
     find_skew,
 )
 from scantailor.imageproc.binarize import (
+    binarize_bradley,
     binarize_otsu,
     binarize_sauvola,
     binarize_wolf,
@@ -37,6 +38,7 @@ __all__ = [
     distance_transform.__name__,
     find_skew.__name__,
     # Binarization
+    binarize_bradley.__name__,
     binarize_otsu.__name__,
     binarize_sauvola.__name__,
     binarize_wolf.__name__,

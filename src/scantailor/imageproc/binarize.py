@@ -102,3 +102,45 @@ def binarize_wolf(
 
     binary = (image > threshold).astype(np.uint8) * 255
     return binary
+
+
+def binarize_bradley(
+    image: NDArray[np.uint8],
+    window_size: int = 25,
+    k: float = 0.15,
+) -> NDArray[np.uint8]:
+    """Binarize an image using Bradley's adaptive thresholding.
+
+    Bradley's method computes a local threshold based only on the mean
+    within a window. A pixel is set to black if it's sufficiently darker
+    than the local mean. Simple and fast, works well for clean documents.
+
+    The threshold at each pixel is: mean * (1 - k)
+    Pixels below this threshold are classified as foreground (black).
+
+    Args:
+        image: Grayscale input image.
+        window_size: Size of the local window (must be odd).
+        k: Sensitivity parameter (0-1). Higher values make it
+            easier for pixels to be classified as foreground (black).
+            Typically 0.1-0.2.
+
+    Returns:
+        Binary image (0 or 255).
+    """
+    # Ensure window_size is odd
+    if window_size % 2 == 0:
+        window_size += 1
+
+    # Compute local mean using box filter (efficient via integral image internally)
+    local_mean = cv2.blur(image.astype(np.float64), (window_size, window_size))
+
+    # Bradley threshold: pixel < mean * (1 - k) -> black
+    # For k >= 1, threshold is 0 (everything white except pure black)
+    if k >= 1.0:
+        threshold = np.zeros_like(local_mean)
+    else:
+        threshold = local_mean * (1.0 - k)
+
+    binary = (image >= threshold).astype(np.uint8) * 255
+    return binary
