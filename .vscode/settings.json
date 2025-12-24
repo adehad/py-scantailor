@@ -13,5 +13,21 @@
         "**/src/scantailor/**/*.ui": "xml",
         "**/*.spec": "python",
         "**/pdm.lock": "toml",
-    }
+    },
+    "cSpell.words": [
+        "docstrings",
+        "isort",
+        "loguru",
+        "numpy",
+        "opencv",
+        "pydantic",
+        "pydocstyle",
+        "pyinstaller",
+        "pyproject",
+        "pyrefly",
+        "pytest",
+        "scantailor",
+        "scikit",
+        "scipy"
+    ]
 }

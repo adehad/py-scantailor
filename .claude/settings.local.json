@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pre-commit run:*)",
+      "Bash(pdm run pytest:*)",
+      "Bash(dir:*)",
+      "Bash(pdm run typecheck:*)",
+      "Bash(cat:*)",
+      "Bash(pdm run ruff:*)",
+      "Bash(pdm run pre-commit run:*)"
+    ]
+  }
+}

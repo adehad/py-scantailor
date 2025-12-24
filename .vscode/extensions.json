@@ -1,0 +1,20 @@
+{
+    "recommendations": [
+        "njpwerner.autodocstring",
+        "aaron-bond.better-comments",
+        "charliermarsh.ruff",
+        "GitHub.vscode-github-actions",
+        "hbenl.vscode-test-explorer",
+        "littlefoxteam.vscode-python-test-adapter",
+        "ms-azuretools.vscode-containers",
+        "ms-python.python",
+        "ms-vscode-remote.remote-containers",
+        "mutantdino.resourcemonitor",
+        "njpwerner.autodocstring",
+        "tamasfe.even-better-toml",
+        "trond-snekvik.simple-rst",
+        "usernamehw.errorlens",
+        "wayou.vscode-todo-highlight",
+        "yzhang.markdown-all-in-one",
+    ]
+}
