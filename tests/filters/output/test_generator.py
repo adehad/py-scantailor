@@ -117,6 +117,38 @@ class TestGenerateOutput:
 
         assert result.is_binary is True
 
+    def test_bradley_binarization(self):
+        """Bradley binarization produces binary output."""
+        image = np.zeros((100, 100), dtype=np.uint8)
+        image[:50, :] = 200
+        image[50:, :] = 50
+
+        params = Params(
+            color_mode=ColorMode.BLACK_AND_WHITE,
+            binarization=BinarizationOptions(method=BinarizationMethod.BRADLEY),
+        )
+        result = generate_output(image, params)
+
+        assert result.is_binary is True
+        unique = np.unique(result.image)
+        assert len(unique) <= 2
+
+    def test_edgediv_binarization(self):
+        """EdgeDiv binarization produces binary output."""
+        image = np.zeros((100, 100), dtype=np.uint8)
+        image[:50, :] = 200
+        image[50:, :] = 50
+
+        params = Params(
+            color_mode=ColorMode.BLACK_AND_WHITE,
+            binarization=BinarizationOptions(method=BinarizationMethod.EDGEDIV),
+        )
+        result = generate_output(image, params)
+
+        assert result.is_binary is True
+        unique = np.unique(result.image)
+        assert len(unique) <= 2
+
     def test_despeckle_off(self):
         """Despeckle off leaves small components."""
         image = np.full((100, 100), 200, dtype=np.uint8)
