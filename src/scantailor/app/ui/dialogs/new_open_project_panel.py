@@ -8,8 +8,10 @@ from typing import ClassVar
 from PySide6 import QtWidgets
 from PySide6.QtCore import Signal
 
-from scantailor.app.ui import UI_FOLDER, load_ui_widget
+from scantailor.app.ui import load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
+
+_UI_FOLDER = Path(__file__).parent
 
 
 class NewOpenProjectPanel(QtWidgets.QWidget):
@@ -49,7 +51,7 @@ class NewOpenProjectPanel(QtWidgets.QWidget):
         self._recent_buttons: list[QtWidgets.QPushButton] = []
 
         # Load UI
-        self.ui = load_ui_widget(UI_FOLDER / "NewOpenProjectPanel.ui", self)
+        self.ui = load_ui_widget(_UI_FOLDER / "NewOpenProjectPanel.ui", self)
         self._setup_widgets()
         self._populate_recent_projects()
         self._connect_signals()
