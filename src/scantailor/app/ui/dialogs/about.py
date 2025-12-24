@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6 import QtCore, QtWidgets
 
 from scantailor import __about__
-from scantailor.app.ui import UI_FOLDER, load_ui_widget
+from scantailor.app.ui import load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
+
+_UI_FOLDER = Path(__file__).parent
 
 
 class AboutDialog(QtWidgets.QDialog):
@@ -15,7 +19,7 @@ class AboutDialog(QtWidgets.QDialog):
     def __init__(self, parent: QtWidgets.QWidget | None = None):
         """Initialize."""
         super().__init__(parent)
-        self.ui = load_ui_widget(UI_FOLDER / "AboutDialog.ui", self)
+        self.ui = load_ui_widget(_UI_FOLDER / "AboutDialog.ui", self)
         self.version_label = get_cwidget(self.ui, QtWidgets.QLabel, "version")
         self.license_viewer = get_cwidget(
             self.ui, QtWidgets.QTextBrowser, "licenseViewer"
