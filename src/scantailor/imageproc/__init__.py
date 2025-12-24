@@ -8,6 +8,8 @@ without wrapper classes.
 from __future__ import annotations
 
 from scantailor.imageproc.analysis import (
+    DEFAULT_COARSE_STEP,
+    DEFAULT_MAX_ANGLE,
     SkewResult,
     connected_components,
     distance_transform,
@@ -69,6 +71,8 @@ from scantailor.imageproc.utils import (
 
 __all__ = [
     # Analysis
+    "DEFAULT_COARSE_STEP",
+    "DEFAULT_MAX_ANGLE",
     SkewResult.__name__,
     connected_components.__name__,
     distance_transform.__name__,
