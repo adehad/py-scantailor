@@ -42,15 +42,23 @@ from scantailor.dewarping.polyline_intersector import (
     PolylineIntersector,
     project_point_to_line,
 )
+from scantailor.dewarping.raster_dewarper import (
+    InterpolationMethod,
+    compute_dewarped_size,
+    dewarp_image,
+)
 
 __all__ = [
     "ArcLengthMapper",
+    "compute_dewarped_size",
     "create_distortion_model",
     "create_distortion_model_from_splines",
     "Curve",
     "CylindricalSurfaceDewarper",
+    "dewarp_image",
     "DistortionModel",
     "Generatrix",
+    "InterpolationMethod",
     "PolylineIntersector",
     "project_point_to_line",
 ]

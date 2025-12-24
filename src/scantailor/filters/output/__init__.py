@@ -7,6 +7,7 @@ generating output images with binarization, despeckling, and other processing.
 from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode
 from .despeckle import DespeckleLevel
+from .dewarping_options import DewarpingMode, DewarpingOptions
 from .filter import Filter
 from .generator import OutputResult, generate_output
 from .params import Params
@@ -18,6 +19,8 @@ __all__ = [
     "BinarizationOptions",
     "ColorMode",
     "DespeckleLevel",
+    "DewarpingMode",
+    "DewarpingOptions",
     "Filter",
     "OutputResult",
     "Params",
