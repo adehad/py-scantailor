@@ -19,12 +19,17 @@ from scantailor.core.project import (
     PageInfo,
     Project,
 )
+from scantailor.core.stage_sequence import (
+    FilterStage,
+    StageSequence,
+)
 from scantailor.core.transformation import (
     ImageTransformation,
     Rect,
 )
 
 __all__ = [
+    FilterStage.__name__,
     Dpi.__name__,
     DpiStatus.__name__,
     ImageId.__name__,
@@ -39,5 +44,6 @@ __all__ = [
     PageInfo.__name__,
     Project.__name__,
     Rect.__name__,
+    StageSequence.__name__,
     SubPage.__name__,
 ]
