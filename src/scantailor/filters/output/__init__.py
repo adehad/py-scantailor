@@ -10,6 +10,7 @@ from .despeckle import DespeckleLevel
 from .filter import Filter
 from .generator import OutputResult, generate_output
 from .params import Params
+from .render_params import RenderParams, SplittingOptions
 from .settings import Settings
 
 __all__ = [
@@ -20,6 +21,8 @@ __all__ = [
     "Filter",
     "OutputResult",
     "Params",
+    "RenderParams",
     "Settings",
+    "SplittingOptions",
     "generate_output",
 ]
