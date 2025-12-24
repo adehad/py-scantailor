@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from scantailor.imageproc import (
+    DEFAULT_COARSE_STEP,
     SkewResult,
     connected_components,
     distance_transform,
@@ -80,12 +81,23 @@ class TestFindSkew:
         assert hasattr(result, "confidence")
 
     def test_respects_max_angle(self):
-        """Detected angle should not exceed max_angle."""
-        image = np.random.randint(0, 256, (100, 100), dtype=np.uint8)
+        """Coarse search is limited to max_angle, fine search can extend slightly.
 
-        result = find_skew(image, max_angle=5.0)
+        The algorithm searches coarsely within [-max_angle, +max_angle], then
+        does fine binary search that can extend up to coarse_step/2 beyond the
+        boundary to find the true optimum. This matches C++ SkewFinder behavior.
+        """
+        # Create an image with diagonal lines that would suggest a large skew
+        image = np.zeros((100, 100), dtype=np.uint8)
+        for i in range(100):
+            x = min(99, i + 20)  # Diagonal offset suggesting ~11° skew
+            image[i, x] = 255
 
-        assert abs(result.angle) <= 5.0
+        max_angle = 5.0
+        result = find_skew(image, max_angle=max_angle)
+
+        # Fine search can extend coarse_step/2 beyond max_angle
+        assert abs(result.angle) <= max_angle + DEFAULT_COARSE_STEP / 2
 
     def test_min_angle_threshold(self):
         """Angles smaller than min_angle should return 0."""
