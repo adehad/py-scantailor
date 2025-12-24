@@ -11,6 +11,7 @@ Reference:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -607,7 +608,7 @@ class XSpline:
             a[3] = _HBlendFunc(tdp.q[3]).value(u3)
 
         # Normalize
-        total = sum(a)
+        total = float(sum(a))
         if abs(total) > 1e-10:
             a = [x / total for x in a]
 
@@ -716,7 +717,7 @@ class XSpline:
                 dda[3] = h.second_derivative(u) * (ta * dt_dT) ** 2
 
         # Normalize and compute derivative coefficients
-        total = sum(a)
+        total = float(sum(a))
         total2 = total * total
         total4 = total2 * total2
         d_total = sum(da)
@@ -811,7 +812,7 @@ class XSpline:
 
     def _maybe_add_more_samples(
         self,
-        sink: callable,
+        sink: Callable,
         max_sqdist_to_spline: float,
         max_sqdist_between_samples: float,
         num_segments: int,
