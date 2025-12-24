@@ -11,6 +11,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from scantailor.imageproc import (
+    binarize_bradley,
+    binarize_edge_div,
     binarize_otsu,
     binarize_sauvola,
     binarize_wolf,
@@ -167,11 +169,24 @@ def _binarize(
             window_size=options.window_size,
             k=options.sauvola_coef,
         )
-    # Wolf method
-    return binarize_wolf(
+    if options.method == BinarizationMethod.WOLF:
+        return binarize_wolf(
+            adjusted,
+            window_size=options.window_size,
+            k=options.wolf_coef,
+        )
+    if options.method == BinarizationMethod.BRADLEY:
+        return binarize_bradley(
+            adjusted,
+            window_size=options.window_size,
+            k=options.bradley_coef,
+        )
+    # EdgeDiv method
+    return binarize_edge_div(
         adjusted,
         window_size=options.window_size,
-        k=options.wolf_coef,
+        kep=options.edge_div_kep,
+        kbd=options.edge_div_kbd,
     )
 
 
