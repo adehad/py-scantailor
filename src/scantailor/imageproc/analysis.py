@@ -304,3 +304,126 @@ def distance_transform(
     }
     result = cv2.distanceTransform(image, dist_types[distance_type], maskSize=5)
     return np.asarray(result, dtype=np.float32)
+
+
+def hough_lines(
+    image: NDArray[np.uint8],
+    rho: float = 1.0,
+    theta: float = np.pi / 180,
+    threshold: int = 100,
+) -> NDArray[np.float32] | None:
+    """Detect lines in a binary image using the standard Hough transform.
+
+    Args:
+        image: Binary edge image (e.g., from Canny).
+        rho: Distance resolution in pixels.
+        theta: Angle resolution in radians.
+        threshold: Accumulator threshold (minimum votes for a line).
+
+    Returns:
+        Array of lines as (rho, theta) pairs, or None if no lines found.
+    """
+    lines = cv2.HoughLines(image, rho, theta, threshold)
+    if lines is None:
+        return None
+    return np.asarray(lines, dtype=np.float32)
+
+
+def hough_lines_p(
+    image: NDArray[np.uint8],
+    rho: float = 1.0,
+    theta: float = np.pi / 180,
+    threshold: int = 50,
+    min_line_length: float = 50,
+    max_line_gap: float = 10,
+) -> NDArray[np.int32] | None:
+    """Detect line segments using the probabilistic Hough transform.
+
+    Args:
+        image: Binary edge image (e.g., from Canny).
+        rho: Distance resolution in pixels.
+        theta: Angle resolution in radians.
+        threshold: Accumulator threshold (minimum votes for a line).
+        min_line_length: Minimum line length to accept.
+        max_line_gap: Maximum gap between line segments to merge.
+
+    Returns:
+        Array of line segments as (x1, y1, x2, y2), or None if no lines found.
+    """
+    lines = cv2.HoughLinesP(
+        image,
+        rho,
+        theta,
+        threshold,
+        minLineLength=min_line_length,
+        maxLineGap=max_line_gap,
+    )
+    if lines is None:
+        return None
+    return np.asarray(lines, dtype=np.int32).reshape(-1, 4)
+
+
+def find_contours(
+    image: NDArray[np.uint8],
+    mode: Literal["external", "list", "tree"] = "external",
+) -> list[NDArray[np.int32]]:
+    """Find contours in a binary image.
+
+    Args:
+        image: Binary image (0 and 255 values).
+        mode: Retrieval mode:
+            - "external": Only outermost contours
+            - "list": All contours as flat list
+            - "tree": All contours with hierarchy
+
+    Returns:
+        List of contours, each as an Nx1x2 array of (x, y) points.
+    """
+    mode_map = {
+        "external": cv2.RETR_EXTERNAL,
+        "list": cv2.RETR_LIST,
+        "tree": cv2.RETR_TREE,
+    }
+    contours, _ = cv2.findContours(image, mode_map[mode], cv2.CHAIN_APPROX_SIMPLE)
+    return [np.asarray(c, dtype=np.int32) for c in contours]
+
+
+def max_whitespace_rect(
+    image: NDArray[np.uint8],
+) -> tuple[int, int, int, int] | None:
+    """Find the largest axis-aligned white rectangle in a binary image.
+
+    This is useful for finding margins or blank areas in document images.
+
+    Args:
+        image: Binary image (0=black, 255=white).
+
+    Returns:
+        Tuple (x, y, width, height) of the largest white rectangle,
+        or None if no white pixels found.
+    """
+    # Use connected components to find white regions
+    # Invert so white becomes foreground
+    inverted = cv2.bitwise_not(image)
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(inverted)
+
+    if num_labels <= 1:
+        # No white regions (only background)
+        return None
+
+    # Find largest white region (skip label 0 which is the black background)
+    max_area = 0
+    best_rect = None
+
+    for label in range(1, num_labels):
+        x = stats[label, cv2.CC_STAT_LEFT]
+        y = stats[label, cv2.CC_STAT_TOP]
+        w = stats[label, cv2.CC_STAT_WIDTH]
+        h = stats[label, cv2.CC_STAT_HEIGHT]
+        area = stats[label, cv2.CC_STAT_AREA]
+
+        if area > max_area:
+            max_area = area
+            best_rect = (x, y, w, h)
+
+    return best_rect
