@@ -19,6 +19,10 @@ from scantailor.core.project import (
     PageInfo,
     Project,
 )
+from scantailor.core.transformation import (
+    ImageTransformation,
+    Rect,
+)
 
 __all__ = [
     Dpi.__name__,
@@ -26,6 +30,7 @@ __all__ = [
     ImageId.__name__,
     ImageInfo.__name__,
     ImageMetadata.__name__,
+    ImageTransformation.__name__,
     "LayoutDirection",
     Margins.__name__,
     "OrthogonalDegrees",
@@ -33,5 +38,6 @@ __all__ = [
     PageId.__name__,
     PageInfo.__name__,
     Project.__name__,
+    Rect.__name__,
     SubPage.__name__,
 ]
