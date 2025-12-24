@@ -123,7 +123,7 @@ class ArcLengthMapper:
             return self._interpolate_arc_len_in_segment(arc_len, n - 2)
 
         # Binary search for the segment
-        idx = np.searchsorted(self._samples_arclen, arc_len, side="right") - 1
+        idx = int(np.searchsorted(self._samples_arclen, arc_len, side="right")) - 1
         idx = max(0, min(idx, n - 2))
         return self._interpolate_arc_len_in_segment(arc_len, idx)
 
@@ -151,7 +151,7 @@ class ArcLengthMapper:
             return self._interpolate_x_in_segment(x, n - 2)
 
         # Binary search for the segment
-        idx = np.searchsorted(self._samples_x, x, side="right") - 1
+        idx = int(np.searchsorted(self._samples_x, x, side="right")) - 1
         idx = max(0, min(idx, n - 2))
         return self._interpolate_x_in_segment(x, idx)
 

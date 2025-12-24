@@ -64,8 +64,8 @@ class PolylineIntersector:
 
     def intersect(
         self,
-        line_p1: NDArray[np.float64],
-        line_p2: NDArray[np.float64],
+        line_p1: NDArray[np.floating],
+        line_p2: NDArray[np.floating],
     ) -> NDArray[np.float64]:
         """Find intersection of a line with the polyline.
 
@@ -118,8 +118,8 @@ class PolylineIntersector:
     def _segment_intersects_line(
         self,
         segment: int,
-        line_origin: NDArray[np.float64],
-        line_normal: NDArray[np.float64],
+        line_origin: NDArray[np.floating],
+        line_normal: NDArray[np.floating],
     ) -> bool:
         """Check if a segment intersects with the line.
 
@@ -146,8 +146,8 @@ class PolylineIntersector:
     def _intersect_with_segment(
         self,
         segment: int,
-        line_p1: NDArray[np.float64],
-        line_p2: NDArray[np.float64],
+        line_p1: NDArray[np.floating],
+        line_p2: NDArray[np.floating],
     ) -> NDArray[np.float64]:
         """Compute intersection point with a specific segment.
 
@@ -171,10 +171,10 @@ class PolylineIntersector:
 
     def _line_line_intersection(
         self,
-        p1: NDArray[np.float64],
-        p2: NDArray[np.float64],
-        p3: NDArray[np.float64],
-        p4: NDArray[np.float64],
+        p1: NDArray[np.floating],
+        p2: NDArray[np.floating],
+        p3: NDArray[np.floating],
+        p4: NDArray[np.floating],
     ) -> NDArray[np.float64] | None:
         """Compute intersection of two lines.
 
@@ -205,9 +205,9 @@ class PolylineIntersector:
 
     def _try_intersecting_outside_polyline(
         self,
-        line_p1: NDArray[np.float64],
-        line_p2: NDArray[np.float64],
-        line_normal: NDArray[np.float64],
+        line_p1: NDArray[np.floating],
+        line_p2: NDArray[np.floating],
+        line_normal: NDArray[np.floating],
     ) -> NDArray[np.float64] | None:
         """Check if line misses polyline entirely, return closest projection.
 
@@ -238,8 +238,8 @@ class PolylineIntersector:
 
     def _find_intersecting_segment(
         self,
-        line_origin: NDArray[np.float64],
-        line_normal: NDArray[np.float64],
+        line_origin: NDArray[np.floating],
+        line_normal: NDArray[np.floating],
     ) -> int:
         """Binary search for the segment that intersects the line.
 
@@ -269,9 +269,9 @@ class PolylineIntersector:
 
     def _project_point_to_line(
         self,
-        point: NDArray[np.float64],
-        line_p1: NDArray[np.float64],
-        line_p2: NDArray[np.float64],
+        point: NDArray[np.floating],
+        line_p1: NDArray[np.floating],
+        line_p2: NDArray[np.floating],
     ) -> NDArray[np.float64]:
         """Project a point onto a line.
 
@@ -287,16 +287,16 @@ class PolylineIntersector:
         line_len_sq = np.dot(line_vec, line_vec)
 
         if line_len_sq < 1e-10:
-            return line_p1.copy()
+            return np.asarray(line_p1, dtype=np.float64).copy()
 
         t = np.dot(point - line_p1, line_vec) / line_len_sq
-        return line_p1 + t * line_vec
+        return np.asarray(line_p1 + t * line_vec, dtype=np.float64)
 
 
 def project_point_to_line(
-    point: NDArray[np.float64],
-    line_p1: NDArray[np.float64],
-    line_p2: NDArray[np.float64],
+    point: NDArray[np.floating],
+    line_p1: NDArray[np.floating],
+    line_p2: NDArray[np.floating],
 ) -> tuple[NDArray[np.float64], float]:
     """Project a point onto a line and return projection and scalar.
 
@@ -309,16 +309,16 @@ def project_point_to_line(
         Tuple of (projection_point, projection_scalar).
         The scalar is 0 at line_p1, 1 at line_p2.
     """
-    point = np.asarray(point, dtype=np.float64)
-    line_p1 = np.asarray(line_p1, dtype=np.float64)
-    line_p2 = np.asarray(line_p2, dtype=np.float64)
+    pt: NDArray[np.float64] = np.asarray(point, dtype=np.float64)
+    p1: NDArray[np.float64] = np.asarray(line_p1, dtype=np.float64)
+    p2: NDArray[np.float64] = np.asarray(line_p2, dtype=np.float64)
 
-    line_vec = line_p2 - line_p1
+    line_vec = p2 - p1
     line_len_sq = np.dot(line_vec, line_vec)
 
     if line_len_sq < 1e-10:
-        return line_p1.copy(), 0.0
+        return p1.copy(), 0.0
 
-    t = float(np.dot(point - line_p1, line_vec) / line_len_sq)
-    projection = line_p1 + t * line_vec
+    t = float(np.dot(pt - p1, line_vec) / line_len_sq)
+    projection: NDArray[np.float64] = p1 + t * line_vec
     return projection, t
