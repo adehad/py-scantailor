@@ -59,6 +59,14 @@ from scantailor.core.zones import (
     ZoneSet,
     ZoneSpline,
 )
+from scantailor.core.schema import (
+    SCHEMA_VERSION,
+    generate_project_schema,
+    migrate_project,
+    save_schema,
+    validate_project_file,
+    validate_project_json,
+)
 
 __all__ = [
     ApplicationSettings.__name__,
@@ -102,4 +110,10 @@ __all__ = [
     ZoneCategory.__name__,
     ZoneSet.__name__,
     ZoneSpline.__name__,
+    "SCHEMA_VERSION",
+    "generate_project_schema",
+    "migrate_project",
+    "save_schema",
+    "validate_project_file",
+    "validate_project_json",
 ]
