@@ -44,6 +44,15 @@ from scantailor.core.transformation import (
     ImageTransformation,
     Rect,
 )
+from scantailor.core.zones import (
+    FillZoneProperties,
+    PictureLayer,
+    PictureZoneProperties,
+    Zone,
+    ZoneCategory,
+    ZoneSet,
+    ZoneSpline,
+)
 
 __all__ = [
     ApplicationSettings.__name__,
@@ -53,6 +62,7 @@ __all__ = [
     DeviationSettings.__name__,
     Dpi.__name__,
     DpiStatus.__name__,
+    FillZoneProperties.__name__,
     FilterStage.__name__,
     FixOrientationDefaults.__name__,
     ImageId.__name__,
@@ -68,6 +78,8 @@ __all__ = [
     PageInfo.__name__,
     PageLayoutDefaults.__name__,
     PageSplitDefaults.__name__,
+    PictureLayer.__name__,
+    PictureZoneProperties.__name__,
     Project.__name__,
     Rect.__name__,
     SelectContentDefaults.__name__,
@@ -76,4 +88,8 @@ __all__ = [
     ThumbnailSize.__name__,
     TiffCompression.__name__,
     Units.__name__,
+    Zone.__name__,
+    ZoneCategory.__name__,
+    ZoneSet.__name__,
+    ZoneSpline.__name__,
 ]
