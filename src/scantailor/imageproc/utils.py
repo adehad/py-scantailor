@@ -97,7 +97,8 @@ def bounding_rect(contour: NDArray[np.int32]) -> tuple[int, int, int, int]:
     Returns:
         Tuple (x, y, width, height).
     """
-    return cv2.boundingRect(contour)
+    x, y, w, h = cv2.boundingRect(contour)
+    return (x, y, w, h)
 
 
 def min_area_rect(
@@ -111,7 +112,8 @@ def min_area_rect(
     Returns:
         Tuple ((center_x, center_y), (width, height), angle).
     """
-    return cv2.minAreaRect(contour)
+    center, size, angle = cv2.minAreaRect(contour)
+    return ((float(center[0]), float(center[1])), (float(size[0]), float(size[1])), float(angle))
 
 
 def convex_hull(contour: NDArray[np.int32]) -> NDArray[np.int32]:
