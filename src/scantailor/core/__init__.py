@@ -40,6 +40,12 @@ from scantailor.core.stage_sequence import (
     FilterStage,
     StageSequence,
 )
+from scantailor.core.pipeline import (
+    PipelineOptions,
+    PipelineResult,
+    process_batch,
+    process_page,
+)
 from scantailor.core.transformation import (
     ImageTransformation,
     Rect,
@@ -80,6 +86,10 @@ __all__ = [
     PageSplitDefaults.__name__,
     PictureLayer.__name__,
     PictureZoneProperties.__name__,
+    PipelineOptions.__name__,
+    PipelineResult.__name__,
+    "process_batch",
+    "process_page",
     Project.__name__,
     Rect.__name__,
     SelectContentDefaults.__name__,
