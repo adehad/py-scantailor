@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from scantailor.app.widgets import CollapsibleGroupBox
+from scantailor.app.ui.widgets import CollapsibleGroupBox
 from scantailor.core import PageId
 
 if TYPE_CHECKING:
