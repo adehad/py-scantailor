@@ -20,6 +20,14 @@ class TestBinarizationMethod:
         """Wolf has correct string value."""
         assert BinarizationMethod.WOLF.value == "wolf"
 
+    def test_bradley_value(self):
+        """Bradley has correct string value."""
+        assert BinarizationMethod.BRADLEY.value == "bradley"
+
+    def test_edgediv_value(self):
+        """EdgeDiv has correct string value."""
+        assert BinarizationMethod.EDGEDIV.value == "edgediv"
+
     def test_from_string_otsu(self):
         """Parse otsu string."""
         assert BinarizationMethod.from_string("otsu") == BinarizationMethod.OTSU
@@ -31,6 +39,14 @@ class TestBinarizationMethod:
     def test_from_string_wolf(self):
         """Parse wolf string."""
         assert BinarizationMethod.from_string("wolf") == BinarizationMethod.WOLF
+
+    def test_from_string_bradley(self):
+        """Parse bradley string."""
+        assert BinarizationMethod.from_string("bradley") == BinarizationMethod.BRADLEY
+
+    def test_from_string_edgediv(self):
+        """Parse edgediv string."""
+        assert BinarizationMethod.from_string("edgediv") == BinarizationMethod.EDGEDIV
 
     def test_from_string_unknown_defaults_to_otsu(self):
         """Unknown string defaults to Otsu."""
@@ -100,6 +116,47 @@ class TestBinarizationOptions:
             BinarizationOptions(sauvola_coef=-0.1)
         with pytest.raises(ValueError):
             BinarizationOptions(sauvola_coef=1.1)
+
+    def test_bradley_coef_bounds(self):
+        """Bradley coefficient has valid bounds."""
+        BinarizationOptions(bradley_coef=0.0)
+        BinarizationOptions(bradley_coef=1.0)
+
+        with pytest.raises(ValueError):
+            BinarizationOptions(bradley_coef=-0.1)
+        with pytest.raises(ValueError):
+            BinarizationOptions(bradley_coef=1.1)
+
+    def test_edge_div_kep_bounds(self):
+        """EdgeDiv kep coefficient has valid bounds."""
+        BinarizationOptions(edge_div_kep=0.0)
+        BinarizationOptions(edge_div_kep=1.0)
+
+        with pytest.raises(ValueError):
+            BinarizationOptions(edge_div_kep=-0.1)
+        with pytest.raises(ValueError):
+            BinarizationOptions(edge_div_kep=1.1)
+
+    def test_edge_div_kbd_bounds(self):
+        """EdgeDiv kbd coefficient has valid bounds."""
+        BinarizationOptions(edge_div_kbd=0.0)
+        BinarizationOptions(edge_div_kbd=1.0)
+
+        with pytest.raises(ValueError):
+            BinarizationOptions(edge_div_kbd=-0.1)
+        with pytest.raises(ValueError):
+            BinarizationOptions(edge_div_kbd=1.1)
+
+    def test_bradley_default_values(self):
+        """Bradley options have correct defaults."""
+        options = BinarizationOptions(method=BinarizationMethod.BRADLEY)
+        assert options.bradley_coef == 0.34
+
+    def test_edge_div_default_values(self):
+        """EdgeDiv options have correct defaults."""
+        options = BinarizationOptions(method=BinarizationMethod.EDGEDIV)
+        assert options.edge_div_kep == 0.5
+        assert options.edge_div_kbd == 0.5
 
     def test_frozen_model(self):
         """Options is immutable."""
