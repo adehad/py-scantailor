@@ -37,23 +37,34 @@ class SkewResult:
         return self.confidence >= self.GOOD_CONFIDENCE
 
 
+# Default parameters for skew detection (matching C++ SkewFinder defaults)
+DEFAULT_MAX_ANGLE: float = 7.0
+DEFAULT_MIN_ANGLE: float = 0.1
+DEFAULT_ACCURACY: float = 0.1
+DEFAULT_COARSE_STEP: float = 1.0  # Degrees per step in coarse search
+
+
 def find_skew(
     image: NDArray[np.uint8],
-    max_angle: float = 7.0,
-    accuracy: float = 0.1,
-    min_angle: float = 0.1,
+    max_angle: float = DEFAULT_MAX_ANGLE,
+    accuracy: float = DEFAULT_ACCURACY,
+    min_angle: float = DEFAULT_MIN_ANGLE,
     resolution_ratio: float = 1.0,
+    coarse_step: float = DEFAULT_COARSE_STEP,
 ) -> SkewResult:
     """Detect the skew angle of a document image.
 
     Uses a two-phase algorithm:
-    1. Coarse search: Linear scan from -max_angle to +max_angle in 1° steps
+    1. Coarse search: Linear scan from -max_angle to +max_angle in coarse_step increments
     2. Fine search: Binary search around the best coarse angle for accuracy
 
     The algorithm works by applying vertical shear transforms at various
     angles and scoring each based on horizontal alignment of text lines.
     Well-aligned text has consistent pixel counts per row; skewed text
     shows variation.
+
+    Note: The fine search can extend up to coarse_step/2 beyond max_angle
+    to find the true optimum near boundaries. This matches C++ SkewFinder behavior.
 
     Args:
         image: Grayscale or binary image (uint8). Binary images work best.
@@ -63,6 +74,7 @@ def find_skew(
             (default 0.1).
         resolution_ratio: Ratio of horizontal to vertical DPI. Used to adjust
             shear transform for non-square pixels (default 1.0).
+        coarse_step: Step size in degrees for the coarse search (default 1.0).
 
     Returns:
         SkewResult with detected angle and confidence score.
@@ -94,8 +106,7 @@ def find_skew(
     # Reduce image size for faster processing
     reduced = _reduce_image(np.asarray(binary, dtype=np.uint8), factor=2)
 
-    # Phase 1: Coarse search with 1-degree steps
-    coarse_step = 1.0
+    # Phase 1: Coarse search
     best_angle = 0.0
     best_score = 0.0
     scores: list[float] = []
@@ -118,6 +129,8 @@ def find_skew(
 
     # Phase 2: Fine binary search around best angle
     # Use original (less reduced) image for fine search
+    # Note: Fine search can extend slightly beyond max_angle (by up to 0.5°)
+    # to find the true optimum near boundaries. This matches C++ behavior.
     fine_reduced = _reduce_image(np.asarray(binary, dtype=np.uint8), factor=1)
     half_range = coarse_step / 2.0
 
