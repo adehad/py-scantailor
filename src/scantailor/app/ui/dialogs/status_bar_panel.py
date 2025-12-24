@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6 import QtWidgets
 
-from scantailor.app.ui import UI_FOLDER, load_ui_widget
+from scantailor.app.ui import load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
+
+_UI_FOLDER = Path(__file__).parent
 
 
 class StatusBarPanel(QtWidgets.QWidget):
@@ -31,7 +35,7 @@ class StatusBarPanel(QtWidgets.QWidget):
         super().__init__(parent)
 
         # Load UI
-        self.ui = load_ui_widget(UI_FOLDER / "StatusBarPanel.ui", self)
+        self.ui = load_ui_widget(_UI_FOLDER / "StatusBarPanel.ui", self)
         self._setup_widgets()
 
     def _setup_widgets(self) -> None:
