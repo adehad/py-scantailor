@@ -22,6 +22,7 @@ scantailor = "scantailor.__main__:main"
 [dependency-groups]
 dev = [
     "pyrefly>=0.46.0",
+    "scipy-stubs>=1.16.3.3",
 ]
 
 installer = [
