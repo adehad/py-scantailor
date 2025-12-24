@@ -355,3 +355,152 @@ def point_to_segment_distance(
         float: Distance from point to nearest point on segment.
     """
     return segment.distance_to_point(point)
+
+
+def sides_of_line(
+    line: LineSegment,
+    p1: NDArray[np.floating],
+    p2: NDArray[np.floating],
+) -> float:
+    """Check if two points are on the same or different sides of a line.
+
+    This function determines the relative position of two points with
+    respect to a line (not a line segment - the endpoints don't matter).
+
+    Args:
+        line: A line segment defining the line direction.
+        p1: First point as array [x, y].
+        p2: Second point as array [x, y].
+
+    Returns:
+        - Negative value if points are on different sides of the line.
+        - Positive value if points are on the same side of the line.
+        - Zero if one or both points are on the line.
+    """
+    p1 = np.asarray(p1, dtype=np.float64)
+    p2 = np.asarray(p2, dtype=np.float64)
+
+    # Get normal vector (perpendicular to line direction)
+    direction = line.p2 - line.p1
+    normal = np.array([-direction[1], direction[0]], dtype=np.float64)
+
+    # Vectors from line start to each point
+    vec1 = p1 - line.p1
+    vec2 = p2 - line.p1
+
+    # Dot products with normal give signed distances
+    dot1 = np.dot(normal, vec1)
+    dot2 = np.dot(normal, vec2)
+
+    # Product: positive if same side, negative if different sides
+    return float(dot1 * dot2)
+
+
+def line_intersection_scalar(
+    line1: LineSegment,
+    line2: LineSegment,
+) -> tuple[float, float] | None:
+    """Find intersection scalars for two line segments.
+
+    Computes scalars s1 and s2 such that:
+    - line1.point_at(s1) is the intersection point
+    - line2.point_at(s2) is the intersection point
+
+    Note that the actual intersection may be outside the segment
+    bounds (s1 or s2 outside [0, 1]).
+
+    Args:
+        line1: First line segment.
+        line2: Second line segment.
+
+    Returns:
+        Tuple (s1, s2) of scalars, or None if lines are parallel
+        or either line has zero length.
+    """
+    p1 = line1.p1
+    p2 = line2.p1
+    v1 = line1.p2 - line1.p1
+    v2 = line2.p2 - line2.p1
+
+    # Solve: p1 + s1 * v1 = p2 + s2 * v2
+    # Using Cramer's rule on the 2x2 system
+    det_A = v2[0] * v1[1] - v1[0] * v2[1]
+
+    if abs(det_A) < np.finfo(float).eps:
+        return None
+
+    b = p2 - p1
+    r_det_A = 1.0 / det_A
+
+    s1 = (v2[0] * b[1] - b[0] * v2[1]) * r_det_A
+    s2 = (v1[0] * b[1] - b[0] * v1[1]) * r_det_A
+
+    return (float(s1), float(s2))
+
+
+def line_bounded_by_rect(
+    line: LineSegment,
+    rect: tuple[float, float, float, float],
+) -> LineSegment | None:
+    """Clip a line to the bounds of a rectangle.
+
+    Given a line (extended infinitely in both directions) and a rectangle,
+    returns the portion of the line that lies within the rectangle.
+
+    Args:
+        line: Line segment defining the line direction (extended infinitely).
+        rect: Rectangle as (x, y, width, height).
+
+    Returns:
+        New LineSegment clipped to rectangle bounds, or None if the line
+        doesn't intersect the rectangle.
+    """
+    x, y, w, h = rect
+
+    # Four sides of rectangle as line segments
+    rect_lines = [
+        LineSegment(
+            p1=np.array([x, y], dtype=np.float64),
+            p2=np.array([x + w, y], dtype=np.float64),
+        ),  # top
+        LineSegment(
+            p1=np.array([x, y + h], dtype=np.float64),
+            p2=np.array([x + w, y + h], dtype=np.float64),
+        ),  # bottom
+        LineSegment(
+            p1=np.array([x, y], dtype=np.float64),
+            p2=np.array([x, y + h], dtype=np.float64),
+        ),  # left
+        LineSegment(
+            p1=np.array([x + w, y], dtype=np.float64),
+            p2=np.array([x + w, y + h], dtype=np.float64),
+        ),  # right
+    ]
+
+    min_s = float("inf")
+    max_s = float("-inf")
+
+    for rect_line in rect_lines:
+        result = line_intersection_scalar(rect_line, line)
+        if result is None:
+            # Line is parallel to this rect edge
+            continue
+
+        s1, s2 = result
+
+        # s1 is the scalar on rect_line, must be in [0, 1] to be on rect edge
+        if s1 < 0 or s1 > 1:
+            continue
+
+        # s2 is the scalar on our line
+        if s2 > max_s:
+            max_s = s2
+        if s2 < min_s:
+            min_s = s2
+
+    if max_s > min_s:
+        return LineSegment(
+            p1=line.point_at(min_s),
+            p2=line.point_at(max_s),
+        )
+    return None
