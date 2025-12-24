@@ -129,6 +129,72 @@ def close_morph(
     return np.asarray(result, dtype=np.uint8)
 
 
+def white_top_hat(
+    image: NDArray[np.uint8],
+    kernel_size: int = 3,
+    shape: StructuringElementShape = "rect",
+) -> NDArray[np.uint8]:
+    """Apply white top-hat transform (image - opening).
+
+    Extracts bright spots smaller than the structuring element.
+    Useful for finding small bright features on a varying background.
+
+    Args:
+        image: Input image (grayscale).
+        kernel_size: Size of the structuring element.
+        shape: Shape of the structuring element.
+
+    Returns:
+        Top-hat transformed image.
+    """
+    kernel = _get_structuring_element(shape, kernel_size)
+    result = cv2.morphologyEx(image, cv2.MORPH_TOPHAT, kernel)
+    return np.asarray(result, dtype=np.uint8)
+
+
+def black_top_hat(
+    image: NDArray[np.uint8],
+    kernel_size: int = 3,
+    shape: StructuringElementShape = "rect",
+) -> NDArray[np.uint8]:
+    """Apply black top-hat transform (closing - image).
+
+    Extracts dark spots smaller than the structuring element.
+    Useful for finding small dark features on a varying background.
+
+    Args:
+        image: Input image (grayscale).
+        kernel_size: Size of the structuring element.
+        shape: Shape of the structuring element.
+
+    Returns:
+        Black top-hat transformed image.
+    """
+    kernel = _get_structuring_element(shape, kernel_size)
+    result = cv2.morphologyEx(image, cv2.MORPH_BLACKHAT, kernel)
+    return np.asarray(result, dtype=np.uint8)
+
+
+def hit_miss(
+    image: NDArray[np.uint8],
+    kernel: NDArray[np.int8],
+) -> NDArray[np.uint8]:
+    """Apply hit-or-miss transform.
+
+    The hit-or-miss transform detects specific patterns in binary images.
+    The kernel uses: 1 for foreground, -1 for background, 0 for don't care.
+
+    Args:
+        image: Binary input image (0 or 255).
+        kernel: Hit-miss kernel with values -1, 0, or 1.
+
+    Returns:
+        Binary image with detected patterns.
+    """
+    result = cv2.morphologyEx(image, cv2.MORPH_HITMISS, kernel)
+    return np.asarray(result, dtype=np.uint8)
+
+
 def remove_small_components(
     image: NDArray[np.uint8],
     min_size: int,

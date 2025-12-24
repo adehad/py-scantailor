@@ -4,7 +4,15 @@ from __future__ import annotations
 
 import numpy as np
 
-from scantailor.imageproc import close_morph, dilate, erode, open_morph
+from scantailor.imageproc import (
+    black_top_hat,
+    close_morph,
+    dilate,
+    erode,
+    hit_miss,
+    open_morph,
+    white_top_hat,
+)
 
 
 class TestDilate:
@@ -145,3 +153,114 @@ class TestCloseMorph:
         for shape in ["rect", "ellipse", "cross"]:
             result = close_morph(image, kernel_size=3, shape=shape)
             assert result.shape == image.shape
+
+
+class TestWhiteTopHat:
+    """Tests for white top-hat transform."""
+
+    def test_extracts_bright_spots(self):
+        """Should extract small bright spots from dark background."""
+        # Create dark image with small bright spot
+        image = np.full((100, 100), 50, dtype=np.uint8)
+        image[48:52, 48:52] = 200  # Small bright spot
+
+        result = white_top_hat(image, kernel_size=15)
+
+        # The bright spot should be highlighted
+        assert np.mean(result[48:52, 48:52]) > np.mean(result[0:10, 0:10])
+
+    def test_uniform_image_returns_zeros(self):
+        """Uniform image should return near-zero result."""
+        image = np.full((100, 100), 128, dtype=np.uint8)
+        result = white_top_hat(image, kernel_size=5)
+        # Result should be all zeros or very small values
+        assert np.max(result) < 10
+
+    def test_preserves_shape(self):
+        """Output should have same shape as input."""
+        image = np.random.randint(0, 256, (100, 150), dtype=np.uint8)
+        result = white_top_hat(image)
+        assert result.shape == image.shape
+
+    def test_different_kernel_sizes(self):
+        """Different kernel sizes should produce different results."""
+        image = np.random.randint(0, 256, (100, 100), dtype=np.uint8)
+        result_small = white_top_hat(image, kernel_size=3)
+        result_large = white_top_hat(image, kernel_size=15)
+        # Results should generally differ
+        assert result_small.shape == result_large.shape
+
+
+class TestBlackTopHat:
+    """Tests for black top-hat transform."""
+
+    def test_extracts_dark_spots(self):
+        """Should extract small dark spots from bright background."""
+        # Create bright image with small dark spot
+        image = np.full((100, 100), 200, dtype=np.uint8)
+        image[48:52, 48:52] = 50  # Small dark spot
+
+        result = black_top_hat(image, kernel_size=15)
+
+        # The dark spot area should be highlighted
+        assert np.mean(result[48:52, 48:52]) > np.mean(result[0:10, 0:10])
+
+    def test_uniform_image_returns_zeros(self):
+        """Uniform image should return near-zero result."""
+        image = np.full((100, 100), 128, dtype=np.uint8)
+        result = black_top_hat(image, kernel_size=5)
+        # Result should be all zeros or very small values
+        assert np.max(result) < 10
+
+    def test_preserves_shape(self):
+        """Output should have same shape as input."""
+        image = np.random.randint(0, 256, (100, 150), dtype=np.uint8)
+        result = black_top_hat(image)
+        assert result.shape == image.shape
+
+
+class TestHitMiss:
+    """Tests for hit-or-miss transform."""
+
+    def test_detects_pattern(self):
+        """Should detect specific pattern in binary image."""
+        # Create binary image with isolated white pixel
+        image = np.zeros((100, 100), dtype=np.uint8)
+        image[50, 50] = 255  # Single white pixel
+
+        # Kernel to detect isolated white pixels (surrounded by black)
+        kernel = np.array([
+            [-1, -1, -1],
+            [-1,  1, -1],
+            [-1, -1, -1],
+        ], dtype=np.int8)
+
+        result = hit_miss(image, kernel)
+
+        # Should detect the isolated pixel
+        assert result[50, 50] == 255
+
+    def test_no_match_returns_black(self):
+        """Pattern not present should result in black output."""
+        # Create image with connected white region (no isolated pixels)
+        image = np.zeros((100, 100), dtype=np.uint8)
+        image[48:52, 48:52] = 255  # 4x4 white square
+
+        # Kernel to detect isolated pixels
+        kernel = np.array([
+            [-1, -1, -1],
+            [-1,  1, -1],
+            [-1, -1, -1],
+        ], dtype=np.int8)
+
+        result = hit_miss(image, kernel)
+
+        # No isolated pixels, so result should be mostly black
+        assert np.sum(result == 255) == 0
+
+    def test_preserves_shape(self):
+        """Output should have same shape as input."""
+        image = np.zeros((100, 150), dtype=np.uint8)
+        kernel = np.array([[1, -1], [-1, 1]], dtype=np.int8)
+        result = hit_miss(image, kernel)
+        assert result.shape == image.shape
