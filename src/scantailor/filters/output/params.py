@@ -11,6 +11,7 @@ from scantailor.core import Dpi
 from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode
 from .despeckle import DespeckleLevel
+from .dewarping_options import DewarpingOptions
 
 
 class Params(BaseModel):
@@ -22,6 +23,7 @@ class Params(BaseModel):
         binarization: Binarization options for B&W conversion.
         despeckle_level: Noise removal level.
         black_on_white: True for black text on white background.
+        dewarping: Dewarping options for curved page correction.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -31,6 +33,7 @@ class Params(BaseModel):
     binarization: BinarizationOptions = Field(default_factory=BinarizationOptions)
     despeckle_level: DespeckleLevel = DespeckleLevel.NORMAL
     black_on_white: bool = True
+    dewarping: DewarpingOptions = Field(default_factory=DewarpingOptions)
 
     def with_output_dpi(self, dpi: Dpi) -> "Params":
         """Create a copy with different output DPI."""
@@ -57,6 +60,14 @@ class Params(BaseModel):
         """Create a copy with different black_on_white setting."""
         return self.model_copy(update={"black_on_white": black_on_white})
 
+    def with_dewarping(self, options: DewarpingOptions) -> "Params":
+        """Create a copy with different dewarping options."""
+        return self.model_copy(update={"dewarping": options})
+
     def needs_binarization(self) -> bool:
         """Return True if the color mode requires binarization."""
         return self.color_mode in (ColorMode.BLACK_AND_WHITE, ColorMode.MIXED)
+
+    def needs_dewarping(self) -> bool:
+        """Return True if dewarping is enabled."""
+        return self.dewarping.is_enabled()
