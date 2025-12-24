@@ -61,3 +61,8 @@ class Params(BaseModel):
     def is_manual(self) -> bool:
         """Return True if the split line was manually set."""
         return self.split_line_mode == AutoManualMode.MANUAL
+
+    def with_manual_mode(self, is_manual: bool) -> "Params":
+        """Create a copy with a different split line mode."""
+        mode = AutoManualMode.MANUAL if is_manual else AutoManualMode.AUTO
+        return self.model_copy(update={"split_line_mode": mode})
