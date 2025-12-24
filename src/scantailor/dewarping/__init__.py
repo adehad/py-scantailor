@@ -47,18 +47,30 @@ from scantailor.dewarping.raster_dewarper import (
     compute_dewarped_size,
     dewarp_image,
 )
+from scantailor.dewarping.text_lines import (
+    TextLine,
+    TextLineResult,
+    VerticalBounds,
+    detect_vertical_bounds,
+    trace_text_lines,
+)
 
 __all__ = [
     "ArcLengthMapper",
-    "compute_dewarped_size",
-    "create_distortion_model",
-    "create_distortion_model_from_splines",
     "Curve",
     "CylindricalSurfaceDewarper",
-    "dewarp_image",
     "DistortionModel",
     "Generatrix",
     "InterpolationMethod",
     "PolylineIntersector",
+    "TextLine",
+    "TextLineResult",
+    "VerticalBounds",
+    "compute_dewarped_size",
+    "create_distortion_model",
+    "create_distortion_model_from_splines",
+    "detect_vertical_bounds",
+    "dewarp_image",
     "project_point_to_line",
+    "trace_text_lines",
 ]
