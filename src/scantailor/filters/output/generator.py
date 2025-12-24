@@ -69,7 +69,7 @@ def _generate_binary_output(
     """
     # Convert to grayscale if needed
     if len(image.shape) == 3:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        gray = np.asarray(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), dtype=np.uint8)
     else:
         gray = image
 
@@ -266,4 +266,4 @@ def _morphological_smooth(binary: NDArray[np.uint8]) -> NDArray[np.uint8]:
     # Closing fills small holes
     result = cv2.morphologyEx(result, cv2.MORPH_CLOSE, kernel)
 
-    return result
+    return np.asarray(result, dtype=np.uint8)
