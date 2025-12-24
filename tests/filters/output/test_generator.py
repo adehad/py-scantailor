@@ -2,11 +2,14 @@
 
 import numpy as np
 
+from scantailor.dewarping import CylindricalSurfaceDewarper
 from scantailor.filters.output import (
     BinarizationMethod,
     BinarizationOptions,
     ColorMode,
     DespeckleLevel,
+    DewarpingMode,
+    DewarpingOptions,
     Params,
 )
 from scantailor.filters.output.generator import generate_output
@@ -223,3 +226,139 @@ class TestGenerateOutput:
         )
         result = generate_output(image, params)
         assert result.is_binary is True
+
+
+class TestDewarpingIntegration:
+    """Tests for dewarping integration in output generator."""
+
+    def test_no_dewarping_by_default(self):
+        """Default params do not apply dewarping."""
+        image = np.full((100, 100), 200, dtype=np.uint8)
+        params = Params(color_mode=ColorMode.COLOR_GRAYSCALE)
+
+        result = generate_output(image, params)
+
+        assert result.was_dewarped is False
+        assert result.image.shape == image.shape
+
+    def test_dewarping_off_no_dewarper(self):
+        """Dewarping OFF mode doesn't dewarp even with dewarper."""
+        image = np.full((100, 100), 200, dtype=np.uint8)
+        params = Params(
+            color_mode=ColorMode.COLOR_GRAYSCALE,
+            dewarping=DewarpingOptions(mode=DewarpingMode.OFF),
+        )
+
+        # Create a dewarper (won't be used)
+        top = np.array([[0, 10], [50, 10], [99, 10]], dtype=np.float64)
+        bottom = np.array([[0, 90], [50, 90], [99, 90]], dtype=np.float64)
+        dewarper = CylindricalSurfaceDewarper.from_directrices(top, bottom)
+
+        result = generate_output(image, params, dewarper=dewarper)
+
+        assert result.was_dewarped is False
+
+    def test_dewarping_auto_with_dewarper(self):
+        """Dewarping AUTO mode applies dewarping when dewarper provided."""
+        image = np.full((100, 100), 200, dtype=np.uint8)
+        params = Params(
+            color_mode=ColorMode.COLOR_GRAYSCALE,
+            dewarping=DewarpingOptions(mode=DewarpingMode.AUTO),
+        )
+
+        # Create a simple dewarper (minimal distortion)
+        top = np.array([[0, 10], [50, 10], [99, 10]], dtype=np.float64)
+        bottom = np.array([[0, 90], [50, 90], [99, 90]], dtype=np.float64)
+        dewarper = CylindricalSurfaceDewarper.from_directrices(top, bottom)
+
+        result = generate_output(image, params, dewarper=dewarper)
+
+        assert result.was_dewarped is True
+
+    def test_dewarping_manual_with_dewarper(self):
+        """Dewarping MANUAL mode applies dewarping when dewarper provided."""
+        image = np.full((100, 100), 200, dtype=np.uint8)
+        params = Params(
+            color_mode=ColorMode.COLOR_GRAYSCALE,
+            dewarping=DewarpingOptions(mode=DewarpingMode.MANUAL),
+        )
+
+        top = np.array([[0, 10], [50, 10], [99, 10]], dtype=np.float64)
+        bottom = np.array([[0, 90], [50, 90], [99, 90]], dtype=np.float64)
+        dewarper = CylindricalSurfaceDewarper.from_directrices(top, bottom)
+
+        result = generate_output(image, params, dewarper=dewarper)
+
+        assert result.was_dewarped is True
+
+    def test_dewarping_enabled_no_dewarper(self):
+        """Dewarping enabled but no dewarper provided skips dewarping."""
+        image = np.full((100, 100), 200, dtype=np.uint8)
+        params = Params(
+            color_mode=ColorMode.COLOR_GRAYSCALE,
+            dewarping=DewarpingOptions(mode=DewarpingMode.AUTO),
+        )
+
+        # No dewarper provided
+        result = generate_output(image, params, dewarper=None)
+
+        assert result.was_dewarped is False
+
+    def test_dewarping_with_binary_output(self):
+        """Dewarping works with binary output mode."""
+        image = np.zeros((100, 100), dtype=np.uint8)
+        image[:50, :] = 200
+        image[50:, :] = 50
+
+        params = Params(
+            color_mode=ColorMode.BLACK_AND_WHITE,
+            dewarping=DewarpingOptions(mode=DewarpingMode.AUTO),
+        )
+
+        top = np.array([[0, 10], [50, 10], [99, 10]], dtype=np.float64)
+        bottom = np.array([[0, 90], [50, 90], [99, 90]], dtype=np.float64)
+        dewarper = CylindricalSurfaceDewarper.from_directrices(top, bottom)
+
+        result = generate_output(image, params, dewarper=dewarper)
+
+        assert result.was_dewarped is True
+        assert result.is_binary is True
+
+    def test_dewarping_with_color_input(self):
+        """Dewarping works with color input."""
+        image = np.full((100, 100, 3), 200, dtype=np.uint8)
+        params = Params(
+            color_mode=ColorMode.COLOR_GRAYSCALE,
+            dewarping=DewarpingOptions(mode=DewarpingMode.AUTO),
+        )
+
+        top = np.array([[0, 10], [50, 10], [99, 10]], dtype=np.float64)
+        bottom = np.array([[0, 90], [50, 90], [99, 90]], dtype=np.float64)
+        dewarper = CylindricalSurfaceDewarper.from_directrices(top, bottom)
+
+        result = generate_output(image, params, dewarper=dewarper)
+
+        assert result.was_dewarped is True
+        assert len(result.image.shape) == 3  # Preserves color
+
+    def test_dewarping_with_post_deskew(self):
+        """Dewarping with post-deskew rotation."""
+        image = np.full((100, 100), 200, dtype=np.uint8)
+        params = Params(
+            color_mode=ColorMode.COLOR_GRAYSCALE,
+            dewarping=DewarpingOptions(
+                mode=DewarpingMode.AUTO,
+                post_deskew=True,
+                post_deskew_angle=5.0,
+            ),
+        )
+
+        top = np.array([[0, 10], [50, 10], [99, 10]], dtype=np.float64)
+        bottom = np.array([[0, 90], [50, 90], [99, 90]], dtype=np.float64)
+        dewarper = CylindricalSurfaceDewarper.from_directrices(top, bottom)
+
+        result = generate_output(image, params, dewarper=dewarper)
+
+        assert result.was_dewarped is True
+        # Rotated image may be larger due to rotation
+        assert result.image.shape[0] >= 100 or result.image.shape[1] >= 100

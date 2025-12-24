@@ -1,10 +1,13 @@
 """Output image generator for the output filter.
 
 This module provides functions for generating final output images
-with binarization, despeckling, and other processing.
+with binarization, despeckling, dewarping, and other processing.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
@@ -24,6 +27,9 @@ from .color_mode import ColorMode
 from .despeckle import DespeckleLevel
 from .params import Params
 
+if TYPE_CHECKING:
+    from scantailor.dewarping import CylindricalSurfaceDewarper
+
 
 @dataclass
 class OutputResult:
@@ -31,27 +37,135 @@ class OutputResult:
 
     image: NDArray[np.uint8]
     is_binary: bool = False
+    was_dewarped: bool = False
 
 
 def generate_output(
     image: NDArray[np.uint8],
     params: Params,
+    dewarper: CylindricalSurfaceDewarper | None = None,
 ) -> OutputResult:
     """Generate the output image according to parameters.
 
     Args:
         image: Input image (grayscale or color).
         params: Output parameters.
+        dewarper: Optional dewarper for curved page correction.
+            Required if dewarping mode is AUTO or MANUAL.
 
     Returns:
         OutputResult with the processed image.
     """
+    processed = image
+    was_dewarped = False
+
+    # Apply dewarping if enabled and dewarper provided
+    if params.needs_dewarping() and dewarper is not None:
+        processed = _apply_dewarping(processed, params, dewarper)
+        was_dewarped = True
+
     # Convert based on color mode
     if params.color_mode == ColorMode.BLACK_AND_WHITE:
-        return _generate_binary_output(image, params)
-    if params.color_mode == ColorMode.COLOR_GRAYSCALE:
-        return _generate_grayscale_output(image, params)
-    return _generate_mixed_output(image, params)
+        result = _generate_binary_output(processed, params)
+    elif params.color_mode == ColorMode.COLOR_GRAYSCALE:
+        result = _generate_grayscale_output(processed, params)
+    else:
+        result = _generate_mixed_output(processed, params)
+
+    result.was_dewarped = was_dewarped
+    return result
+
+
+def _apply_dewarping(
+    image: NDArray[np.uint8],
+    params: Params,
+    dewarper: CylindricalSurfaceDewarper,
+) -> NDArray[np.uint8]:
+    """Apply dewarping to an image.
+
+    Args:
+        image: Input image.
+        params: Output parameters with dewarping options.
+        dewarper: The dewarper model.
+
+    Returns:
+        Dewarped image.
+    """
+    from scantailor.dewarping import compute_dewarped_size, dewarp_image
+
+    # Compute output size based on source size and dewarper
+    src_size = (image.shape[1], image.shape[0])  # (width, height)
+    dst_size = compute_dewarped_size(src_size, dewarper)
+
+    # Determine background color based on image type
+    if len(image.shape) == 2:
+        background = 255  # White for grayscale
+    elif image.shape[2] == 3:
+        background = (255, 255, 255)  # White for RGB
+    else:
+        background = (255, 255, 255, 255)  # White for RGBA
+
+    # Apply dewarping with full model domain
+    dewarped = dewarp_image(
+        image,
+        dewarper,
+        dst_size=dst_size,
+        model_domain=(0.0, 0.0, 1.0, 1.0),
+        background_color=background,
+    )
+
+    # Apply post-deskew if requested
+    if params.dewarping.post_deskew and params.dewarping.post_deskew_angle != 0.0:
+        dewarped = _apply_post_deskew(dewarped, params.dewarping.post_deskew_angle)
+
+    return dewarped
+
+
+def _apply_post_deskew(
+    image: NDArray[np.uint8],
+    angle: float,
+) -> NDArray[np.uint8]:
+    """Apply post-dewarping deskew rotation.
+
+    Args:
+        image: Dewarped image.
+        angle: Rotation angle in degrees.
+
+    Returns:
+        Rotated image.
+    """
+    h, w = image.shape[:2]
+    center = (w / 2, h / 2)
+
+    # Get rotation matrix
+    rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+
+    # Compute new bounding box size
+    cos = abs(rotation_matrix[0, 0])
+    sin = abs(rotation_matrix[0, 1])
+    new_w = int(h * sin + w * cos)
+    new_h = int(h * cos + w * sin)
+
+    # Adjust the rotation matrix for the new size
+    rotation_matrix[0, 2] += (new_w - w) / 2
+    rotation_matrix[1, 2] += (new_h - h) / 2
+
+    # Determine background color
+    if len(image.shape) == 2:
+        border_value = 255
+    else:
+        border_value = (255,) * image.shape[2]
+
+    # Apply rotation
+    rotated = cv2.warpAffine(
+        image,
+        rotation_matrix,
+        (new_w, new_h),
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=border_value,
+    )
+
+    return np.asarray(rotated, dtype=np.uint8)
 
 
 def _generate_binary_output(
