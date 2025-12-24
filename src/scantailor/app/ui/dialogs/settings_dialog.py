@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6 import QtWidgets
 
-from scantailor.app.ui import UI_FOLDER, load_ui_widget
+from scantailor.app.ui import load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
 from scantailor.core.settings import ApplicationSettings
+
+_UI_FOLDER = Path(__file__).parent
 
 
 class SettingsDialog(QtWidgets.QDialog):
@@ -33,7 +37,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self._original_settings = settings.model_copy()
 
         # Load UI
-        self.ui = load_ui_widget(UI_FOLDER / "SettingsDialog.ui", self)
+        self.ui = load_ui_widget(_UI_FOLDER / "SettingsDialog.ui", self)
         self._setup_widgets()
         self._load_settings()
         self._connect_signals()

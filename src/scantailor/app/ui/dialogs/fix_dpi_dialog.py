@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 from PySide6 import QtWidgets
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIntValidator
 
-from scantailor.app.ui import UI_FOLDER, load_ui_widget
+from scantailor.app.ui import load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
 from scantailor.core import Dpi
+
+_UI_FOLDER = Path(__file__).parent
 
 if TYPE_CHECKING:
     from scantailor.core.models import ImageInfo
@@ -51,7 +54,7 @@ class FixDpiDialog(QtWidgets.QDialog):
         self._dpi_changes: dict[str, Dpi] = {}  # path -> new DPI
 
         # Load UI
-        self.ui = load_ui_widget(UI_FOLDER / "FixDpiDialog.ui", self)
+        self.ui = load_ui_widget(_UI_FOLDER / "FixDpiDialog.ui", self)
         self._setup_widgets()
         self._populate_views()
         self._connect_signals()
