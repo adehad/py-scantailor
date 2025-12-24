@@ -52,7 +52,7 @@ class Generatrix:
         pln2img_1d: 1D homography mapping plane Y to image line parameter.
     """
 
-    img_line: tuple[NDArray[np.float64], NDArray[np.float64]]
+    img_line: tuple[NDArray[np.floating], NDArray[np.floating]]
     pln2img_1d: NDArray[np.float64]  # Shape (2, 2) for 1D homography
 
 
@@ -485,10 +485,11 @@ class CylindricalSurfaceDewarper:
 
 
 def _line_segment_intersect(
-    line_p1: NDArray[np.float64],
-    line_p2: NDArray[np.float64],
-    seg_p1: NDArray[np.float64],
-    seg_p2: NDArray[np.float64],
+
+    line_p1: NDArray[np.floating],
+    line_p2: NDArray[np.floating],
+    seg_p1: NDArray[np.floating],
+    seg_p2: NDArray[np.floating],
 ) -> NDArray[np.float64] | None:
     """Find intersection of infinite line with line segment.
 
