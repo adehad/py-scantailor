@@ -11,9 +11,11 @@ from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
 from scantailor.app.ui.dialogs.relinking import RelinkingDialog
 from scantailor.app.ui.dialogs.remove_pages import RemovePagesDialog
 from scantailor.app.ui.dialogs.settings import SettingsDialog
+from scantailor.app.ui.dialogs.split_mode import ApplyScope, SplitModeDialog
 
 __all__ = [
     "AboutDialog",
+    "ApplyScope",
     "DefaultParamsDialog",
     "FixDpiDialog",
     "LoadFilesStatusDialog",
@@ -22,4 +24,5 @@ __all__ = [
     "RelinkingDialog",
     "RemovePagesDialog",
     "SettingsDialog",
+    "SplitModeDialog",
 ]
