@@ -7,7 +7,9 @@
       "Bash(pdm run typecheck:*)",
       "Bash(cat:*)",
       "Bash(pdm run ruff:*)",
-      "Bash(pdm run pre-commit run:*)"
+      "Bash(pdm run pre-commit run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
