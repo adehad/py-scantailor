@@ -7,9 +7,11 @@ from scantailor.app.ui.widgets.color_pickup import (
     ColorPickerButton,
     ColorPickupInteraction,
 )
+from scantailor.app.ui.widgets.non_owning_widget import NonOwningWidget
 
 __all__ = [
     "CollapsibleGroupBox",
     "ColorPickerButton",
     "ColorPickupInteraction",
+    "NonOwningWidget",
 ]
