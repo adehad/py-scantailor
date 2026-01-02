@@ -55,7 +55,6 @@ tests/
 ## Code Rules
 
 ### MUST DO
-- `from __future__ import annotations` in every file
 - Type hints on all functions
 - Google-style docstrings with type info (Args must include types, not just param names)
 - Pydantic for data models
