@@ -8,10 +8,24 @@ from scantailor.app.ui.widgets.color_pickup import (
     ColorPickupInteraction,
 )
 from scantailor.app.ui.widgets.non_owning_widget import NonOwningWidget
+from scantailor.app.ui.widgets.relinkable_path_visualization import (
+    PathType,
+    RelinkablePathVisualization,
+)
+from scantailor.app.ui.widgets.relinking_list_view import (
+    RelinkingListView,
+    RelinkingStatus,
+    UNCOMMITTED_STATUS_ROLE,
+)
 
 __all__ = [
     "CollapsibleGroupBox",
     "ColorPickerButton",
     "ColorPickupInteraction",
     "NonOwningWidget",
+    "PathType",
+    "RelinkablePathVisualization",
+    "RelinkingListView",
+    "RelinkingStatus",
+    "UNCOMMITTED_STATUS_ROLE",
 ]
