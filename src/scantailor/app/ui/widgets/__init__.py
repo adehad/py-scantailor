@@ -17,6 +17,7 @@ from scantailor.app.ui.widgets.relinking_list_view import (
     RelinkingStatus,
     UNCOMMITTED_STATUS_ROLE,
 )
+from scantailor.app.ui.widgets.stage_list_view import StageListView
 
 __all__ = [
     "CollapsibleGroupBox",
@@ -27,5 +28,6 @@ __all__ = [
     "RelinkablePathVisualization",
     "RelinkingListView",
     "RelinkingStatus",
+    "StageListView",
     "UNCOMMITTED_STATUS_ROLE",
 ]
