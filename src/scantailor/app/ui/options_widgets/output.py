@@ -4,8 +4,6 @@ Provides UI controls for configuring output settings including color mode,
 binarization, despeckling, and dewarping.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Signal
@@ -433,6 +431,7 @@ class OptionsWidget(QWidget):
             return
 
         from scantailor.core import Dpi
+
         params = self._filter.get_params(self._current_page_id)
         new_params = params.with_output_dpi(Dpi.uniform(value))
         self._filter.set_params(self._current_page_id, new_params)

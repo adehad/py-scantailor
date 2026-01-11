@@ -4,8 +4,6 @@ All functions take grayscale images as numpy arrays and return binary images.
 Binary images use 0 for black (background) and 255 for white (foreground).
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 import cv2

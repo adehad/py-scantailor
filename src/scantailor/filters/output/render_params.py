@@ -5,8 +5,6 @@ from the stored output parameters. These flags control various aspects of
 the output generation process.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 

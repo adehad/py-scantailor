@@ -1,7 +1,5 @@
 """Tests for Deskew filter parameters."""
 
-from __future__ import annotations
-
 import pytest
 
 from scantailor.filters.deskew import AutoManualMode, Params

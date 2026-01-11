@@ -17,14 +17,8 @@ Notes:
     - All pixel coordinates use (x, y) convention where x=column, y=row
 """
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
 import numpy as np
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
+from numpy.typing import NDArray
 
 # Type aliases for image arrays
 BinaryImage = NDArray[np.uint8]  # Binary image: 0 or 255
@@ -147,14 +141,14 @@ def invert_binary(image: BinaryImage) -> BinaryImage:
 
 __all__ = [
     "BinaryImage",
-    "GrayImage",
     "ColorImage",
     "FloatImage",
-    "is_binary",
-    "is_grayscale",
-    "is_color",
+    "GrayImage",
     "ensure_binary",
-    "ensure_grayscale",
     "ensure_color",
+    "ensure_grayscale",
     "invert_binary",
+    "is_binary",
+    "is_color",
+    "is_grayscale",
 ]

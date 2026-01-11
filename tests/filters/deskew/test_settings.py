@@ -1,7 +1,5 @@
 """Tests for Deskew filter settings."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from scantailor.core import ImageId, PageId, SubPage

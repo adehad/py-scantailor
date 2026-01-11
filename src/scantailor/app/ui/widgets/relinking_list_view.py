@@ -4,13 +4,16 @@ This list view displays a visual status layer showing which files exist (green)
 and which are missing (red) using colored rounded rectangles on the right side.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from PySide6.QtCore import QModelIndex, QRect, Qt
 from PySide6.QtGui import QBrush, QColor, QPainter, QPaintEvent, QPen
-from PySide6.QtWidgets import QListView, QStyleOptionViewItem, QStyledItemDelegate, QWidget
+from PySide6.QtWidgets import (
+    QListView,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QWidget,
+)
 
 
 # Status constants matching the C++ RelinkingModel
@@ -196,8 +199,16 @@ class RelinkingListView(QListView):
 
         # Draw existing items (green), then missing items (red)
         for status, pen_color, brush_color in [
-            (RelinkingStatus.EXISTS, QColor(0x3A, 0x58, 0x27), QColor(0x89, 0xE7, 0x4A)),
-            (RelinkingStatus.MISSING, QColor(0x6F, 0x27, 0x19), QColor(0xFF, 0x67, 0x4B)),
+            (
+                RelinkingStatus.EXISTS,
+                QColor(0x3A, 0x58, 0x27),
+                QColor(0x89, 0xE7, 0x4A),
+            ),
+            (
+                RelinkingStatus.MISSING,
+                QColor(0x6F, 0x27, 0x19),
+                QColor(0xFF, 0x67, 0x4B),
+            ),
         ]:
             pen = QPen(pen_color)
             pen.setWidthF(1.5)

@@ -1,7 +1,5 @@
 """Tests for zone system."""
 
-from __future__ import annotations
-
 import numpy as np
 import pytest
 
@@ -267,7 +265,9 @@ class TestZoneSet:
         assert result is True
         assert zs.is_empty()
 
-    def test_remove_nonexistent_zone(self, spline1: ZoneSpline, spline2: ZoneSpline) -> None:
+    def test_remove_nonexistent_zone(
+        self, spline1: ZoneSpline, spline2: ZoneSpline
+    ) -> None:
         """Removing non-existent zone returns False."""
         zs = ZoneSet()
         zone1 = zs.add_picture_zone(spline1)
@@ -286,7 +286,9 @@ class TestZoneSet:
         assert result is True
         assert zs.is_empty()
 
-    def test_clear_picture_zones(self, spline1: ZoneSpline, spline2: ZoneSpline) -> None:
+    def test_clear_picture_zones(
+        self, spline1: ZoneSpline, spline2: ZoneSpline
+    ) -> None:
         """Clear only picture zones."""
         zs = ZoneSet()
         zs.add_picture_zone(spline1)

@@ -1,7 +1,5 @@
 """Tests for Page Layout alignment types."""
 
-from __future__ import annotations
-
 from scantailor.filters.page_layout import (
     Alignment,
     HorizontalAlignment,

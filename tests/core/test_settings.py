@@ -1,7 +1,5 @@
 """Tests for ApplicationSettings."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 
@@ -177,9 +175,7 @@ class TestApplicationSettings:
 
         assert size == (250.0, 160.0)
 
-    def test_save_and_load(
-        self, temp_config_path: Path, reset_singleton: None
-    ) -> None:
+    def test_save_and_load(self, temp_config_path: Path, reset_singleton: None) -> None:
         """Can save and load settings."""
         ApplicationSettings.set_config_path(temp_config_path)
 

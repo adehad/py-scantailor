@@ -1,9 +1,6 @@
 """Default parameters dialog for setting filter defaults."""
 
-from __future__ import annotations
-
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from PySide6 import QtWidgets
 from PySide6.QtCore import Signal
@@ -11,9 +8,7 @@ from PySide6.QtGui import QPixmap
 
 from scantailor.app.ui import load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
-
-if TYPE_CHECKING:
-    from scantailor.core.settings import DefaultParams
+from scantailor.core.settings import DefaultParams
 
 _UI_FOLDER = Path(__file__).parent
 
@@ -86,18 +81,14 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         self._reset_btn = get_cwidget(self.ui, QtWidgets.QPushButton, "resetBtn")
 
         # === Split Pages tab ===
-        self._layout_mode_cb = get_cwidget(
-            self.ui, QtWidgets.QComboBox, "layoutModeCB"
-        )
+        self._layout_mode_cb = get_cwidget(self.ui, QtWidgets.QComboBox, "layoutModeCB")
         self._single_page_uncut_btn = get_cwidget(
             self.ui, QtWidgets.QToolButton, "singlePageUncutBtn"
         )
         self._page_plus_offcut_btn = get_cwidget(
             self.ui, QtWidgets.QToolButton, "pagePlusOffcutBtn"
         )
-        self._two_pages_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "twoPagesBtn"
-        )
+        self._two_pages_btn = get_cwidget(self.ui, QtWidgets.QToolButton, "twoPagesBtn")
 
         # === Deskew tab ===
         self._deskew_auto_btn = get_cwidget(
@@ -126,9 +117,7 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         self._page_detect_disable_btn = get_cwidget(
             self.ui, QtWidgets.QToolButton, "pageDetectDisableBtn"
         )
-        self._fine_tune_btn = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "fineTuneBtn"
-        )
+        self._fine_tune_btn = get_cwidget(self.ui, QtWidgets.QCheckBox, "fineTuneBtn")
 
         # === Margins tab ===
         self._top_margin_sb = get_cwidget(
@@ -149,17 +138,13 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         self._left_right_link = get_cwidget(
             self.ui, QtWidgets.QToolButton, "leftRightLink"
         )
-        self._auto_margins_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "autoMargins"
-        )
+        self._auto_margins_cb = get_cwidget(self.ui, QtWidgets.QCheckBox, "autoMargins")
 
         # Alignment buttons
         self._align_top_left_btn = get_cwidget(
             self.ui, QtWidgets.QToolButton, "alignTopLeftBtn"
         )
-        self._align_top_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "alignTopBtn"
-        )
+        self._align_top_btn = get_cwidget(self.ui, QtWidgets.QToolButton, "alignTopBtn")
         self._align_top_right_btn = get_cwidget(
             self.ui, QtWidgets.QToolButton, "alignTopRightBtn"
         )
@@ -204,9 +189,7 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         )
 
         # DPI
-        self._dpi_selector = get_cwidget(
-            self.ui, QtWidgets.QComboBox, "dpiSelector"
-        )
+        self._dpi_selector = get_cwidget(self.ui, QtWidgets.QComboBox, "dpiSelector")
 
         # Binarization
         self._threshold_method_box = get_cwidget(
@@ -227,15 +210,9 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         self._wolf_window_size = get_cwidget(
             self.ui, QtWidgets.QSpinBox, "wolfWindowSize"
         )
-        self._wolf_coef = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "wolfCoef"
-        )
-        self._lower_bound = get_cwidget(
-            self.ui, QtWidgets.QSpinBox, "lowerBound"
-        )
-        self._upper_bound = get_cwidget(
-            self.ui, QtWidgets.QSpinBox, "upperBound"
-        )
+        self._wolf_coef = get_cwidget(self.ui, QtWidgets.QDoubleSpinBox, "wolfCoef")
+        self._lower_bound = get_cwidget(self.ui, QtWidgets.QSpinBox, "lowerBound")
+        self._upper_bound = get_cwidget(self.ui, QtWidgets.QSpinBox, "upperBound")
 
         # Picture shape
         self._picture_shape_selector = get_cwidget(
@@ -249,9 +226,7 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         )
 
         # Despeckle
-        self._despeckle_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "despeckleCB"
-        )
+        self._despeckle_cb = get_cwidget(self.ui, QtWidgets.QCheckBox, "despeckleCB")
         self._despeckle_slider = get_cwidget(
             self.ui, QtWidgets.QSlider, "despeckleSlider"
         )
@@ -276,17 +251,13 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         self._fill_margins_cb = get_cwidget(
             self.ui, QtWidgets.QCheckBox, "fillMarginsCB"
         )
-        self._fill_offcut_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "fillOffcutCB"
-        )
+        self._fill_offcut_cb = get_cwidget(self.ui, QtWidgets.QCheckBox, "fillOffcutCB")
         self._filling_color_box = get_cwidget(
             self.ui, QtWidgets.QComboBox, "fillingColorBox"
         )
 
         # Splitting
-        self._splitting_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "splittingCB"
-        )
+        self._splitting_cb = get_cwidget(self.ui, QtWidgets.QCheckBox, "splittingCB")
         self._original_background_cb = get_cwidget(
             self.ui, QtWidgets.QCheckBox, "originalBackgroundCB"
         )
@@ -307,9 +278,7 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         )
 
         # Posterize
-        self._posterize_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "posterizeCB"
-        )
+        self._posterize_cb = get_cwidget(self.ui, QtWidgets.QCheckBox, "posterizeCB")
         self._posterize_level_sb = get_cwidget(
             self.ui, QtWidgets.QSpinBox, "posterizeLevelSB"
         )
@@ -340,9 +309,7 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         )
 
         # Button box
-        self._button_box = get_cwidget(
-            self.ui, QtWidgets.QDialogButtonBox, "buttonBox"
-        )
+        self._button_box = get_cwidget(self.ui, QtWidgets.QDialogButtonBox, "buttonBox")
 
         # Set default units
         self._units_label.setText("mm")
@@ -358,10 +325,12 @@ class DefaultParamsDialog(QtWidgets.QDialog):
 
         # Layout mode for page split
         self._layout_mode_cb.clear()
-        self._layout_mode_cb.addItems([
-            "Auto",
-            "Manual",
-        ])
+        self._layout_mode_cb.addItems(
+            [
+                "Auto",
+                "Manual",
+            ]
+        )
 
         # Alignment mode options
         alignment_modes = ["Auto", "Manual", "Original"]
@@ -372,52 +341,64 @@ class DefaultParamsDialog(QtWidgets.QDialog):
 
         # Color mode
         self._color_mode_selector.clear()
-        self._color_mode_selector.addItems([
-            "Black and White",
-            "Color / Grayscale",
-            "Mixed",
-        ])
+        self._color_mode_selector.addItems(
+            [
+                "Black and White",
+                "Color / Grayscale",
+                "Mixed",
+            ]
+        )
 
         # DPI options
         self._dpi_selector.clear()
-        self._dpi_selector.addItems([
-            "300",
-            "400",
-            "600",
-            "1200",
-        ])
+        self._dpi_selector.addItems(
+            [
+                "300",
+                "400",
+                "600",
+                "1200",
+            ]
+        )
 
         # Binarization method
         self._threshold_method_box.clear()
-        self._threshold_method_box.addItems([
-            "Otsu",
-            "Sauvola",
-            "Wolf",
-        ])
+        self._threshold_method_box.addItems(
+            [
+                "Otsu",
+                "Sauvola",
+                "Wolf",
+            ]
+        )
 
         # Picture shape
         self._picture_shape_selector.clear()
-        self._picture_shape_selector.addItems([
-            "Off",
-            "Free",
-            "Rectangular",
-        ])
+        self._picture_shape_selector.addItems(
+            [
+                "Off",
+                "Free",
+                "Rectangular",
+            ]
+        )
 
         # Filling color
         self._filling_color_box.clear()
-        self._filling_color_box.addItems([
-            "White",
-            "Black",
-        ])
+        self._filling_color_box.addItems(
+            [
+                "White",
+                "Black",
+            ]
+        )
 
         # Dewarping mode
         self._dewarping_mode_cb.clear()
-        self._dewarping_mode_cb.addItems([
-            "Off",
-            "Auto",
-            "Manual",
-            "Marginal",
-        ])
+        self._dewarping_mode_cb.addItems(
+            [
+                "Off",
+                "Auto",
+                "Manual",
+                "Marginal",
+            ]
+        )
 
     def _load_params(self) -> None:
         """Load current parameters into the UI."""
@@ -476,9 +457,7 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         self._splitting_cb.toggled.connect(self._on_splitting_toggled)
 
         # Color segmentation
-        self._color_segmentation_cb.toggled.connect(
-            self._on_color_segmentation_toggled
-        )
+        self._color_segmentation_cb.toggled.connect(self._on_color_segmentation_toggled)
 
     def _save_and_accept(self) -> None:
         """Save parameters and close dialog."""

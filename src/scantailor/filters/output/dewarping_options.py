@@ -4,8 +4,6 @@ This module provides configuration for dewarping (page curvature correction)
 during output generation.
 """
 
-from __future__ import annotations
-
 from enum import Enum
 
 from pydantic import BaseModel, Field

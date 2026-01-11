@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.AboutDialog import AboutDialog

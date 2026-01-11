@@ -4,8 +4,6 @@ This filter applies orthogonal rotations (0, 90, 180, 270 degrees) to images.
 The rotation is stored as metadata and applied during rendering/output.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 import numpy as np

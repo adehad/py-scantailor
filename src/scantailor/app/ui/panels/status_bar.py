@@ -1,7 +1,5 @@
 """Status bar panel for displaying page and position information."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from PySide6 import QtWidgets
@@ -40,19 +38,11 @@ class StatusBarPanel(QtWidgets.QWidget):
 
     def _setup_widgets(self) -> None:
         """Set up widget references."""
-        self._zone_mode_label = get_cwidget(
-            self.ui, QtWidgets.QLabel, "zoneModeLabel"
-        )
-        self._mouse_pos_label = get_cwidget(
-            self.ui, QtWidgets.QLabel, "mousePosLabel"
-        )
-        self._phys_size_label = get_cwidget(
-            self.ui, QtWidgets.QLabel, "physSizeLabel"
-        )
+        self._zone_mode_label = get_cwidget(self.ui, QtWidgets.QLabel, "zoneModeLabel")
+        self._mouse_pos_label = get_cwidget(self.ui, QtWidgets.QLabel, "mousePosLabel")
+        self._phys_size_label = get_cwidget(self.ui, QtWidgets.QLabel, "physSizeLabel")
         self._page_no_label = get_cwidget(self.ui, QtWidgets.QLabel, "pageNoLabel")
-        self._page_info_label = get_cwidget(
-            self.ui, QtWidgets.QLabel, "pageInfoLabel"
-        )
+        self._page_info_label = get_cwidget(self.ui, QtWidgets.QLabel, "pageInfoLabel")
 
         # Initialize with empty values
         self.clear()

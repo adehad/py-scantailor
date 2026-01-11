@@ -4,8 +4,6 @@ This filter manages page margins and alignment across a project, ensuring
 consistent page sizes in the final output.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from scantailor.core.models import Margins, PageId

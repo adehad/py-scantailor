@@ -1,7 +1,5 @@
 """UI Elements & Screens."""
 
-from __future__ import annotations
-
 import pathlib
 
 from PySide6 import QtCore, QtUiTools, QtWidgets

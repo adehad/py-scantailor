@@ -12,8 +12,6 @@ The pipeline stages are:
 6. Output - Generate final output with binarization
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -269,7 +267,7 @@ def _process_page_layout(
     image: NDArray[np.uint8],
     page_id: PageId,
     sequence: StageSequence,
-    options: PipelineOptions,  # noqa: ARG001
+    options: PipelineOptions,
 ) -> tuple[NDArray[np.uint8], dict]:
     """Process the Page Layout stage."""
     filter_ = sequence.page_layout_filter
@@ -346,6 +344,5 @@ def process_batch(
         ... )
     """
     return [
-        process_page(image, page_id, sequence, options)
-        for image, page_id in images
+        process_page(image, page_id, sequence, options) for image, page_id in images
     ]

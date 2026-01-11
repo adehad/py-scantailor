@@ -3,8 +3,6 @@
 Provides UI controls for configuring content and page box detection.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Signal
@@ -123,9 +121,7 @@ class OptionsWidget(QWidget):
         # Fine tune checkbox
         self._fine_tune_check = QCheckBox("Fine Tune Page Corners")
         self._fine_tune_check.setObjectName("fineTuneBtn")
-        self._fine_tune_check.setToolTip(
-            "Shift with corners while they are in black."
-        )
+        self._fine_tune_check.setToolTip("Shift with corners while they are in black.")
         options_layout.addWidget(self._fine_tune_check)
 
         # Dimensions widget

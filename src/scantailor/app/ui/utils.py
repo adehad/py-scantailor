@@ -1,7 +1,5 @@
 """UI Helpers & Utilities."""
 
-from __future__ import annotations
-
 import typing
 
 from PySide6 import QtCore, QtWidgets

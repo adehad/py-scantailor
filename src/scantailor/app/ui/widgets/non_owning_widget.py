@@ -4,8 +4,6 @@ A QWidget that calls setParent(None) on its children instead of deleting them.
 This is useful for container widgets where the children may be managed elsewhere.
 """
 
-from __future__ import annotations
-
 from PySide6.QtWidgets import QWidget
 
 

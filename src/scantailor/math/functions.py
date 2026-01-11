@@ -4,8 +4,6 @@ This module provides classes for linear and quadratic functions
 that can be used in optimization algorithms and geometric computations.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 

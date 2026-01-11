@@ -1,7 +1,5 @@
 """Reusable UI widgets for the ScanTailor application."""
 
-from __future__ import annotations
-
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 from scantailor.app.ui.widgets.color_pickup import (
     ColorPickerButton,
@@ -13,13 +11,14 @@ from scantailor.app.ui.widgets.relinkable_path_visualization import (
     RelinkablePathVisualization,
 )
 from scantailor.app.ui.widgets.relinking_list_view import (
+    UNCOMMITTED_STATUS_ROLE,
     RelinkingListView,
     RelinkingStatus,
-    UNCOMMITTED_STATUS_ROLE,
 )
 from scantailor.app.ui.widgets.stage_list_view import StageListView
 
 __all__ = [
+    "UNCOMMITTED_STATUS_ROLE",
     "CollapsibleGroupBox",
     "ColorPickerButton",
     "ColorPickupInteraction",
@@ -29,5 +28,4 @@ __all__ = [
     "RelinkingListView",
     "RelinkingStatus",
     "StageListView",
-    "UNCOMMITTED_STATUS_ROLE",
 ]

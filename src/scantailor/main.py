@@ -1,7 +1,5 @@
 """Main Entrypoint for the application."""
 
-from __future__ import annotations
-
 from PySide6 import QtCore, QtWidgets
 
 from .app._ui import resources_rc

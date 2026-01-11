@@ -3,8 +3,6 @@
 Functions for rotating, scaling, and transforming images using OpenCV.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Literal
 
 import cv2
@@ -183,10 +181,13 @@ def shear(
     # Build shear matrix:
     # [1, shear_x, 0]
     # [shear_y, 1, 0]
-    matrix = np.array([
-        [1.0, shear_x, 0.0],
-        [shear_y, 1.0, 0.0],
-    ], dtype=np.float64)
+    matrix = np.array(
+        [
+            [1.0, shear_x, 0.0],
+            [shear_y, 1.0, 0.0],
+        ],
+        dtype=np.float64,
+    )
 
     return transform_affine(
         image,

@@ -7,8 +7,6 @@ Provides an interactive image view for the Select Content filter with:
 - Visual feedback for content and page boundaries
 """
 
-from __future__ import annotations
-
 import math
 from enum import IntFlag, auto
 from typing import TYPE_CHECKING
@@ -229,9 +227,7 @@ class SelectContentImageView(ImageViewBase):
         else:  # BOTTOM
             return QLineF(rect.bottomLeft(), rect.bottomRight())
 
-    def _corner_at_position(
-        self, rect: QRectF, widget_pos: QPointF
-    ) -> Edge:
+    def _corner_at_position(self, rect: QRectF, widget_pos: QPointF) -> Edge:
         """Check if a position is over a corner of a rectangle.
 
         Args:
@@ -264,9 +260,7 @@ class SelectContentImageView(ImageViewBase):
 
         return Edge.NONE
 
-    def _edge_at_position(
-        self, rect: QRectF, widget_pos: QPointF
-    ) -> Edge:
+    def _edge_at_position(self, rect: QRectF, widget_pos: QPointF) -> Edge:
         """Check if a position is over an edge of a rectangle.
 
         Args:
@@ -345,13 +339,9 @@ class SelectContentImageView(ImageViewBase):
         nearest_x = line.x1() + t * line_dx
         nearest_y = line.y1() + t * line_dy
 
-        return math.sqrt(
-            (point.x() - nearest_x) ** 2 + (point.y() - nearest_y) ** 2
-        )
+        return math.sqrt((point.x() - nearest_x) ** 2 + (point.y() - nearest_y) ** 2)
 
-    def _move_corner(
-        self, rect: QRectF, edge_mask: Edge, new_pos: QPointF
-    ) -> QRectF:
+    def _move_corner(self, rect: QRectF, edge_mask: Edge, new_pos: QPointF) -> QRectF:
         """Move a corner of a rectangle to a new position.
 
         Args:
@@ -375,9 +365,7 @@ class SelectContentImageView(ImageViewBase):
 
         return new_rect.normalized()
 
-    def _move_edge(
-        self, rect: QRectF, edge: Edge, new_pos: QPointF
-    ) -> QRectF:
+    def _move_edge(self, rect: QRectF, edge: Edge, new_pos: QPointF) -> QRectF:
         """Move an edge of a rectangle to a new position.
 
         Args:

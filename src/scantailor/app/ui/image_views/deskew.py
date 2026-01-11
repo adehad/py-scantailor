@@ -6,8 +6,6 @@ Provides an interactive image view for the Deskew filter with:
 - Ctrl+Wheel rotation with fine adjustment using Ctrl+Shift
 """
 
-from __future__ import annotations
-
 import math
 from typing import TYPE_CHECKING
 
@@ -61,7 +59,9 @@ class DeskewImageView(ImageViewBase):
         super().__init__(image, downscaled_image, transformation, parent=parent)
 
         self._deskew_angle = 0.0  # Current deskew angle in degrees
-        self._dragging_handle = -1  # -1 = not dragging, 0 = left handle, 1 = right handle
+        self._dragging_handle = (
+            -1
+        )  # -1 = not dragging, 0 = left handle, 1 = right handle
         self._show_grid = True
 
         # Set up keyboard shortcuts
@@ -180,7 +180,9 @@ class DeskewImageView(ImageViewBase):
             return QRectF()
 
         # Scale to fit while maintaining aspect ratio for the arc
-        arc_width = min(reduced_rect.width(), reduced_rect.height() / self.MAX_ROTATION_SIN)
+        arc_width = min(
+            reduced_rect.width(), reduced_rect.height() / self.MAX_ROTATION_SIN
+        )
         arc_height = arc_width  # Square for circular arcs
 
         arc_rect = QRectF(0, 0, arc_width, arc_height)

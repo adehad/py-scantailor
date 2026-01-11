@@ -5,18 +5,13 @@ user preferences. Settings are persisted to a JSON file in the user's config
 directory.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar, Self
 
 from loguru import logger
 from pydantic import BaseModel, Field
-
-if TYPE_CHECKING:
-    from typing import Self
 
 
 class ColorScheme(str, Enum):
@@ -201,9 +196,7 @@ class ApplicationSettings(BaseModel):
         config_path = self.get_config_path()
         try:
             config_path.parent.mkdir(parents=True, exist_ok=True)
-            config_path.write_text(
-                self.model_dump_json(indent=2), encoding="utf-8"
-            )
+            config_path.write_text(self.model_dump_json(indent=2), encoding="utf-8")
             logger.debug(f"Settings saved to {config_path}")
         except Exception as e:
             logger.error(f"Failed to save settings to {config_path}: {e}")

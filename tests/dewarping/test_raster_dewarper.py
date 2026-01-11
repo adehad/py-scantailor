@@ -1,7 +1,5 @@
 """Tests for raster dewarping functions."""
 
-from __future__ import annotations
-
 import numpy as np
 import pytest
 
@@ -50,11 +48,14 @@ class TestInterpolationMethod:
 class TestDewarpImage:
     """Tests for dewarp_image function."""
 
-    def test_grayscale_output_shape(self, simple_dewarper: CylindricalSurfaceDewarper) -> None:
+    def test_grayscale_output_shape(
+        self, simple_dewarper: CylindricalSurfaceDewarper
+    ) -> None:
         """Grayscale output has correct shape."""
         src = np.zeros((300, 200), dtype=np.uint8)
         result = dewarp_image(
-            src, simple_dewarper,
+            src,
+            simple_dewarper,
             dst_size=(250, 350),
             model_domain=(0, 0, 1, 1),
         )
@@ -62,11 +63,14 @@ class TestDewarpImage:
         assert result.shape == (350, 250)
         assert result.dtype == np.uint8
 
-    def test_rgb_output_shape(self, simple_dewarper: CylindricalSurfaceDewarper) -> None:
+    def test_rgb_output_shape(
+        self, simple_dewarper: CylindricalSurfaceDewarper
+    ) -> None:
         """RGB output has correct shape."""
         src = np.zeros((300, 200, 3), dtype=np.uint8)
         result = dewarp_image(
-            src, simple_dewarper,
+            src,
+            simple_dewarper,
             dst_size=(250, 350),
             model_domain=(0, 0, 1, 1),
         )
@@ -74,11 +78,14 @@ class TestDewarpImage:
         assert result.shape == (350, 250, 3)
         assert result.dtype == np.uint8
 
-    def test_rgba_output_shape(self, simple_dewarper: CylindricalSurfaceDewarper) -> None:
+    def test_rgba_output_shape(
+        self, simple_dewarper: CylindricalSurfaceDewarper
+    ) -> None:
         """RGBA output has correct shape."""
         src = np.zeros((300, 200, 4), dtype=np.uint8)
         result = dewarp_image(
-            src, simple_dewarper,
+            src,
+            simple_dewarper,
             dst_size=(250, 350),
             model_domain=(0, 0, 1, 1),
         )
@@ -86,12 +93,15 @@ class TestDewarpImage:
         assert result.shape == (350, 250, 4)
         assert result.dtype == np.uint8
 
-    def test_background_color_grayscale(self, simple_dewarper: CylindricalSurfaceDewarper) -> None:
+    def test_background_color_grayscale(
+        self, simple_dewarper: CylindricalSurfaceDewarper
+    ) -> None:
         """Background color is applied for grayscale."""
         # Source image smaller than mapped area
         src = np.full((100, 100), 128, dtype=np.uint8)
         result = dewarp_image(
-            src, simple_dewarper,
+            src,
+            simple_dewarper,
             dst_size=(200, 200),
             model_domain=(0, 0, 1, 1),
             background_color=255,
@@ -100,11 +110,14 @@ class TestDewarpImage:
         # Some pixels should be background color
         assert np.any(result == 255)
 
-    def test_background_color_rgb(self, simple_dewarper: CylindricalSurfaceDewarper) -> None:
+    def test_background_color_rgb(
+        self, simple_dewarper: CylindricalSurfaceDewarper
+    ) -> None:
         """Background color is applied for RGB."""
         src = np.full((100, 100, 3), 128, dtype=np.uint8)
         result = dewarp_image(
-            src, simple_dewarper,
+            src,
+            simple_dewarper,
             dst_size=(200, 200),
             model_domain=(0, 0, 1, 1),
             background_color=(255, 0, 0),
@@ -113,38 +126,47 @@ class TestDewarpImage:
         # Check that we got RGB output
         assert result.shape[2] == 3
 
-    def test_all_interpolation_methods(self, simple_dewarper: CylindricalSurfaceDewarper) -> None:
+    def test_all_interpolation_methods(
+        self, simple_dewarper: CylindricalSurfaceDewarper
+    ) -> None:
         """All interpolation methods work."""
         src = np.random.randint(0, 256, (100, 100), dtype=np.uint8)
 
         for method in InterpolationMethod:
             result = dewarp_image(
-                src, simple_dewarper,
+                src,
+                simple_dewarper,
                 dst_size=(100, 100),
                 model_domain=(0, 0, 1, 1),
                 interpolation=method,
             )
             assert result.shape == (100, 100)
 
-    def test_invalid_model_domain(self, simple_dewarper: CylindricalSurfaceDewarper) -> None:
+    def test_invalid_model_domain(
+        self, simple_dewarper: CylindricalSurfaceDewarper
+    ) -> None:
         """Invalid model domain raises error."""
         src = np.zeros((100, 100), dtype=np.uint8)
 
         with pytest.raises(ValueError, match="positive width"):
             dewarp_image(
-                src, simple_dewarper,
+                src,
+                simple_dewarper,
                 dst_size=(100, 100),
                 model_domain=(0.5, 0, 0.5, 1),  # Zero width
             )
 
         with pytest.raises(ValueError, match="positive.*height"):
             dewarp_image(
-                src, simple_dewarper,
+                src,
+                simple_dewarper,
                 dst_size=(100, 100),
                 model_domain=(0, 0.5, 1, 0.5),  # Zero height
             )
 
-    def test_partial_model_domain(self, simple_dewarper: CylindricalSurfaceDewarper) -> None:
+    def test_partial_model_domain(
+        self, simple_dewarper: CylindricalSurfaceDewarper
+    ) -> None:
         """Partial model domain works correctly."""
         src = np.zeros((300, 200), dtype=np.uint8)
         # Fill center with white
@@ -152,7 +174,8 @@ class TestDewarpImage:
 
         # Map only the center portion
         result = dewarp_image(
-            src, simple_dewarper,
+            src,
+            simple_dewarper,
             dst_size=(100, 100),
             model_domain=(0.25, 0.33, 0.75, 0.67),
         )
@@ -169,7 +192,8 @@ class TestDewarpImage:
             src[y : y + 2, :] = 255
 
         result = dewarp_image(
-            src, curved_dewarper,
+            src,
+            curved_dewarper,
             dst_size=(200, 300),
             model_domain=(0, 0, 1, 1),
         )
@@ -181,7 +205,9 @@ class TestDewarpImage:
 class TestComputeDewarpedSize:
     """Tests for compute_dewarped_size function."""
 
-    def test_flat_surface_same_size(self, simple_dewarper: CylindricalSurfaceDewarper) -> None:
+    def test_flat_surface_same_size(
+        self, simple_dewarper: CylindricalSurfaceDewarper
+    ) -> None:
         """Flat surface returns approximately same size."""
         src_size = (200, 300)
         dst_size = compute_dewarped_size(src_size, simple_dewarper)
@@ -193,7 +219,9 @@ class TestComputeDewarpedSize:
         assert 0.9 * src_size[0] < dst_size[0] < 1.1 * src_size[0]
         assert dst_size[1] == src_size[1]
 
-    def test_curved_surface_wider(self, curved_dewarper: CylindricalSurfaceDewarper) -> None:
+    def test_curved_surface_wider(
+        self, curved_dewarper: CylindricalSurfaceDewarper
+    ) -> None:
         """Curved surface may result in wider output."""
         src_size = (200, 300)
         dst_size = compute_dewarped_size(src_size, curved_dewarper)

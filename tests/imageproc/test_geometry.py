@@ -1,7 +1,5 @@
 """Tests for geometric transformations."""
 
-from __future__ import annotations
-
 import numpy as np
 
 from scantailor.imageproc import rotate_orthogonal, scale

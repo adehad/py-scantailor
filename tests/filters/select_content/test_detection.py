@@ -1,7 +1,5 @@
 """Tests for detection mode enums."""
 
-from __future__ import annotations
-
 from scantailor.filters.select_content import ContentDetectionMode, PageDetectionMode
 
 

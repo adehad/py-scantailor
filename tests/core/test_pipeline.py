@@ -1,7 +1,5 @@
 """Tests for pipeline execution."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import numpy as np
@@ -73,7 +71,9 @@ class TestPipelineOptions:
 class TestPipelineResult:
     """Tests for PipelineResult."""
 
-    def test_result_attributes(self, grayscale_image: np.ndarray, page_id: PageId) -> None:
+    def test_result_attributes(
+        self, grayscale_image: np.ndarray, page_id: PageId
+    ) -> None:
         """Result has expected attributes."""
         result = PipelineResult(
             image=grayscale_image,
@@ -282,7 +282,9 @@ class TestProcessBatch:
 
         results = process_batch(images, sequence, opts)
 
-        assert len(results[0].stages_completed) == 3  # FIX_ORIENTATION, PAGE_SPLIT, DESKEW
+        assert (
+            len(results[0].stages_completed) == 3
+        )  # FIX_ORIENTATION, PAGE_SPLIT, DESKEW
 
     def test_empty_batch(self, sequence: StageSequence) -> None:
         """Empty batch returns empty list."""

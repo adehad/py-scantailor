@@ -1,7 +1,5 @@
 """Out of memory dialog for handling OOM situations."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from PySide6 import QtWidgets
@@ -55,14 +53,10 @@ class OutOfMemoryDialog(QtWidgets.QDialog):
         self._save_project_as_btn = get_cwidget(
             self.ui, QtWidgets.QPushButton, "saveProjectAsBtn"
         )
-        self._dont_save_btn = get_cwidget(
-            self.ui, QtWidgets.QPushButton, "dontSaveBtn"
-        )
+        self._dont_save_btn = get_cwidget(self.ui, QtWidgets.QPushButton, "dontSaveBtn")
 
         # Success page
-        self._button_box = get_cwidget(
-            self.ui, QtWidgets.QDialogButtonBox, "buttonBox"
-        )
+        self._button_box = get_cwidget(self.ui, QtWidgets.QDialogButtonBox, "buttonBox")
 
         # Start on the main page
         self._top_level_stack.setCurrentIndex(0)

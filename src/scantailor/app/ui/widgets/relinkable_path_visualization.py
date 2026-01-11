@@ -5,8 +5,6 @@ path component. Components are styled green if they exist and red if missing.
 Hovering over a component highlights it and all components before it.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -73,7 +71,8 @@ class RelinkablePathVisualization(QWidget):
 
     Signals:
         clicked: Emitted when a path component is clicked.
-            Args:
+
+    Args:
                 prefix_path (str): Path up to and including clicked component
                 suffix_path (str): Rest of path after clicked component
                 path_type (int): PathType.FILE or PathType.DIR
@@ -296,7 +295,9 @@ class RelinkablePathVisualization(QWidget):
                 widget.setProperty("stickHighlight", True)
 
         # Emit signal
-        self.clicked.emit(component.prefix_path, component.suffix_path, component.path_type)
+        self.clicked.emit(
+            component.prefix_path, component.suffix_path, component.path_type
+        )
 
         # Clear stick highlighting
         for i in range(component_idx + 1):

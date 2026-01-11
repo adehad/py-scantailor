@@ -21,8 +21,6 @@ The mapping assumes adjacent samples are connected by straight lines,
 so arc length between samples is monotonically increasing.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -48,8 +46,12 @@ class ArcLengthMapper:
         _samples_arclen: Array of cumulative arc lengths at each sample.
     """
 
-    _samples_x: NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
-    _samples_arclen: NDArray[np.float64] = field(default_factory=lambda: np.array([], dtype=np.float64))
+    _samples_x: NDArray[np.float64] = field(
+        default_factory=lambda: np.array([], dtype=np.float64)
+    )
+    _samples_arclen: NDArray[np.float64] = field(
+        default_factory=lambda: np.array([], dtype=np.float64)
+    )
     _prev_fx: float = field(default=0.0, repr=False)
 
     def add_sample(self, x: float, fx: float) -> None:

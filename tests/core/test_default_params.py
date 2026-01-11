@@ -1,7 +1,5 @@
 """Tests for DefaultParams."""
 
-from __future__ import annotations
-
 import json
 
 import pytest
@@ -40,9 +38,7 @@ class TestFixOrientationDefaults:
 
     def test_custom_rotation(self) -> None:
         """Can create with custom rotation."""
-        defaults = FixOrientationDefaults(
-            image_rotation=OrthogonalRotation(degrees=90)
-        )
+        defaults = FixOrientationDefaults(image_rotation=OrthogonalRotation(degrees=90))
         assert defaults.image_rotation.degrees == 90
 
 
@@ -168,7 +164,9 @@ class TestDefaultParams:
         assert defaults.fix_orientation.image_rotation.degrees == 0
         assert defaults.deskew.deskew_angle_deg == 0.0
         assert defaults.page_split.layout_type == LayoutType.AUTO_LAYOUT_TYPE
-        assert defaults.select_content.content_detection_mode == ContentDetectionMode.AUTO
+        assert (
+            defaults.select_content.content_detection_mode == ContentDetectionMode.AUTO
+        )
         assert defaults.page_layout.hard_margins_mm.left == 10.0
         assert defaults.output.dpi.horizontal == 600
         assert defaults.units == Units.MILLIMETERS
@@ -184,7 +182,9 @@ class TestDefaultParams:
     def test_get_page_split_params(self) -> None:
         """get_page_split_params returns filter params."""
         defaults = DefaultParams()
-        defaults.page_split = PageSplitDefaults(layout_type=LayoutType.SINGLE_PAGE_UNCUT)
+        defaults.page_split = PageSplitDefaults(
+            layout_type=LayoutType.SINGLE_PAGE_UNCUT
+        )
 
         params = defaults.get_page_split_params()
         assert params.layout_type == LayoutType.SINGLE_PAGE_UNCUT

@@ -5,8 +5,6 @@ horizontal text lines. It can operate in automatic mode (detecting skew)
 or manual mode (using user-specified angles).
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 import cv2

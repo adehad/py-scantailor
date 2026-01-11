@@ -1,7 +1,5 @@
 """Parameters for Select Content filter."""
 
-from __future__ import annotations
-
 from pydantic import BaseModel, Field
 
 from .content_box import ContentBox, PageBox, PhysicalSize

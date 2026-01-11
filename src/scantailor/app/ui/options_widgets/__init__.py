@@ -4,8 +4,6 @@ Each filter has its own OptionsWidget class that provides the UI controls
 specific to that filter's parameters.
 """
 
-from __future__ import annotations
-
 from scantailor.app.ui.options_widgets.deskew import (
     OptionsWidget as DeskewOptionsWidget,
 )

@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 """PyInstaller file for generating app binaries."""
-from __future__ import annotations
+
 
 import typing
 
