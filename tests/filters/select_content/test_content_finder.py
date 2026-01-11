@@ -1,7 +1,5 @@
 """Tests for content detection algorithms."""
 
-from __future__ import annotations
-
 import numpy as np
 
 from scantailor.filters.select_content import (

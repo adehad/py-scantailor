@@ -4,8 +4,6 @@ All functions use OpenCV's morphology operations with configurable
 structuring elements.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Literal
 
 import cv2

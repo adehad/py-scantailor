@@ -1,7 +1,5 @@
 """Main Window."""
 
-from __future__ import annotations
-
 import pathlib
 
 from loguru import logger as _LOG
@@ -18,9 +16,8 @@ from PySide6.QtWidgets import (
 )
 
 from scantailor.app.ui import UI_FOLDER, load_ui_widget
-from scantailor.app.ui.utils import get_cwidget
-
 from scantailor.app.ui.dialogs import AboutDialog
+from scantailor.app.ui.utils import get_cwidget
 
 
 class MainWindowManager:

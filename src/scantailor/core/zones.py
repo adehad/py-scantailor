@@ -11,8 +11,6 @@ Each zone has:
 - Properties specific to its type (layer, category, fill color, etc.)
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING

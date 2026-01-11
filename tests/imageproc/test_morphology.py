@@ -1,7 +1,5 @@
 """Tests for morphological operations."""
 
-from __future__ import annotations
-
 import numpy as np
 
 from scantailor.imageproc import (
@@ -229,11 +227,14 @@ class TestHitMiss:
         image[50, 50] = 255  # Single white pixel
 
         # Kernel to detect isolated white pixels (surrounded by black)
-        kernel = np.array([
-            [-1, -1, -1],
-            [-1,  1, -1],
-            [-1, -1, -1],
-        ], dtype=np.int8)
+        kernel = np.array(
+            [
+                [-1, -1, -1],
+                [-1, 1, -1],
+                [-1, -1, -1],
+            ],
+            dtype=np.int8,
+        )
 
         result = hit_miss(image, kernel)
 
@@ -247,11 +248,14 @@ class TestHitMiss:
         image[48:52, 48:52] = 255  # 4x4 white square
 
         # Kernel to detect isolated pixels
-        kernel = np.array([
-            [-1, -1, -1],
-            [-1,  1, -1],
-            [-1, -1, -1],
-        ], dtype=np.int8)
+        kernel = np.array(
+            [
+                [-1, -1, -1],
+                [-1, 1, -1],
+                [-1, -1, -1],
+            ],
+            dtype=np.int8,
+        )
 
         result = hit_miss(image, kernel)
 

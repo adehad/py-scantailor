@@ -1,7 +1,5 @@
 """Tests for X-Spline implementation."""
 
-from __future__ import annotations
-
 import numpy as np
 
 from scantailor.math import ControlPoint, PointAndDerivatives, XSpline

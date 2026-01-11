@@ -1,7 +1,5 @@
 """Settings dialog for application preferences."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from PySide6 import QtWidgets
@@ -113,9 +111,7 @@ class SettingsDialog(QtWidgets.QDialog):
         )
 
         # Button box
-        self._button_box = get_cwidget(
-            self.ui, QtWidgets.QDialogButtonBox, "buttonBox"
-        )
+        self._button_box = get_cwidget(self.ui, QtWidgets.QDialogButtonBox, "buttonBox")
 
         # Populate combo boxes
         self._populate_combo_boxes()
@@ -136,53 +132,50 @@ class SettingsDialog(QtWidgets.QDialog):
     def _load_settings(self) -> None:
         """Load current settings into the UI."""
         # User Interface
-        self._enable_opengl_cb.setChecked(self._settings.enable_opengl)
+        self._enable_opengl_cb.setChecked(self._settings.opengl_enabled)
         self._auto_save_cb.setChecked(self._settings.auto_save_project)
 
         # Set color scheme
         scheme_index = {"light": 0, "dark": 1, "system": 2}.get(
-            self._settings.color_scheme, 2
+            self._settings.color_scheme.value, 2
         )
         self._color_scheme_box.setCurrentIndex(scheme_index)
 
         # Thumbnails
-        self._thumbnail_quality_sb.setValue(self._settings.thumbnail_quality)
-        self._thumbnail_size_sb.setValue(self._settings.thumbnail_size)
-        self._single_column_cb.setChecked(self._settings.single_column_thumbnails)
+        self._thumbnail_quality_sb.setValue(self._settings.thumbnail_quality_width)
+        self._thumbnail_size_sb.setValue(int(self._settings.max_thumbnail_width))
+        self._single_column_cb.setChecked(self._settings.single_column_thumbnail_display)
         self._cancel_selection_cb.setChecked(
-            self._settings.show_cancel_selection_question
+            self._settings.show_canceling_selection_question
         )
 
         # TIFF compression
-        bw_index = {"none": 0, "lzw": 1, "deflate": 2, "ccitt_g4": 3}.get(
-            self._settings.tiff_compression_bw, 0
-        )
+        bw_map = {1: 0, 5: 1, 8: 2, 4: 3}  # TiffCompression enum to index
+        bw_index = bw_map.get(self._settings.tiff_bw_compression.value, 3)
         self._tiff_bw_box.setCurrentIndex(bw_index)
 
-        color_index = {"none": 0, "lzw": 1, "deflate": 2, "jpeg": 3}.get(
-            self._settings.tiff_compression_color, 1
-        )
+        color_map = {1: 0, 5: 1, 8: 2, 7: 3}  # TiffCompression enum to index
+        color_index = color_map.get(self._settings.tiff_color_compression.value, 1)
         self._tiff_color_box.setCurrentIndex(color_index)
 
         # White on black detection
-        self._black_on_white_cb.setChecked(self._settings.auto_detect_black_on_white)
+        self._black_on_white_cb.setChecked(self._settings.black_on_white_detection)
         self._black_on_white_output_cb.setChecked(
-            self._settings.use_black_on_white_at_output
+            self._settings.black_on_white_detection_output
         )
 
         # Deviation settings
         self._highlight_deviation_cb.setChecked(self._settings.highlight_deviation)
-        deviation = self._settings.deviation_thresholds
-        self._deskew_deviation_coef.setValue(deviation.deskew_coefficient)
-        self._deskew_deviation_thresh.setValue(deviation.deskew_threshold)
+        self._deskew_deviation_coef.setValue(self._settings.deskew_deviation.coefficient)
+        self._deskew_deviation_thresh.setValue(self._settings.deskew_deviation.threshold)
         self._select_content_deviation_coef.setValue(
-            deviation.select_content_coefficient
+            self._settings.select_content_deviation.coefficient
         )
         self._select_content_deviation_thresh.setValue(
-            deviation.select_content_threshold
+            self._settings.select_content_deviation.threshold
         )
-        self._margins_deviation_coef.setValue(deviation.margins_coefficient)
-        self._margins_deviation_thresh.setValue(deviation.margins_threshold)
+        self._margins_deviation_coef.setValue(self._settings.margins_deviation.coefficient)
+        self._margins_deviation_thresh.setValue(self._settings.margins_deviation.threshold)
 
     def _connect_signals(self) -> None:
         """Connect widget signals."""
@@ -196,51 +189,55 @@ class SettingsDialog(QtWidgets.QDialog):
 
     def _save_settings(self) -> None:
         """Save UI values to settings."""
-        from scantailor.core.settings import DeviationThresholds
+        from scantailor.core.settings import ColorScheme, DeviationSettings, TiffCompression
 
         # User Interface
-        self._settings.enable_opengl = self._enable_opengl_cb.isChecked()
+        self._settings.opengl_enabled = self._enable_opengl_cb.isChecked()
         self._settings.auto_save_project = self._auto_save_cb.isChecked()
 
-        schemes = ["light", "dark", "system"]
+        schemes = [ColorScheme.LIGHT, ColorScheme.DARK, ColorScheme.DARK]  # "system" -> dark
         self._settings.color_scheme = schemes[self._color_scheme_box.currentIndex()]
 
         # Thumbnails
-        self._settings.thumbnail_quality = self._thumbnail_quality_sb.value()
-        self._settings.thumbnail_size = self._thumbnail_size_sb.value()
-        self._settings.single_column_thumbnails = self._single_column_cb.isChecked()
-        self._settings.show_cancel_selection_question = (
+        self._settings.thumbnail_quality_width = self._thumbnail_quality_sb.value()
+        self._settings.thumbnail_quality_height = self._thumbnail_quality_sb.value()
+        self._settings.max_thumbnail_width = float(self._thumbnail_size_sb.value())
+        self._settings.max_thumbnail_height = float(self._thumbnail_size_sb.value())
+        self._settings.single_column_thumbnail_display = self._single_column_cb.isChecked()
+        self._settings.show_canceling_selection_question = (
             self._cancel_selection_cb.isChecked()
         )
 
         # TIFF compression
-        bw_options = ["none", "lzw", "deflate", "ccitt_g4"]
-        self._settings.tiff_compression_bw = bw_options[
+        bw_options = [TiffCompression.NONE, TiffCompression.LZW, TiffCompression.DEFLATE, TiffCompression.CCITT_FAX4]
+        self._settings.tiff_bw_compression = bw_options[
             self._tiff_bw_box.currentIndex()
         ]
 
-        color_options = ["none", "lzw", "deflate", "jpeg"]
-        self._settings.tiff_compression_color = color_options[
+        color_options = [TiffCompression.NONE, TiffCompression.LZW, TiffCompression.DEFLATE, TiffCompression.JPEG]
+        self._settings.tiff_color_compression = color_options[
             self._tiff_color_box.currentIndex()
         ]
 
         # White on black detection
-        self._settings.auto_detect_black_on_white = (
-            self._black_on_white_cb.isChecked()
-        )
-        self._settings.use_black_on_white_at_output = (
+        self._settings.black_on_white_detection = self._black_on_white_cb.isChecked()
+        self._settings.black_on_white_detection_output = (
             self._black_on_white_output_cb.isChecked()
         )
 
         # Deviation settings
         self._settings.highlight_deviation = self._highlight_deviation_cb.isChecked()
-        self._settings.deviation_thresholds = DeviationThresholds(
-            deskew_coefficient=self._deskew_deviation_coef.value(),
-            deskew_threshold=self._deskew_deviation_thresh.value(),
-            select_content_coefficient=self._select_content_deviation_coef.value(),
-            select_content_threshold=self._select_content_deviation_thresh.value(),
-            margins_coefficient=self._margins_deviation_coef.value(),
-            margins_threshold=self._margins_deviation_thresh.value(),
+        self._settings.deskew_deviation = DeviationSettings(
+            coefficient=self._deskew_deviation_coef.value(),
+            threshold=self._deskew_deviation_thresh.value(),
+        )
+        self._settings.select_content_deviation = DeviationSettings(
+            coefficient=self._select_content_deviation_coef.value(),
+            threshold=self._select_content_deviation_thresh.value(),
+        )
+        self._settings.margins_deviation = DeviationSettings(
+            coefficient=self._margins_deviation_coef.value(),
+            threshold=self._margins_deviation_thresh.value(),
         )
 
     def get_settings(self) -> ApplicationSettings:

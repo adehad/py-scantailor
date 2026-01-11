@@ -3,7 +3,7 @@
 No relative imports so PyInstaller doesn't get confused.
 """
 
-from __future__ import annotations
+
 
 from scantailor.main import main
 

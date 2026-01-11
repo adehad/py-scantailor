@@ -1,7 +1,5 @@
 """Tests for Dependencies class."""
 
-from __future__ import annotations
-
 from scantailor.filters.select_content import (
     ContentDetectionMode,
     Dependencies,

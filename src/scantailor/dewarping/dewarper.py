@@ -28,15 +28,16 @@ The dewarping model assumes the page surface is a cylindrical section,
 with the top and bottom curves (directrices) defining the cylinder shape.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 from scantailor.dewarping.arc_length_mapper import ArcLengthMapper
-from scantailor.dewarping.polyline_intersector import PolylineIntersector, project_point_to_line
+from scantailor.dewarping.polyline_intersector import (
+    PolylineIntersector,
+    project_point_to_line,
+)
 from scantailor.math import Homography
 
 if TYPE_CHECKING:
@@ -124,7 +125,9 @@ class CylindricalSurfaceDewarper:
     _img_directrix2_intersector: PolylineIntersector = field(repr=False)
     # Optional fields (have defaults)
     _directrix_arc_length: float = field(default=1.0)
-    _arc_length_mapper: ArcLengthMapper = field(default_factory=ArcLengthMapper, repr=False)
+    _arc_length_mapper: ArcLengthMapper = field(
+        default_factory=ArcLengthMapper, repr=False
+    )
 
     @classmethod
     def from_directrices(
@@ -201,8 +204,12 @@ class CylindricalSurfaceDewarper:
         img_generatrix = (img_top, img_bottom)
 
         # Find intersections with the directrices
-        img_directrix1_pt = self._img_directrix1_intersector.intersect(img_top, img_bottom)
-        img_directrix2_pt = self._img_directrix2_intersector.intersect(img_top, img_bottom)
+        img_directrix1_pt = self._img_directrix1_intersector.intersect(
+            img_top, img_bottom
+        )
+        img_directrix2_pt = self._img_directrix2_intersector.intersect(
+            img_top, img_bottom
+        )
 
         # Project points onto the generatrix line
         _, proj1 = project_point_to_line(img_directrix1_pt, img_top, img_bottom)
@@ -215,7 +222,10 @@ class CylindricalSurfaceDewarper:
 
         # Build 1D homography mapping plane Y to image projection
         pairs: list[tuple[float, float]]
-        if abs(self._pln_straight_line_y) < 0.05 or abs(self._pln_straight_line_y - 1.0) < 0.05:
+        if (
+            abs(self._pln_straight_line_y) < 0.05
+            or abs(self._pln_straight_line_y - 1.0) < 0.05
+        ):
             # Straight line is near an edge, use midpoint instead
             pairs = [
                 (0.0, proj1),
@@ -258,8 +268,12 @@ class CylindricalSurfaceDewarper:
         img_bottom = self._pln2img.apply_to_point(pln_bottom)
 
         # Find intersections with the directrices
-        img_directrix1_pt = self._img_directrix1_intersector.intersect(img_top, img_bottom)
-        img_directrix2_pt = self._img_directrix2_intersector.intersect(img_top, img_bottom)
+        img_directrix1_pt = self._img_directrix1_intersector.intersect(
+            img_top, img_bottom
+        )
+        img_directrix2_pt = self._img_directrix2_intersector.intersect(
+            img_top, img_bottom
+        )
 
         # Project points onto the generatrix line
         _, proj1 = project_point_to_line(img_directrix1_pt, img_top, img_bottom)
@@ -272,7 +286,10 @@ class CylindricalSurfaceDewarper:
 
         # Build inverse 1D homography (image projection -> plane Y -> crv Y)
         pairs: list[tuple[float, float]]
-        if abs(self._pln_straight_line_y) < 0.05 or abs(self._pln_straight_line_y - 1.0) < 0.05:
+        if (
+            abs(self._pln_straight_line_y) < 0.05
+            or abs(self._pln_straight_line_y - 1.0) < 0.05
+        ):
             pairs = [
                 (proj1, 0.0),
                 (proj2, 1.0),
@@ -320,9 +337,7 @@ class CylindricalSurfaceDewarper:
 
         Maps: (0,0)->top-left, (1,0)->top-right, (0,1)->bottom-left, (1,1)->bottom-right
         """
-        src_points = np.array(
-            [[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float32
-        )
+        src_points = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float32)
         dst_points = np.array(
             [
                 img_directrix1[0],
@@ -414,8 +429,7 @@ class CylindricalSurfaceDewarper:
 
                 # Intersect line (pt1, img_ptx) with segment (prev_pt2, next_pt2)
                 pt2 = _line_segment_intersect(
-                    pt1, img_ptx,
-                    prev_pt2, img_directrix2[min(i2, n2 - 1)]
+                    pt1, img_ptx, prev_pt2, img_directrix2[min(i2, n2 - 1)]
                 )
                 if pt2 is None:
                     pt2 = img_directrix2[min(i2, n2 - 1)]
@@ -437,8 +451,7 @@ class CylindricalSurfaceDewarper:
 
                 # Intersect line (pt2, img_ptx) with segment (prev_pt1, next_pt1)
                 pt1 = _line_segment_intersect(
-                    pt2, img_ptx,
-                    prev_pt1, img_directrix1[min(i1, n1 - 1)]
+                    pt2, img_ptx, prev_pt1, img_directrix1[min(i1, n1 - 1)]
                 )
                 if pt1 is None:
                     pt1 = img_directrix1[min(i1, n1 - 1)]
@@ -485,7 +498,6 @@ class CylindricalSurfaceDewarper:
 
 
 def _line_segment_intersect(
-
     line_p1: NDArray[np.floating],
     line_p2: NDArray[np.floating],
     seg_p1: NDArray[np.floating],

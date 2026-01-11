@@ -1,7 +1,5 @@
 """System load widget for controlling parallel processing load."""
 
-from __future__ import annotations
-
 import sys
 from pathlib import Path
 
@@ -71,8 +69,12 @@ class SystemLoadWidget(QtWidgets.QWidget):
         # Set icons (using standard icons as fallback)
         style = self.style()
         if style:
-            minus_icon = style.standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ArrowLeft)
-            plus_icon = style.standardIcon(QtWidgets.QStyle.StandardPixmap.SP_ArrowRight)
+            minus_icon = style.standardIcon(
+                QtWidgets.QStyle.StandardPixmap.SP_ArrowLeft
+            )
+            plus_icon = style.standardIcon(
+                QtWidgets.QStyle.StandardPixmap.SP_ArrowRight
+            )
             self._minus_btn.setIcon(minus_icon)
             self._plus_btn.setIcon(plus_icon)
 

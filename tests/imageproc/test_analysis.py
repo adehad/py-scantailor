@@ -1,7 +1,5 @@
 """Tests for image analysis utilities."""
 
-from __future__ import annotations
-
 import numpy as np
 
 from scantailor.imageproc import (

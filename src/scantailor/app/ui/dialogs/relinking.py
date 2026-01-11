@@ -1,11 +1,9 @@
 """Relinking dialog for fixing broken file paths in projects."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from PySide6 import QtWidgets
-from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt, Signal
+from PySide6.QtCore import QAbstractListModel, QModelIndex, QPersistentModelIndex, Qt, Signal
 from PySide6.QtGui import QColor
 
 
@@ -55,11 +53,11 @@ class RelinkingModel(QAbstractListModel):
         super().__init__(parent)
         self._items = items or []
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
         """Get the number of rows."""
         return len(self._items)
 
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
+    def data(self, index: QModelIndex | QPersistentModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
         """Get data for a cell."""
         if not index.isValid() or index.row() >= len(self._items):
             return None
@@ -246,9 +244,7 @@ class RelinkingDialog(QtWidgets.QDialog):
                 item = self._model.get_item(row)
                 if item:
                     # Save for undo
-                    self._undo_stack.append(
-                        (row, item.new_path, item.status)
-                    )
+                    self._undo_stack.append((row, item.new_path, item.status))
                     self._model.update_item(row, new_path)
 
         self._update_ui()
@@ -268,9 +264,7 @@ class RelinkingDialog(QtWidgets.QDialog):
                     # Try to find the file by name in the folder
                     potential_path = folder_path / item.original_path.name
                     if potential_path.exists():
-                        self._undo_stack.append(
-                            (row, item.new_path, item.status)
-                        )
+                        self._undo_stack.append((row, item.new_path, item.status))
                         self._model.update_item(row, potential_path)
 
         self._update_ui()

@@ -7,8 +7,6 @@ The rotation is stored as metadata and applied during rendering/output,
 not directly to image pixels during this stage.
 """
 
-from __future__ import annotations
-
 from scantailor.filters.fix_orientation.filter import Filter
 from scantailor.filters.fix_orientation.settings import Settings
 

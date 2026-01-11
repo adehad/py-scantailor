@@ -3,8 +3,6 @@
 These tests cover Project, ImageInfo, ImageMetadata, and XML compatibility.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytest

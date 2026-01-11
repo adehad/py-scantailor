@@ -1,7 +1,5 @@
 """Dependencies tracking for cache invalidation."""
 
-from __future__ import annotations
-
 from pydantic import BaseModel
 
 from .detection import ContentDetectionMode, PageDetectionMode

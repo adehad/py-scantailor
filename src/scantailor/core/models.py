@@ -5,8 +5,6 @@ application: image identification, page references, resolution, margins,
 and orientation.
 """
 
-from __future__ import annotations
-
 from enum import IntEnum
 from pathlib import Path
 from typing import Literal, cast

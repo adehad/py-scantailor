@@ -13,8 +13,6 @@ Image Type Conventions:
 See image_types module for type aliases and conversion utilities.
 """
 
-from __future__ import annotations
-
 from scantailor.imageproc.analysis import (
     DEFAULT_COARSE_STEP,
     DEFAULT_MAX_ANGLE,

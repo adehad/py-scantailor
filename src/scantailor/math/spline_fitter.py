@@ -44,8 +44,6 @@ FUTURE IMPROVEMENTS (if needed):
 - Port PolylineModelShape for more accurate distance calculation
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 

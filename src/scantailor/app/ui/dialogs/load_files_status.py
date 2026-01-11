@@ -1,7 +1,5 @@
 """Load files status dialog showing results of file loading."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from PySide6 import QtWidgets
@@ -52,9 +50,7 @@ class LoadFilesStatusDialog(QtWidgets.QDialog):
         self._failed_text = get_cwidget(
             self.ui, QtWidgets.QPlainTextEdit, "failedFiles"
         )
-        self._button_box = get_cwidget(
-            self.ui, QtWidgets.QDialogButtonBox, "buttonBox"
-        )
+        self._button_box = get_cwidget(self.ui, QtWidgets.QDialogButtonBox, "buttonBox")
 
         # Update tab titles with counts
         loaded_count = len(self._loaded_files)

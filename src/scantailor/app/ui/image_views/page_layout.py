@@ -7,8 +7,6 @@ Provides an interactive image view for the Page Layout filter with:
 - Context menu for guide management
 """
 
-from __future__ import annotations
-
 import math
 from enum import IntFlag, auto
 from typing import TYPE_CHECKING
@@ -41,9 +39,7 @@ class Edge(IntFlag):
 class Guide:
     """A horizontal or vertical alignment guide."""
 
-    def __init__(
-        self, position: float, is_horizontal: bool, index: int
-    ) -> None:
+    def __init__(self, position: float, is_horizontal: bool, index: int) -> None:
         """Initialize a guide.
 
         Args:
@@ -253,9 +249,13 @@ class PageLayoutImageView(ImageViewBase):
             Margins in mm.
         """
         left = (self._inner_rect.left() - self._middle_rect.left()) * self._pixels_to_mm
-        right = (self._middle_rect.right() - self._inner_rect.right()) * self._pixels_to_mm
+        right = (
+            self._middle_rect.right() - self._inner_rect.right()
+        ) * self._pixels_to_mm
         top = (self._inner_rect.top() - self._middle_rect.top()) * self._pixels_to_mm
-        bottom = (self._middle_rect.bottom() - self._inner_rect.bottom()) * self._pixels_to_mm
+        bottom = (
+            self._middle_rect.bottom() - self._inner_rect.bottom()
+        ) * self._pixels_to_mm
 
         return Margins(
             left=max(0, left),
@@ -458,7 +458,10 @@ class PageLayoutImageView(ImageViewBase):
         # Draw middle rect (hard margins)
         if self._show_middle_rect and not self._middle_rect.isEmpty():
             self._paint_rect(
-                painter, self._middle_rect, self.MIDDLE_RECT_COLOR, self.MIDDLE_RECT_FILL
+                painter,
+                self._middle_rect,
+                self.MIDDLE_RECT_COLOR,
+                self.MIDDLE_RECT_FILL,
             )
 
         # Draw inner rect (content)

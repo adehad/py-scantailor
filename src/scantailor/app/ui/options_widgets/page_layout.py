@@ -3,8 +3,6 @@
 Provides UI controls for configuring margins and alignment.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Signal
@@ -307,7 +305,9 @@ class OptionsWidget(QWidget):
         self._match_size_check.toggled.connect(self._on_match_size_changed)
         self._h_mode_combo.currentIndexChanged.connect(self._on_h_mode_changed)
         self._v_mode_combo.currentIndexChanged.connect(self._on_v_mode_changed)
-        self._align_button_group.buttonClicked.connect(self._on_alignment_button_clicked)
+        self._align_button_group.buttonClicked.connect(
+            self._on_alignment_button_clicked
+        )
         self._apply_alignment_btn.clicked.connect(self.apply_alignment_requested.emit)
 
     def set_current_page(self, page_id: PageId) -> None:

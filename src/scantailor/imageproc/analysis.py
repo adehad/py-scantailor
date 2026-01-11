@@ -4,8 +4,6 @@ This module provides functions for analyzing images to detect properties
 like skew angle, content boundaries, and other characteristics.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Literal
 

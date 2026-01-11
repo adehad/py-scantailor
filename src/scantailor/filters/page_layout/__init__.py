@@ -5,8 +5,6 @@ sizes across a project by calculating hard margins (user-specified) and
 soft margins (to align pages with each other).
 """
 
-from __future__ import annotations
-
 from scantailor.filters.page_layout.alignment import (
     Alignment,
     HorizontalAlignment,

@@ -1,7 +1,5 @@
 """Detection mode enums for content and page detection."""
 
-from __future__ import annotations
-
 from enum import Enum
 
 

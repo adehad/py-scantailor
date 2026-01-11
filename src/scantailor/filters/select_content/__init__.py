@@ -1,7 +1,5 @@
 """Select Content filter for detecting content and page boundaries."""
 
-from __future__ import annotations
-
 from .content_box import ContentBox, PageBox, PhysicalSize
 from .content_finder import ContentDetectionResult, find_content_box, find_page_edges
 from .dependencies import Dependencies

@@ -6,8 +6,6 @@ Provides an interactive image view for the Page Split filter with:
 - Buttons to restore removed page halves
 """
 
-from __future__ import annotations
-
 import math
 from typing import TYPE_CHECKING
 
@@ -85,7 +83,9 @@ class PageSplitImageView(ImageViewBase):
         self._right_page_removed = right_page_removed
 
         # Interaction state
-        self._dragging_handle = -1  # -1 = not dragging, 0 = top handle, 1 = bottom handle
+        self._dragging_handle = (
+            -1
+        )  # -1 = not dragging, 0 = top handle, 1 = bottom handle
         self._dragging_line = False
         self._line_drag_offset = 0.0
 
@@ -121,9 +121,7 @@ class PageSplitImageView(ImageViewBase):
         # This would depend on the actual PageLayout implementation
         self.update()
 
-    def set_page_removal_state(
-        self, left_removed: bool, right_removed: bool
-    ) -> None:
+    def set_page_removal_state(self, left_removed: bool, right_removed: bool) -> None:
         """Set which page halves are removed.
 
         Args:
@@ -380,7 +378,9 @@ class PageSplitImageView(ImageViewBase):
 
         # Draw line
         is_line_active = self._dragging_line or self._hovered_line
-        line_color = self.SPLIT_LINE_HIGHLIGHT if is_line_active else self.SPLIT_LINE_COLOR
+        line_color = (
+            self.SPLIT_LINE_HIGHLIGHT if is_line_active else self.SPLIT_LINE_COLOR
+        )
         pen = QPen(line_color)
         pen.setWidth(3 if is_line_active else 2)
         painter.setPen(pen)
@@ -447,14 +447,20 @@ class PageSplitImageView(ImageViewBase):
             pos = event.position()
 
             # Check unremove buttons first
-            if not self._left_unremove_rect.isEmpty() and self._left_unremove_rect.contains(pos):
+            if (
+                not self._left_unremove_rect.isEmpty()
+                and self._left_unremove_rect.contains(pos)
+            ):
                 self._left_page_removed = False
                 self.update()
                 self.page_layout_set_locally.emit(None)  # Would emit actual layout
                 event.accept()
                 return
 
-            if not self._right_unremove_rect.isEmpty() and self._right_unremove_rect.contains(pos):
+            if (
+                not self._right_unremove_rect.isEmpty()
+                and self._right_unremove_rect.contains(pos)
+            ):
                 self._right_page_removed = False
                 self.update()
                 self.page_layout_set_locally.emit(None)  # Would emit actual layout

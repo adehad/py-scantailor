@@ -1,7 +1,5 @@
 """Project files dialog for adding/removing files from a project."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from PySide6 import QtWidgets
@@ -58,15 +56,11 @@ class ProjectFilesDialog(QtWidgets.QDialog):
     def _setup_widgets(self) -> None:
         """Set up widget references."""
         # Directory inputs
-        self._input_dir_line = get_cwidget(
-            self.ui, QtWidgets.QLineEdit, "inpDirLine"
-        )
+        self._input_dir_line = get_cwidget(self.ui, QtWidgets.QLineEdit, "inpDirLine")
         self._input_dir_browse_btn = get_cwidget(
             self.ui, QtWidgets.QPushButton, "inpDirBrowseBtn"
         )
-        self._output_dir_line = get_cwidget(
-            self.ui, QtWidgets.QLineEdit, "outDirLine"
-        )
+        self._output_dir_line = get_cwidget(self.ui, QtWidgets.QLineEdit, "outDirLine")
         self._output_dir_browse_btn = get_cwidget(
             self.ui, QtWidgets.QPushButton, "outDirBrowseBtn"
         )
@@ -94,23 +88,17 @@ class ProjectFilesDialog(QtWidgets.QDialog):
         )
 
         # Options
-        self._rtl_layout_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "rtlLayoutCB"
-        )
+        self._rtl_layout_cb = get_cwidget(self.ui, QtWidgets.QCheckBox, "rtlLayoutCB")
         self._force_fix_dpi_cb = get_cwidget(
             self.ui, QtWidgets.QCheckBox, "forceFixDpi"
         )
 
         # Progress bar
-        self._progress_bar = get_cwidget(
-            self.ui, QtWidgets.QProgressBar, "progressBar"
-        )
+        self._progress_bar = get_cwidget(self.ui, QtWidgets.QProgressBar, "progressBar")
         self._progress_bar.setVisible(False)
 
         # Button box
-        self._button_box = get_cwidget(
-            self.ui, QtWidgets.QDialogButtonBox, "buttonBox"
-        )
+        self._button_box = get_cwidget(self.ui, QtWidgets.QDialogButtonBox, "buttonBox")
 
         # Set initial directory paths
         if self._input_dir:

@@ -1,7 +1,5 @@
 """UI dialogs for the ScanTailor application."""
 
-from __future__ import annotations
-
 from scantailor.app.ui.dialogs.about import AboutDialog
 from scantailor.app.ui.dialogs.default_params import DefaultParamsDialog
 from scantailor.app.ui.dialogs.fix_dpi import FixDpiDialog

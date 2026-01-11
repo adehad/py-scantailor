@@ -4,8 +4,6 @@ These tests verify the fundamental data structures: Dpi, ImageId, PageId,
 Margins, SubPage, and OrthogonalRotation.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytest

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import pytest
 
 from scantailor.app._ui import resources_rc

@@ -4,8 +4,6 @@ Provides utility functions for drawing, polygon operations,
 and color manipulation.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 import cv2
@@ -113,7 +111,11 @@ def min_area_rect(
         Tuple ((center_x, center_y), (width, height), angle).
     """
     center, size, angle = cv2.minAreaRect(contour)
-    return ((float(center[0]), float(center[1])), (float(size[0]), float(size[1])), float(angle))
+    return (
+        (float(center[0]), float(center[1])),
+        (float(size[0]), float(size[1])),
+        float(angle),
+    )
 
 
 def convex_hull(contour: NDArray[np.int32]) -> NDArray[np.int32]:

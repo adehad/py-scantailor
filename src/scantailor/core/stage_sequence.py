@@ -5,8 +5,6 @@ filter pipeline: Fix Orientation -> Page Split -> Deskew -> Select Content
 -> Page Layout -> Output.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable

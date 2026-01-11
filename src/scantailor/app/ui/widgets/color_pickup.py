@@ -5,8 +5,6 @@ in fill zones. The picker shows a circular area around the cursor and
 takes the median color from pixels within that area.
 """
 
-from __future__ import annotations
-
 import numpy as np
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import QPoint, QRect, Qt, Signal
@@ -220,9 +218,7 @@ class ColorPickupInteraction(QtCore.QObject):
 
         return (r << 16) | (g << 8) | b
 
-    def eventFilter(
-        self, watched: QtCore.QObject, event: QtCore.QEvent
-    ) -> bool:
+    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
         """Filter events on the image view.
 
         Args:

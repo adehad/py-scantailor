@@ -4,8 +4,6 @@ Allows users to select the split mode (auto/manual) and apply scope
 (this page, all pages, selected pages, etc.) for page splitting.
 """
 
-from __future__ import annotations
-
 from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -238,18 +236,12 @@ class SplitModeDialog(QtWidgets.QDialog):
         elif scope == ApplyScope.THIS_PAGE_EVERY_OTHER:
             try:
                 idx = self._all_pages.index(self._current_page)
-                return {
-                    self._all_pages[i]
-                    for i in range(idx, len(self._all_pages), 2)
-                }
+                return {self._all_pages[i] for i in range(idx, len(self._all_pages), 2)}
             except ValueError:
                 return {self._current_page}
 
         elif scope == ApplyScope.EVERY_OTHER:
-            return {
-                self._all_pages[i]
-                for i in range(0, len(self._all_pages), 2)
-            }
+            return {self._all_pages[i] for i in range(0, len(self._all_pages), 2)}
 
         elif scope == ApplyScope.SELECTED_PAGES:
             return self._selected_pages.copy()

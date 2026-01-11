@@ -4,8 +4,6 @@ This module defines the parameter structures for storing page layout
 settings on a per-page basis.
 """
 
-from __future__ import annotations
-
 from pydantic import BaseModel, Field
 
 from scantailor.core.models import Margins

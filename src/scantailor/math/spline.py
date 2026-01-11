@@ -8,10 +8,8 @@ Reference:
     http://scholar.google.com/scholar?cluster=2002168279173394147
 """
 
-from __future__ import annotations
-
-from dataclasses import dataclass, field
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np

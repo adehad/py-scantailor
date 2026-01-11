@@ -9,6 +9,4 @@ Each filter represents a processing stage:
 6. output - Generate final output with binarization and dewarping
 """
 
-from __future__ import annotations
-
 __all__: list[str] = []

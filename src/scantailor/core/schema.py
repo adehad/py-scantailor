@@ -4,8 +4,6 @@ This module provides functions to generate and validate JSON schemas
 for project files, ensuring compatibility and data integrity.
 """
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 from typing import Any

@@ -1,7 +1,5 @@
 """Tests for Page Layout filter."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from scantailor.core import ImageId, Margins, PageId, SubPage

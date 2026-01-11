@@ -1,22 +1,18 @@
 """Fix DPI dialog for images with undefined or incorrect DPI."""
 
-from __future__ import annotations
-
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar
 
-from PySide6 import QtWidgets
+from PySide6 import QtGui, QtWidgets
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIntValidator
 
 from scantailor.app.ui import load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
 from scantailor.core import Dpi
+from scantailor.core.project import ImageInfo
 
 _UI_FOLDER = Path(__file__).parent
-
-if TYPE_CHECKING:
-    from scantailor.core.models import ImageInfo
 
 
 class FixDpiDialog(QtWidgets.QDialog):
@@ -67,9 +63,7 @@ class FixDpiDialog(QtWidgets.QDialog):
         self._undefined_view = get_cwidget(
             self.ui, QtWidgets.QTreeView, "undefinedDpiView"
         )
-        self._all_pages_view = get_cwidget(
-            self.ui, QtWidgets.QTreeView, "allPagesView"
-        )
+        self._all_pages_view = get_cwidget(self.ui, QtWidgets.QTreeView, "allPagesView")
 
         # DPI controls
         self._dpi_combo = get_cwidget(self.ui, QtWidgets.QComboBox, "dpiCombo")
@@ -78,9 +72,7 @@ class FixDpiDialog(QtWidgets.QDialog):
         self._apply_btn = get_cwidget(self.ui, QtWidgets.QPushButton, "applyBtn")
 
         # Button box
-        self._button_box = get_cwidget(
-            self.ui, QtWidgets.QDialogButtonBox, "buttonBox"
-        )
+        self._button_box = get_cwidget(self.ui, QtWidgets.QDialogButtonBox, "buttonBox")
 
         # Set up DPI combo
         self._dpi_combo.clear()
@@ -99,10 +91,10 @@ class FixDpiDialog(QtWidgets.QDialog):
     def _populate_views(self) -> None:
         """Populate the tree views with image data."""
         # Create models for both views
-        self._undefined_model = QtWidgets.QStandardItemModel()
+        self._undefined_model = QtGui.QStandardItemModel()
         self._undefined_model.setHorizontalHeaderLabels(["File", "DPI"])
 
-        self._all_model = QtWidgets.QStandardItemModel()
+        self._all_model = QtGui.QStandardItemModel()
         self._all_model.setHorizontalHeaderLabels(["File", "DPI"])
 
         # Populate models
@@ -122,11 +114,11 @@ class FixDpiDialog(QtWidgets.QDialog):
                 needs_fixing = False
 
             # Create items
-            path_item = QtWidgets.QStandardItem(path)
+            path_item = QtGui.QStandardItem(path)
             path_item.setData(str(img.id.file_path), Qt.ItemDataRole.UserRole)
             path_item.setEditable(False)
 
-            dpi_item = QtWidgets.QStandardItem(dpi_str)
+            dpi_item = QtGui.QStandardItem(dpi_str)
             dpi_item.setEditable(False)
 
             # Add to all pages model
@@ -222,6 +214,8 @@ class FixDpiDialog(QtWidgets.QDialog):
         # Get selected items
         current_view = self._get_current_view()
         model = current_view.model()
+        if not isinstance(model, QtGui.QStandardItemModel):
+            return
         selection = current_view.selectionModel().selectedRows()
 
         for index in selection:
