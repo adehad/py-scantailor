@@ -1,7 +1,5 @@
 """Tests for distortion model."""
 
-from __future__ import annotations
-
 import numpy as np
 import pytest
 
@@ -167,11 +165,14 @@ class TestDistortionModel:
         )
 
         # Scale by 2
-        transform = np.array([
-            [2, 0, 0],
-            [0, 2, 0],
-            [0, 0, 1],
-        ], dtype=np.float64)
+        transform = np.array(
+            [
+                [2, 0, 0],
+                [0, 2, 0],
+                [0, 0, 1],
+            ],
+            dtype=np.float64,
+        )
 
         bbox = model.bounding_box(transform)
         assert bbox is not None

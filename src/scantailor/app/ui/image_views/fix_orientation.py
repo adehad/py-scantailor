@@ -5,8 +5,6 @@ This is the simplest image view - it just displays the image with the
 current rotation applied, supporting zoom and pan.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 import numpy as np

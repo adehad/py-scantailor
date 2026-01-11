@@ -1,7 +1,5 @@
 """Tests for Page Layout parameters."""
 
-from __future__ import annotations
-
 from scantailor.core import Margins
 from scantailor.filters.page_layout import Alignment, Params
 from scantailor.filters.page_layout.params import ContentRect, ContentSize

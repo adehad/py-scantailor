@@ -5,8 +5,6 @@ original C++ ScanTailor application. Projects loaded from XML can be
 saved in the new JSON format.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import TYPE_CHECKING
 from xml.etree import ElementTree as ET

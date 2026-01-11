@@ -3,8 +3,6 @@
 Provides UI controls for setting the deskew angle (auto or manual).
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Signal

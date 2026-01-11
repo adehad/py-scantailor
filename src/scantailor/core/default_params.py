@@ -5,8 +5,6 @@ values for each stage of the ScanTailor processing pipeline. These defaults
 are applied when processing new pages.
 """
 
-from __future__ import annotations
-
 from pydantic import BaseModel, Field
 
 from scantailor.core.models import Dpi, Margins, OrthogonalRotation

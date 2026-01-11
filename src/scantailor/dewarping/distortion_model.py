@@ -18,8 +18,6 @@ PYTHON SIMPLIFICATION:
 - No XML serialization (can add later if needed)
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -157,12 +155,14 @@ class DistortionModel:
         if self.top_curve is None or self.bottom_curve is None:
             return False
 
-        corners = np.array([
-            self.top_curve.start_point,
-            self.top_curve.end_point,
-            self.bottom_curve.end_point,
-            self.bottom_curve.start_point,
-        ])
+        corners = np.array(
+            [
+                self.top_curve.start_point,
+                self.top_curve.end_point,
+                self.bottom_curve.end_point,
+                self.bottom_curve.start_point,
+            ]
+        )
 
         # Check convexity by ensuring all cross products have same sign
         min_dot = np.inf

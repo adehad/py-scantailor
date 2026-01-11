@@ -4,8 +4,6 @@ This module provides functions for generating final output images
 with binarization, despeckling, dewarping, and other processing.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 

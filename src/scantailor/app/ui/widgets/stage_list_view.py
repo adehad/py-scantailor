@@ -4,16 +4,14 @@ This view displays the 6 filter stages as a table with stage names and
 a batch processing launch button.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, Signal
 from PySide6.QtWidgets import (
     QHeaderView,
     QSizePolicy,
-    QStyledItemDelegate,
     QStyle,
+    QStyledItemDelegate,
     QStyleOptionViewItem,
     QTableView,
     QToolButton,
@@ -27,7 +25,9 @@ if TYPE_CHECKING:
 class StageListModel(QAbstractTableModel):
     """Model for the stage list table."""
 
-    def __init__(self, stages: StageSequence | None = None, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, stages: StageSequence | None = None, parent: QWidget | None = None
+    ) -> None:
         """Initialize the model.
 
         Args:
@@ -190,7 +190,9 @@ class StageListView(QTableView):
         self._launch_btn.clicked.connect(self.launch_batch_processing.emit)
 
         # Set size policy
-        size_policy = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        size_policy = QSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum
+        )
         size_policy.setVerticalStretch(1)
         self.setSizePolicy(size_policy)
 
@@ -266,7 +268,9 @@ class StageListView(QTableView):
             return
 
         # Show button if batch processing is possible and not in progress
-        show_button = self._batch_processing_possible and not self._batch_processing_in_progress
+        show_button = (
+            self._batch_processing_possible and not self._batch_processing_in_progress
+        )
 
         # Get selected row
         selection = self.selectionModel()

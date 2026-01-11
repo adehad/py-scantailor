@@ -1,7 +1,5 @@
 """Tests for content and page box classes."""
 
-from __future__ import annotations
-
 import pytest
 
 from scantailor.filters.select_content import ContentBox, PageBox, PhysicalSize

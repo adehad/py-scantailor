@@ -8,8 +8,6 @@ handling common functionality like:
 - Mouse and keyboard interaction
 """
 
-from __future__ import annotations
-
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
@@ -538,10 +536,7 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
             return
 
         # Use HQ pixmap if available and transform hasn't changed
-        if (
-            self._hq_pixmap is not None
-            and self._hq_xform == self._virtual_to_widget
-        ):
+        if self._hq_pixmap is not None and self._hq_xform == self._virtual_to_widget:
             # Draw the high-quality version
             painter.drawPixmap(self._hq_pixmap_pos, self._hq_pixmap)
         else:
@@ -550,9 +545,7 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
 
             # Apply pixmap-to-image, then image-to-virtual, then virtual-to-widget
             full_xform = (
-                self._pixmap_to_image
-                * self._image_to_virtual
-                * self._virtual_to_widget
+                self._pixmap_to_image * self._image_to_virtual * self._virtual_to_widget
             )
             painter.setTransform(full_xform)
             painter.drawPixmap(0, 0, self._pixmap)

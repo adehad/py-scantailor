@@ -3,8 +3,6 @@
 Provides UI controls for selecting page layout type and split mode.
 """
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Signal

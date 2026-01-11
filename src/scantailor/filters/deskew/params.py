@@ -4,8 +4,6 @@ This module defines the parameter structures for storing deskew settings
 on a per-page basis.
 """
 
-from __future__ import annotations
-
 from enum import Enum
 
 from pydantic import BaseModel, Field

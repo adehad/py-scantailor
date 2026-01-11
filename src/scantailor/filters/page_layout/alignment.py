@@ -4,8 +4,6 @@ This module defines how pages are aligned both vertically and horizontally
 when their sizes differ.
 """
 
-from __future__ import annotations
-
 from enum import Enum
 
 from pydantic import BaseModel

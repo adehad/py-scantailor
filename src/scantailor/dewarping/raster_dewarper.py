@@ -8,8 +8,6 @@ This Python version uses OpenCV's cv2.remap() with configurable interpolation,
 which is simpler and leverages optimized implementations.
 """
 
-from __future__ import annotations
-
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -96,7 +94,11 @@ def dewarp_image(
     # Prepare background
     if src.ndim == 2:
         # Grayscale
-        bg = int(background_color) if isinstance(background_color, (int, float)) else background_color[0]
+        bg = (
+            int(background_color)
+            if isinstance(background_color, (int, float))
+            else background_color[0]
+        )
         dst = np.full((dst_height, dst_width), bg, dtype=np.uint8)
     elif src.ndim == 3 and src.shape[2] == 3:
         # RGB/BGR

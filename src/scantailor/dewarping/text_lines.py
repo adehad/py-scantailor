@@ -12,8 +12,6 @@ The algorithm works as follows:
 5. Filter out invalid lines (too short, wrong curvature, etc.)
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 

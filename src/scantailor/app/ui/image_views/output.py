@@ -6,15 +6,21 @@ Provides image views for the Output filter including:
 - ZoneEditor: Interactive zone editing for picture and fill zones
 """
 
-from __future__ import annotations
-
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
 import numpy as np
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal, Slot
-from PySide6.QtGui import QColor, QImage, QPainter, QPainterPath, QPen, QPolygonF, QShortcut
+from PySide6.QtGui import (
+    QColor,
+    QImage,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPolygonF,
+    QShortcut,
+)
 from PySide6.QtWidgets import QTabWidget
 
 from scantailor.app.ui.image_views.base import ImageViewBase
@@ -75,9 +81,7 @@ class TabbedImageView(QTabWidget):
             shortcut.activated.connect(lambda idx=i: self._switch_to_tab(idx))
             self._shortcuts.append(shortcut)
 
-    def add_tab(
-        self, widget: QtWidgets.QWidget, label: str, tab: ImageViewTab
-    ) -> None:
+    def add_tab(self, widget: QtWidgets.QWidget, label: str, tab: ImageViewTab) -> None:
         """Add a tab with an associated ImageViewTab enum.
 
         Args:
@@ -381,7 +385,9 @@ class OutputImageView(ImageViewBase):
 
         # Draw closing line to first point (preview)
         if len(widget_points) >= 2:
-            painter.setPen(QPen(self.ZONE_BORDER_COLOR.lighter(), 1, Qt.PenStyle.DotLine))
+            painter.setPen(
+                QPen(self.ZONE_BORDER_COLOR.lighter(), 1, Qt.PenStyle.DotLine)
+            )
             painter.drawLine(widget_points[-1], widget_points[0])
 
         # Draw points

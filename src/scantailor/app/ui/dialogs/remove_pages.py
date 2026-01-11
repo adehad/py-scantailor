@@ -1,7 +1,5 @@
 """Remove pages confirmation dialog."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from PySide6 import QtWidgets
@@ -43,12 +41,8 @@ class RemovePagesDialog(QtWidgets.QDialog):
         """Set up widget references."""
         self._icon_label = get_cwidget(self.ui, QtWidgets.QLabel, "icon")
         self._text_label = get_cwidget(self.ui, QtWidgets.QLabel, "text")
-        self._warning_label = get_cwidget(
-            self.ui, QtWidgets.QLabel, "multiPageWarning"
-        )
-        self._button_box = get_cwidget(
-            self.ui, QtWidgets.QDialogButtonBox, "buttonBox"
-        )
+        self._warning_label = get_cwidget(self.ui, QtWidgets.QLabel, "multiPageWarning")
+        self._button_box = get_cwidget(self.ui, QtWidgets.QDialogButtonBox, "buttonBox")
 
         # Set the question icon
         icon = self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion)

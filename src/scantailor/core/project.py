@@ -5,8 +5,6 @@ Handles loading, saving, and managing ScanTailor projects. Supports:
 - XML format (read-only, for C++ ScanTailor compatibility)
 """
 
-from __future__ import annotations
-
 from enum import IntEnum
 from pathlib import Path
 from typing import Literal

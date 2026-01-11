@@ -1,7 +1,5 @@
 """Tests for polyline intersector."""
 
-from __future__ import annotations
-
 import numpy as np
 import pytest
 
@@ -17,9 +15,7 @@ class TestPolylineIntersector:
         intersector = PolylineIntersector(polyline)
 
         # Vertical line through midpoint
-        intersection = intersector.intersect(
-            np.array([50, 0]), np.array([50, 100])
-        )
+        intersection = intersector.intersect(np.array([50, 0]), np.array([50, 100]))
         assert intersection[0] == pytest.approx(50.0)
         assert intersection[1] == pytest.approx(10.0)
 
@@ -29,9 +25,7 @@ class TestPolylineIntersector:
         intersector = PolylineIntersector(polyline)
 
         # Horizontal line through midpoint
-        intersection = intersector.intersect(
-            np.array([0, 50]), np.array([100, 50])
-        )
+        intersection = intersector.intersect(np.array([0, 50]), np.array([100, 50]))
         assert intersection[0] == pytest.approx(10.0)
         assert intersection[1] == pytest.approx(50.0)
 
@@ -41,25 +35,24 @@ class TestPolylineIntersector:
         intersector = PolylineIntersector(polyline)
 
         # Horizontal line at y=50
-        intersection = intersector.intersect(
-            np.array([0, 50]), np.array([100, 50])
-        )
+        intersection = intersector.intersect(np.array([0, 50]), np.array([100, 50]))
         assert intersection[0] == pytest.approx(50.0)
         assert intersection[1] == pytest.approx(50.0)
 
     def test_multi_segment_polyline(self):
         """Intersection with multi-segment polyline."""
-        polyline = np.array([
-            [0, 10],
-            [50, 20],
-            [100, 10],
-        ], dtype=np.float64)
+        polyline = np.array(
+            [
+                [0, 10],
+                [50, 20],
+                [100, 10],
+            ],
+            dtype=np.float64,
+        )
         intersector = PolylineIntersector(polyline)
 
         # Vertical line at x=25 should intersect first segment
-        intersection = intersector.intersect(
-            np.array([25, 0]), np.array([25, 100])
-        )
+        intersection = intersector.intersect(np.array([25, 0]), np.array([25, 100]))
         assert intersection[0] == pytest.approx(25.0)
         # y should be interpolated between 10 and 20
         assert 10 < intersection[1] < 20
@@ -70,28 +63,27 @@ class TestPolylineIntersector:
         intersector = PolylineIntersector(polyline)
 
         # Line far above the polyline
-        intersection = intersector.intersect(
-            np.array([0, 100]), np.array([10, 100])
-        )
+        intersection = intersector.intersect(np.array([0, 100]), np.array([10, 100]))
         # Should project onto the line at y=100
         assert intersection[1] == pytest.approx(100.0)
 
     def test_sequential_queries_optimization(self):
         """Sequential queries use optimization hint."""
-        polyline = np.array([
-            [0, 0],
-            [10, 0],
-            [20, 0],
-            [30, 0],
-            [40, 0],
-        ], dtype=np.float64)
+        polyline = np.array(
+            [
+                [0, 0],
+                [10, 0],
+                [20, 0],
+                [30, 0],
+                [40, 0],
+            ],
+            dtype=np.float64,
+        )
         intersector = PolylineIntersector(polyline)
 
         # Sequential vertical lines
         for x in [5, 15, 25, 35]:
-            intersection = intersector.intersect(
-                np.array([x, -10]), np.array([x, 10])
-            )
+            intersection = intersector.intersect(np.array([x, -10]), np.array([x, 10]))
             assert intersection[0] == pytest.approx(float(x))
             assert intersection[1] == pytest.approx(0.0)
 

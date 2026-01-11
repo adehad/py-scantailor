@@ -1,7 +1,5 @@
 """Tests for Params class."""
 
-from __future__ import annotations
-
 from scantailor.filters.select_content import (
     ContentBox,
     ContentDetectionMode,

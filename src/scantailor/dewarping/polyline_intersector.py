@@ -22,8 +22,6 @@ The intersector finds where a line crosses a polyline, with optimization
 for sequential queries where intersections move monotonically along the polyline.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -92,7 +90,9 @@ class PolylineIntersector:
 
         # Check adjacent segments
         next_seg = self._last_segment + 1
-        if next_seg < self.num_segments and self._segment_intersects_line(next_seg, line_p1, normal):
+        if next_seg < self.num_segments and self._segment_intersects_line(
+            next_seg, line_p1, normal
+        ):
             self._last_segment = next_seg
             return self._intersect_with_segment(next_seg, line_p1, line_p2)
 

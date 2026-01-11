@@ -4,8 +4,6 @@ A QGroupBox that can be collapsed to hide its contents, saving screen space.
 The collapsed state is persisted across sessions using QSettings.
 """
 
-from __future__ import annotations
-
 from PySide6.QtCore import QEvent, QSettings, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QGroupBox, QStyle, QToolButton, QWidget

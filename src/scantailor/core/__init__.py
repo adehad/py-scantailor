@@ -1,7 +1,14 @@
 """Core data models for ScanTailor."""
 
-from __future__ import annotations
-
+from scantailor.core.default_params import (
+    DefaultParams,
+    DeskewDefaults,
+    FixOrientationDefaults,
+    OutputDefaults,
+    PageLayoutDefaults,
+    PageSplitDefaults,
+    SelectContentDefaults,
+)
 from scantailor.core.models import (
     Dpi,
     ImageId,
@@ -11,6 +18,12 @@ from scantailor.core.models import (
     PageId,
     SubPage,
 )
+from scantailor.core.pipeline import (
+    PipelineOptions,
+    PipelineResult,
+    process_batch,
+    process_page,
+)
 from scantailor.core.project import (
     DpiStatus,
     ImageInfo,
@@ -19,14 +32,13 @@ from scantailor.core.project import (
     PageInfo,
     Project,
 )
-from scantailor.core.default_params import (
-    DefaultParams,
-    DeskewDefaults,
-    FixOrientationDefaults,
-    OutputDefaults,
-    PageLayoutDefaults,
-    PageSplitDefaults,
-    SelectContentDefaults,
+from scantailor.core.schema import (
+    SCHEMA_VERSION,
+    generate_project_schema,
+    migrate_project,
+    save_schema,
+    validate_project_file,
+    validate_project_json,
 )
 from scantailor.core.settings import (
     ApplicationSettings,
@@ -40,12 +52,6 @@ from scantailor.core.stage_sequence import (
     FilterStage,
     StageSequence,
 )
-from scantailor.core.pipeline import (
-    PipelineOptions,
-    PipelineResult,
-    process_batch,
-    process_page,
-)
 from scantailor.core.transformation import (
     ImageTransformation,
     Rect,
@@ -58,14 +64,6 @@ from scantailor.core.zones import (
     ZoneCategory,
     ZoneSet,
     ZoneSpline,
-)
-from scantailor.core.schema import (
-    SCHEMA_VERSION,
-    generate_project_schema,
-    migrate_project,
-    save_schema,
-    validate_project_file,
-    validate_project_json,
 )
 
 __all__ = [

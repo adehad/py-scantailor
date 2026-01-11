@@ -11,8 +11,6 @@ pipeline, matching the C++ ImageTransformation class:
 6. Post-scale: Scale to output DPI
 """
 
-from __future__ import annotations
-
 import math
 from dataclasses import dataclass, field
 
@@ -358,9 +356,7 @@ class ImageTransformation:
         new_pre_scale_rotate = self._pre_scale_xform @ self._pre_rotate_xform
         if len(self._pre_crop_area) > 0:
             # Transform through: old_inv -> new
-            old_inv = np.asarray(
-                np.linalg.inv(old_pre_scale_rotate), dtype=np.float64
-            )
+            old_inv = np.asarray(np.linalg.inv(old_pre_scale_rotate), dtype=np.float64)
             self._pre_crop_area = _transform_polygon(
                 _transform_polygon(self._pre_crop_area, old_inv),
                 new_pre_scale_rotate,
@@ -497,7 +493,9 @@ class ImageTransformation:
         if len(self._pre_crop_area) == 0:
             # Use original rect transformed through pre-scale and pre-rotate
             pre_scale_rotate = self._pre_scale_xform @ self._pre_rotate_xform
-            poly = _transform_polygon(_rect_to_polygon(self.orig_rect), pre_scale_rotate)
+            poly = _transform_polygon(
+                _rect_to_polygon(self.orig_rect), pre_scale_rotate
+            )
         else:
             poly = self._pre_crop_area
 

@@ -1,7 +1,5 @@
 """Batch processing lower panel for batch operation controls."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from PySide6 import QtWidgets
@@ -56,11 +54,13 @@ class BatchProcessingLowerPanel(QtWidgets.QWidget):
         # Add spacers and checkbox
         layout.addItem(
             QtWidgets.QSpacerItem(
-                1, 1,
+                1,
+                1,
                 QtWidgets.QSizePolicy.Policy.Expanding,
-                QtWidgets.QSizePolicy.Policy.Minimum
+                QtWidgets.QSizePolicy.Policy.Minimum,
             ),
-            1, 0
+            1,
+            0,
         )
 
         self._beep_checkbox = QtWidgets.QCheckBox("Beep when finished", self)
@@ -68,11 +68,13 @@ class BatchProcessingLowerPanel(QtWidgets.QWidget):
 
         layout.addItem(
             QtWidgets.QSpacerItem(
-                1, 1,
+                1,
+                1,
                 QtWidgets.QSizePolicy.Policy.Expanding,
-                QtWidgets.QSizePolicy.Policy.Minimum
+                QtWidgets.QSizePolicy.Policy.Minimum,
             ),
-            1, 2
+            1,
+            2,
         )
 
     def _connect_signals(self) -> None:
