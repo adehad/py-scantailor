@@ -9,19 +9,15 @@ Provides an interactive image view for the Select Content filter with:
 
 import math
 from enum import IntFlag, auto
-from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide6 import QtCore, QtGui, QtWidgets
+from numpy.typing import NDArray
+from PySide6 import QtGui, QtWidgets
 from PySide6.QtCore import QLineF, QPointF, QRectF, QSizeF, Qt, Signal, Slot
 from PySide6.QtGui import QAction, QColor, QImage, QPainter, QPen
 
 from scantailor.app.ui.image_views.base import ImageViewBase
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-    from scantailor.core import ImageTransformation
+from scantailor.core import ImageTransformation
 
 
 class Edge(IntFlag):
@@ -246,8 +242,6 @@ class SelectContentImageView(ImageViewBase):
             (Edge.LEFT | Edge.BOTTOM, rect.bottomLeft()),
             (Edge.RIGHT | Edge.BOTTOM, rect.bottomRight()),
         ]
-
-        virtual_pos = self.widget_to_virtual_point(widget_pos)
 
         for edge_mask, corner in corners:
             corner_widget = self.virtual_to_widget_point(corner)
@@ -734,6 +728,6 @@ class SelectContentImageView(ImageViewBase):
             event: The context menu event.
         """
         if self._content_rect.isEmpty():
-            self._no_content_menu.exec(event.globalPos())
+            self._no_content_menu.exec_(event.globalPos())
         else:
-            self._have_content_menu.exec(event.globalPos())
+            self._have_content_menu.exec_(event.globalPos())

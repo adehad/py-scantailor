@@ -53,7 +53,8 @@ def find_skew(
     """Detect the skew angle of a document image.
 
     Uses a two-phase algorithm:
-    1. Coarse search: Linear scan from -max_angle to +max_angle in coarse_step increments
+    1. Coarse search: Linear scan from -max_angle to +max_angle
+       in coarse_step increments
     2. Fine search: Binary search around the best coarse angle for accuracy
 
     The algorithm works by applying vertical shear transforms at various

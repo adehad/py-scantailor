@@ -3,13 +3,11 @@
 Functions for rotating, scaling, and transforming images using OpenCV.
 """
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 import cv2
 import numpy as np
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
+from numpy.typing import NDArray
 
 from scantailor.core import OrthogonalDegrees
 

@@ -13,6 +13,7 @@ pipeline, matching the C++ ImageTransformation class:
 
 import math
 from dataclasses import dataclass, field
+from typing import Self
 
 import numpy as np
 from numpy.typing import NDArray
@@ -58,7 +59,7 @@ class Rect:
         return (self.width, self.height)
 
     @classmethod
-    def from_size(cls, width: float, height: float) -> Rect:
+    def from_size(cls, width: float, height: float) -> "Rect":
         """Create rect from size at origin."""
         return cls(x=0, y=0, width=width, height=height)
 
@@ -272,9 +273,7 @@ class ImageTransformation:
         self.pre_scale_to_equalize_dpi()
 
     @classmethod
-    def from_size(
-        cls, width: float, height: float, dpi: Dpi | None = None
-    ) -> ImageTransformation:
+    def from_size(cls, width: float, height: float, dpi: Dpi | None = None) -> Self:
         """Create transformation from image dimensions."""
         rect = Rect.from_size(width, height)
         return cls(orig_rect=rect, orig_dpi=dpi or Dpi())

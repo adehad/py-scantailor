@@ -10,12 +10,10 @@ Reference:
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import Self
 
 import numpy as np
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
+from numpy.typing import NDArray
 
 
 @dataclass
@@ -170,7 +168,7 @@ class _TensionDerivedParams:
     p: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0])
 
     @classmethod
-    def from_tensions(cls, tension1: float, tension2: float) -> _TensionDerivedParams:
+    def from_tensions(cls, tension1: float, tension2: float) -> Self:
         """Create parameters from two adjacent control point tensions."""
         params = cls()
 

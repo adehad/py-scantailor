@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 from scantailor.core import (
     DefaultParams,
     DeskewDefaults,
@@ -20,7 +18,6 @@ from scantailor.core import (
 from scantailor.filters.deskew.params import AutoManualMode as DeskewMode
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
-from scantailor.filters.page_layout.alignment import Alignment
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.select_content.detection import (
     ContentDetectionMode,

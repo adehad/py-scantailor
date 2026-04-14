@@ -4,13 +4,11 @@ This module provides classes for linear and quadratic functions
 that can be used in optimization algorithms and geometric computations.
 """
 
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import Self
 
 import numpy as np
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
+from numpy.typing import NDArray
 
 
 @dataclass
@@ -35,7 +33,7 @@ class LinearFunction:
         self.a = np.asarray(self.a, dtype=np.float64)
 
     @classmethod
-    def zeros(cls, num_vars: int) -> LinearFunction:
+    def zeros(cls, num_vars: int) -> Self:
         """Create a zero linear function with the given number of variables.
 
         Args:
@@ -68,7 +66,7 @@ class LinearFunction:
         self.a[:] = 0.0
         self.b = 0.0
 
-    def __iadd__(self, other: LinearFunction) -> LinearFunction:
+    def __iadd__(self, other: Self) -> Self:
         """Add another linear function in place."""
         if self.num_vars != other.num_vars:
             msg = "Cannot add functions with different number of variables"
@@ -77,24 +75,24 @@ class LinearFunction:
         self.b += other.b
         return self
 
-    def __add__(self, other: LinearFunction) -> LinearFunction:
+    def __add__(self, other: Self) -> Self:
         """Add two linear functions."""
         if self.num_vars != other.num_vars:
             msg = "Cannot add functions with different number of variables"
             raise ValueError(msg)
         return LinearFunction(a=self.a + other.a, b=self.b + other.b)
 
-    def __imul__(self, scalar: float) -> LinearFunction:
+    def __imul__(self, scalar: float) -> Self:
         """Multiply by a scalar in place."""
         self.a *= scalar
         self.b *= scalar
         return self
 
-    def __mul__(self, scalar: float) -> LinearFunction:
+    def __mul__(self, scalar: float) -> Self:
         """Multiply by a scalar."""
         return LinearFunction(a=self.a * scalar, b=self.b * scalar)
 
-    def __rmul__(self, scalar: float) -> LinearFunction:
+    def __rmul__(self, scalar: float) -> Self:
         """Right multiply by a scalar."""
         return self * scalar
 
@@ -149,7 +147,7 @@ class QuadraticFunction:
         self.b = np.asarray(self.b, dtype=np.float64)
 
     @classmethod
-    def zeros(cls, num_vars: int) -> QuadraticFunction:
+    def zeros(cls, num_vars: int) -> Self:
         """Create a zero quadratic function with the given number of variables.
 
         Args:
@@ -238,7 +236,7 @@ class QuadraticFunction:
         self.b = new_b
         self.c = new_c
 
-    def __iadd__(self, other: QuadraticFunction) -> QuadraticFunction:
+    def __iadd__(self, other: Self) -> Self:
         """Add another quadratic function in place."""
         if self.num_vars != other.num_vars:
             msg = "Cannot add functions with different number of variables"
@@ -248,7 +246,7 @@ class QuadraticFunction:
         self.c += other.c
         return self
 
-    def __add__(self, other: QuadraticFunction) -> QuadraticFunction:
+    def __add__(self, other: Self) -> Self:
         """Add two quadratic functions."""
         if self.num_vars != other.num_vars:
             msg = "Cannot add functions with different number of variables"
@@ -257,19 +255,19 @@ class QuadraticFunction:
             A=self.A + other.A, b=self.b + other.b, c=self.c + other.c
         )
 
-    def __imul__(self, scalar: float) -> QuadraticFunction:
+    def __imul__(self, scalar: float) -> Self:
         """Multiply by a scalar in place."""
         self.A *= scalar
         self.b *= scalar
         self.c *= scalar
         return self
 
-    def __mul__(self, scalar: float) -> QuadraticFunction:
+    def __mul__(self, scalar: float) -> Self:
         """Multiply by a scalar."""
         return QuadraticFunction(
             A=self.A * scalar, b=self.b * scalar, c=self.c * scalar
         )
 
-    def __rmul__(self, scalar: float) -> QuadraticFunction:
+    def __rmul__(self, scalar: float) -> Self:
         """Right multiply by a scalar."""
         return self * scalar

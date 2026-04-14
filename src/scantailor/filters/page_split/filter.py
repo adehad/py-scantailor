@@ -7,19 +7,16 @@ It splits scanned images into individual pages, handling cases like:
 - Pages with offcut garbage (cut off edges)
 """
 
-from typing import TYPE_CHECKING
-
 import numpy as np
 from numpy.typing import NDArray
+
+from scantailor.core import PageId
 
 from .layout_type import LayoutType
 from .page_layout import PageLayout
 from .params import Params
 from .settings import Settings
 from .split_finder import SplitResult, detect_split
-
-if TYPE_CHECKING:
-    from scantailor.core import PageId
 
 
 class Filter:

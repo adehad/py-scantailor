@@ -24,7 +24,7 @@ def load_translation(app: QtWidgets.QApplication):
     translator = QtCore.QTranslator()
     user_locale = QtCore.QLocale()
     if translation_file := translation_map().get(user_locale.name()):
-        translator.load(locale=user_locale, filename=translation_file)
+        translator.load(user_locale, translation_file)
         app.installTranslator(translator)
 
 

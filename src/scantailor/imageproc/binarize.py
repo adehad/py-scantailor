@@ -4,14 +4,10 @@ All functions take grayscale images as numpy arrays and return binary images.
 Binary images use 0 for black (background) and 255 for white (foreground).
 """
 
-from typing import TYPE_CHECKING
-
 import cv2
 import numpy as np
+from numpy.typing import NDArray
 from skimage.filters import threshold_sauvola
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
 
 
 def peak_threshold(image: NDArray[np.uint8]) -> int:

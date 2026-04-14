@@ -5,14 +5,13 @@ is divided into pages, including the outline and any split lines.
 """
 
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import Self
 
 import numpy as np
 from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, field_validator
 
-if TYPE_CHECKING:
-    from scantailor.core import SubPage
+from scantailor.core import SubPage
 
 
 class PageLayoutType(Enum):
@@ -63,7 +62,7 @@ class PageLayout(BaseModel):
     @classmethod
     def single_page_uncut(
         cls, width: float, height: float, x: float = 0, y: float = 0
-    ) -> "PageLayout":
+    ) -> Self:
         """Create a single page layout with no cutting.
 
         Args:
@@ -88,7 +87,7 @@ class PageLayout(BaseModel):
         split_x: float,
         x: float = 0,
         y: float = 0,
-    ) -> "PageLayout":
+    ) -> Self:
         """Create a two-page layout split at the given x position.
 
         Args:
@@ -118,7 +117,7 @@ class PageLayout(BaseModel):
         right_x: float,
         x: float = 0,
         y: float = 0,
-    ) -> "PageLayout":
+    ) -> Self:
         """Create a single page layout with cutters on left and right.
 
         Args:
@@ -288,7 +287,7 @@ class PageLayout(BaseModel):
             return self.get_right_page_outline()
         return self.get_single_page_outline()
 
-    def with_split_line(self, split_x: float) -> "PageLayout":
+    def with_split_line(self, split_x: float) -> Self:
         """Create a new layout with a different split line position.
 
         Args:
@@ -306,7 +305,7 @@ class PageLayout(BaseModel):
             cutter2=split_line,
         )
 
-    def with_cutters(self, left_x: float, right_x: float) -> "PageLayout":
+    def with_cutters(self, left_x: float, right_x: float) -> Self:
         """Create a new layout with different cutter positions.
 
         Args:

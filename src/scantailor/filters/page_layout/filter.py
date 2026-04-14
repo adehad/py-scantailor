@@ -4,15 +4,10 @@ This filter manages page margins and alignment across a project, ensuring
 consistent page sizes in the final output.
 """
 
-from typing import TYPE_CHECKING
-
 from scantailor.core.models import Margins, PageId
 from scantailor.filters.page_layout.alignment import Alignment
 from scantailor.filters.page_layout.params import ContentSize, Params
 from scantailor.filters.page_layout.settings import Settings
-
-if TYPE_CHECKING:
-    pass
 
 
 class Filter:

@@ -5,20 +5,16 @@ This is the simplest image view - it just displays the image with the
 current rotation applied, supporting zoom and pan.
 """
 
-from typing import TYPE_CHECKING
+from typing import cast
 
 import numpy as np
-from PySide6 import QtGui
+from numpy.typing import NDArray
+from PySide6 import QtGui, QtWidgets
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal, Slot
-from PySide6.QtGui import QImage, QPainter, QPen, QTransform
+from PySide6.QtGui import QImage, QPainter, QPen
 
 from scantailor.app.ui.image_views.base import ImageViewBase
-from scantailor.core import OrthogonalRotation
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-    from scantailor.core import ImageTransformation
+from scantailor.core import ImageTransformation, OrthogonalDegrees, OrthogonalRotation
 
 
 class FixOrientationImageView(ImageViewBase):
@@ -38,7 +34,7 @@ class FixOrientationImageView(ImageViewBase):
         image: QImage | NDArray[np.uint8] | None = None,
         downscaled_image: QImage | None = None,
         transformation: ImageTransformation | None = None,
-        parent: QtGui.QWidget | None = None,
+        parent: QtWidgets.QWidget | None = None,
     ) -> None:
         """Initialize the Fix Orientation image view.
 
@@ -163,14 +159,14 @@ class FixOrientationImageView(ImageViewBase):
         if event.key() == Qt.Key.Key_Left or event.key() == Qt.Key.Key_L:
             # Rotate left (counter-clockwise)
             new_rotation = OrthogonalRotation(
-                degrees=(self._rotation.degrees - 90) % 360
+                degrees=cast(OrthogonalDegrees, (self._rotation.degrees - 90) % 360)
             )
             self.rotation_requested.emit(new_rotation)
             event.accept()
         elif event.key() == Qt.Key.Key_Right or event.key() == Qt.Key.Key_R:
             # Rotate right (clockwise)
             new_rotation = OrthogonalRotation(
-                degrees=(self._rotation.degrees + 90) % 360
+                degrees=cast(OrthogonalDegrees, (self._rotation.degrees + 90) % 360)
             )
             self.rotation_requested.emit(new_rotation)
             event.accept()
@@ -186,7 +182,7 @@ class FixOrientationImageView(ImageViewBase):
         if event.button() == Qt.MouseButton.LeftButton:
             # Double-click to rotate clockwise
             new_rotation = OrthogonalRotation(
-                degrees=(self._rotation.degrees + 90) % 360
+                degrees=cast(OrthogonalDegrees, (self._rotation.degrees + 90) % 360)
             )
             self.rotation_requested.emit(new_rotation)
             event.accept()

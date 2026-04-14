@@ -4,6 +4,8 @@ This module defines the Params class which stores all output settings
 for a specific page.
 """
 
+from typing import Self
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from scantailor.core import Dpi
@@ -35,32 +37,32 @@ class Params(BaseModel):
     black_on_white: bool = True
     dewarping: DewarpingOptions = Field(default_factory=DewarpingOptions)
 
-    def with_output_dpi(self, dpi: Dpi) -> "Params":
+    def with_output_dpi(self, dpi: Dpi) -> Self:
         """Create a copy with different output DPI."""
         return self.model_copy(update={"output_dpi": dpi})
 
-    def with_color_mode(self, mode: ColorMode) -> "Params":
+    def with_color_mode(self, mode: ColorMode) -> Self:
         """Create a copy with different color mode."""
         return self.model_copy(update={"color_mode": mode})
 
-    def with_binarization(self, options: BinarizationOptions) -> "Params":
+    def with_binarization(self, options: BinarizationOptions) -> Self:
         """Create a copy with different binarization options."""
         return self.model_copy(update={"binarization": options})
 
-    def with_binarization_method(self, method: BinarizationMethod) -> "Params":
+    def with_binarization_method(self, method: BinarizationMethod) -> Self:
         """Create a copy with different binarization method."""
         new_binarization = self.binarization.with_method(method)
         return self.model_copy(update={"binarization": new_binarization})
 
-    def with_despeckle_level(self, level: DespeckleLevel) -> "Params":
+    def with_despeckle_level(self, level: DespeckleLevel) -> Self:
         """Create a copy with different despeckle level."""
         return self.model_copy(update={"despeckle_level": level})
 
-    def with_black_on_white(self, black_on_white: bool) -> "Params":
+    def with_black_on_white(self, black_on_white: bool) -> Self:
         """Create a copy with different black_on_white setting."""
         return self.model_copy(update={"black_on_white": black_on_white})
 
-    def with_dewarping(self, options: DewarpingOptions) -> "Params":
+    def with_dewarping(self, options: DewarpingOptions) -> Self:
         """Create a copy with different dewarping options."""
         return self.model_copy(update={"dewarping": options})
 

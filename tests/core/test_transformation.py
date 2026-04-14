@@ -51,7 +51,9 @@ class TestImageTransformation:
 
     def test_creation_with_dpi(self) -> None:
         """Test creation with DPI."""
-        xform = ImageTransformation.from_size(800, 600, Dpi(horizontal=300, vertical=300))
+        xform = ImageTransformation.from_size(
+            800, 600, Dpi(horizontal=300, vertical=300)
+        )
         assert xform.orig_dpi.horizontal == 300
         assert xform.orig_dpi.vertical == 300
 
@@ -76,13 +78,17 @@ class TestImageTransformation:
 
     def test_equalize_dpi_symmetric(self) -> None:
         """Test that symmetric DPI stays unchanged."""
-        xform = ImageTransformation.from_size(800, 600, Dpi(horizontal=300, vertical=300))
+        xform = ImageTransformation.from_size(
+            800, 600, Dpi(horizontal=300, vertical=300)
+        )
         assert xform.pre_scaled_dpi.horizontal == 300
         assert xform.pre_scaled_dpi.vertical == 300
 
     def test_equalize_dpi_asymmetric(self) -> None:
         """Test that asymmetric DPI is equalized to minimum."""
-        xform = ImageTransformation.from_size(800, 600, Dpi(horizontal=300, vertical=600))
+        xform = ImageTransformation.from_size(
+            800, 600, Dpi(horizontal=300, vertical=600)
+        )
         assert xform.pre_scaled_dpi.horizontal == 300
         assert xform.pre_scaled_dpi.vertical == 300
 
@@ -130,12 +136,15 @@ class TestImageTransformation:
         xform = ImageTransformation.from_size(800, 600, Dpi.uniform(300))
 
         # Crop to center 400x300
-        crop_area = np.array([
-            [200, 150],
-            [600, 150],
-            [600, 450],
-            [200, 450],
-        ], dtype=np.float64)
+        crop_area = np.array(
+            [
+                [200, 150],
+                [600, 150],
+                [600, 450],
+                [200, 450],
+            ],
+            dtype=np.float64,
+        )
         xform.set_pre_crop_area(crop_area)
 
         result = xform.resulting_rect

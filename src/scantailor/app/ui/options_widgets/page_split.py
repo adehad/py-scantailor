@@ -3,8 +3,6 @@
 Provides UI controls for selecting page layout type and split mode.
 """
 
-from typing import TYPE_CHECKING
-
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -20,10 +18,8 @@ from PySide6.QtWidgets import (
 
 from scantailor.app.ui.widgets import CollapsibleGroupBox
 from scantailor.core import PageId
+from scantailor.filters.page_split.filter import Filter
 from scantailor.filters.page_split.layout_type import LayoutType
-
-if TYPE_CHECKING:
-    from scantailor.filters.page_split.filter import Filter
 
 
 class OptionsWidget(QWidget):

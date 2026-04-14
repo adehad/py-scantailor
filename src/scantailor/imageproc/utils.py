@@ -4,13 +4,9 @@ Provides utility functions for drawing, polygon operations,
 and color manipulation.
 """
 
-from typing import TYPE_CHECKING
-
 import cv2
 import numpy as np
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
+from numpy.typing import NDArray
 
 
 def fill_polygon(

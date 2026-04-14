@@ -3,8 +3,6 @@
 Provides UI controls for configuring content and page box detection.
 """
 
-from typing import TYPE_CHECKING
-
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -26,9 +24,7 @@ from scantailor.filters.select_content.detection import (
     ContentDetectionMode,
     PageDetectionMode,
 )
-
-if TYPE_CHECKING:
-    from scantailor.filters.select_content.filter import Filter
+from scantailor.filters.select_content.filter import Filter
 
 
 class OptionsWidget(QWidget):
@@ -275,10 +271,10 @@ class OptionsWidget(QWidget):
             self._content_manual_btn.setChecked(params.is_content_manual())
 
             # Update dimension spinboxes if we have size info
-            if params.content_size_mm.width > 0:
-                self._width_spinbox.setValue(params.content_size_mm.width)
-            if params.content_size_mm.height > 0:
-                self._height_spinbox.setValue(params.content_size_mm.height)
+            if params.content_size_mm.width_mm > 0:
+                self._width_spinbox.setValue(params.content_size_mm.width_mm)
+            if params.content_size_mm.height_mm > 0:
+                self._height_spinbox.setValue(params.content_size_mm.height_mm)
         finally:
             self._updating = False
 

@@ -5,12 +5,12 @@ with binarization, despeckling, dewarping, and other processing.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
 from scantailor.imageproc import (
     binarize_bradley,
     binarize_edge_div,
@@ -24,9 +24,6 @@ from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode
 from .despeckle import DespeckleLevel
 from .params import Params
-
-if TYPE_CHECKING:
-    from scantailor.dewarping import CylindricalSurfaceDewarper
 
 
 @dataclass

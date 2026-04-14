@@ -8,7 +8,7 @@ from PySide6.QtGui import QPixmap
 
 from scantailor.app.ui import load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
-from scantailor.core.settings import DefaultParams
+from scantailor.core.default_params import DefaultParams
 
 _UI_FOLDER = Path(__file__).parent
 

@@ -45,15 +45,12 @@ FUTURE IMPROVEMENTS (if needed):
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.optimize import minimize
 
 from scantailor.math.spline import XSpline
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
 
 
 @dataclass

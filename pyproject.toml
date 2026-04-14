@@ -32,7 +32,6 @@ installer = [
 test = [
     "pytest>=7.4.4",
     "pytest-cov>=4.1.0",
-    "PySide6-stubs>=6.4.2.0",
     "pytest-qt>=4.3.1",
 ]
 

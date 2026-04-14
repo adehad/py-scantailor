@@ -4,13 +4,11 @@ All functions use OpenCV's morphology operations with configurable
 structuring elements.
 """
 
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 import cv2
 import numpy as np
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
+from numpy.typing import NDArray
 
 StructuringElementShape = Literal["rect", "ellipse", "cross"]
 

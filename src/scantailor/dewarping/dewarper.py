@@ -6,8 +6,10 @@ perspective distortion from curved page surfaces (like book spines).
 SIMPLIFICATIONS FROM C++ IMPLEMENTATION
 ========================================
 
-The original C++ CylindricalSurfaceDewarper (src/dewarping/CylindricalSurfaceDewarper.cpp):
-- Uses custom HomographicTransform<1,D> and HomographicTransform<2,D> templates
+The original C++ CylindricalSurfaceDewarper
+(src/dewarping/CylindricalSurfaceDewarper.cpp):
+- Uses custom HomographicTransform<1,D> and
+  HomographicTransform<2,D> templates
 - Has a CoupledPolylinesIterator for synchronizing traversal of two polylines
 - Uses ToLineProjector for projecting points onto lines
 - Custom matrix solving via MatrixCalc
@@ -20,8 +22,9 @@ PYTHON SIMPLIFICATION:
 
 COORDINATE SYSTEMS:
 - img: Warped image coordinates (input)
-- pln: Plane coordinates where corner points map to unit square:
-       top-left -> (0,0), top-right -> (1,0), bottom-left -> (0,1), bottom-right -> (1,1)
+- pln: Plane coordinates where corner points map to unit
+  square: top-left -> (0,0), top-right -> (1,0),
+  bottom-left -> (0,1), bottom-right -> (1,1)
 - crv: Dewarped normalized coordinates (output)
 
 The dewarping model assumes the page surface is a cylindrical section,
@@ -29,9 +32,10 @@ with the top and bottom curves (directrices) defining the cylinder shape.
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import Self
 
 import numpy as np
+from numpy.typing import NDArray
 
 from scantailor.dewarping.arc_length_mapper import ArcLengthMapper
 from scantailor.dewarping.polyline_intersector import (
@@ -39,9 +43,6 @@ from scantailor.dewarping.polyline_intersector import (
     project_point_to_line,
 )
 from scantailor.math import Homography
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
 
 
 @dataclass
@@ -135,7 +136,7 @@ class CylindricalSurfaceDewarper:
         img_directrix1: NDArray[np.float64],
         img_directrix2: NDArray[np.float64],
         depth_perception: float = 2.0,
-    ) -> CylindricalSurfaceDewarper:
+    ) -> Self:
         """Create a dewarper from two directrix curves.
 
         Args:
@@ -310,7 +311,7 @@ class CylindricalSurfaceDewarper:
 
         return np.array([crv_x, crv_y], dtype=np.float64)
 
-    def map_to_warped_space(self, crv_pt: NDArray[np.float64]) -> NDArray[np.float64]:
+    def map_to_warped_space(self, crv_pt: NDArray[np.float64]) -> NDArray[np.floating]:
         """Transform a point from dewarped to warped image coordinates.
 
         Args:
@@ -506,8 +507,10 @@ def _line_segment_intersect(
     """Find intersection of infinite line with line segment.
 
     Args:
-        line_p1, line_p2: Two points defining the infinite line.
-        seg_p1, seg_p2: Endpoints of the line segment.
+        line_p1: First point defining the infinite line.
+        line_p2: Second point defining the infinite line.
+        seg_p1: First endpoint of the line segment.
+        seg_p2: Second endpoint of the line segment.
 
     Returns:
         Intersection point, or None if no intersection.

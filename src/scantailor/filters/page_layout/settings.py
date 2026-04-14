@@ -4,16 +4,13 @@ This module provides storage for per-page layout parameters.
 """
 
 import threading
-from typing import TYPE_CHECKING
+from collections.abc import Iterable
 
 from pydantic import BaseModel, Field, PrivateAttr
 
 from scantailor.core.models import Margins, PageId
 from scantailor.filters.page_layout.alignment import Alignment
 from scantailor.filters.page_layout.params import ContentSize, Params
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable
 
 
 class Settings(BaseModel):

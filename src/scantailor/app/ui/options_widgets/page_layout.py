@@ -3,8 +3,6 @@
 Provides UI controls for configuring margins and alignment.
 """
 
-from typing import TYPE_CHECKING
-
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -30,9 +28,7 @@ from scantailor.filters.page_layout.alignment import (
     HorizontalAlignment,
     VerticalAlignment,
 )
-
-if TYPE_CHECKING:
-    from scantailor.filters.page_layout.filter import Filter
+from scantailor.filters.page_layout.filter import Filter
 
 
 class OptionsWidget(QWidget):

@@ -4,17 +4,13 @@ This filter applies orthogonal rotations (0, 90, 180, 270 degrees) to images.
 The rotation is stored as metadata and applied during rendering/output.
 """
 
-from typing import TYPE_CHECKING
-
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core import PageId
 from scantailor.core.models import ImageId, OrthogonalRotation
 from scantailor.filters.fix_orientation.settings import Settings
 from scantailor.imageproc import rotate_orthogonal
-
-if TYPE_CHECKING:
-    from scantailor.core import PageId
 
 
 class Filter:

@@ -144,7 +144,9 @@ class SettingsDialog(QtWidgets.QDialog):
         # Thumbnails
         self._thumbnail_quality_sb.setValue(self._settings.thumbnail_quality_width)
         self._thumbnail_size_sb.setValue(int(self._settings.max_thumbnail_width))
-        self._single_column_cb.setChecked(self._settings.single_column_thumbnail_display)
+        self._single_column_cb.setChecked(
+            self._settings.single_column_thumbnail_display
+        )
         self._cancel_selection_cb.setChecked(
             self._settings.show_canceling_selection_question
         )
@@ -166,16 +168,24 @@ class SettingsDialog(QtWidgets.QDialog):
 
         # Deviation settings
         self._highlight_deviation_cb.setChecked(self._settings.highlight_deviation)
-        self._deskew_deviation_coef.setValue(self._settings.deskew_deviation.coefficient)
-        self._deskew_deviation_thresh.setValue(self._settings.deskew_deviation.threshold)
+        self._deskew_deviation_coef.setValue(
+            self._settings.deskew_deviation.coefficient
+        )
+        self._deskew_deviation_thresh.setValue(
+            self._settings.deskew_deviation.threshold
+        )
         self._select_content_deviation_coef.setValue(
             self._settings.select_content_deviation.coefficient
         )
         self._select_content_deviation_thresh.setValue(
             self._settings.select_content_deviation.threshold
         )
-        self._margins_deviation_coef.setValue(self._settings.margins_deviation.coefficient)
-        self._margins_deviation_thresh.setValue(self._settings.margins_deviation.threshold)
+        self._margins_deviation_coef.setValue(
+            self._settings.margins_deviation.coefficient
+        )
+        self._margins_deviation_thresh.setValue(
+            self._settings.margins_deviation.threshold
+        )
 
     def _connect_signals(self) -> None:
         """Connect widget signals."""
@@ -189,13 +199,21 @@ class SettingsDialog(QtWidgets.QDialog):
 
     def _save_settings(self) -> None:
         """Save UI values to settings."""
-        from scantailor.core.settings import ColorScheme, DeviationSettings, TiffCompression
+        from scantailor.core.settings import (
+            ColorScheme,
+            DeviationSettings,
+            TiffCompression,
+        )
 
         # User Interface
         self._settings.opengl_enabled = self._enable_opengl_cb.isChecked()
         self._settings.auto_save_project = self._auto_save_cb.isChecked()
 
-        schemes = [ColorScheme.LIGHT, ColorScheme.DARK, ColorScheme.DARK]  # "system" -> dark
+        schemes = [
+            ColorScheme.LIGHT,
+            ColorScheme.DARK,
+            ColorScheme.DARK,
+        ]  # "system" -> dark
         self._settings.color_scheme = schemes[self._color_scheme_box.currentIndex()]
 
         # Thumbnails
@@ -203,18 +221,30 @@ class SettingsDialog(QtWidgets.QDialog):
         self._settings.thumbnail_quality_height = self._thumbnail_quality_sb.value()
         self._settings.max_thumbnail_width = float(self._thumbnail_size_sb.value())
         self._settings.max_thumbnail_height = float(self._thumbnail_size_sb.value())
-        self._settings.single_column_thumbnail_display = self._single_column_cb.isChecked()
+        self._settings.single_column_thumbnail_display = (
+            self._single_column_cb.isChecked()
+        )
         self._settings.show_canceling_selection_question = (
             self._cancel_selection_cb.isChecked()
         )
 
         # TIFF compression
-        bw_options = [TiffCompression.NONE, TiffCompression.LZW, TiffCompression.DEFLATE, TiffCompression.CCITT_FAX4]
+        bw_options = [
+            TiffCompression.NONE,
+            TiffCompression.LZW,
+            TiffCompression.DEFLATE,
+            TiffCompression.CCITT_FAX4,
+        ]
         self._settings.tiff_bw_compression = bw_options[
             self._tiff_bw_box.currentIndex()
         ]
 
-        color_options = [TiffCompression.NONE, TiffCompression.LZW, TiffCompression.DEFLATE, TiffCompression.JPEG]
+        color_options = [
+            TiffCompression.NONE,
+            TiffCompression.LZW,
+            TiffCompression.DEFLATE,
+            TiffCompression.JPEG,
+        ]
         self._settings.tiff_color_compression = color_options[
             self._tiff_color_box.currentIndex()
         ]

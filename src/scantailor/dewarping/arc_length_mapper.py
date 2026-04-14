@@ -22,12 +22,9 @@ so arc length between samples is monotonically increasing.
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 import numpy as np
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
+from numpy.typing import NDArray
 
 
 @dataclass

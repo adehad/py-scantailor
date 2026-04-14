@@ -3,8 +3,6 @@
 Provides UI controls for setting the deskew angle (auto or manual).
 """
 
-from typing import TYPE_CHECKING
-
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QDoubleSpinBox,
@@ -18,9 +16,7 @@ from PySide6.QtWidgets import (
 
 from scantailor.app.ui.widgets import CollapsibleGroupBox
 from scantailor.core import PageId
-
-if TYPE_CHECKING:
-    from scantailor.filters.deskew.filter import Filter
+from scantailor.filters.deskew.filter import Filter
 
 
 class OptionsWidget(QWidget):

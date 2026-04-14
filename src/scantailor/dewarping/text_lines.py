@@ -13,14 +13,12 @@ The algorithm works as follows:
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-if TYPE_CHECKING:
-    from scantailor.core import Dpi
+from scantailor.core import Dpi
 
 
 @dataclass
@@ -365,10 +363,10 @@ def trace_text_lines(
     # Normalize DPI
     if isinstance(dpi, tuple):
         dpi_h, dpi_v = dpi
-    elif hasattr(dpi, "horizontal"):
-        dpi_h, dpi_v = dpi.horizontal, dpi.vertical
-    else:
+    elif isinstance(dpi, int | float):
         dpi_h = dpi_v = float(dpi)
+    else:
+        dpi_h, dpi_v = float(dpi.horizontal), float(dpi.vertical)
 
     # Ensure grayscale
     if len(image.shape) == 3:
@@ -456,7 +454,7 @@ def trace_text_lines(
 
 
 def _binarize_wolf(
-    image: NDArray[np.uint8],
+    image: np.ndarray,
     window_size: int = 31,
     k: float = 0.5,
 ) -> NDArray[np.uint8]:
@@ -561,7 +559,7 @@ def _sanitize_binary_image(
         mask[y : y + rh, x : x + rw] = 255
         result = cv2.bitwise_and(result, mask)
 
-    return result
+    return np.asarray(result, dtype=np.uint8)
 
 
 def _calc_avg_unit_vector(bounds: VerticalBounds) -> NDArray[np.float64]:
@@ -602,7 +600,7 @@ def _calc_avg_unit_vector(bounds: VerticalBounds) -> NDArray[np.float64]:
 
 
 def _extract_text_lines(
-    image: NDArray[np.uint8],
+    image: np.ndarray,
     bounds: VerticalBounds,
 ) -> list[list[tuple[float, float]]]:
     """Extract text lines using gradient analysis.
@@ -698,7 +696,7 @@ def _close_with_obstacles(
             break
         prev = current
 
-    return prev
+    return np.asarray(prev, dtype=np.uint8)
 
 
 def _calc_mid_line(
@@ -724,7 +722,7 @@ def _calc_mid_line(
 
 
 def _find_mid_line_seeds(
-    sedm: NDArray[np.float32],
+    sedm: np.ndarray,
     mid_line: tuple[tuple[float, float], tuple[float, float]],
     height: int,
     width: int,
@@ -779,8 +777,8 @@ def _find_mid_line_seeds(
 
 
 def _trace_from_seed(
-    sedm: NDArray[np.float32],
-    gradient: NDArray[np.float32],
+    sedm: np.ndarray,
+    gradient: np.ndarray,
     seed: tuple[int, int],
     bounds: VerticalBounds,
     height: int,
@@ -820,8 +818,8 @@ def _trace_from_seed(
 
 
 def _trace_towards_line(
-    sedm: NDArray[np.float32],
-    gradient: NDArray[np.float32],
+    sedm: np.ndarray,
+    gradient: np.ndarray,
     start: tuple[int, int],
     target_line: tuple[tuple[float, float], tuple[float, float]],
     height: int,
@@ -1098,7 +1096,7 @@ def _is_curvature_consistent(
 
 
 def _refine_text_lines(
-    image: NDArray[np.uint8],
+    image: np.ndarray,
     polylines: list[list[tuple[float, float]]],
     unit_down: NDArray[np.float64],
     iterations: int = 100,

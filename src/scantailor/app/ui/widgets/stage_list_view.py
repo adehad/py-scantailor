@@ -4,9 +4,14 @@ This view displays the 6 filter stages as a table with stage names and
 a batch processing launch button.
 """
 
-from typing import TYPE_CHECKING
-
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, Signal
+from PySide6.QtCore import (
+    QAbstractTableModel,
+    QModelIndex,
+    QPersistentModelIndex,
+    Qt,
+    Signal,
+)
+from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import (
     QHeaderView,
     QSizePolicy,
@@ -18,8 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-if TYPE_CHECKING:
-    from scantailor.core.stage_sequence import StageSequence
+from scantailor.core.stage_sequence import StageSequence
 
 
 class StageListModel(QAbstractTableModel):
@@ -39,7 +43,9 @@ class StageListModel(QAbstractTableModel):
         self._show_animation = False
         self._selected_row = -1
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(
+        self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()
+    ) -> int:
         """Get row count.
 
         Args:
@@ -52,7 +58,9 @@ class StageListModel(QAbstractTableModel):
             return 0
         return 6  # Always 6 stages
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(
+        self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()
+    ) -> int:
         """Get column count.
 
         Args:
@@ -65,7 +73,11 @@ class StageListModel(QAbstractTableModel):
             return 0
         return 2
 
-    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
+    def data(
+        self,
+        index: QModelIndex | QPersistentModelIndex,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ):
         """Get data for a cell.
 
         Args:
@@ -124,7 +136,12 @@ class StageListDelegate(QStyledItemDelegate):
         """
         super().__init__(parent)
 
-    def paint(self, painter, option: QStyleOptionViewItem, index: QModelIndex) -> None:
+    def paint(
+        self,
+        painter: QPainter,
+        option: QStyleOptionViewItem,
+        index: QModelIndex | QPersistentModelIndex,
+    ) -> None:
         """Paint the item without focus indicator.
 
         Args:
@@ -134,6 +151,8 @@ class StageListDelegate(QStyledItemDelegate):
         """
         # Remove focus state to prevent focus rectangle
         opt = QStyleOptionViewItem(option)
+        # QStyleOption.state missing from PySide6 stubs (PYSIDE-3034)
+        # pyrefly: ignore[missing-attribute]
         opt.state &= ~QStyle.StateFlag.State_HasFocus
         super().paint(painter, opt, index)
 

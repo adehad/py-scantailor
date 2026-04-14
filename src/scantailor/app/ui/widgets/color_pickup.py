@@ -7,8 +7,8 @@ takes the median color from pixels within that area.
 
 import numpy as np
 from PySide6 import QtCore, QtGui, QtWidgets
-from PySide6.QtCore import QPoint, QRect, Qt, Signal
-from PySide6.QtGui import QColor, QCursor, QImage, QPainter, QPen, QPixmap
+from PySide6.QtCore import QRect, Qt, Signal
+from PySide6.QtGui import QColor, QCursor, QImage, QPainter, QPen
 
 
 class ColorPickupInteraction(QtCore.QObject):
@@ -52,7 +52,9 @@ class ColorPickupInteraction(QtCore.QObject):
         self._image_view.installEventFilter(self)
 
         # Set up escape shortcut
-        self._escape_shortcut = QtGui.QShortcut(Qt.Key.Key_Escape, self._image_view)
+        self._escape_shortcut = QtGui.QShortcut(
+            QtGui.QKeySequence(Qt.Key.Key_Escape), self._image_view
+        )
         self._escape_shortcut.setAutoRepeat(False)
         self._escape_shortcut.setEnabled(False)
         self._escape_shortcut.activated.connect(self._cancel)
@@ -232,8 +234,10 @@ class ColorPickupInteraction(QtCore.QObject):
             return False
 
         if event.type() == QtCore.QEvent.Type.MouseButtonPress:
-            mouse_event = event  # type: QtGui.QMouseEvent
-            if mouse_event.button() == Qt.MouseButton.LeftButton:
+            if (
+                isinstance(event, QtGui.QMouseEvent)
+                and event.button() == Qt.MouseButton.LeftButton
+            ):
                 self._take_color()
                 return True
 
