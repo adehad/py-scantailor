@@ -4,6 +4,8 @@ This module defines the parameter structures for storing page layout
 settings on a per-page basis.
 """
 
+from typing import Self
+
 from pydantic import BaseModel, Field
 
 from scantailor.core.models import Margins
@@ -81,7 +83,7 @@ class Params(BaseModel):
             + self.hard_margins_mm.bottom
         )
 
-    def with_margins(self, margins: Margins) -> Params:
+    def with_margins(self, margins: Margins) -> Self:
         """Return a new Params with updated margins.
 
         Args:
@@ -94,7 +96,7 @@ class Params(BaseModel):
             update={"hard_margins_mm": margins, "auto_margins": False}
         )
 
-    def with_alignment(self, alignment: Alignment) -> Params:
+    def with_alignment(self, alignment: Alignment) -> Self:
         """Return a new Params with updated alignment.
 
         Args:
@@ -105,7 +107,7 @@ class Params(BaseModel):
         """
         return self.model_copy(update={"alignment": alignment})
 
-    def with_auto_margins(self, auto: bool = True) -> Params:
+    def with_auto_margins(self, auto: bool = True) -> Self:
         """Return a new Params with auto_margins flag set.
 
         Args:

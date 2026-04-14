@@ -270,7 +270,7 @@ class TestZoneSet:
     ) -> None:
         """Removing non-existent zone returns False."""
         zs = ZoneSet()
-        zone1 = zs.add_picture_zone(spline1)
+        zs.add_picture_zone(spline1)
         zone2 = Zone(spline=spline2, properties=PictureZoneProperties())
 
         result = zs.remove_picture_zone(zone2)

@@ -1,14 +1,12 @@
 """Settings storage for Select Content filter."""
 
 import threading
-from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field, PrivateAttr
 
-from .params import Params
+from scantailor.core import PageId
 
-if TYPE_CHECKING:
-    from scantailor.core import PageId
+from .params import Params
 
 
 class Settings(BaseModel):

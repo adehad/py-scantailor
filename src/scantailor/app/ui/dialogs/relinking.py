@@ -3,7 +3,13 @@
 from pathlib import Path
 
 from PySide6 import QtWidgets
-from PySide6.QtCore import QAbstractListModel, QModelIndex, QPersistentModelIndex, Qt, Signal
+from PySide6.QtCore import (
+    QAbstractListModel,
+    QModelIndex,
+    QPersistentModelIndex,
+    Qt,
+    Signal,
+)
 from PySide6.QtGui import QColor
 
 
@@ -53,11 +59,17 @@ class RelinkingModel(QAbstractListModel):
         super().__init__(parent)
         self._items = items or []
 
-    def rowCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
+    def rowCount(
+        self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()
+    ) -> int:
         """Get the number of rows."""
         return len(self._items)
 
-    def data(self, index: QModelIndex | QPersistentModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
+    def data(
+        self,
+        index: QModelIndex | QPersistentModelIndex,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ):
         """Get data for a cell."""
         if not index.isValid() or index.row() >= len(self._items):
             return None

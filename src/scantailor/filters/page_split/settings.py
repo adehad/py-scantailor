@@ -4,13 +4,10 @@ This module provides the Settings class which stores per-page parameters
 for the page split filter.
 """
 
-from typing import TYPE_CHECKING
+from scantailor.core import PageId
 
 from .layout_type import LayoutType
 from .params import Params
-
-if TYPE_CHECKING:
-    from scantailor.core import PageId
 
 
 class Settings:

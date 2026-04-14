@@ -4,16 +4,11 @@ This module provides the Settings class which stores per-page parameters
 for the output filter.
 """
 
-from typing import TYPE_CHECKING
-
-from scantailor.core import Dpi
+from scantailor.core import Dpi, PageId
 
 from .color_mode import ColorMode
 from .despeckle import DespeckleLevel
 from .params import Params
-
-if TYPE_CHECKING:
-    from scantailor.core import PageId
 
 
 class Settings:

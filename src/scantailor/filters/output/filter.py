@@ -5,12 +5,10 @@ the final output images with binarization, despeckle, and other processing
 applied.
 """
 
-from typing import TYPE_CHECKING
-
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.core import Dpi
+from scantailor.core import Dpi, PageId
 
 from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode
@@ -18,9 +16,6 @@ from .despeckle import DespeckleLevel
 from .generator import OutputResult, generate_output
 from .params import Params
 from .settings import Settings
-
-if TYPE_CHECKING:
-    from scantailor.core import PageId
 
 
 class Filter:

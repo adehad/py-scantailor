@@ -8,7 +8,7 @@ Hovering over a component highlights it and all components before it.
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtGui import QCursor, QPaintEvent
 from PySide6.QtWidgets import QHBoxLayout, QPushButton, QWidget
 
@@ -45,22 +45,22 @@ class ComponentButton(QPushButton):
         self._force_highlight = False
         self._stick_highlight = False
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def paintEvent(self, arg__1: QPaintEvent) -> None:
         """Custom paint to support forced highlighting.
 
         Args:
-            event: Paint event.
+            arg__1: Paint event.
         """
         # Check if we should force hover appearance
         if self.property("forceHighlight") or self.property("stickHighlight"):
             # Temporarily enable hover state
             self.setAttribute(Qt.WidgetAttribute.WA_UnderMouse, True)
-            super().paintEvent(event)
+            super().paintEvent(arg__1)
             # Restore original state
             actual_under_mouse = self.rect().contains(self.mapFromGlobal(QCursor.pos()))
             self.setAttribute(Qt.WidgetAttribute.WA_UnderMouse, actual_under_mouse)
         else:
-            super().paintEvent(event)
+            super().paintEvent(arg__1)
 
 
 class RelinkablePathVisualization(QWidget):
@@ -244,7 +244,7 @@ class RelinkablePathVisualization(QWidget):
 
         btn.setStyleSheet(style)
 
-    def eventFilter(self, watched: QWidget, event: QEvent) -> bool:
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         """Filter events to implement hover highlighting.
 
         Args:

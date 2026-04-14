@@ -6,15 +6,12 @@ saved in the new JSON format.
 """
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 from xml.etree import ElementTree as ET
 
 from loguru import logger
 
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
-
-if TYPE_CHECKING:
-    from scantailor.core.project import ImageInfo, ImageMetadata, Project
+from scantailor.core.project import ImageInfo, ImageMetadata, Project
 
 
 def parse_xml_project(path: Path, content: str) -> Project:

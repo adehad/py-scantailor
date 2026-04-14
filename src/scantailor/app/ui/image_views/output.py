@@ -7,16 +7,15 @@ Provides image views for the Output filter including:
 """
 
 from enum import Enum, auto
-from typing import TYPE_CHECKING
 
 import numpy as np
+from numpy.typing import NDArray
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal, Slot
 from PySide6.QtGui import (
     QColor,
     QImage,
     QPainter,
-    QPainterPath,
     QPen,
     QPolygonF,
     QShortcut,
@@ -24,11 +23,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QTabWidget
 
 from scantailor.app.ui.image_views.base import ImageViewBase
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-    from scantailor.core import ImageTransformation
+from scantailor.core import ImageTransformation
 
 
 class ImageViewTab(Enum):
@@ -329,7 +324,7 @@ class OutputImageView(ImageViewBase):
         """
         # Convert to widget coordinates
         widget_polygon = QPolygonF()
-        for point in zone:
+        for point in zone.toList():
             widget_polygon.append(self.virtual_to_widget_point(point))
 
         painter.save()
@@ -353,7 +348,7 @@ class OutputImageView(ImageViewBase):
         if is_selected:
             painter.setBrush(self.ZONE_HANDLE_COLOR)
             painter.setPen(Qt.PenStyle.NoPen)
-            for point in widget_polygon:
+            for point in widget_polygon.toList():
                 painter.drawEllipse(point, 5, 5)
 
         painter.restore()
@@ -503,7 +498,7 @@ class OutputImageView(ImageViewBase):
                 clear_action = menu.addAction("Clear All Zones")
                 clear_action.triggered.connect(self.clear_zones)
 
-        menu.exec(event.globalPos())
+        menu.exec_(event.globalPos())
 
 
 class PictureZoneEditor(OutputImageView):
@@ -701,7 +696,7 @@ class FillZoneEditor(OutputImageView):
 
         # Convert to widget coordinates
         widget_polygon = QPolygonF()
-        for point in zone:
+        for point in zone.toList():
             widget_polygon.append(self.virtual_to_widget_point(point))
 
         painter.save()
@@ -726,7 +721,7 @@ class FillZoneEditor(OutputImageView):
         if is_selected:
             painter.setBrush(self.ZONE_HANDLE_COLOR)
             painter.setPen(Qt.PenStyle.NoPen)
-            for point in widget_polygon:
+            for point in widget_polygon.toList():
                 painter.drawEllipse(point, 5, 5)
 
         painter.restore()

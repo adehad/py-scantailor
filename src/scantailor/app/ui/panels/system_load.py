@@ -151,7 +151,7 @@ class SystemLoadWidget(QtWidgets.QWidget):
         saved_value = settings.value(_SETTINGS_KEY, self._max_threads)
 
         # Clamp to valid range
-        if isinstance(saved_value, (int, str)):
+        if isinstance(saved_value, int | str):
             try:
                 value = int(saved_value)
                 value = min(self._max_threads, max(1, value))

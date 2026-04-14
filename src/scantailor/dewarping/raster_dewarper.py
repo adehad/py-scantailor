@@ -9,15 +9,12 @@ which is simpler and leverages optimized implementations.
 """
 
 from enum import Enum
-from typing import TYPE_CHECKING
 
 import cv2
 import numpy as np
+from numpy.typing import NDArray
 
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-    from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
+from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
 
 
 class InterpolationMethod(Enum):
@@ -96,7 +93,7 @@ def dewarp_image(
         # Grayscale
         bg = (
             int(background_color)
-            if isinstance(background_color, (int, float))
+            if isinstance(background_color, int | float)
             else background_color[0]
         )
         dst = np.full((dst_height, dst_width), bg, dtype=np.uint8)
@@ -150,7 +147,10 @@ def _compute_dewarp_maps(
         dewarper: The dewarping model.
         dst_width: Destination image width.
         dst_height: Destination image height.
-        left, top, right, bottom: Model domain bounds.
+        left: Left model domain bound.
+        top: Top model domain bound.
+        right: Right model domain bound.
+        bottom: Bottom model domain bound.
 
     Returns:
         Tuple of (map_x, map_y) arrays for cv2.remap.

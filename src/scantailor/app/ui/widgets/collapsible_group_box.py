@@ -5,7 +5,7 @@ The collapsed state is persisted across sessions using QSettings.
 """
 
 from PySide6.QtCore import QEvent, QSettings, Signal
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QResizeEvent, QShowEvent
 from PySide6.QtWidgets import QGroupBox, QStyle, QToolButton, QWidget
 
 
@@ -170,7 +170,7 @@ class CollapsibleGroupBox(QGroupBox):
         if checked and self._collapsed:
             self.set_collapsed(False)
 
-    def showEvent(self, event: QEvent) -> None:
+    def showEvent(self, event: QShowEvent) -> None:
         """Handle show event.
 
         Args:
@@ -184,7 +184,7 @@ class CollapsibleGroupBox(QGroupBox):
             self._update_widgets()
             self.collapsed_state_changed.emit(self._collapsed)
 
-    def resizeEvent(self, event: QEvent) -> None:
+    def resizeEvent(self, event: QResizeEvent) -> None:
         """Handle resize event.
 
         Args:

@@ -1,5 +1,7 @@
 """Content and page box data structures."""
 
+from typing import Self
+
 from pydantic import BaseModel, Field
 
 
@@ -56,7 +58,7 @@ class ContentBox(BaseModel):
         """Return True if the point is inside the box."""
         return self.left <= x <= self.right and self.top <= y <= self.bottom
 
-    def intersects(self, other: ContentBox) -> bool:
+    def intersects(self, other: "ContentBox") -> bool:
         """Return True if this box overlaps with another."""
         return not (
             self.right < other.left
@@ -65,7 +67,7 @@ class ContentBox(BaseModel):
             or self.top > other.bottom
         )
 
-    def intersection(self, other: ContentBox) -> ContentBox:
+    def intersection(self, other: "ContentBox") -> Self:
         """Return the intersection of this box with another."""
         left = max(self.left, other.left)
         top = max(self.top, other.top)
@@ -77,7 +79,7 @@ class ContentBox(BaseModel):
 
         return ContentBox(x=left, y=top, width=right - left, height=bottom - top)
 
-    def union(self, other: ContentBox) -> ContentBox:
+    def union(self, other: "ContentBox") -> Self:
         """Return the smallest box containing both boxes."""
         if self.is_empty():
             return other.model_copy()
@@ -91,7 +93,7 @@ class ContentBox(BaseModel):
 
         return ContentBox(x=left, y=top, width=right - left, height=bottom - top)
 
-    def expanded(self, margin: float) -> ContentBox:
+    def expanded(self, margin: float) -> Self:
         """Return a new box expanded by the given margin on all sides."""
         return ContentBox(
             x=self.x - margin,
@@ -105,9 +107,7 @@ class ContentBox(BaseModel):
         return (self.x, self.y, self.width, self.height)
 
     @classmethod
-    def from_ltrb(
-        cls, left: float, top: float, right: float, bottom: float
-    ) -> ContentBox:
+    def from_ltrb(cls, left: float, top: float, right: float, bottom: float) -> Self:
         """Create a box from left, top, right, bottom coordinates."""
         return cls(x=left, y=top, width=right - left, height=bottom - top)
 
@@ -161,12 +161,12 @@ class PageBox(BaseModel):
         return (self.x, self.y, self.width, self.height)
 
     @classmethod
-    def from_ltrb(cls, left: float, top: float, right: float, bottom: float) -> PageBox:
+    def from_ltrb(cls, left: float, top: float, right: float, bottom: float) -> Self:
         """Create a box from left, top, right, bottom coordinates."""
         return cls(x=left, y=top, width=right - left, height=bottom - top)
 
     @classmethod
-    def from_image_size(cls, width: int, height: int) -> PageBox:
+    def from_image_size(cls, width: int, height: int) -> Self:
         """Create a page box covering the entire image."""
         return cls(x=0, y=0, width=float(width), height=float(height))
 
@@ -182,9 +182,7 @@ class PhysicalSize(BaseModel):
         return self.width_mm <= 0 or self.height_mm <= 0
 
     @classmethod
-    def from_pixels(
-        cls, width_px: float, height_px: float, dpi: float = 300.0
-    ) -> PhysicalSize:
+    def from_pixels(cls, width_px: float, height_px: float, dpi: float = 300.0) -> Self:
         """Calculate physical size from pixel dimensions and DPI."""
         mm_per_inch = 25.4
         return cls(

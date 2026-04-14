@@ -4,14 +4,10 @@ Provides common image filters including blur, edge detection,
 and noise reduction.
 """
 
-from typing import TYPE_CHECKING
-
 import cv2
 import numpy as np
+from numpy.typing import NDArray
 from scipy import signal
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
 
 
 def gaussian_blur(

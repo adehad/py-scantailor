@@ -4,9 +4,7 @@ Provides UI controls for configuring output settings including color mode,
 binarization, despeckling, and dewarping.
 """
 
-from typing import TYPE_CHECKING
-
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -31,9 +29,7 @@ from scantailor.filters.output.binarization import BinarizationMethod
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.output.dewarping_options import DewarpingMode
-
-if TYPE_CHECKING:
-    from scantailor.filters.output.filter import Filter
+from scantailor.filters.output.filter import Filter
 
 
 class OptionsWidget(QWidget):
@@ -175,7 +171,7 @@ class OptionsWidget(QWidget):
         thresh_layout.addWidget(QLabel("Threshold:"))
         self._threshold_slider = QSlider()
         self._threshold_slider.setObjectName("thresholdSlider")
-        self._threshold_slider.setOrientation(1)  # Horizontal
+        self._threshold_slider.setOrientation(Qt.Orientation.Horizontal)
         self._threshold_slider.setRange(-100, 100)
         self._threshold_slider.setValue(0)
         thresh_layout.addWidget(self._threshold_slider)

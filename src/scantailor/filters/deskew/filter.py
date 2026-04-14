@@ -5,18 +5,14 @@ horizontal text lines. It can operate in automatic mode (detecting skew)
 or manual mode (using user-specified angles).
 """
 
-from typing import TYPE_CHECKING
-
 import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core import PageId
 from scantailor.filters.deskew.params import AutoManualMode, Params
 from scantailor.filters.deskew.settings import Settings
 from scantailor.imageproc import SkewResult, binarize_otsu, find_skew
-
-if TYPE_CHECKING:
-    from scantailor.core import PageId
 
 
 class Filter:

@@ -5,7 +5,7 @@ user preferences. Settings are persisted to a JSON file in the user's config
 directory.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import ClassVar, Self
@@ -117,7 +117,7 @@ class ApplicationSettings(BaseModel):
     current_profile: str = Field(default="Default")
 
     # Class-level singleton storage
-    _instance: ClassVar[ApplicationSettings | None] = None
+    _instance: ClassVar[Self | None] = None
     _config_path: ClassVar[Path | None] = None
 
     @classmethod
@@ -156,7 +156,7 @@ class ApplicationSettings(BaseModel):
         cls._instance = None  # Reset singleton
 
     @classmethod
-    def get_instance(cls) -> ApplicationSettings:
+    def get_instance(cls) -> Self:
         """Get the singleton settings instance.
 
         Loads settings from the config file if it exists, otherwise
@@ -176,7 +176,7 @@ class ApplicationSettings(BaseModel):
         cls._config_path = None
 
     @classmethod
-    def load(cls) -> ApplicationSettings:
+    def load(cls) -> Self:
         """Load settings from the config file.
 
         Returns:
