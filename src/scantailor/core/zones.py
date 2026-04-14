@@ -13,13 +13,11 @@ Each zone has:
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import Any
 
 import numpy as np
-from pydantic import BaseModel, Field
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
+from numpy.typing import NDArray
+from pydantic import BaseModel
 
 
 class ZoneCategory(str, Enum):
@@ -71,6 +69,7 @@ class ZoneSpline:
     is_smooth: bool = False
 
     def __post_init__(self) -> None:
+        """Validate and normalize the points array."""
         self.points = np.asarray(self.points, dtype=np.float64)
         if self.points.ndim == 1:
             self.points = self.points.reshape(-1, 2)
@@ -105,7 +104,8 @@ class ZoneSpline:
         try:
             # Close the spline by appending start point
             pts = np.vstack([self.points, self.points[0]])
-            tck, _ = splprep([pts[:, 0], pts[:, 1]], s=0, per=True)
+            tck_list, _ = splprep([pts[:, 0], pts[:, 1]], s=0, per=True)
+            tck: Any = tck_list
             u = np.linspace(0, 1, num_samples)
             x, y = splev(u, tck)
             return np.column_stack([x, y])
@@ -175,6 +175,7 @@ class ZoneSet(BaseModel):
     _fill_zones: list[Zone] = []
 
     def __init__(self, **data) -> None:
+        """Initialize with empty picture and fill zone lists."""
         super().__init__(**data)
         object.__setattr__(self, "_picture_zones", [])
         object.__setattr__(self, "_fill_zones", [])

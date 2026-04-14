@@ -23,12 +23,9 @@ for sequential queries where intersections move monotonically along the polyline
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 import numpy as np
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
+from numpy.typing import NDArray
 
 
 @dataclass
@@ -182,8 +179,10 @@ class PolylineIntersector:
         Line 2 passes through p3 and p4.
 
         Args:
-            p1, p2: Points defining line 1.
-            p3, p4: Points defining line 2.
+            p1: First point defining line 1.
+            p2: Second point defining line 1.
+            p3: First point defining line 2.
+            p4: Second point defining line 2.
 
         Returns:
             Intersection point, or None if lines are parallel.

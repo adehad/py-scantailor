@@ -6,12 +6,10 @@ the output generation process.
 """
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .params import Params
+from typing import Self
 
 from .color_mode import ColorMode
+from .params import Params
 
 
 @dataclass(frozen=True)
@@ -67,7 +65,7 @@ class RenderParams:
         cls,
         params: Params,
         splitting_options: SplittingOptions | None = None,
-    ) -> RenderParams:
+    ) -> Self:
         """Create RenderParams from output Params.
 
         Args:

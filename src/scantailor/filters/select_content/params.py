@@ -1,5 +1,7 @@
 """Parameters for Select Content filter."""
 
+from typing import Self
+
 from pydantic import BaseModel, Field
 
 from .content_box import ContentBox, PageBox, PhysicalSize
@@ -49,7 +51,7 @@ class Params(BaseModel):
         self,
         box: ContentBox,
         mode: ContentDetectionMode | None = None,
-    ) -> Params:
+    ) -> Self:
         """Return new params with updated content box."""
         return self.model_copy(
             update={
@@ -64,7 +66,7 @@ class Params(BaseModel):
         self,
         box: PageBox,
         mode: PageDetectionMode | None = None,
-    ) -> Params:
+    ) -> Self:
         """Return new params with updated page box."""
         return self.model_copy(
             update={
@@ -75,41 +77,41 @@ class Params(BaseModel):
             }
         )
 
-    def with_manual_content(self, box: ContentBox) -> Params:
+    def with_manual_content(self, box: ContentBox) -> Self:
         """Return new params with manually specified content box."""
         return self.with_content_box(box, ContentDetectionMode.MANUAL)
 
-    def with_manual_page(self, box: PageBox) -> Params:
+    def with_manual_page(self, box: PageBox) -> Self:
         """Return new params with manually specified page box."""
         return self.with_page_box(box, PageDetectionMode.MANUAL)
 
-    def with_auto_content(self) -> Params:
+    def with_auto_content(self) -> Self:
         """Return new params with content detection set to AUTO."""
         return self.model_copy(
             update={"content_detection_mode": ContentDetectionMode.AUTO}
         )
 
-    def with_auto_page(self) -> Params:
+    def with_auto_page(self) -> Self:
         """Return new params with page detection set to AUTO."""
         return self.model_copy(update={"page_detection_mode": PageDetectionMode.AUTO})
 
-    def with_disabled_content(self) -> Params:
+    def with_disabled_content(self) -> Self:
         """Return new params with content detection disabled."""
         return self.model_copy(
             update={"content_detection_mode": ContentDetectionMode.DISABLED}
         )
 
-    def with_disabled_page(self) -> Params:
+    def with_disabled_page(self) -> Self:
         """Return new params with page detection disabled."""
         return self.model_copy(
             update={"page_detection_mode": PageDetectionMode.DISABLED}
         )
 
-    def with_fine_tune(self, enabled: bool) -> Params:
+    def with_fine_tune(self, enabled: bool) -> Self:
         """Return new params with fine-tune corners setting."""
         return self.model_copy(update={"fine_tune_corners": enabled})
 
-    def ensure_content_within_page(self) -> Params:
+    def ensure_content_within_page(self) -> Self:
         """Return new params with content box clipped to page box."""
         if self.page_box.is_empty():
             return self

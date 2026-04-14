@@ -1,18 +1,15 @@
 """Select Content filter implementation."""
 
-from typing import TYPE_CHECKING
-
 import numpy as np
 from numpy.typing import NDArray
+
+from scantailor.core import PageId
 
 from .content_box import ContentBox, PageBox, PhysicalSize
 from .content_finder import ContentDetectionResult, find_content_box, find_page_edges
 from .detection import ContentDetectionMode, PageDetectionMode
 from .params import Params
 from .settings import Settings
-
-if TYPE_CHECKING:
-    from scantailor.core import PageId
 
 
 class Filter:

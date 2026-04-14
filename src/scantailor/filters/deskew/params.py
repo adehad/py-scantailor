@@ -5,6 +5,7 @@ on a per-page basis.
 """
 
 from enum import Enum
+from typing import Self
 
 from pydantic import BaseModel, Field
 
@@ -41,7 +42,7 @@ class Params(BaseModel):
         """Return True if the angle was auto-detected."""
         return self.mode == AutoManualMode.AUTO
 
-    def with_angle(self, angle: float, mode: AutoManualMode | None = None) -> Params:
+    def with_angle(self, angle: float, mode: AutoManualMode | None = None) -> Self:
         """Return a new Params with the specified angle.
 
         Args:
@@ -56,7 +57,7 @@ class Params(BaseModel):
             mode=mode if mode is not None else self.mode,
         )
 
-    def with_auto_angle(self, angle: float) -> Params:
+    def with_auto_angle(self, angle: float) -> Self:
         """Return a new Params with an auto-detected angle.
 
         Args:
@@ -67,7 +68,7 @@ class Params(BaseModel):
         """
         return Params(deskew_angle_deg=angle, mode=AutoManualMode.AUTO)
 
-    def with_manual_angle(self, angle: float) -> Params:
+    def with_manual_angle(self, angle: float) -> Self:
         """Return a new Params with a manually specified angle.
 
         Args:

@@ -2,28 +2,23 @@
 
 Provides an interactive image view for the Page Layout filter with:
 - Draggable margin edges
-- Visual display of inner (content), middle (hard margins), and outer (soft margins) rectangles
+- Visual display of inner (content), middle (hard margins),
+  and outer (soft margins) rectangles
 - Alignment guides
 - Context menu for guide management
 """
 
 import math
 from enum import IntFlag, auto
-from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide6 import QtCore, QtGui, QtWidgets
-from PySide6.QtCore import QLineF, QPointF, QRectF, QSizeF, Qt, Signal, Slot
+from numpy.typing import NDArray
+from PySide6 import QtGui, QtWidgets
+from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, Signal, Slot
 from PySide6.QtGui import QAction, QColor, QImage, QPainter, QPen
 
 from scantailor.app.ui.image_views.base import ImageViewBase
-from scantailor.core import Margins
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-    from scantailor.core import ImageTransformation
-    from scantailor.filters.page_layout import Alignment
+from scantailor.core import ImageTransformation, Margins
 
 
 class Edge(IntFlag):
@@ -279,8 +274,6 @@ class PageLayoutImageView(ImageViewBase):
         """
         if rect.isEmpty():
             return Edge.NONE
-
-        virtual_pos = self.widget_to_virtual_point(widget_pos)
 
         # For middle rect, we want to detect edges between inner and middle
         edges = [Edge.LEFT, Edge.RIGHT, Edge.TOP, Edge.BOTTOM]
@@ -681,4 +674,4 @@ class PageLayoutImageView(ImageViewBase):
         self._remove_guide_action.setEnabled(self._hovered_guide is not None)
         self._remove_all_guides_action.setEnabled(len(self._guides) > 0)
 
-        self._context_menu.exec(event.globalPos())
+        self._context_menu.exec_(event.globalPos())

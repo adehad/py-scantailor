@@ -19,14 +19,12 @@ PYTHON SIMPLIFICATION:
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import Self
 
 import numpy as np
+from numpy.typing import NDArray
 
 from scantailor.math import XSpline
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
 
 
 @dataclass
@@ -52,7 +50,7 @@ class Curve:
             raise ValueError(msg)
 
     @classmethod
-    def from_spline(cls, spline: XSpline, max_dist: float = 1.0) -> Curve:
+    def from_spline(cls, spline: XSpline, max_dist: float = 1.0) -> Self:
         """Create a curve from an XSpline.
 
         Args:
@@ -66,7 +64,7 @@ class Curve:
         return cls(polyline=polyline, spline=spline)
 
     @classmethod
-    def from_polyline(cls, polyline: NDArray[np.float64]) -> Curve:
+    def from_polyline(cls, polyline: NDArray[np.float64]) -> Self:
         """Create a curve from a polyline.
 
         Args:
@@ -87,7 +85,7 @@ class Curve:
         # Check that endpoints are distinct
         return not np.allclose(self.polyline[0], self.polyline[-1], atol=1e-6)
 
-    def matches(self, other: Curve, tolerance: float = 0.01) -> bool:
+    def matches(self, other: "Curve", tolerance: float = 0.01) -> bool:
         """Check if this curve approximately matches another.
 
         Args:
@@ -193,7 +191,7 @@ class DistortionModel:
 
         return True
 
-    def matches(self, other: DistortionModel) -> bool:
+    def matches(self, other: "DistortionModel") -> bool:
         """Check if this model approximately matches another.
 
         Args:

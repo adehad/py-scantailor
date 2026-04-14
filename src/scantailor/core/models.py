@@ -7,7 +7,7 @@ and orientation.
 
 from enum import IntEnum
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, Self, cast
 
 from pydantic import BaseModel, Field
 
@@ -30,7 +30,7 @@ class Dpi(BaseModel, frozen=True):
         return self.horizontal <= 1 or self.vertical <= 1
 
     @classmethod
-    def uniform(cls, dpi: int) -> Dpi:
+    def uniform(cls, dpi: int) -> Self:
         """Create a Dpi with equal horizontal and vertical values."""
         return cls(horizontal=dpi, vertical=dpi)
 
@@ -76,7 +76,7 @@ class SubPage(IntEnum):
         return self.name.lower().replace("_", "-")
 
     @classmethod
-    def from_string(cls, value: str) -> SubPage:
+    def from_string(cls, value: str) -> Self:
         """Parse a SubPage from its string representation."""
         normalized = value.upper().replace("-", "_")
         return cls[normalized]
@@ -104,7 +104,7 @@ class PageId(BaseModel, frozen=True):
         """Return hash for use in sets and dicts."""
         return hash((self.image_id, self.sub_page))
 
-    def __lt__(self, other: PageId) -> bool:
+    def __lt__(self, other: Self) -> bool:
         """Enable sorting of PageIds."""
         if not isinstance(other, PageId):
             return NotImplemented
@@ -131,7 +131,7 @@ class Margins(BaseModel):
     right: float = 0.0
 
     @classmethod
-    def uniform(cls, value: float) -> Margins:
+    def uniform(cls, value: float) -> Self:
         """Create margins with equal values on all sides."""
         return cls(top=value, bottom=value, left=value, right=value)
 
@@ -145,15 +145,15 @@ class OrthogonalRotation(BaseModel):
 
     degrees: OrthogonalDegrees = 0
 
-    def rotate_clockwise(self) -> OrthogonalRotation:
+    def rotate_clockwise(self) -> Self:
         """Return a new rotation rotated 90 degrees clockwise."""
         new_degrees = cast(OrthogonalDegrees, (self.degrees + 90) % 360)
-        return OrthogonalRotation(degrees=new_degrees)
+        return type(self)(degrees=new_degrees)
 
-    def rotate_counter_clockwise(self) -> OrthogonalRotation:
+    def rotate_counter_clockwise(self) -> Self:
         """Return a new rotation rotated 90 degrees counter-clockwise."""
         new_degrees = cast(OrthogonalDegrees, (self.degrees - 90) % 360)
-        return OrthogonalRotation(degrees=new_degrees)
+        return type(self)(degrees=new_degrees)
 
     def rotate_dimensions(self, width: float, height: float) -> tuple[float, float]:
         """Apply rotation to dimensions, returning (new_width, new_height)."""

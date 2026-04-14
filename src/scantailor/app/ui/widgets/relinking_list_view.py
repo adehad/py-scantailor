@@ -6,7 +6,7 @@ and which are missing (red) using colored rounded rectangles on the right side.
 
 from dataclasses import dataclass
 
-from PySide6.QtCore import QModelIndex, QRect, Qt
+from PySide6.QtCore import QModelIndex, QPersistentModelIndex, QRect, Qt
 from PySide6.QtGui import QBrush, QColor, QPainter, QPaintEvent, QPen
 from PySide6.QtWidgets import (
     QListView,
@@ -40,7 +40,7 @@ class IndicationGroup:
 class RelinkingListViewDelegate(QStyledItemDelegate):
     """Custom delegate that allows the list view to draw status indicators."""
 
-    def __init__(self, owner: RelinkingListView) -> None:
+    def __init__(self, owner: "RelinkingListView") -> None:
         """Initialize the delegate.
 
         Args:
@@ -50,7 +50,10 @@ class RelinkingListViewDelegate(QStyledItemDelegate):
         self._owner = owner
 
     def paint(
-        self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex
+        self,
+        painter: QPainter,
+        option: QStyleOptionViewItem,
+        index: QModelIndex | QPersistentModelIndex,
     ) -> None:
         """Paint the item and maybe draw status layer.
 
@@ -59,6 +62,8 @@ class RelinkingListViewDelegate(QStyledItemDelegate):
             option: Style options for the item.
             index: The model index of the item.
         """
+        # QStyleOption.rect missing from PySide6 stubs (PYSIDE-3034)
+        # pyrefly: ignore[missing-attribute]
         self._owner._maybe_draw_status_layer(painter, index, option.rect)
         super().paint(painter, option, index)
 
@@ -111,17 +116,20 @@ class RelinkingListView(QListView):
         self._status_layer_drawn = False
         self.setItemDelegate(RelinkingListViewDelegate(self))
 
-    def paintEvent(self, event: QPaintEvent) -> None:
+    def paintEvent(self, e: QPaintEvent) -> None:
         """Handle paint event.
 
         Args:
-            event: The paint event.
+            e: The paint event.
         """
         self._status_layer_drawn = False
-        super().paintEvent(event)
+        super().paintEvent(e)
 
     def _maybe_draw_status_layer(
-        self, painter: QPainter, item_index: QModelIndex, item_paint_rect: QRect
+        self,
+        painter: QPainter,
+        item_index: QModelIndex | QPersistentModelIndex,
+        item_paint_rect: QRect,
     ) -> None:
         """Draw the status layer once during painting.
 

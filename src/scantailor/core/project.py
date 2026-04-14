@@ -7,7 +7,7 @@ Handles loading, saving, and managing ScanTailor projects. Supports:
 
 from enum import IntEnum
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import BaseModel, Field
 
@@ -190,7 +190,7 @@ class Project(BaseModel):
         )
 
     @classmethod
-    def load(cls, path: Path) -> Project:
+    def load(cls, path: Path) -> Self:
         """Load a project from a file.
 
         Automatically detects JSON or XML format.
@@ -217,7 +217,7 @@ class Project(BaseModel):
         raise ValueError(msg)
 
     @classmethod
-    def _load_xml(cls, path: Path, content: str) -> Project:
+    def _load_xml(cls, path: Path, content: str) -> Self:
         """Load a project from C++ ScanTailor XML format.
 
         Args:

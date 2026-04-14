@@ -13,16 +13,14 @@ The pipeline stages are:
 """
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.typing import NDArray
 
-from .stage_sequence import FilterStage, StageSequence
+from scantailor.core.models import PageId
+from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
 
-if TYPE_CHECKING:
-    from scantailor.core import PageId
-    from scantailor.dewarping import CylindricalSurfaceDewarper
+from .stage_sequence import FilterStage, StageSequence
 
 
 @dataclass
@@ -84,7 +82,9 @@ def process_page(
     Example:
         >>> import numpy as np
         >>> from scantailor.core import PageId, ImageId, SubPage, StageSequence
-        >>> from scantailor.core.pipeline import process_page, PipelineOptions, FilterStage
+        >>> from scantailor.core.pipeline import (
+        ...     process_page, PipelineOptions, FilterStage,
+        ... )
         >>> from pathlib import Path
         >>>
         >>> # Create a test image and page ID
@@ -191,7 +191,7 @@ def _process_page_split(
         filter_.process(image, page_id, dpi=options.dpi)
 
     params = filter_.get_params(page_id)
-    metadata = {
+    metadata: dict[str, object] = {
         "layout_type": params.layout_type.value,
         "is_manual": params.is_manual(),
     }
@@ -244,7 +244,7 @@ def _process_select_content(
         filter_.process(image, page_id, dpi=options.dpi)
 
     params = filter_.get_params(page_id)
-    metadata = {
+    metadata: dict[str, object] = {
         "content_detection_mode": params.content_detection_mode.value,
         "page_detection_mode": params.page_detection_mode.value,
     }

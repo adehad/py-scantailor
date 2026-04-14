@@ -3,8 +3,6 @@
 Provides UI controls for rotating images by 90-degree increments.
 """
 
-from typing import TYPE_CHECKING
-
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -19,9 +17,7 @@ from PySide6.QtWidgets import (
 
 from scantailor.app.ui.widgets import CollapsibleGroupBox
 from scantailor.core.models import ImageId, OrthogonalRotation
-
-if TYPE_CHECKING:
-    from scantailor.filters.fix_orientation.filter import Filter
+from scantailor.filters.fix_orientation.filter import Filter
 
 
 class OptionsWidget(QWidget):

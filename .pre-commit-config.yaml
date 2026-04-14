@@ -51,3 +51,11 @@ repos:
     hooks:
       - id: yamllint
         files: \.(yaml|yml)$
+  - repo: local
+    hooks:
+      - id: typecheck
+        name: typecheck (pyrefly)
+        language: system
+        entry: pdm run typecheck
+        types_or: [python, pyi]
+        pass_filenames: false

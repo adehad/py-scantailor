@@ -9,17 +9,14 @@ handling common functionality like:
 """
 
 from enum import Enum, auto
-from typing import TYPE_CHECKING
 
 import numpy as np
+from numpy.typing import NDArray
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPainter, QPixmap, QTransform
 
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-    from scantailor.core import ImageTransformation
+from scantailor.core import ImageTransformation
 
 
 class FocalPointMode(Enum):
@@ -251,7 +248,7 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
             transformation: The image transformation to apply.
         """
         # Get the transformation matrix
-        matrix = transformation.transform()
+        matrix = transformation.transform
         self._image_to_virtual = QTransform(
             matrix[0, 0],
             matrix[0, 1],
@@ -269,9 +266,9 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
             self._virtual_to_image = QTransform()
 
         # Set display area from transformation's result rect
-        result_rect = transformation.result_rect()
+        result_rect = transformation.resulting_rect
         self._virtual_display_area = QRectF(
-            result_rect[0], result_rect[1], result_rect[2], result_rect[3]
+            result_rect.x, result_rect.y, result_rect.width, result_rect.height
         )
         self._virtual_crop_area = QtGui.QPolygonF(self._virtual_display_area)
 

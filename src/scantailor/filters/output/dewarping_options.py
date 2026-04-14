@@ -5,6 +5,7 @@ during output generation.
 """
 
 from enum import Enum
+from typing import Self
 
 from pydantic import BaseModel, Field
 
@@ -64,14 +65,14 @@ class DewarpingOptions(BaseModel):
         """Return True if marginal dewarping is enabled."""
         return self.mode == DewarpingMode.MARGINAL
 
-    def with_mode(self, mode: DewarpingMode) -> DewarpingOptions:
+    def with_mode(self, mode: DewarpingMode) -> Self:
         """Return a copy with a different mode."""
         return self.model_copy(update={"mode": mode})
 
-    def with_post_deskew(self, enabled: bool) -> DewarpingOptions:
+    def with_post_deskew(self, enabled: bool) -> Self:
         """Return a copy with post-deskew setting changed."""
         return self.model_copy(update={"post_deskew": enabled})
 
-    def with_post_deskew_angle(self, angle: float) -> DewarpingOptions:
+    def with_post_deskew_angle(self, angle: float) -> Self:
         """Return a copy with a different post-deskew angle."""
         return self.model_copy(update={"post_deskew_angle": angle})

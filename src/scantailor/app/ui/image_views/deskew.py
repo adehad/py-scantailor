@@ -7,19 +7,15 @@ Provides an interactive image view for the Deskew filter with:
 """
 
 import math
-from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide6 import QtCore, QtGui, QtWidgets
+from numpy.typing import NDArray
+from PySide6 import QtGui, QtWidgets
 from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, Signal, Slot
 from PySide6.QtGui import QColor, QImage, QPainter, QPen
 
 from scantailor.app.ui.image_views.base import ImageViewBase
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-    from scantailor.core import ImageTransformation
+from scantailor.core import ImageTransformation
 
 
 class DeskewImageView(ImageViewBase):

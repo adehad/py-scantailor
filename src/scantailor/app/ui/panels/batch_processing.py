@@ -5,9 +5,7 @@ from pathlib import Path
 from PySide6 import QtWidgets
 from PySide6.QtCore import Signal
 
-from scantailor.app.ui import load_ui_widget
 from scantailor.app.ui.panels.system_load import SystemLoadWidget
-from scantailor.app.ui.utils import get_cwidget
 
 _UI_FOLDER = Path(__file__).parent
 

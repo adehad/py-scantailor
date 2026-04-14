@@ -7,20 +7,16 @@ Provides an interactive image view for the Page Split filter with:
 """
 
 import math
-from typing import TYPE_CHECKING
 
 import numpy as np
-from PySide6 import QtCore, QtGui, QtWidgets
+from numpy.typing import NDArray
+from PySide6 import QtGui, QtWidgets
 from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, Signal, Slot
-from PySide6.QtGui import QColor, QImage, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QImage, QPainter, QPen
 
 from scantailor.app.ui.image_views.base import ImageViewBase
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
-    from scantailor.core import ImageTransformation
-    from scantailor.filters.page_split import PageLayout
+from scantailor.core import ImageTransformation
+from scantailor.filters.page_split import PageLayout
 
 
 class PageSplitImageView(ImageViewBase):
@@ -110,7 +106,7 @@ class PageSplitImageView(ImageViewBase):
         self._split_line = line
         self.update()
 
-    @Slot(object)
+    @Slot(PageLayout)
     def page_layout_set_externally(self, layout: PageLayout) -> None:
         """Slot to set page layout from external source.
 

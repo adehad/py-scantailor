@@ -6,15 +6,14 @@ Allows users to select the split mode (auto/manual) and apply scope
 
 from enum import Enum, auto
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtWidgets
 from PySide6.QtCore import Signal
-from PySide6.QtUiTools import QUiLoader
 
-if TYPE_CHECKING:
-    from scantailor.core import PageId
-    from scantailor.filters.page_split import LayoutType
+from scantailor.app.ui import load_ui_widget
+from scantailor.app.ui.utils import get_cwidget
+from scantailor.core import PageId
+from scantailor.filters.page_split import LayoutType
 
 _UI_FOLDER = Path(__file__).parent
 
@@ -77,11 +76,7 @@ class SplitModeDialog(QtWidgets.QDialog):
 
     def _load_ui(self) -> None:
         """Load the UI from the .ui file."""
-        loader = QUiLoader()
-        ui_file = QtCore.QFile(str(_UI_FOLDER / "SplitModeDialog.ui"))
-        ui_file.open(QtCore.QFile.OpenModeFlag.ReadOnly)
-        self._ui = loader.load(ui_file, self)
-        ui_file.close()
+        self._ui = load_ui_widget(_UI_FOLDER / "SplitModeDialog.ui", self)
 
         # Set up the dialog layout
         layout = QtWidgets.QVBoxLayout(self)
@@ -92,57 +87,49 @@ class SplitModeDialog(QtWidgets.QDialog):
         self.setModal(True)
 
         # Get references to widgets
-        self._layout_type_label: QtWidgets.QLabel = self._ui.findChild(
-            QtWidgets.QLabel, "layoutTypeLabel"
+        self._layout_type_label = get_cwidget(
+            self._ui, QtWidgets.QLabel, "layoutTypeLabel"
         )
 
         # Mode radio buttons
-        self._mode_auto: QtWidgets.QRadioButton = self._ui.findChild(
-            QtWidgets.QRadioButton, "modeAuto"
-        )
-        self._mode_manual: QtWidgets.QRadioButton = self._ui.findChild(
-            QtWidgets.QRadioButton, "modeManual"
-        )
+        self._mode_auto = get_cwidget(self._ui, QtWidgets.QRadioButton, "modeAuto")
+        self._mode_manual = get_cwidget(self._ui, QtWidgets.QRadioButton, "modeManual")
 
         # Options
-        self._apply_cut_option: QtWidgets.QCheckBox = self._ui.findChild(
-            QtWidgets.QCheckBox, "applyCutOption"
+        self._apply_cut_option = get_cwidget(
+            self._ui, QtWidgets.QCheckBox, "applyCutOption"
         )
 
         # Scope radio buttons
-        self._this_page_rb: QtWidgets.QRadioButton = self._ui.findChild(
-            QtWidgets.QRadioButton, "thisPageRB"
+        self._this_page_rb = get_cwidget(self._ui, QtWidgets.QRadioButton, "thisPageRB")
+        self._all_pages_rb = get_cwidget(self._ui, QtWidgets.QRadioButton, "allPagesRB")
+        self._this_page_and_followers_rb = get_cwidget(
+            self._ui, QtWidgets.QRadioButton, "thisPageAndFollowersRB"
         )
-        self._all_pages_rb: QtWidgets.QRadioButton = self._ui.findChild(
-            QtWidgets.QRadioButton, "allPagesRB"
+        self._this_every_other_rb = get_cwidget(
+            self._ui, QtWidgets.QRadioButton, "thisEveryOtherRB"
         )
-        self._this_page_and_followers_rb: QtWidgets.QRadioButton = self._ui.findChild(
-            QtWidgets.QRadioButton, "thisPageAndFollowersRB"
+        self._every_other_rb = get_cwidget(
+            self._ui, QtWidgets.QRadioButton, "everyOtherRB"
         )
-        self._this_every_other_rb: QtWidgets.QRadioButton = self._ui.findChild(
-            QtWidgets.QRadioButton, "thisEveryOtherRB"
+        self._selected_pages_rb = get_cwidget(
+            self._ui, QtWidgets.QRadioButton, "selectedPagesRB"
         )
-        self._every_other_rb: QtWidgets.QRadioButton = self._ui.findChild(
-            QtWidgets.QRadioButton, "everyOtherRB"
-        )
-        self._selected_pages_rb: QtWidgets.QRadioButton = self._ui.findChild(
-            QtWidgets.QRadioButton, "selectedPagesRB"
-        )
-        self._every_other_selected_rb: QtWidgets.QRadioButton = self._ui.findChild(
-            QtWidgets.QRadioButton, "everyOtherSelectedRB"
+        self._every_other_selected_rb = get_cwidget(
+            self._ui, QtWidgets.QRadioButton, "everyOtherSelectedRB"
         )
 
         # Hints
-        self._selected_pages_hint: QtWidgets.QLabel = self._ui.findChild(
-            QtWidgets.QLabel, "selectedPagesHint"
+        self._selected_pages_hint = get_cwidget(
+            self._ui, QtWidgets.QLabel, "selectedPagesHint"
         )
-        self._every_other_selected_hint: QtWidgets.QLabel = self._ui.findChild(
-            QtWidgets.QLabel, "everyOtherSelectedHint"
+        self._every_other_selected_hint = get_cwidget(
+            self._ui, QtWidgets.QLabel, "everyOtherSelectedHint"
         )
 
         # Button box
-        self._button_box: QtWidgets.QDialogButtonBox = self._ui.findChild(
-            QtWidgets.QDialogButtonBox, "buttonBox"
+        self._button_box = get_cwidget(
+            self._ui, QtWidgets.QDialogButtonBox, "buttonBox"
         )
 
     def _connect_signals(self) -> None:
@@ -169,7 +156,7 @@ class SplitModeDialog(QtWidgets.QDialog):
             # Import here to avoid circular imports
             from scantailor.filters.page_split import LayoutType
 
-            if self._layout_type == LayoutType.AUTO:
+            if self._layout_type == LayoutType.AUTO_LAYOUT_TYPE:
                 self._mode_auto.setChecked(True)
             else:
                 self._mode_manual.setChecked(True)
@@ -273,10 +260,10 @@ class SplitModeDialog(QtWidgets.QDialog):
         from scantailor.filters.page_split import LayoutType
 
         if self._mode_auto.isChecked():
-            return LayoutType.AUTO
+            return LayoutType.AUTO_LAYOUT_TYPE
         else:
             # Manual mode - return the current or auto-detected type
-            if self._layout_type and self._layout_type != LayoutType.AUTO:
+            if self._layout_type and self._layout_type != LayoutType.AUTO_LAYOUT_TYPE:
                 return self._layout_type
             elif self._auto_detected_layout_type:
                 return self._auto_detected_layout_type

@@ -5,6 +5,7 @@ when their sizes differ.
 """
 
 from enum import Enum
+from typing import Self
 
 from pydantic import BaseModel
 
@@ -83,7 +84,7 @@ class Alignment(BaseModel):
         return not self.is_null
 
     @classmethod
-    def centered(cls) -> Alignment:
+    def centered(cls) -> Self:
         """Create a centered alignment (default)."""
         return cls(
             vertical=VerticalAlignment.VCENTER,
@@ -91,7 +92,7 @@ class Alignment(BaseModel):
         )
 
     @classmethod
-    def top_left(cls) -> Alignment:
+    def top_left(cls) -> Self:
         """Create a top-left alignment."""
         return cls(
             vertical=VerticalAlignment.TOP,
@@ -99,6 +100,6 @@ class Alignment(BaseModel):
         )
 
     @classmethod
-    def independent(cls) -> Alignment:
+    def independent(cls) -> Self:
         """Create an independent alignment (not aligned with others)."""
         return cls(is_null=True)

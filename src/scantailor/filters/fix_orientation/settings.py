@@ -4,14 +4,12 @@ This module provides storage for per-image rotation settings.
 """
 
 import threading
-from typing import TYPE_CHECKING
+from collections.abc import Iterable
+from typing import Self
 
 from pydantic import BaseModel, Field, PrivateAttr
 
 from scantailor.core.models import ImageId, OrthogonalRotation, PageId
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable
 
 
 class Settings(BaseModel):
@@ -108,7 +106,7 @@ class Settings(BaseModel):
             }
 
     @classmethod
-    def from_dict(cls, data: dict[str, dict]) -> Settings:
+    def from_dict(cls, data: dict[str, dict]) -> Self:
         """Create Settings from a serialized dictionary.
 
         Args:
