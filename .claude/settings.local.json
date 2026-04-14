@@ -11,5 +11,8 @@
       "Bash(git add:*)",
       "Bash(git commit:*)"
     ]
+  },
+  "enabledPlugins": {
+    "pyrefly-lsp@pyrefly-lsp-claude-plugin": true
   }
 }
