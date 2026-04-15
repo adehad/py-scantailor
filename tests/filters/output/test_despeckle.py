@@ -1,6 +1,6 @@
 """Tests for DespeckleLevel enum."""
 
-from scantailor.filters.output import DespeckleLevel
+from scantailor.filters.output.despeckle import DespeckleLevel
 
 
 class TestDespeckleLevel:

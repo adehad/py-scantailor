@@ -2,8 +2,9 @@
 
 from pathlib import Path
 
-from scantailor.core import ImageId, PageId, SubPage
-from scantailor.filters.deskew import AutoManualMode, Params, Settings
+from scantailor.core.models import ImageId, PageId, SubPage
+from scantailor.filters.deskew.params import AutoManualMode, Params
+from scantailor.filters.deskew.settings import Settings
 
 
 def make_page_id(name: str, sub_page: SubPage = SubPage.SINGLE_PAGE) -> PageId:

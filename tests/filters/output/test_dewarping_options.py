@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from scantailor.filters.output import DewarpingMode, DewarpingOptions
+from scantailor.filters.output.dewarping_options import DewarpingMode, DewarpingOptions
 
 
 class TestDewarpingMode:

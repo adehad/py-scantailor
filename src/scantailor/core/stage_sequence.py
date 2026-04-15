@@ -10,12 +10,12 @@ from enum import IntEnum
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
 if TYPE_CHECKING:
-    from scantailor.filters.deskew import Filter as DeskewFilter
-    from scantailor.filters.fix_orientation import Filter as FixOrientationFilter
-    from scantailor.filters.output import Filter as OutputFilter
-    from scantailor.filters.page_layout import Filter as PageLayoutFilter
-    from scantailor.filters.page_split import Filter as PageSplitFilter
-    from scantailor.filters.select_content import Filter as SelectContentFilter
+    from scantailor.filters.deskew.filter import Filter as DeskewFilter
+    from scantailor.filters.fix_orientation.filter import Filter as FixOrientationFilter
+    from scantailor.filters.output.filter import Filter as OutputFilter
+    from scantailor.filters.page_layout.filter import Filter as PageLayoutFilter
+    from scantailor.filters.page_split.filter import Filter as PageSplitFilter
+    from scantailor.filters.select_content.filter import Filter as SelectContentFilter
 
 
 class FilterStage(IntEnum):
@@ -87,7 +87,7 @@ class StageSequence:
     def fix_orientation_filter(self) -> "FixOrientationFilter":
         """Get the Fix Orientation filter."""
         if self._fix_orientation_filter is None:
-            from scantailor.filters.fix_orientation import Filter
+            from scantailor.filters.fix_orientation.filter import Filter
 
             self._fix_orientation_filter = Filter()
         return self._fix_orientation_filter
@@ -101,7 +101,7 @@ class StageSequence:
     def page_split_filter(self) -> "PageSplitFilter":
         """Get the Page Split filter."""
         if self._page_split_filter is None:
-            from scantailor.filters.page_split import Filter
+            from scantailor.filters.page_split.filter import Filter
 
             self._page_split_filter = Filter()
         return self._page_split_filter
@@ -115,7 +115,7 @@ class StageSequence:
     def deskew_filter(self) -> "DeskewFilter":
         """Get the Deskew filter."""
         if self._deskew_filter is None:
-            from scantailor.filters.deskew import Filter
+            from scantailor.filters.deskew.filter import Filter
 
             self._deskew_filter = Filter()
         return self._deskew_filter
@@ -129,7 +129,7 @@ class StageSequence:
     def select_content_filter(self) -> "SelectContentFilter":
         """Get the Select Content filter."""
         if self._select_content_filter is None:
-            from scantailor.filters.select_content import Filter
+            from scantailor.filters.select_content.filter import Filter
 
             self._select_content_filter = Filter()
         return self._select_content_filter
@@ -143,7 +143,7 @@ class StageSequence:
     def page_layout_filter(self) -> "PageLayoutFilter":
         """Get the Page Layout filter."""
         if self._page_layout_filter is None:
-            from scantailor.filters.page_layout import Filter
+            from scantailor.filters.page_layout.filter import Filter
 
             self._page_layout_filter = Filter()
         return self._page_layout_filter
@@ -157,7 +157,7 @@ class StageSequence:
     def output_filter(self) -> "OutputFilter":
         """Get the Output filter."""
         if self._output_filter is None:
-            from scantailor.filters.output import Filter
+            from scantailor.filters.output.filter import Filter
 
             self._output_filter = Filter()
         return self._output_filter

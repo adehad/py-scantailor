@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from scantailor.imageproc import (
+from scantailor.imageproc.binarize import (
     binarize_bradley,
     binarize_edge_div,
     binarize_mokji,

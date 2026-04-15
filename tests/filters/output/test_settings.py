@@ -2,8 +2,11 @@
 
 from pathlib import Path
 
-from scantailor.core import Dpi, ImageId, PageId, SubPage
-from scantailor.filters.output import ColorMode, DespeckleLevel, Params, Settings
+from scantailor.core.models import Dpi, ImageId, PageId, SubPage
+from scantailor.filters.output.color_mode import ColorMode
+from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.params import Params
+from scantailor.filters.output.settings import Settings
 
 
 def make_page_id(name: str = "test.tiff") -> PageId:

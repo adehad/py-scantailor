@@ -9,10 +9,11 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.core import PageId
+from scantailor.core.models import PageId
 from scantailor.filters.deskew.params import AutoManualMode, Params
 from scantailor.filters.deskew.settings import Settings
-from scantailor.imageproc import SkewResult, binarize_otsu, find_skew
+from scantailor.imageproc.analysis import SkewResult, find_skew
+from scantailor.imageproc.binarize import binarize_otsu
 
 
 class Filter:

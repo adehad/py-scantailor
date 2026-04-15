@@ -3,7 +3,7 @@
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.core import PageId
+from scantailor.core.models import PageId
 
 from .content_box import ContentBox, PageBox, PhysicalSize
 from .content_finder import ContentDetectionResult, find_content_box, find_page_edges

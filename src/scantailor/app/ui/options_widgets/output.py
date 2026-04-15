@@ -23,8 +23,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from scantailor.app.ui.widgets import CollapsibleGroupBox
-from scantailor.core import PageId
+from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
+from scantailor.core.models import PageId
 from scantailor.filters.output.binarization import BinarizationMethod
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
@@ -426,7 +426,7 @@ class OptionsWidget(QWidget):
         if self._current_page_id is None or self._updating:
             return
 
-        from scantailor.core import Dpi
+        from scantailor.core.models import Dpi
 
         params = self._filter.get_params(self._current_page_id)
         new_params = params.with_output_dpi(Dpi.uniform(value))

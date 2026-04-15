@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from scantailor.math import AffineTransform, compose_transforms
+from scantailor.math.transform import AffineTransform, compose_transforms
 
 
 class TestAffineTransform:

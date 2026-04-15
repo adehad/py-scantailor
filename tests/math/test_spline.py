@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from scantailor.math import ControlPoint, PointAndDerivatives, XSpline
+from scantailor.math.spline import ControlPoint, PointAndDerivatives, XSpline
 
 
 class TestControlPoint:

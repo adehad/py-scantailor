@@ -23,7 +23,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QTabWidget
 
 from scantailor.app.ui.image_views.base import ImageViewBase
-from scantailor.core import ImageTransformation
+from scantailor.core.transformation import ImageTransformation
 
 
 class ImageViewTab(Enum):

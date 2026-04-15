@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from scantailor.math import Polygon, polygon_area, polygon_contains_point
+from scantailor.math.polygon import Polygon, polygon_area, polygon_contains_point
 
 
 class TestPolygon:

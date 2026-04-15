@@ -1,8 +1,8 @@
 """Tests for Page Layout parameters."""
 
-from scantailor.core import Margins
-from scantailor.filters.page_layout import Alignment, Params
-from scantailor.filters.page_layout.params import ContentRect, ContentSize
+from scantailor.core.models import Margins
+from scantailor.filters.page_layout.alignment import Alignment
+from scantailor.filters.page_layout.params import ContentRect, ContentSize, Params
 
 
 class TestContentRect:

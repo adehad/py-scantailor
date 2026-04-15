@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from scantailor.math import Homography, warp_perspective
+from scantailor.math.homography import Homography, warp_perspective
 
 
 class TestHomography:

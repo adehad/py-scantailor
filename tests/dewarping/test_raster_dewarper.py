@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from scantailor.dewarping import (
-    CylindricalSurfaceDewarper,
+from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
+from scantailor.dewarping.raster_dewarper import (
     InterpolationMethod,
     compute_dewarped_size,
     dewarp_image,

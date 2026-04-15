@@ -5,19 +5,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from scantailor.core import (
-    FilterStage,
-    ImageId,
-    PageId,
-    StageSequence,
-    SubPage,
-)
+from scantailor.core.models import ImageId, PageId, SubPage
 from scantailor.core.pipeline import (
     PipelineOptions,
     PipelineResult,
     process_batch,
     process_page,
 )
+from scantailor.core.stage_sequence import FilterStage, StageSequence
 
 
 @pytest.fixture

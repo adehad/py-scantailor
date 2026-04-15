@@ -1,8 +1,8 @@
 """Tests for Dependencies class."""
 
-from scantailor.filters.select_content import (
+from scantailor.filters.select_content.dependencies import Dependencies
+from scantailor.filters.select_content.detection import (
     ContentDetectionMode,
-    Dependencies,
     PageDetectionMode,
 )
 

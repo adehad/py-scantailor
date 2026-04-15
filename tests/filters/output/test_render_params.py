@@ -1,12 +1,9 @@
 """Tests for RenderParams."""
 
-from scantailor.filters.output import (
-    BinarizationOptions,
-    ColorMode,
-    Params,
-    RenderParams,
-    SplittingOptions,
-)
+from scantailor.filters.output.binarization import BinarizationOptions
+from scantailor.filters.output.color_mode import ColorMode
+from scantailor.filters.output.params import Params
+from scantailor.filters.output.render_params import RenderParams, SplittingOptions
 
 
 class TestSplittingOptions:

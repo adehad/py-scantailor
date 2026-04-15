@@ -2,14 +2,14 @@
 
 import pytest
 
-from scantailor.core import Dpi
-from scantailor.filters.output import (
+from scantailor.core.models import Dpi
+from scantailor.filters.output.binarization import (
     BinarizationMethod,
     BinarizationOptions,
-    ColorMode,
-    DespeckleLevel,
-    Params,
 )
+from scantailor.filters.output.color_mode import ColorMode
+from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.params import Params
 
 
 class TestParams:

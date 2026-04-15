@@ -20,9 +20,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from scantailor.app.ui.widgets import CollapsibleGroupBox
-from scantailor.core import PageId
-from scantailor.core.models import Margins
+from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
+from scantailor.core.models import Margins, PageId
 from scantailor.filters.page_layout.alignment import (
     Alignment,
     HorizontalAlignment,
