@@ -15,8 +15,8 @@ from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, Signal, Slot
 from PySide6.QtGui import QColor, QImage, QPainter, QPen
 
 from scantailor.app.ui.image_views.base import ImageViewBase
-from scantailor.core import ImageTransformation
-from scantailor.filters.page_split import PageLayout
+from scantailor.core.transformation import ImageTransformation
+from scantailor.filters.page_split.page_layout import PageLayout
 
 
 class PageSplitImageView(ImageViewBase):

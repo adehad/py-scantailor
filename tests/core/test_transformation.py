@@ -3,7 +3,8 @@
 import numpy as np
 import pytest
 
-from scantailor.core import Dpi, ImageTransformation, OrthogonalRotation, Rect
+from scantailor.core.models import Dpi, OrthogonalRotation
+from scantailor.core.transformation import ImageTransformation, Rect
 
 
 class TestRect:

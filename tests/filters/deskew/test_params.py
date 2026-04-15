@@ -2,7 +2,7 @@
 
 import pytest
 
-from scantailor.filters.deskew import AutoManualMode, Params
+from scantailor.filters.deskew.params import AutoManualMode, Params
 
 
 class TestAutoManualMode:

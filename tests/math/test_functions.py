@@ -3,7 +3,11 @@
 import numpy as np
 import pytest
 
-from scantailor.math import LinearFunction, QuadraticFunction, QuadraticGradient
+from scantailor.math.functions import (
+    LinearFunction,
+    QuadraticFunction,
+    QuadraticGradient,
+)
 
 
 class TestLinearFunction:

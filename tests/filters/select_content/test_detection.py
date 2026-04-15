@@ -1,6 +1,9 @@
 """Tests for detection mode enums."""
 
-from scantailor.filters.select_content import ContentDetectionMode, PageDetectionMode
+from scantailor.filters.select_content.detection import (
+    ContentDetectionMode,
+    PageDetectionMode,
+)
 
 
 class TestContentDetectionMode:

@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.imageproc import binarize_otsu
+from scantailor.imageproc.binarize import binarize_otsu
 
 from .layout_type import LayoutType
 from .page_layout import PageLayout

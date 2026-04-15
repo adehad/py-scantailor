@@ -1,6 +1,6 @@
 """Tests for ColorMode enum."""
 
-from scantailor.filters.output import ColorMode
+from scantailor.filters.output.color_mode import ColorMode
 
 
 class TestColorMode:

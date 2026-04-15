@@ -8,7 +8,7 @@ applied.
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.core import Dpi, PageId
+from scantailor.core.models import Dpi, PageId
 
 from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode

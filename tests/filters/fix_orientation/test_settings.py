@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from scantailor.core import ImageId, OrthogonalRotation, PageId, SubPage
-from scantailor.filters.fix_orientation import Settings
+from scantailor.core.models import ImageId, OrthogonalRotation, PageId, SubPage
+from scantailor.filters.fix_orientation.settings import Settings
 
 
 class TestSettings:

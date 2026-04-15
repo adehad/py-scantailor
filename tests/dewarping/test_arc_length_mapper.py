@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from scantailor.dewarping import ArcLengthMapper
+from scantailor.dewarping.arc_length_mapper import ArcLengthMapper
 
 
 class TestArcLengthMapper:

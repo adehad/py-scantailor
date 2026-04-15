@@ -4,16 +4,16 @@ from pathlib import Path
 
 import numpy as np
 
-from scantailor.core import Dpi, ImageId, PageId, SubPage
-from scantailor.filters.output import (
+from scantailor.core.models import Dpi, ImageId, PageId, SubPage
+from scantailor.filters.output.binarization import (
     BinarizationMethod,
     BinarizationOptions,
-    ColorMode,
-    DespeckleLevel,
-    Filter,
-    Params,
-    Settings,
 )
+from scantailor.filters.output.color_mode import ColorMode
+from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.filter import Filter
+from scantailor.filters.output.params import Params
+from scantailor.filters.output.settings import Settings
 
 
 def make_page_id(name: str = "test.tiff") -> PageId:

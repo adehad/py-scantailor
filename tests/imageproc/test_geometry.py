@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from scantailor.imageproc import rotate_orthogonal, scale
+from scantailor.imageproc.geometry import rotate_orthogonal, scale
 
 
 class TestRotateOrthogonal:

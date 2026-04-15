@@ -2,13 +2,11 @@
 
 from pathlib import Path
 
-from scantailor.core import ImageId, PageId, SubPage
-from scantailor.filters.select_content import (
-    ContentBox,
-    ContentDetectionMode,
-    Params,
-    Settings,
-)
+from scantailor.core.models import ImageId, PageId, SubPage
+from scantailor.filters.select_content.content_box import ContentBox
+from scantailor.filters.select_content.detection import ContentDetectionMode
+from scantailor.filters.select_content.params import Params
+from scantailor.filters.select_content.settings import Settings
 
 
 def make_page_id(name: str, sub_page: SubPage = SubPage.SINGLE_PAGE) -> PageId:

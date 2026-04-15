@@ -2,7 +2,10 @@
 
 import pytest
 
-from scantailor.filters.output import BinarizationMethod, BinarizationOptions
+from scantailor.filters.output.binarization import (
+    BinarizationMethod,
+    BinarizationOptions,
+)
 
 
 class TestBinarizationMethod:

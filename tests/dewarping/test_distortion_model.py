@@ -3,13 +3,13 @@
 import numpy as np
 import pytest
 
-from scantailor.dewarping import (
+from scantailor.dewarping.distortion_model import (
     Curve,
     DistortionModel,
     create_distortion_model,
     create_distortion_model_from_splines,
 )
-from scantailor.math import XSpline
+from scantailor.math.spline import XSpline
 
 
 class TestCurve:

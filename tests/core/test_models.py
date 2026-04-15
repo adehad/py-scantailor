@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from scantailor.core import (
+from scantailor.core.models import (
     Dpi,
     ImageId,
     Margins,

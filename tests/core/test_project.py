@@ -7,16 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from scantailor.core import (
-    Dpi,
-    DpiStatus,
-    ImageId,
-    ImageInfo,
-    ImageMetadata,
-    PageId,
-    Project,
-    SubPage,
-)
+from scantailor.core.models import Dpi, ImageId, PageId, SubPage
+from scantailor.core.project import DpiStatus, ImageInfo, ImageMetadata, Project
 
 
 class TestImageMetadata:

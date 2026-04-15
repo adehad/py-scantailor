@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from scantailor.core import SubPage
-from scantailor.filters.page_split import PageLayout, PageLayoutType
+from scantailor.core.models import SubPage
+from scantailor.filters.page_split.page_layout import PageLayout, PageLayoutType
 
 
 class TestPageLayout:

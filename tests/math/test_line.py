@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from scantailor.math import (
+from scantailor.math.line import (
     Line2D,
     LineSegment,
     line_bounded_by_rect,

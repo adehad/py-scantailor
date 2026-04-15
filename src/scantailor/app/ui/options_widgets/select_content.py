@@ -18,8 +18,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from scantailor.app.ui.widgets import CollapsibleGroupBox
-from scantailor.core import PageId
+from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
+from scantailor.core.models import PageId
 from scantailor.filters.select_content.detection import (
     ContentDetectionMode,
     PageDetectionMode,

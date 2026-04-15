@@ -2,17 +2,16 @@
 
 import numpy as np
 
-from scantailor.dewarping import CylindricalSurfaceDewarper
-from scantailor.filters.output import (
+from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
+from scantailor.filters.output.binarization import (
     BinarizationMethod,
     BinarizationOptions,
-    ColorMode,
-    DespeckleLevel,
-    DewarpingMode,
-    DewarpingOptions,
-    Params,
 )
+from scantailor.filters.output.color_mode import ColorMode
+from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.dewarping_options import DewarpingMode, DewarpingOptions
 from scantailor.filters.output.generator import generate_output
+from scantailor.filters.output.params import Params
 
 
 class TestGenerateOutput:

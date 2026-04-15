@@ -4,7 +4,7 @@ This module provides the Settings class which stores per-page parameters
 for the output filter.
 """
 
-from scantailor.core import Dpi, PageId
+from scantailor.core.models import Dpi, PageId
 
 from .color_mode import ColorMode
 from .despeckle import DespeckleLevel

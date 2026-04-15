@@ -4,16 +4,15 @@ from pathlib import Path
 
 import numpy as np
 
-from scantailor.core import ImageId, PageId, SubPage
-from scantailor.filters.select_content import (
-    ContentBox,
+from scantailor.core.models import ImageId, PageId, SubPage
+from scantailor.filters.select_content.content_box import ContentBox, PageBox
+from scantailor.filters.select_content.detection import (
     ContentDetectionMode,
-    Filter,
-    PageBox,
     PageDetectionMode,
-    Params,
-    Settings,
 )
+from scantailor.filters.select_content.filter import Filter
+from scantailor.filters.select_content.params import Params
+from scantailor.filters.select_content.settings import Settings
 
 
 def make_page_id(name: str, sub_page: SubPage = SubPage.SINGLE_PAGE) -> PageId:

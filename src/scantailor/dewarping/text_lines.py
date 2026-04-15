@@ -18,7 +18,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.core import Dpi
+from scantailor.core.models import Dpi
 
 
 @dataclass

@@ -3,9 +3,9 @@
 import numpy as np
 import pytest
 
-from scantailor.math import (
+from scantailor.math.spline import XSpline
+from scantailor.math.spline_fitter import (
     FitResult,
-    XSpline,
     fit_spline_initial_guess,
     fit_spline_to_points,
     fit_spline_to_polyline,

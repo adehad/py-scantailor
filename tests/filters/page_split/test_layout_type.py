@@ -1,6 +1,6 @@
 """Tests for LayoutType enum."""
 
-from scantailor.filters.page_split import LayoutType
+from scantailor.filters.page_split.layout_type import LayoutType
 
 
 class TestLayoutType:

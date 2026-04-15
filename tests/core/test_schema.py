@@ -5,13 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from scantailor.core import (
-    Dpi,
-    ImageId,
-    ImageInfo,
-    ImageMetadata,
-    Project,
-)
+from scantailor.core.models import Dpi, ImageId
+from scantailor.core.project import ImageInfo, ImageMetadata, Project
 from scantailor.core.schema import (
     SCHEMA_VERSION,
     generate_project_schema,

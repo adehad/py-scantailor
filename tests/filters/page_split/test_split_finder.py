@@ -2,10 +2,8 @@
 
 import numpy as np
 
-from scantailor.filters.page_split import (
-    LayoutType,
-    PageLayoutType,
-)
+from scantailor.filters.page_split.layout_type import LayoutType
+from scantailor.filters.page_split.page_layout import PageLayoutType
 from scantailor.filters.page_split.split_finder import (
     ContentSpan,
     detect_split,

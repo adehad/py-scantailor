@@ -2,9 +2,11 @@
 
 from pathlib import Path
 
-from scantailor.core import ImageId, Margins, PageId, SubPage
-from scantailor.filters.page_layout import Alignment, Filter, Params, Settings
-from scantailor.filters.page_layout.params import ContentSize
+from scantailor.core.models import ImageId, Margins, PageId, SubPage
+from scantailor.filters.page_layout.alignment import Alignment
+from scantailor.filters.page_layout.filter import Filter
+from scantailor.filters.page_layout.params import ContentSize, Params
+from scantailor.filters.page_layout.settings import Settings
 
 
 def make_page_id(name: str, sub_page: SubPage = SubPage.SINGLE_PAGE) -> PageId:

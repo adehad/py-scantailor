@@ -6,14 +6,3 @@ angle.
 
 The deskew angle is stored as metadata and applied during rendering/output.
 """
-
-from scantailor.filters.deskew.filter import Filter
-from scantailor.filters.deskew.params import AutoManualMode, Params
-from scantailor.filters.deskew.settings import Settings
-
-__all__ = [
-    AutoManualMode.__name__,
-    Filter.__name__,
-    Params.__name__,
-    Settings.__name__,
-]

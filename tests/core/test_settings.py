@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from scantailor.core import (
+from scantailor.core.settings import (
     ApplicationSettings,
     ColorScheme,
     DeviationSettings,

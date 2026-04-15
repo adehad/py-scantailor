@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from scantailor.imageproc import (
+from scantailor.imageproc.morphology import (
     black_top_hat,
     close_morph,
     dilate,

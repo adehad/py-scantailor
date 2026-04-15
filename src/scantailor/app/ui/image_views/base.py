@@ -16,7 +16,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPainter, QPixmap, QTransform
 
-from scantailor.core import ImageTransformation
+from scantailor.core.transformation import ImageTransformation
 
 
 class FocalPointMode(Enum):

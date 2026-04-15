@@ -3,7 +3,10 @@
 import numpy as np
 import pytest
 
-from scantailor.dewarping import PolylineIntersector, project_point_to_line
+from scantailor.dewarping.polyline_intersector import (
+    PolylineIntersector,
+    project_point_to_line,
+)
 
 
 class TestPolylineIntersector:
