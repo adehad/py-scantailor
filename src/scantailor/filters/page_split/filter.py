@@ -10,7 +10,7 @@ It splits scanned images into individual pages, handling cases like:
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.core import PageId
+from scantailor.core.models import PageId
 
 from .layout_type import LayoutType
 from .page_layout import PageLayout

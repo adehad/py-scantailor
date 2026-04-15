@@ -24,7 +24,7 @@ from typing import Self
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.math import XSpline
+from scantailor.math.spline import XSpline
 
 
 @dataclass

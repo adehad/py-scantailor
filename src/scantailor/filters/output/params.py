@@ -8,7 +8,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from scantailor.core import Dpi
+from scantailor.core.models import Dpi
 
 from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode

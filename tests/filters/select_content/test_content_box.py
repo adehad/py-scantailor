@@ -2,7 +2,11 @@
 
 import pytest
 
-from scantailor.filters.select_content import ContentBox, PageBox, PhysicalSize
+from scantailor.filters.select_content.content_box import (
+    ContentBox,
+    PageBox,
+    PhysicalSize,
+)
 
 
 class TestContentBox:

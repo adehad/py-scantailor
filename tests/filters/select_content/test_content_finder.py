@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from scantailor.filters.select_content import (
+from scantailor.filters.select_content.content_finder import (
     ContentDetectionResult,
     find_content_box,
     find_page_edges,
@@ -97,7 +97,7 @@ class TestContentDetectionResult:
 
     def test_is_confident_threshold(self):
         """is_confident should use 0.5 threshold."""
-        from scantailor.filters.select_content import ContentBox
+        from scantailor.filters.select_content.content_box import ContentBox
 
         high_conf = ContentDetectionResult(
             content_box=ContentBox(x=0, y=0, width=100, height=100),
@@ -113,7 +113,7 @@ class TestContentDetectionResult:
 
     def test_boundary_confidence(self):
         """Confidence exactly at 0.5 should be confident."""
-        from scantailor.filters.select_content import ContentBox
+        from scantailor.filters.select_content.content_box import ContentBox
 
         result = ContentDetectionResult(
             content_box=ContentBox(x=0, y=0, width=100, height=100),

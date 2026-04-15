@@ -4,8 +4,9 @@ from pathlib import Path
 
 import numpy as np
 
-from scantailor.core import ImageId, OrthogonalRotation, PageId, SubPage
-from scantailor.filters.fix_orientation import Filter, Settings
+from scantailor.core.models import ImageId, OrthogonalRotation, PageId, SubPage
+from scantailor.filters.fix_orientation.filter import Filter
+from scantailor.filters.fix_orientation.settings import Settings
 
 
 class TestFilter:

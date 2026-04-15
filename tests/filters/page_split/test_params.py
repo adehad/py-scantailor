@@ -2,12 +2,9 @@
 
 import pytest
 
-from scantailor.filters.page_split import (
-    AutoManualMode,
-    LayoutType,
-    PageLayout,
-    Params,
-)
+from scantailor.filters.page_split.layout_type import LayoutType
+from scantailor.filters.page_split.page_layout import PageLayout
+from scantailor.filters.page_split.params import AutoManualMode, Params
 
 
 class TestParams:

@@ -12,8 +12,8 @@ from PySide6.QtCore import Signal
 
 from scantailor.app.ui import load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
-from scantailor.core import PageId
-from scantailor.filters.page_split import LayoutType
+from scantailor.core.models import PageId
+from scantailor.filters.page_split.layout_type import LayoutType
 
 _UI_FOLDER = Path(__file__).parent
 
@@ -154,7 +154,7 @@ class SplitModeDialog(QtWidgets.QDialog):
         # Update mode selection based on current layout type
         if self._layout_type is not None:
             # Import here to avoid circular imports
-            from scantailor.filters.page_split import LayoutType
+            from scantailor.filters.page_split.layout_type import LayoutType
 
             if self._layout_type == LayoutType.AUTO_LAYOUT_TYPE:
                 self._mode_auto.setChecked(True)
@@ -257,7 +257,7 @@ class SplitModeDialog(QtWidgets.QDialog):
         Returns:
             The selected LayoutType.
         """
-        from scantailor.filters.page_split import LayoutType
+        from scantailor.filters.page_split.layout_type import LayoutType
 
         if self._mode_auto.isChecked():
             return LayoutType.AUTO_LAYOUT_TYPE

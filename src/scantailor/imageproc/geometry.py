@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.core import OrthogonalDegrees
+from scantailor.core.models import OrthogonalDegrees
 
 InterpolationMethod = Literal["nearest", "linear", "cubic", "area", "lanczos"]
 

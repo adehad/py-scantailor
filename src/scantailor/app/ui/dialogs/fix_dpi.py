@@ -9,7 +9,7 @@ from PySide6.QtGui import QIntValidator
 
 from scantailor.app.ui import load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
-from scantailor.core import Dpi
+from scantailor.core.models import Dpi
 from scantailor.core.project import ImageInfo
 
 _UI_FOLDER = Path(__file__).parent

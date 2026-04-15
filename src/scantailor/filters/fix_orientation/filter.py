@@ -7,10 +7,9 @@ The rotation is stored as metadata and applied during rendering/output.
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.core import PageId
-from scantailor.core.models import ImageId, OrthogonalRotation
+from scantailor.core.models import ImageId, OrthogonalRotation, PageId
 from scantailor.filters.fix_orientation.settings import Settings
-from scantailor.imageproc import rotate_orthogonal
+from scantailor.imageproc.geometry import rotate_orthogonal
 
 
 class Filter:

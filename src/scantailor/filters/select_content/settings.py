@@ -4,7 +4,7 @@ import threading
 
 from pydantic import BaseModel, Field, PrivateAttr
 
-from scantailor.core import PageId
+from scantailor.core.models import PageId
 
 from .params import Params
 

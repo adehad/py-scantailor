@@ -2,8 +2,10 @@
 
 from pathlib import Path
 
-from scantailor.core import ImageId, PageId, SubPage
-from scantailor.filters.page_split import LayoutType, Params, Settings
+from scantailor.core.models import ImageId, PageId, SubPage
+from scantailor.filters.page_split.layout_type import LayoutType
+from scantailor.filters.page_split.params import Params
+from scantailor.filters.page_split.settings import Settings
 
 
 def make_page_id(name: str = "test.tiff") -> PageId:

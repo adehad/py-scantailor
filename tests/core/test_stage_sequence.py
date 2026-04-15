@@ -2,7 +2,7 @@
 
 import pytest
 
-from scantailor.core import FilterStage, StageSequence
+from scantailor.core.stage_sequence import FilterStage, StageSequence
 
 
 class TestFilterStage:
@@ -84,7 +84,7 @@ class TestStageSequence:
 
     def test_find_filter_not_found(self) -> None:
         """find_filter returns None for unknown filter."""
-        from scantailor.filters.deskew import Filter as DeskewFilter
+        from scantailor.filters.deskew.filter import Filter as DeskewFilter
 
         sequence = StageSequence()
         other_filter = DeskewFilter()  # Different instance
@@ -118,7 +118,7 @@ class TestStageSequence:
 
     def test_set_custom_filter(self) -> None:
         """Can set custom filter instance."""
-        from scantailor.filters.deskew import Filter as DeskewFilter
+        from scantailor.filters.deskew.filter import Filter as DeskewFilter
 
         sequence = StageSequence()
         custom_filter = DeskewFilter()

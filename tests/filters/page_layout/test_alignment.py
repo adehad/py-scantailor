@@ -1,6 +1,6 @@
 """Tests for Page Layout alignment types."""
 
-from scantailor.filters.page_layout import (
+from scantailor.filters.page_layout.alignment import (
     Alignment,
     HorizontalAlignment,
     VerticalAlignment,

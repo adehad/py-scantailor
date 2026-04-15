@@ -8,5 +8,3 @@ Each filter represents a processing stage:
 5. page_layout - Set margins and alignment
 6. output - Generate final output with binarization and dewarping
 """
-
-__all__: list[str] = []

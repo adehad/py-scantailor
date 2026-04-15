@@ -15,7 +15,7 @@ from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, Signal, Slot
 from PySide6.QtGui import QColor, QImage, QPainter, QPen
 
 from scantailor.app.ui.image_views.base import ImageViewBase
-from scantailor.core import ImageTransformation
+from scantailor.core.transformation import ImageTransformation
 
 
 class DeskewImageView(ImageViewBase):

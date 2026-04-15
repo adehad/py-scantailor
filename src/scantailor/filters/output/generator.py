@@ -11,14 +11,14 @@ import numpy as np
 from numpy.typing import NDArray
 
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
-from scantailor.imageproc import (
+from scantailor.imageproc.binarize import (
     binarize_bradley,
     binarize_edge_div,
     binarize_otsu,
     binarize_sauvola,
     binarize_wolf,
-    remove_small_components,
 )
+from scantailor.imageproc.morphology import remove_small_components
 
 from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode
@@ -86,7 +86,7 @@ def _apply_dewarping(
     Returns:
         Dewarped image.
     """
-    from scantailor.dewarping import compute_dewarped_size, dewarp_image
+    from scantailor.dewarping.raster_dewarper import compute_dewarped_size, dewarp_image
 
     # Compute output size based on source size and dewarper
     src_size = (image.shape[1], image.shape[0])  # (width, height)

@@ -14,7 +14,8 @@ from PySide6.QtCore import QPointF, QRectF, Qt, Signal, Slot
 from PySide6.QtGui import QImage, QPainter, QPen
 
 from scantailor.app.ui.image_views.base import ImageViewBase
-from scantailor.core import ImageTransformation, OrthogonalDegrees, OrthogonalRotation
+from scantailor.core.models import OrthogonalDegrees, OrthogonalRotation
+from scantailor.core.transformation import ImageTransformation
 
 
 class FixOrientationImageView(ImageViewBase):

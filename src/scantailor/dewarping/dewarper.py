@@ -42,7 +42,7 @@ from scantailor.dewarping.polyline_intersector import (
     PolylineIntersector,
     project_point_to_line,
 )
-from scantailor.math import Homography
+from scantailor.math.homography import Homography
 
 
 @dataclass

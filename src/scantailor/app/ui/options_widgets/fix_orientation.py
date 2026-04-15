@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from scantailor.app.ui.widgets import CollapsibleGroupBox
+from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 from scantailor.core.models import ImageId, OrthogonalRotation
 from scantailor.filters.fix_orientation.filter import Filter
 

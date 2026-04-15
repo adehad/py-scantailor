@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from scantailor.imageproc import (
+from scantailor.imageproc.analysis import (
     DEFAULT_COARSE_STEP,
     SkewResult,
     connected_components,

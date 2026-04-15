@@ -1,12 +1,11 @@
 """Tests for Params class."""
 
-from scantailor.filters.select_content import (
-    ContentBox,
+from scantailor.filters.select_content.content_box import ContentBox, PageBox
+from scantailor.filters.select_content.detection import (
     ContentDetectionMode,
-    PageBox,
     PageDetectionMode,
-    Params,
 )
+from scantailor.filters.select_content.params import Params
 
 
 class TestParams:

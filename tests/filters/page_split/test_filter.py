@@ -4,15 +4,12 @@ from pathlib import Path
 
 import numpy as np
 
-from scantailor.core import ImageId, PageId, SubPage
-from scantailor.filters.page_split import (
-    AutoManualMode,
-    Filter,
-    LayoutType,
-    PageLayoutType,
-    Params,
-    Settings,
-)
+from scantailor.core.models import ImageId, PageId, SubPage
+from scantailor.filters.page_split.filter import Filter
+from scantailor.filters.page_split.layout_type import LayoutType
+from scantailor.filters.page_split.page_layout import PageLayoutType
+from scantailor.filters.page_split.params import AutoManualMode, Params
+from scantailor.filters.page_split.settings import Settings
 
 
 def make_page_id(name: str = "test.tiff") -> PageId:

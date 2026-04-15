@@ -11,7 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from scantailor.core import SubPage
+from scantailor.core.models import SubPage
 
 
 class PageLayoutType(Enum):
@@ -279,7 +279,7 @@ class PageLayout(BaseModel):
         Returns:
             Polygon array for the requested page.
         """
-        from scantailor.core import SubPage
+        from scantailor.core.models import SubPage
 
         if sub_page == SubPage.LEFT_PAGE:
             return self.get_left_page_outline()

@@ -2,19 +2,17 @@
 
 import json
 
-from scantailor.core import (
+from scantailor.core.default_params import (
     DefaultParams,
     DeskewDefaults,
-    Dpi,
     FixOrientationDefaults,
-    Margins,
-    OrthogonalRotation,
     OutputDefaults,
     PageLayoutDefaults,
     PageSplitDefaults,
     SelectContentDefaults,
-    Units,
 )
+from scantailor.core.models import Dpi, Margins, OrthogonalRotation
+from scantailor.core.settings import Units
 from scantailor.filters.deskew.params import AutoManualMode as DeskewMode
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
