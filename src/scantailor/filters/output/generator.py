@@ -12,6 +12,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from scantailor.core.estimate_background import normalize_illumination_gray
+from scantailor.core.models import Dpi
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
 from scantailor.imageproc.binarize import (
     binarize_bradley,
@@ -20,7 +21,7 @@ from scantailor.imageproc.binarize import (
     binarize_sauvola,
     binarize_wolf,
 )
-from scantailor.imageproc.morphology import remove_small_components
+from scantailor.imageproc.despeckle import despeckle as despeckle_image
 
 from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode
@@ -55,7 +56,7 @@ def generate_output(
             curved page correction. Required if dewarping mode is AUTO or MANUAL.
         color_options (ColorCommonOptions | None): Options for the grayscale and
             colour paths; margin filling also applies to bilevel output.
-            Defaults to ``ColorCommonOptions()``.
+            Defaults to ``params.color_common``.
         content_polygon (Sequence[tuple[float, float]] | None): Content area as
             (x, y) vertices in the coordinates of the image after dewarping.
             Margins outside it are filled when ``fill_margins`` is set. None
@@ -64,7 +65,7 @@ def generate_output(
     Returns:
         OutputResult with the processed image.
     """
-    color_options = color_options or ColorCommonOptions()
+    color_options = color_options or params.color_common
     processed = image
     was_dewarped = False
 
@@ -218,7 +219,7 @@ def _generate_binary_output(
 
     # Despeckling stays the last step that changes which pixels are ink.
     if params.despeckle_level.is_enabled():
-        binary = _despeckle(binary, params.despeckle_level)
+        binary = _despeckle(binary, params.despeckle_level, params.output_dpi)
 
     if not params.black_on_white:
         binary = 255 - binary
@@ -350,11 +351,25 @@ def _replace_brightness(
     return result
 
 
+_MIN_POLYGON_VERTICES = 3
+
+
 def _polygon_mask(
     shape: tuple[int, int],
     polygon: Sequence[tuple[float, float]],
 ) -> NDArray[np.bool_]:
-    """Rasterise a polygon given as (x, y) vertices."""
+    """Rasterise a polygon given as (x, y) vertices.
+
+    Args:
+        shape (tuple[int, int]): (height, width) of the mask.
+        polygon (Sequence[tuple[float, float]]): Vertices in pixel coordinates.
+
+    Returns:
+        NDArray[np.bool_]: True inside the polygon. Fewer than three vertices
+            enclose nothing, so the whole mask is True (no polygon).
+    """
+    if len(polygon) < _MIN_POLYGON_VERTICES:
+        return np.ones(shape, dtype=bool)
     mask = np.zeros(shape, dtype=np.uint8)
     vertices = np.round(np.asarray(polygon, dtype=np.float64)).astype(np.int32)
     cv2.fillPoly(mask, [vertices], 1)
@@ -466,29 +481,21 @@ def _binarize(
 def _despeckle(
     binary: NDArray[np.uint8],
     level: DespeckleLevel,
+    dpi: Dpi,
 ) -> NDArray[np.uint8]:
-    """Remove small noise components from a binary image.
+    """Remove small noise components that are not near text.
 
     Args:
-        binary: Binary input image.
-        level: Despeckle level.
+        binary (NDArray[np.uint8]): Binary image, 0 is ink. Not modified.
+        level (DespeckleLevel): Despeckle level.
+        dpi (Dpi): Resolution of ``binary``; the smaller axis sets the thresholds.
 
     Returns:
-        Despeckled binary image.
+        NDArray[np.uint8]: Despeckled binary image.
     """
-    min_size = level.to_component_size()
-    if min_size <= 0:
+    if not level.is_enabled():
         return binary
-
-    # Remove small black components (noise in white areas)
-    result = remove_small_components(binary, min_size, connectivity=8)
-
-    # Also remove small white components (noise in black areas)
-    inverted = 255 - result
-    inverted = remove_small_components(inverted, min_size, connectivity=8)
-    result = 255 - inverted
-
-    return result
+    return despeckle_image(binary, min(dpi.horizontal, dpi.vertical), level.to_factor())
 
 
 def _morphological_smooth(binary: NDArray[np.uint8]) -> NDArray[np.uint8]:

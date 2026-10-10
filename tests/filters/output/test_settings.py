@@ -27,7 +27,7 @@ class TestSettings:
         params = settings.get_params(page_id)
         assert params.output_dpi == Dpi.uniform(600)
         assert params.color_mode == ColorMode.BLACK_AND_WHITE
-        assert params.despeckle_level == DespeckleLevel.NORMAL
+        assert params.despeckle_level == DespeckleLevel.CAUTIOUS
 
     def test_set_and_get_params(self):
         """Set and retrieve params."""
@@ -80,7 +80,7 @@ class TestSettings:
     def test_default_despeckle_level(self):
         """Get and set default despeckle level."""
         settings = Settings()
-        assert settings.get_default_despeckle_level() == DespeckleLevel.NORMAL
+        assert settings.get_default_despeckle_level() == DespeckleLevel.CAUTIOUS
 
         settings.set_default_despeckle_level(DespeckleLevel.AGGRESSIVE)
         assert settings.get_default_despeckle_level() == DespeckleLevel.AGGRESSIVE
