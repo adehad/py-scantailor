@@ -155,44 +155,29 @@ def _compute_dewarp_maps(
     Returns:
         Tuple of (map_x, map_y) arrays for cv2.remap.
     """
-    # Scale factors from destination pixels to normalized model coordinates
     x_scale = (right - left) / dst_width
     y_scale = (bottom - top) / dst_height
 
-    # Initialize output arrays
-    map_x = np.zeros((dst_height, dst_width), dtype=np.float32)
-    map_y = np.zeros((dst_height, dst_width), dtype=np.float32)
-
-    # Pre-compute generatrices for each column (more efficient than per-pixel)
+    starts = np.empty((dst_width, 2), dtype=np.float64)
+    directions = np.empty((dst_width, 2), dtype=np.float64)
+    homographies = np.empty((dst_width, 2, 2), dtype=np.float64)
     for dst_x in range(dst_width):
-        # Convert destination x to normalized model x
-        model_x = left + (dst_x + 0.5) * x_scale
-
-        # Get the generatrix for this x coordinate
-        generatrix = dewarper.map_generatrix(model_x)
+        generatrix = dewarper.map_generatrix(left + (dst_x + 0.5) * x_scale)
         img_p1, img_p2 = generatrix.img_line
-        H = generatrix.pln2img_1d
+        starts[dst_x] = img_p1
+        directions[dst_x] = np.asarray(img_p2) - np.asarray(img_p1)
+        homographies[dst_x] = generatrix.pln2img_1d
 
-        for dst_y in range(dst_height):
-            # Convert destination y to normalized model y
-            model_y = top + (dst_y + 0.5) * y_scale
+    # Rows broadcast against columns: (dst_height, 1) with (dst_width,).
+    model_y = (top + (np.arange(dst_height) + 0.5) * y_scale)[:, None]
+    num = homographies[:, 0, 0] * model_y + homographies[:, 0, 1]
+    denom = homographies[:, 1, 0] * model_y + homographies[:, 1, 1]
+    degenerate = np.abs(denom) < 1e-10
+    img_t = np.where(degenerate, 0.5, num / np.where(degenerate, 1.0, denom))
 
-            # Apply 1D homography to get image y parameter
-            num = H[0, 0] * model_y + H[0, 1]
-            denom = H[1, 0] * model_y + H[1, 1]
-            if abs(denom) < 1e-10:
-                img_t = 0.5
-            else:
-                img_t = num / denom
-
-            # Interpolate along the generatrix line
-            src_x = img_p1[0] + img_t * (img_p2[0] - img_p1[0])
-            src_y = img_p1[1] + img_t * (img_p2[1] - img_p1[1])
-
-            map_x[dst_y, dst_x] = src_x
-            map_y[dst_y, dst_x] = src_y
-
-    return map_x, map_y
+    map_x = starts[:, 0] + img_t * directions[:, 0]
+    map_y = starts[:, 1] + img_t * directions[:, 1]
+    return map_x.astype(np.float32), map_y.astype(np.float32)
 
 
 def compute_dewarped_size(
