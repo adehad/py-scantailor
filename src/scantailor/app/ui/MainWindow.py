@@ -5,7 +5,7 @@ import pathlib
 from collections.abc import Callable
 
 from loguru import logger as _LOG
-from PySide6 import QtCore, QtGui, QtUiTools, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -18,22 +18,27 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from scantailor.app.ui import UI_FOLDER
+from scantailor.app.ui import UI_FOLDER, load_ui_widget
 from scantailor.app.ui.dialogs.about import AboutDialog
 from scantailor.app.ui.dialogs.load_files_status import LoadFilesStatusDialog
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
+from scantailor.app.ui.page_renderer import PageRenderer, render_thumbnail
+from scantailor.app.ui.stage_panels import StagePanels
+from scantailor.app.ui.thumbnails import ThumbnailListWidget
 from scantailor.app.ui.utils import get_cwidget
+from scantailor.app.ui.widgets.non_owning_widget import NonOwningWidget
 from scantailor.app.ui.widgets.stage_list_view import StageListView
 from scantailor.core.image_io import ImageLoadError, list_image_pages
 from scantailor.core.models import ImageId, PageId
 from scantailor.core.project import ImageMetadata, LayoutDirection, Project
 from scantailor.core.stage_params import apply_stage_params, collect_stage_params
-from scantailor.core.stage_sequence import StageSequence
+from scantailor.core.stage_sequence import FilterStage, StageSequence
 
 PROJECT_SUFFIX = ".ScanTailor"
 APP_TITLE = "ScanTailor Advanced"
 _LAST_DIR_KEY = "project/lastDir"
 _LAST_INPUT_DIR_KEY = "project/lastInputDir"
+THUMBNAIL_SIZE = QtCore.QSize(160, 160)
 
 
 class SaveChoice(enum.Enum):
@@ -49,26 +54,6 @@ LoadStatusPresenter = Callable[
     [list[pathlib.Path], list[tuple[pathlib.Path, str]], QWidget], bool
 ]
 SavePrompt = Callable[[], SaveChoice]
-
-
-def _load_main_window_ui() -> QWidget:
-    """Load ``MainWindow.ui`` with the promoted ``StageListView`` registered.
-
-    Without registration QUiLoader silently substitutes the plain base widget
-    for promoted classes.
-
-    Returns:
-        QWidget: The main window widget.
-    """
-    loader = QtUiTools.QUiLoader()
-    loader.registerCustomWidget(StageListView)
-    ui_file = QtCore.QFile(str(UI_FOLDER / "MainWindow.ui"))
-    ui_file.open(QtCore.QFile.OpenModeFlag.ReadOnly)
-    try:
-        ui = loader.load(ui_file)
-    finally:
-        ui_file.close()
-    return ui
 
 
 class _CloseGuard(QtCore.QObject):
@@ -131,7 +116,10 @@ class MainWindowManager:
             save_prompt (SavePrompt | None): Asks what to do with unsaved changes.
         """
         super().__init__()
-        self.ui = _load_main_window_ui()
+        self.ui = load_ui_widget(
+            UI_FOLDER / "MainWindow.ui",
+            extra_widgets=[StageListView, NonOwningWidget],
+        )
 
         self.project_files_dialog_factory: ProjectFilesDialogFactory = (
             project_files_dialog_factory or self._default_project_files_dialog
@@ -143,7 +131,12 @@ class MainWindowManager:
 
         self.project: Project | None = None
         self.stages = StageSequence()
-        self.current_page: PageId | None = None
+        self._current_page: PageId | None = None
+        self._panels: StagePanels | None = None
+        self._thumbnail_widget: QWidget | None = None
+        self.renderer = PageRenderer(self.ui)
+        self.renderer.render_done.connect(self._on_render_done)
+        self.renderer.render_failed.connect(self._on_render_failed)
         self._modified = False
         self.workerThreadPool = None  # std::make_unique<WorkerThreadPool>()
         self.interactiveQueue = None  # std::make_unique<ProcessingTaskQueue>()
@@ -238,7 +231,8 @@ class MainWindowManager:
 
         # Layouts
         self.imageFrameLayout = QStackedLayout(self.imageViewFrame)
-        self.optionsFrameLayout = QVBoxLayout(self.scrollAreaWidgetContents)
+        self.optionsFrameLayout = QVBoxLayout(self.filterOptions)
+        self.optionsFrameLayout.setContentsMargins(0, 0, 0, 0)
 
         # Connections
         self.actionFirstPage.triggered.connect(self.goFirstPage)
@@ -295,9 +289,20 @@ class MainWindowManager:
         # self.updateSortOptions()
         # self.updateAutoSaveTimer()
         # self.setupIcons()
+        self.thumbnails = ThumbnailListWidget(
+            self._render_page_thumbnail, thumbnail_size=THUMBNAIL_SIZE
+        )
+        self.thumbnails.page_selected.connect(self.page_selected)
+        self.set_thumbnail_widget(self.thumbnails)
         self._attach_stages()
         self._update_project_actions()
         self._update_window_title()
+
+    def _render_page_thumbnail(self, page: PageId, stage: str) -> QtGui.QImage:
+        """Render a thumbnail on a worker thread; settings are only read."""
+        return render_thumbnail(
+            page, self.stages, FilterStage(int(stage)), THUMBNAIL_SIZE
+        )
 
     def _insert_add_files_action(self) -> None:
         """Place the add-files action in the File menu, above the save entries."""
@@ -328,6 +333,20 @@ class MainWindowManager:
         self._update_window_title()
 
     @property
+    def current_page(self) -> PageId | None:
+        """The page shown in the main area."""
+        return self._current_page
+
+    @current_page.setter
+    def current_page(self, page: PageId | None) -> None:
+        if page == self._current_page:
+            return
+        self._current_page = page
+        if page is not None:
+            self.thumbnails.set_current_page(page)
+        self._show_current_page()
+
+    @property
     def is_project_loaded(self) -> bool:
         """Whether a project is currently open."""
         return self.project is not None
@@ -343,6 +362,7 @@ class MainWindowManager:
             self._on_stage_row_changed
         )
         self._select_stage_row(self.curFilter)
+        self._show_stage()
 
     def _on_stage_row_changed(
         self, current: QtCore.QModelIndex, _previous: QtCore.QModelIndex
@@ -350,6 +370,96 @@ class MainWindowManager:
         """Track stage changes made by clicking the filter list."""
         if current.isValid():
             self.curFilter = current.row()
+            self._show_stage()
+
+    def _show_stage(self) -> None:
+        """Show the options widget and image view of the current stage.
+
+        Nothing changes when they already belong to the current stage and stage
+        sequence.
+        """
+        stage = FilterStage(self.curFilter)
+        panels = self._panels
+        if panels and panels.stage == stage and panels.sequence is self.stages:
+            return
+        self._discard_panels()
+        self.thumbnails.set_stage(str(int(stage)))
+        panels = StagePanels(stage, self.stages, self.ui)
+        panels.settings_changed.connect(self._on_settings_edited)
+        self.optionsFrameLayout.addWidget(panels.options)
+        self.imageFrameLayout.addWidget(panels.view)
+        self._panels = panels
+        self._show_current_page()
+
+    def _discard_panels(self) -> None:
+        """Remove the widgets of the stage that is being left."""
+        panels, self._panels = self._panels, None
+        if panels is None:
+            return
+        self.renderer.cancel()
+        for widget, layout in (
+            (panels.options, self.optionsFrameLayout),
+            (panels.view, self.imageFrameLayout),
+        ):
+            layout.removeWidget(widget)
+            widget.setParent(None)
+            widget.deleteLater()
+        panels.deleteLater()
+
+    def _show_current_page(self) -> None:
+        """Point the stage panels at the current page and render it."""
+        panels = self._panels
+        if panels is None:
+            return
+        panels.set_page(self._current_page)
+        self._request_render()
+
+    def _request_render(self) -> None:
+        """Render the current page up to the current stage in the background."""
+        panels = self._panels
+        if panels is None or self._current_page is None:
+            self.renderer.cancel()
+            return
+        self.renderer.request(self._current_page, self.stages, panels.stage)
+
+    def _on_settings_edited(self) -> None:
+        """React to an edit made in the options widget."""
+        self.modified = True
+        self.thumbnails.invalidate(self._current_page)
+        self._request_render()
+
+    def _on_render_done(self, page_id: PageId, image: object) -> None:
+        if self._panels is not None and page_id == self._current_page:
+            self._panels.show_image(image)  # type: ignore[arg-type]
+
+    @staticmethod
+    def _on_render_failed(page_id: PageId, message: str) -> None:
+        _LOG.warning(f"Page {page_id} could not be shown: {message}")
+
+    def set_thumbnail_widget(self, widget: QWidget) -> None:
+        """Show ``widget`` in the thumbnails dock instead of the placeholder view.
+
+        Args:
+            widget (QWidget): The thumbnail list. Replacing it later unparents it.
+        """
+        previous = self._thumbnail_widget or self.thumbView
+        layout = self.ui.findChild(QVBoxLayout, "verticalLayout")
+        assert layout is not None
+        layout.replaceWidget(previous, widget)
+        previous.hide()
+        if previous is not self.thumbView:
+            previous.setParent(None)
+        widget.show()
+        self._thumbnail_widget = widget
+
+    def page_selected(self, page: PageId) -> None:
+        """Make ``page`` current, e.g. when picked in the thumbnails.
+
+        Args:
+            page (PageId): A page of the open project; others are ignored.
+        """
+        if page in self.pages():
+            self.current_page = page
 
     def _select_stage_row(self, row: int) -> None:
         """Select a stage in the filter list.
@@ -654,8 +764,10 @@ class MainWindowManager:
                 None for one that was never saved.
             modified (bool): Whether the project has unsaved changes.
         """
+        self._discard_panels()
         self.project = project
         self.stages = stages
+        self.thumbnails.set_project(project)
         self.projectFile = str(project_file) if project_file else ""
         self._modified = modified
         pages = project.get_pages()
@@ -803,8 +915,10 @@ class MainWindowManager:
 
     def _close_project_without_saving(self) -> None:
         """Drop the project and reset the window to its empty state."""
+        self._discard_panels()
         self.project = None
         self.stages = StageSequence()
+        self.thumbnails.set_project(None)
         self.projectFile = ""
         self.current_page = None
         self._modified = False
