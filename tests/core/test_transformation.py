@@ -278,6 +278,15 @@ class TestRenderTransformed:
     def _gradient() -> np.ndarray:
         return np.arange(60 * 80, dtype=np.uint32).reshape(60, 80).astype(np.uint8)
 
+    @pytest.mark.parametrize("dtype", [np.float32, np.float64, np.uint16, np.bool_])
+    def test_non_uint8_input_is_rejected(self, dtype: type) -> None:
+        """Only uint8 pixels are resampled; anything else raises a clear error."""
+        image = np.zeros((60, 80), dtype=dtype)
+        xform = ImageTransformation.from_size(80, 60, Dpi.uniform(300))
+
+        with pytest.raises(TypeError, match="uint8"):
+            render_transformed(image, xform)
+
     def test_identity_returns_equal_copy(self) -> None:
         """No steps give back identical pixels in a new array."""
         image = self._gradient()
