@@ -1,0 +1,188 @@
+"""Automatic detection of picture regions on a page."""
+
+import cv2
+import numpy as np
+from numpy.typing import NDArray
+from scipy import ndimage
+from skimage.morphology import reconstruction
+
+from .filters import stretch_gray_range
+
+# Resolution the detector is tuned for.
+DETECTION_DPI = 300
+# Tails of the gray range clipped before detection so that text and paper are
+# equally far from mid-gray; otherwise large type would read as a picture.
+_RANGE_CLIP = 0.01
+_GRADIENT_WINDOW = 3
+# Window over which texture must persist; text strokes are narrower, so only
+# wide textured areas survive the reconstruction.
+_MARKER_WINDOW = 35
+_HIGHER_SENSITIVITY_BLACK_CLIP = 5.0
+# Gray level at which the detected map turns into a picture mask.
+PICTURE_THRESHOLD = 48
+# Distance in pixels at 300 dpi under which neighbouring picture runs are one picture.
+_JOIN_DISTANCE = 16
+_FOOTPRINT_8 = np.ones((3, 3), dtype=bool)
+
+
+def detect_pictures(
+    gray: NDArray[np.uint8],
+    *,
+    higher_search_sensitivity: bool = False,
+) -> NDArray[np.uint8]:
+    """Map how picture-like each pixel of a 300 dpi gray page is.
+
+    Pictures show as regions with strong local gray-level variation that is
+    wider than a text stroke; the map is light there and dark elsewhere.
+
+    Args:
+        gray (NDArray[np.uint8]): 2-D gray page at about 300 dpi. Not modified.
+        higher_search_sensitivity (bool): Also stretch weak responses so that
+            faint pictures reach the picture threshold.
+
+    Returns:
+        NDArray[np.uint8]: Map of the same shape; values from ``PICTURE_THRESHOLD``
+            up are picture.
+    """
+    stretched = stretch_gray_range(gray, _RANGE_CLIP, _RANGE_CLIP)
+    window = np.ones((_GRADIENT_WINDOW, _GRADIENT_WINDOW), dtype=np.uint8)
+    lightest = cv2.dilate(
+        stretched, window, borderType=cv2.BORDER_CONSTANT, borderValue=0
+    )
+    darkest = cv2.erode(
+        stretched, window, borderType=cv2.BORDER_CONSTANT, borderValue=255
+    )
+    # Dark where a neighbourhood holds both very dark and very light pixels.
+    gradient = (
+        255 - (255 - darkest.astype(np.uint32)) * lightest.astype(np.uint32) // 255
+    ).astype(np.uint8)
+
+    marker = np.asarray(
+        cv2.dilate(
+            gradient,
+            np.ones((_MARKER_WINDOW, _MARKER_WINDOW), dtype=np.uint8),
+            borderType=cv2.BORDER_CONSTANT,
+            borderValue=0,
+        ),
+        dtype=np.uint8,
+    )
+    picture_like = 255 - _reconstruct_by_erosion(marker, gradient)
+
+    frame = np.full_like(picture_like, 255)
+    frame[0, :] = frame[-1, :] = frame[:, 0] = frame[:, -1] = 0
+    holes_filled = _reconstruct_by_erosion(frame, picture_like)
+
+    if higher_search_sensitivity:
+        return stretch_gray_range(
+            holes_filled, _HIGHER_SENSITIVITY_BLACK_CLIP, _RANGE_CLIP
+        )
+    return holes_filled
+
+
+def _reconstruct_by_erosion(
+    seed: NDArray[np.uint8],
+    mask: NDArray[np.uint8],
+) -> NDArray[np.uint8]:
+    """Spread dark values from the seed as far as the mask lets them.
+
+    The seed is raised to the mask first; the result is nowhere darker than the
+    mask and is lighter wherever no dark path leads to a dark seed pixel
+    (8-connectivity).
+    """
+    filled = reconstruction(
+        np.maximum(seed, mask), mask, method="erosion", footprint=_FOOTPRINT_8
+    )
+    return np.asarray(filled, dtype=np.uint8)
+
+
+def estimate_picture_mask(
+    gray: NDArray[np.uint8],
+    dpi: tuple[int, int],
+    *,
+    higher_search_sensitivity: bool = False,
+) -> NDArray[np.bool_]:
+    """Find picture regions of a gray page of any resolution.
+
+    Args:
+        gray (NDArray[np.uint8]): 2-D gray page. Not modified.
+        dpi (tuple[int, int]): Horizontal and vertical resolution of ``gray``.
+        higher_search_sensitivity (bool): See ``detect_pictures``.
+
+    Returns:
+        NDArray[np.bool_]: True where there is a picture, same shape as ``gray``.
+    """
+    height, width = gray.shape
+    small_size = (
+        max(1, round(width * DETECTION_DPI / dpi[0])),
+        max(1, round(height * DETECTION_DPI / dpi[1])),
+    )
+    shrinking = small_size[0] * small_size[1] < width * height
+    small = np.asarray(
+        cv2.resize(
+            gray,
+            small_size,
+            interpolation=cv2.INTER_AREA if shrinking else cv2.INTER_LINEAR,
+        ),
+        dtype=np.uint8,
+    )
+    detected = detect_pictures(
+        small, higher_search_sensitivity=higher_search_sensitivity
+    )
+    full = cv2.resize(detected, (width, height), interpolation=cv2.INTER_LINEAR)
+    return np.asarray(full) >= PICTURE_THRESHOLD
+
+
+def find_picture_rectangles(
+    picture: NDArray[np.bool_],
+    sensitivity: int = 100,
+) -> list[tuple[int, int, int, int]]:
+    """Bounding rectangles of picture clusters.
+
+    Picture pixels closer than about 16 pixels join into one cluster. With a
+    sensitivity below 100, each rectangle is then trimmed on every side to the
+    first line where more than that share of its pixels is picture.
+
+    Args:
+        picture (NDArray[np.bool_]): True where there is a picture.
+        sensitivity (int): Percentage from 0 to 100 of picture pixels a border
+            line must contain to stay inside its rectangle.
+
+    Returns:
+        list[tuple[int, int, int, int]]: Rectangles as (left, top, right, bottom),
+            all inclusive pixel coordinates.
+    """
+    if not picture.any():
+        return []
+    size = 2 * _JOIN_DISTANCE + 1
+    joined = cv2.dilate(picture.astype(np.uint8), np.ones((size, size), dtype=np.uint8))
+    _, clusters = cv2.connectedComponents(joined, connectivity=8)
+
+    rectangles: list[tuple[int, int, int, int]] = []
+    for rows, cols in ndimage.find_objects(np.where(picture, clusters, 0)):
+        rect = (cols.start, rows.start, cols.stop - 1, rows.stop - 1)
+        rectangles.append(
+            _trim_rectangle(picture, rect, sensitivity / 100.0)
+            if sensitivity < 100
+            else rect
+        )
+    return rectangles
+
+
+def _trim_rectangle(
+    picture: NDArray[np.bool_],
+    rect: tuple[int, int, int, int],
+    share: float,
+) -> tuple[int, int, int, int]:
+    """Shrink a rectangle to the outermost lines that are mostly picture."""
+    left, top, right, bottom = rect
+    block = picture[top : bottom + 1, left : right + 1]
+    rows = block.mean(axis=1) > share
+    cols = block.mean(axis=0) > share
+    if not rows.any() or not cols.any():
+        return rect
+    return (
+        left + int(np.argmax(cols)),
+        top + int(np.argmax(rows)),
+        left + len(cols) - 1 - int(np.argmax(cols[::-1])),
+        top + len(rows) - 1 - int(np.argmax(rows[::-1])),
+    )
