@@ -3,6 +3,7 @@ from PySide6 import QtCore, QtWidgets
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.MainWindow import MainWindowManager
+from scantailor.app.ui.utils import get_cwidget
 from scantailor.app.ui.widgets.stage_list_view import StageListView
 
 STAGE_NUMBERS = [1, 2, 3, 4, 5, 6]
@@ -21,6 +22,10 @@ def _action(main_window: MainWindowManager, number: int):
     return getattr(main_window, f"actionSwitchFilter{number}")
 
 
+def _filter_list(main_window: MainWindowManager) -> QtWidgets.QTableView:
+    return get_cwidget(main_window.ui, QtWidgets.QTableView, "filterList")
+
+
 @pytest.mark.parametrize("number", STAGE_NUMBERS)
 def test_switch_filter_action_has_its_ui_file_shortcut(
     main_window: MainWindowManager, number: int
@@ -31,26 +36,19 @@ def test_switch_filter_action_has_its_ui_file_shortcut(
 
 
 @pytest.mark.parametrize("number", STAGE_NUMBERS)
-def test_triggering_switch_filter_action_logs_only_that_stage(
-    main_window: MainWindowManager, log_messages: list[str], number: int
+def test_triggering_switch_filter_action_selects_that_stage_row(
+    main_window: MainWindowManager, number: int
 ):
     _action(main_window, number).trigger()
 
-    assert [m for m in log_messages if m.startswith("Switch filter")] == [
-        f"Switch filter {number}"
-    ]
+    assert main_window.curFilter == number - 1
+    assert _filter_list(main_window).currentIndex().row() == number - 1
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="actionSwitchFilter1..6 are not attached to any widget or menu, "
-    "so their shortcuts never fire",
-)
 @pytest.mark.parametrize("number", STAGE_NUMBERS)
 def test_shortcut_key_triggers_matching_switch_filter_action(
     qtbot: QtBot,
     main_window: MainWindowManager,
-    log_messages: list[str],
     number: int,
 ):
     with qtbot.waitSignal(_action(main_window, number).triggered, timeout=2000):
@@ -59,12 +57,13 @@ def test_shortcut_key_triggers_matching_switch_filter_action(
             SHORTCUT_KEYS[number][1],
         )
 
-    assert f"Switch filter {number}" in log_messages
+    assert _filter_list(main_window).currentIndex().row() == number - 1
 
 
 @pytest.mark.xfail(
     strict=True,
-    reason="actionSwitchFilter1..6 are not added to any menu in MainWindow.ui",
+    reason="actionSwitchFilter1..6 are window-level shortcuts only (as in the C++ "
+    "app); MainWindow.ui lists them in no menu",
 )
 def test_switch_filter_actions_are_listed_in_a_menu(
     main_window: MainWindowManager,
@@ -100,42 +99,43 @@ def test_filter_options_container_exists(main_window: MainWindowManager):
     assert options is not None
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="filterList is a promoted StageListView in MainWindow.ui but loads "
-    "as a plain QTableView (StageListView not registered with QUiLoader)",
-)
 def test_filter_list_is_a_stage_list_view(main_window: MainWindowManager):
-    assert isinstance(
-        main_window.ui.findChild(QtWidgets.QTableView, "filterList"), StageListView
-    )
+    assert isinstance(_filter_list(main_window), StageListView)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="StageListView is not wired to a StageSequence by MainWindow, "
-    "so the filter list model has no six stage rows",
-)
 def test_filter_list_shows_six_stage_rows(main_window: MainWindowManager):
-    assert (
-        main_window.ui.findChild(QtWidgets.QTableView, "filterList").model().rowCount()
-        == 6
-    )
+    assert _filter_list(main_window).model().rowCount() == 6
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="switchFilterN only logs; it does not select a stage row in filterList",
-)
+def test_filter_list_starts_on_the_first_stage(main_window: MainWindowManager):
+    assert _filter_list(main_window).currentIndex().row() == 0
+
+
 def test_switch_filter_selects_matching_stage_row(main_window: MainWindowManager):
     _action(main_window, 3).trigger()
 
-    assert (
-        main_window.ui.findChild(QtWidgets.QTableView, "filterList")
-        .currentIndex()
-        .row()
-        == 2
-    )
+    assert _filter_list(main_window).currentIndex().row() == 2
+
+
+def test_clicking_a_stage_row_updates_the_current_filter(
+    main_window: MainWindowManager,
+):
+    view = _filter_list(main_window)
+
+    view.setCurrentIndex(view.model().index(4, 0))
+
+    assert main_window.curFilter == 4
+
+
+def test_changing_stage_does_not_change_the_current_page(
+    project_window: MainWindowManager,
+):
+    project_window.goNextPage()
+
+    _action(project_window, 4).trigger()
+
+    assert project_window.curFilter == 3
+    assert project_window.current_page == project_window.pages()[1]
 
 
 @pytest.mark.xfail(
