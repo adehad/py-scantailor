@@ -2,6 +2,7 @@
 
 from scantailor.filters.output.binarization import BinarizationOptions
 from scantailor.filters.output.color_mode import ColorMode
+from scantailor.filters.output.color_options import ColorCommonOptions
 from scantailor.filters.output.params import Params
 from scantailor.filters.output.render_params import RenderParams, SplittingOptions
 
@@ -169,3 +170,40 @@ class TestRenderParams:
         # These should not be set since no binarization needed
         assert render.morphological_smoothing is False
         assert render.normalize_illumination is False
+
+
+class TestColorCommonFlags:
+    """Flags that come from the shared colour options."""
+
+    def test_fill_margins_follows_color_common(self) -> None:
+        """fill_margins mirrors color_common.fill_margins."""
+        on = RenderParams.from_params(Params())
+        off = RenderParams.from_params(
+            Params(color_common=ColorCommonOptions(fill_margins=False))
+        )
+
+        assert on.fill_margins is True
+        assert off.fill_margins is False
+
+    def test_color_normalization_applies_without_binarization(self) -> None:
+        """Grayscale output normalises illumination from color_common."""
+        params = Params(
+            color_mode=ColorMode.COLOR_GRAYSCALE,
+            color_common=ColorCommonOptions(normalize_illumination=True),
+        )
+        render = RenderParams.from_params(params)
+
+        assert render.normalize_illumination is True
+        assert render.normalize_illumination_color is True
+
+    def test_binarized_output_uses_binarization_normalization(self) -> None:
+        """Bilevel output takes normalize_illumination from binarization options."""
+        params = Params(
+            color_mode=ColorMode.BLACK_AND_WHITE,
+            binarization=BinarizationOptions(normalize_illumination=False),
+            color_common=ColorCommonOptions(normalize_illumination=True),
+        )
+        render = RenderParams.from_params(params)
+
+        assert render.normalize_illumination is False
+        assert render.normalize_illumination_color is True

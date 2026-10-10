@@ -100,7 +100,7 @@ class TestFilter:
         """Get despeckle level for page."""
         filter = Filter()
         page_id = make_page_id()
-        assert filter.get_despeckle_level(page_id) == DespeckleLevel.NORMAL
+        assert filter.get_despeckle_level(page_id) == DespeckleLevel.CAUTIOUS
 
     def test_set_despeckle_level(self):
         """Set despeckle level for page."""
