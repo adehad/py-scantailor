@@ -6,6 +6,8 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.imageproc.morphology import remove_small_components
+
 from .content_box import ContentBox
 
 
@@ -80,7 +82,7 @@ def find_content_box(
     binary = _remove_shadows(np.asarray(binary, dtype=np.uint8))
 
     # Despeckle to remove noise
-    binary = _despeckle(binary, min_area=50)
+    binary = remove_small_components(binary, min_size=50, connectivity=8)
 
     # Find content boundaries
     content_rect = _find_bounding_rect(binary, margin=int(margin * scale))
@@ -145,25 +147,6 @@ def _remove_shadows(binary: NDArray[np.uint8]) -> NDArray[np.uint8]:
     result = cv2.subtract(binary, shadows)
 
     return np.asarray(result, dtype=np.uint8)
-
-
-def _despeckle(binary: NDArray[np.uint8], min_area: int = 50) -> NDArray[np.uint8]:
-    """Remove small noise specks from a binary image."""
-    # Find connected components
-    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
-        binary, connectivity=8
-    )
-
-    # Create output image
-    result = np.zeros_like(binary)
-
-    # Keep only components larger than min_area
-    for i in range(1, num_labels):  # Skip background (label 0)
-        area = stats[i, cv2.CC_STAT_AREA]
-        if area >= min_area:
-            result[labels == i] = 255
-
-    return result
 
 
 def _find_bounding_rect(

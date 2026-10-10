@@ -1,5 +1,6 @@
 """Tests for morphological operations."""
 
+import cv2
 import numpy as np
 
 from scantailor.imageproc.morphology import (
@@ -9,6 +10,7 @@ from scantailor.imageproc.morphology import (
     erode,
     hit_miss,
     open_morph,
+    remove_small_components,
     white_top_hat,
 )
 
@@ -268,3 +270,96 @@ class TestHitMiss:
         kernel = np.array([[1, -1], [-1, 1]], dtype=np.int8)
         result = hit_miss(image, kernel)
         assert result.shape == image.shape
+
+
+def _remove_small_components_reference(
+    image: np.ndarray, min_size: int, connectivity: int
+) -> np.ndarray:
+    """Slow per-component filter used only to pin down the expected semantics."""
+    _n, labels, stats, _ = cv2.connectedComponentsWithStats(
+        image, connectivity=connectivity
+    )
+    expected = np.zeros_like(image)
+    for label in range(1, len(stats)):
+        if stats[label, cv2.CC_STAT_AREA] >= min_size:
+            expected[labels == label] = 255
+    return expected
+
+
+class TestRemoveSmallComponents:
+    """Tests for remove_small_components."""
+
+    def test_removes_specks_and_keeps_large_blobs(self):
+        image = np.zeros((60, 60), dtype=np.uint8)
+        image[10:30, 10:30] = 255
+        image[50, 50] = 255
+        image[5, 55] = 255
+
+        result = remove_small_components(image, min_size=5)
+
+        assert np.array_equal(result[10:30, 10:30], np.full((20, 20), 255))
+        assert result[50, 50] == 0
+        assert result[5, 55] == 0
+
+    def test_component_exactly_min_size_is_kept(self):
+        image = np.zeros((20, 20), dtype=np.uint8)
+        image[5, 5:10] = 255
+
+        assert remove_small_components(image, min_size=5)[5, 5:10].tolist() == [255] * 5
+        assert not remove_small_components(image, min_size=6).any()
+
+    def test_diagonal_pair_is_one_component_only_with_8_connectivity(self):
+        image = np.zeros((10, 10), dtype=np.uint8)
+        image[4, 4] = 255
+        image[5, 5] = 255
+
+        assert remove_small_components(image, 2, connectivity=8).sum() == 2 * 255
+        assert remove_small_components(image, 2, connectivity=4).sum() == 0
+
+    def test_any_nonzero_value_is_foreground_and_output_is_0_or_255(self):
+        image = np.zeros((20, 20), dtype=np.uint8)
+        image[2:8, 2:8] = 1
+        image[12:18, 12:18] = 128
+
+        result = remove_small_components(image, min_size=10)
+
+        assert result.dtype == np.uint8
+        assert set(np.unique(result).tolist()) == {0, 255}
+        assert result[2:8, 2:8].min() == 255
+        assert result[12:18, 12:18].min() == 255
+
+    def test_empty_and_full_images(self):
+        empty = np.zeros((30, 40), dtype=np.uint8)
+        full = np.full((30, 40), 255, dtype=np.uint8)
+
+        assert not remove_small_components(empty, min_size=3).any()
+        assert remove_small_components(full, min_size=3).min() == 255
+
+    def test_non_positive_min_size_returns_unchanged_copy(self):
+        image = np.zeros((10, 10), dtype=np.uint8)
+        image[3, 3] = 7
+
+        result = remove_small_components(image, min_size=0)
+
+        assert np.array_equal(result, image)
+        assert result is not image
+
+    def test_input_is_not_mutated(self):
+        image = np.zeros((30, 30), dtype=np.uint8)
+        image[1, 1] = 255
+        image[10:20, 10:20] = 255
+        before = image.copy()
+
+        remove_small_components(image, min_size=5)
+
+        assert np.array_equal(image, before)
+
+    def test_matches_per_component_filter_on_dense_random_specks(self):
+        rng = np.random.default_rng(1234)
+        image = np.where(rng.random((300, 400)) < 0.08, 255, 0).astype(np.uint8)
+        image[100:180, 50:300] = 255
+
+        for connectivity in (4, 8):
+            expected = _remove_small_components_reference(image, 3, connectivity)
+            result = remove_small_components(image, 3, connectivity=connectivity)
+            assert np.array_equal(result, expected)
