@@ -198,33 +198,25 @@ def remove_small_components(
 ) -> NDArray[np.uint8]:
     """Remove small connected components from a binary image.
 
-    Components (connected regions of white pixels) smaller than min_size
-    will be removed (set to black).
+    Any non-zero pixel counts as foreground. Components with fewer than
+    min_size pixels become 0; the rest become 255.
 
     Args:
-        image (NDArray[np.uint8]): Binary input image (0 or 255).
-        min_size (int): Minimum component size to keep.
-        connectivity (int): 4 or 8 connectivity.
+        image (NDArray[np.uint8]): Binary input image, foreground non-zero.
+        min_size (int): Smallest component area, in pixels, that survives.
+        connectivity (int): 4 or 8 neighbour connectivity.
 
     Returns:
-        NDArray[np.uint8]: Filtered binary image.
+        NDArray[np.uint8]: New image with values 0 or 255.
     """
     if min_size <= 0:
         return image.copy()
 
-    # Find connected components
-    num_labels, labels, stats, _centroids = cv2.connectedComponentsWithStats(
+    _num_labels, labels, stats, _centroids = cv2.connectedComponentsWithStats(
         image, connectivity=connectivity
     )
-
-    # Create output image
-    result = np.zeros_like(image)
-
-    # Keep only components larger than min_size
-    # Start from 1 to skip background (label 0)
-    for label in range(1, num_labels):
-        area = stats[label, cv2.CC_STAT_AREA]
-        if area >= min_size:
-            result[labels == label] = 255
-
-    return result
+    # A 300 dpi page has tens of thousands of specks, so the filter must be one
+    # gather over the label image; a pass per component takes about 20 s.
+    keep = np.where(stats[:, cv2.CC_STAT_AREA] >= min_size, 255, 0).astype(np.uint8)
+    keep[0] = 0
+    return keep[np.asarray(labels, dtype=np.int32)]
