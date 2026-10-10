@@ -138,11 +138,6 @@ def test_changing_stage_does_not_change_the_current_page(
     assert project_window.current_page == project_window.pages()[1]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="options widgets (app/ui/options_widgets) are not instantiated by "
-    "MainWindow, so filterOptions has no child options widget",
-)
 def test_filter_options_shows_stage_options_widget(main_window: MainWindowManager):
     _action(main_window, 2).trigger()
 

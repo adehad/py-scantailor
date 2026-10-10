@@ -473,6 +473,11 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
         self.update()
 
     @property
+    def image(self) -> QImage | None:
+        """The displayed image, or None before one was set."""
+        return self._image
+
+    @property
     def zoom_level(self) -> float:
         """Get the current zoom level."""
         return self._zoom
