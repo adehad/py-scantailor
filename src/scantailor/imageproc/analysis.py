@@ -153,7 +153,9 @@ def find_skew(
     if abs(best_angle) < min_angle:
         best_angle = 0.0
 
-    return SkewResult(angle=best_angle, confidence=confidence)
+    # Sign follows SkewFinder.cpp: the reported skew is the negated search angle,
+    # so negating it again yields the clockwise-positive correction.
+    return SkewResult(angle=-best_angle if best_angle else 0.0, confidence=confidence)
 
 
 def _reduce_image(image: NDArray[np.uint8], factor: int) -> NDArray[np.uint8]:
