@@ -1,0 +1,221 @@
+"""Page background estimation for illumination normalisation.
+
+Models the paper background as a smooth polynomial surface fitted to a small
+version of the page after text and shadows have been suppressed morphologically.
+"""
+
+from collections.abc import Sequence
+
+import cv2
+import numpy as np
+from numpy.typing import NDArray
+from skimage.morphology import reconstruction
+
+from scantailor.imageproc.polynomial_line import fit_polynomial_lines
+from scantailor.imageproc.polynomial_surface import PolynomialSurface
+
+# Longest side of the working image. Fitting at this size is cheap and the
+# background is smooth, so nothing is lost by rendering the surface at full size.
+_WORKING_SIZE = 300
+# Height of the vertical opening that removes letter remnants. Chosen for the
+# working size above.
+_LETTER_REMNANT_OPENING = 20
+# Share of pixels that may differ from the shadow model before the page is
+# assumed to hold a picture rather than a shadow.
+_PICTURE_PIXEL_FRACTION = 0.01
+_PICTURE_DIFFERENCE = 10
+# A pixel this much darker than its fitted line is background; lighter pixels
+# on the line are rejected as outliers.
+_LINE_OUTLIER_MARGIN = 30
+# Rows and columns with fewer accepted pixels than 1/4 are dropped entirely.
+_MIN_LINE_COVERAGE_DIVISOR = 4
+
+SURFACE_HOR_DEGREE = 8
+SURFACE_VERT_DEGREE = 5
+
+
+def _fill_dark_holes(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
+    """Fill dark regions that do not touch the image border (8-connectivity)."""
+    seed = np.full_like(image, 255)
+    seed[0, :] = image[0, :]
+    seed[-1, :] = image[-1, :]
+    seed[:, 0] = image[:, 0]
+    seed[:, -1] = image[:, -1]
+    filled = reconstruction(
+        seed, image, method="erosion", footprint=np.ones((3, 3), bool)
+    )
+    return np.asarray(filled, dtype=np.uint8)
+
+
+def _fill_vertically(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
+    """Fill dark runs that are bounded by lighter pixels above and below.
+
+    Each pixel becomes the larger of itself and the smaller of the running
+    maximum above it and the largest value below it.
+    """
+    above = np.maximum.accumulate(image, axis=0)
+    below = np.zeros_like(image)
+    below[:-1] = np.maximum.accumulate(image[:0:-1], axis=0)[::-1]
+    return np.maximum(image, np.minimum(above, below))
+
+
+def _open_vertical(image: NDArray[np.uint8], height: int) -> NDArray[np.uint8]:
+    """Grayscale opening with a 1 x height brick, treating outside pixels as black."""
+    pad = height
+    padded = np.pad(image, ((pad, pad), (0, 0)), constant_values=0)
+    kernel = np.ones((height, 1), np.uint8)
+    opened = cv2.morphologyEx(padded, cv2.MORPH_OPEN, kernel)
+    return np.asarray(opened[pad:-pad], dtype=np.uint8)
+
+
+def _suppress_text_and_shadow(small: NDArray[np.uint8]) -> NDArray[np.uint8]:
+    """Remove text from a downscaled page, choosing between two strategies.
+
+    Hole filling followed by a vertical opening copes with shadows that touch a
+    side edge. Vertical filling copes with pictures lying partly in a spine
+    shadow. The first is used unless the difference between the two is not
+    explained by a smooth shadow.
+
+    Args:
+        small (NDArray[np.uint8]): Downscaled grayscale page.
+
+    Returns:
+        NDArray[np.uint8]: Page with dark text suppressed.
+    """
+    method1 = _open_vertical(_fill_dark_holes(small), _LETTER_REMNANT_OPENING)
+    method2 = _fill_vertically(small)
+
+    # uint8 wrap-around is intended: it keeps the residual large wherever the
+    # methods disagree in sign, which pushes the decision towards method2.
+    diff = method2 - method1
+    approximated = PolynomialSurface.fit(diff, 3, 3).render(diff.shape)
+    residual = cv2.absdiff(diff, approximated)
+
+    unexplained = np.count_nonzero(residual > _PICTURE_DIFFERENCE)
+    if unexplained < _PICTURE_PIXEL_FRACTION * residual.size:
+        return method1
+    return method2
+
+
+def _mask_outliers(
+    background: NDArray[np.uint8],
+    mask: NDArray[np.bool_],
+) -> NDArray[np.bool_]:
+    """Reject pixels that sit well below a smooth fit of their column or row."""
+    column_fit = fit_polynomial_lines(background, 2, axis=0).astype(np.int16)
+    row_fit = fit_polynomial_lines(background, 4, axis=1).astype(np.int16)
+    darker = background.astype(np.int16) + _LINE_OUTLIER_MARGIN
+    return mask & ~(darker < column_fit) & ~(darker < row_fit)
+
+
+def _drop_sparse_lines(mask: NDArray[np.bool_]) -> NDArray[np.bool_]:
+    """Clear rows then columns that are mostly rejected."""
+    height, width = mask.shape
+    result = mask.copy()
+    result[result.sum(axis=1) < width // _MIN_LINE_COVERAGE_DIVISOR, :] = False
+    result[:, result.sum(axis=0) < height // _MIN_LINE_COVERAGE_DIVISOR] = False
+    return result
+
+
+def estimate_background(
+    gray: NDArray[np.uint8],
+    area_to_consider: Sequence[tuple[float, float]] | None = None,
+) -> PolynomialSurface:
+    """Estimate the paper background of a page as a polynomial surface.
+
+    The page is scaled to 300 px on its longer side, text and
+    shadows are suppressed morphologically, outlying pixels are rejected, and a
+    degree (8, 5) surface is fitted by least squares to what remains.
+
+    Args:
+        gray (NDArray[np.uint8]): 2-D grayscale page, dark ink on light paper.
+            Not modified.
+        area_to_consider (Sequence[tuple[float, float]] | None): Polygon of (x, y)
+            vertices in ``gray`` pixel coordinates. Pixels outside it do not take
+            part in the fit. None uses the whole image.
+
+    Returns:
+        PolynomialSurface: Background model. ``render(gray.shape)`` gives a
+        uint8 image of the same size as the input.
+
+    Raises:
+        ValueError: If ``gray`` is not a non-empty 2-D array.
+    """
+    if gray.ndim != 2 or gray.size == 0:
+        raise ValueError("gray must be a non-empty 2-D array")
+
+    height, width = gray.shape
+    # Small pages are enlarged too: the vertical opening height is tuned for a
+    # longer side of exactly _WORKING_SIZE.
+    factor = _WORKING_SIZE / max(height, width)
+    small_size = (max(1, round(width * factor)), max(1, round(height * factor)))
+    small = np.asarray(
+        cv2.resize(
+            gray,
+            small_size,
+            interpolation=cv2.INTER_AREA if factor < 1 else cv2.INTER_LINEAR,
+        ),
+        dtype=np.uint8,
+    )
+    background = _suppress_text_and_shadow(small)
+
+    mask = np.ones(background.shape, dtype=bool)
+    if area_to_consider is not None and len(area_to_consider) > 0:
+        scale = np.array([small_size[0] / width, small_size[1] / height])
+        polygon = np.round(
+            np.asarray(area_to_consider, dtype=np.float64) * scale
+        ).astype(np.int32)
+        inside = np.zeros(background.shape, dtype=np.uint8)
+        cv2.fillPoly(inside, [polygon], 1)
+        mask = inside.astype(bool)
+
+    mask = _mask_outliers(background, mask)
+    mask = cv2.erode(mask.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
+    mask = _drop_sparse_lines(mask)
+    return PolynomialSurface.fit(
+        background, SURFACE_HOR_DEGREE, SURFACE_VERT_DEGREE, mask
+    )
+
+
+def raise_above_background(
+    gray: NDArray[np.uint8],
+    background: NDArray[np.uint8],
+) -> NDArray[np.uint8]:
+    """Scale each pixel so that the background becomes white.
+
+    Computes ``round(gray * 255 / background)``; pixels within one level of the
+    background, or above it, become 255.
+
+    Args:
+        gray (NDArray[np.uint8]): Image to normalise. Not modified.
+        background (NDArray[np.uint8]): Background estimate of the same shape.
+
+    Returns:
+        NDArray[np.uint8]: Normalised image.
+    """
+    src = gray.astype(np.uint32)
+    bg = background.astype(np.uint32)
+    scaled = (src * 255 + bg // 2) // np.maximum(bg, 1)
+    scaled = np.minimum(scaled, 255)
+    return np.where(bg.astype(np.int32) - src.astype(np.int32) < 1, 255, scaled).astype(
+        np.uint8
+    )
+
+
+def normalize_illumination_gray(
+    gray: NDArray[np.uint8],
+    area_to_consider: Sequence[tuple[float, float]] | None = None,
+) -> NDArray[np.uint8]:
+    """Flatten uneven lighting in a grayscale page.
+
+    Args:
+        gray (NDArray[np.uint8]): 2-D grayscale page. Not modified.
+        area_to_consider (Sequence[tuple[float, float]] | None): Polygon limiting
+            where the background is sampled; see ``estimate_background``.
+
+    Returns:
+        NDArray[np.uint8]: New array of the same shape in which the estimated
+        paper colour is mapped to 255.
+    """
+    background = estimate_background(gray, area_to_consider).render(gray.shape)
+    return raise_above_background(gray, background)
