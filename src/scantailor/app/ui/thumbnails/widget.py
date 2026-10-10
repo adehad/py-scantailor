@@ -1,0 +1,359 @@
+"""Standalone page thumbnail list with sort order and selection handling."""
+
+from collections.abc import Callable, Hashable, Sequence
+from pathlib import Path
+from typing import Any, cast
+
+from PySide6.QtCore import (
+    QModelIndex,
+    QPersistentModelIndex,
+    QPoint,
+    QRect,
+    QSize,
+    Qt,
+    Signal,
+)
+from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QComboBox,
+    QListView,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QVBoxLayout,
+    QWidget,
+)
+
+from scantailor.app.ui.thumbnails.cache import ThumbnailCache
+from scantailor.app.ui.thumbnails.model import (
+    IsCurrentRole,
+    PageOrderOption,
+    PageRole,
+    ThumbnailModel,
+    ThumbnailRenderer,
+    natural_order,
+    order_by_height,
+    order_by_width,
+)
+from scantailor.core.models import PageId
+from scantailor.core.project import Project
+
+_PADDING = 6
+_CAPTION_HEIGHT = 18
+_CURRENT_BORDER = 3
+
+
+class ThumbnailDelegate(QStyledItemDelegate):
+    """Paints a thumbnail, its caption and the current-page highlight."""
+
+    def __init__(self, thumbnail_size: QSize, parent: QWidget | None = None) -> None:
+        """Initialise; arguments are described on the class."""
+        super().__init__(parent)
+        self._thumbnail_size = thumbnail_size
+
+    def sizeHint(
+        self,
+        option: QStyleOptionViewItem,
+        index: QModelIndex | QPersistentModelIndex,
+    ) -> QSize:
+        """Return the fixed cell size."""
+        return QSize(
+            self._thumbnail_size.width() + 2 * _PADDING,
+            self._thumbnail_size.height() + _CAPTION_HEIGHT + 2 * _PADDING,
+        )
+
+    def paint(
+        self,
+        painter: QPainter,
+        item_option: QStyleOptionViewItem,
+        index: QModelIndex | QPersistentModelIndex,
+    ) -> None:
+        """Draw one cell; a placeholder frame stands in until the render lands."""
+        # PySide6 stubs omit the public QStyleOption fields (rect, state, palette).
+        option = cast(Any, item_option)
+        palette = option.palette
+        painter.save()
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.fillRect(option.rect, palette.highlight())
+            text_color = palette.highlightedText().color()
+        else:
+            text_color = palette.text().color()
+
+        picture_area = QRect(
+            option.rect.left() + _PADDING,
+            option.rect.top() + _PADDING,
+            self._thumbnail_size.width(),
+            self._thumbnail_size.height(),
+        )
+        image = index.data(Qt.ItemDataRole.DecorationRole)
+        if image is None:
+            painter.setPen(palette.mid().color())
+            painter.drawRect(picture_area.adjusted(0, 0, -1, -1))
+        else:
+            size = image.size().scaled(
+                picture_area.size(), Qt.AspectRatioMode.KeepAspectRatio
+            )
+            target = QRect(QPoint(0, 0), size)
+            target.moveCenter(picture_area.center())
+            painter.drawImage(target, image)
+
+        painter.setPen(text_color)
+        caption_area = QRect(
+            option.rect.left() + _PADDING,
+            picture_area.bottom() + 1,
+            self._thumbnail_size.width(),
+            _CAPTION_HEIGHT,
+        )
+        painter.drawText(
+            caption_area,
+            Qt.AlignmentFlag.AlignCenter,
+            painter.fontMetrics().elidedText(
+                str(index.data(Qt.ItemDataRole.DisplayRole)),
+                Qt.TextElideMode.ElideMiddle,
+                caption_area.width(),
+            ),
+        )
+
+        if index.data(IsCurrentRole):
+            painter.setPen(QPen(QColor("#e8a200"), _CURRENT_BORDER))
+            inset = _CURRENT_BORDER // 2
+            painter.drawRect(option.rect.adjusted(inset, inset, -inset - 1, -inset - 1))
+        painter.restore()
+
+
+class ThumbnailListWidget(QWidget):
+    """Scrollable list of page thumbnails.
+
+    Previews come from ``renderer`` on worker threads and are cached, so the
+    GUI thread never renders. The widget does not know about the main window;
+    connect ``page_selected`` to navigation.
+
+    Args:
+        renderer (ThumbnailRenderer): Renders a small QImage for (page, stage).
+        project (Project | None): Pages to list.
+        stage (str): Stage key whose previews are shown.
+        params_hash (Callable[[PageId, str], Hashable] | None): Digest of the
+            parameters affecting a preview; a changed digest forces a re-render.
+        cache_directory (Path | None): Directory for on-disk thumbnails, or
+            None for memory only.
+        cache_capacity (int): Thumbnails kept in memory.
+        thumbnail_size (QSize | None): Bounding size of a thumbnail; defaults
+            to 160x160.
+        extra_orders (Sequence[PageOrderOption]): Further sort options, for
+            orders that need stage data, shown after the built-in ones.
+        thread_count (int): Worker threads.
+        parent (QWidget | None): Parent widget.
+
+    Signals:
+        page_selected (PageId): The current page changed.
+        selection_changed (list): All selected pages, in display order.
+    """
+
+    page_selected = Signal(object)
+    selection_changed = Signal(object)
+
+    def __init__(
+        self,
+        renderer: ThumbnailRenderer,
+        project: Project | None = None,
+        stage: str = "",
+        params_hash: Callable[[PageId, str], Hashable] | None = None,
+        cache_directory: Path | None = None,
+        cache_capacity: int = 256,
+        thumbnail_size: QSize | None = None,
+        extra_orders: Sequence[PageOrderOption] = (),
+        thread_count: int = 2,
+        parent: QWidget | None = None,
+    ) -> None:
+        """Initialise; arguments are described on the class."""
+        super().__init__(parent)
+        size = thumbnail_size or QSize(160, 160)
+        self._model = ThumbnailModel(
+            renderer,
+            cache=ThumbnailCache(cache_capacity, cache_directory),
+            params_hash=params_hash,
+            max_thumbnail_size=size,
+            thread_count=thread_count,
+            parent=self,
+        )
+        self._model.set_stage(stage)
+        self._orders = [
+            natural_order(),
+            order_by_width(),
+            order_by_height(),
+            *extra_orders,
+        ]
+        self._restoring = False
+        self._follow_current = True
+
+        self._order_combo = QComboBox(self)
+        for order in self._orders:
+            self._order_combo.addItem(order.name)
+
+        self._view = QListView(self)
+        self._view.setModel(self._model)
+        self._view.setItemDelegate(ThumbnailDelegate(size, self._view))
+        self._view.setUniformItemSizes(True)
+        self._view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self._view.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._order_combo)
+        layout.addWidget(self._view)
+
+        self._order_combo.currentIndexChanged.connect(self._on_order_chosen)
+        selection = self._view.selectionModel()
+        selection.currentChanged.connect(self._on_current_changed)
+        selection.selectionChanged.connect(self._on_selection_changed)
+
+        self._model.set_project(project)
+
+    @property
+    def model(self) -> ThumbnailModel:
+        """The underlying model."""
+        return self._model
+
+    @property
+    def view(self) -> QListView:
+        """The list view."""
+        return self._view
+
+    @property
+    def order_combo(self) -> QComboBox:
+        """The sort order combo box."""
+        return self._order_combo
+
+    def set_project(self, project: Project | None) -> None:
+        """Show the pages of a project, keeping the chosen sort order.
+
+        Args:
+            project (Project | None): The project, or None to clear the list.
+        """
+        self._model.set_project(project)
+
+    def set_stage(self, stage: str) -> None:
+        """Show previews for a different stage.
+
+        Args:
+            stage (str): Stage key passed to the renderer.
+        """
+        self._model.set_stage(stage)
+
+    def invalidate(self, page: PageId | None = None) -> None:
+        """Refresh previews after stage parameters changed.
+
+        Args:
+            page (PageId | None): The page to refresh, or None for all.
+        """
+        self._model.invalidate(page)
+
+    def pages(self) -> list[PageId]:
+        """Return the pages in display order."""
+        return self._model.pages()
+
+    def selected_pages(self) -> list[PageId]:
+        """Return the selected pages in display order."""
+        rows = sorted(
+            index.row() for index in self._view.selectionModel().selectedRows()
+        )
+        pages = self._model.pages()
+        return [pages[row] for row in rows]
+
+    def current_page(self) -> PageId | None:
+        """Return the current page, or None."""
+        return self._model.current_page
+
+    def set_current_page(self, page: PageId) -> None:
+        """Make a page current, select only it and scroll it into view.
+
+        Emits ``page_selected`` if the current page changes.
+
+        Args:
+            page (PageId): The page to make current.
+        """
+        row = self._model.row_of(page)
+        if row < 0:
+            return
+        self._view.setCurrentIndex(self._model.index(row))
+        self.scroll_to_current()
+
+    def scroll_to_current(self) -> None:
+        """Scroll so the current page is visible."""
+        page = self._model.current_page
+        row = self._model.row_of(page) if page is not None else -1
+        if row >= 0:
+            self._view.scrollTo(
+                self._model.index(row), QAbstractItemView.ScrollHint.EnsureVisible
+            )
+
+    def set_follow_current(self, enabled: bool) -> None:
+        """Scroll to the current page whenever it changes.
+
+        Args:
+            enabled (bool): Whether to follow the current page.
+        """
+        self._follow_current = enabled
+
+    def set_multi_selection_enabled(self, enabled: bool) -> None:
+        """Allow ctrl and shift multi-selection, or restrict to a single page.
+
+        Args:
+            enabled (bool): True for extended selection, False for single.
+        """
+        mode = (
+            QAbstractItemView.SelectionMode.ExtendedSelection
+            if enabled
+            else QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self._view.setSelectionMode(mode)
+
+    def set_order(self, index: int) -> None:
+        """Choose a sort order by its position in the combo box.
+
+        Args:
+            index (int): Index of the option.
+        """
+        self._order_combo.setCurrentIndex(index)
+
+    def item_rect(self, page: PageId) -> QRect:
+        """Return a page's rectangle in viewport coordinates."""
+        return self._view.visualRect(self._model.index(self._model.row_of(page)))
+
+    def _on_order_chosen(self, option_index: int) -> None:
+        selected = self.selected_pages()
+        current = self._model.current_page
+        self._restoring = True
+        try:
+            self._model.set_order(self._orders[option_index])
+            self._restore(selected, current)
+        finally:
+            self._restoring = False
+        self.selection_changed.emit(self.selected_pages())
+
+    def _restore(self, selected: list[PageId], current: PageId | None) -> None:
+        selection = self._view.selectionModel()
+        for page in selected:
+            selection.select(
+                self._model.index(self._model.row_of(page)),
+                selection.SelectionFlag.Select,
+            )
+        if current is not None and self._model.row_of(current) >= 0:
+            selection.setCurrentIndex(
+                self._model.index(self._model.row_of(current)),
+                selection.SelectionFlag.NoUpdate,
+            )
+
+    def _on_current_changed(self, current: QModelIndex, previous: QModelIndex) -> None:
+        page = current.data(PageRole) if current.isValid() else None
+        self._model.set_current_page(page)
+        if page is None or self._restoring:
+            return
+        if self._follow_current:
+            self.scroll_to_current()
+        self.page_selected.emit(page)
+
+    def _on_selection_changed(self) -> None:
+        if not self._restoring:
+            self.selection_changed.emit(self.selected_pages())
