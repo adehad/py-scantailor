@@ -11,11 +11,12 @@ from pytestqt.qtbot import QtBot
 from scantailor.app.ui.dialogs.load_files_status import LoadFilesStatusDialog
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
 from scantailor.app.ui.MainWindow import MainWindowManager
+from scantailor.app.ui.utils import get_cwidget
 from scantailor.core.models import ImageId
 from scantailor.core.project import Project
 
 if TYPE_CHECKING:
-    from conftest import PageImages
+    from conftest import DialogFactory, PageImages
 
 LEFT = QtCore.Qt.MouseButton.LeftButton
 
@@ -277,29 +278,71 @@ def test_show_status_returns_false_when_user_cancels(
     assert LoadFilesStatusDialog.show_status(page_images.paths, []) is False
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="MainWindow has no add-files action; ProjectFilesDialog is never opened",
-)
 def test_main_window_add_files_action_opens_project_files_dialog(
-    main_window: MainWindowManager, respond_to_modal
+    project_window: MainWindowManager,
+    dialog_factory: "DialogFactory",
+    respond_to_modal,
 ):
-    action = getattr(main_window, "actionAddFiles", None)
-    assert action is not None
-
+    dialog_factory.names = []
     respond_to_modal(accept=False)
-    action.trigger()
 
-    assert main_window.ui.findChild(ProjectFilesDialog) is not None
+    project_window.actionAddFiles.trigger()
+
+    assert len(dialog_factory.created) == 2
+    assert project_window.ui.findChild(ProjectFilesDialog) is not None
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="No code connects ProjectFilesDialog to Project.add_image; "
-    "MainWindowManager holds no Project",
-)
+def test_add_files_action_is_listed_in_the_file_menu(main_window: MainWindowManager):
+    file_menu = get_cwidget(main_window.ui, QtWidgets.QMenu, "menuFile")
+
+    assert main_window.actionAddFiles in file_menu.actions()
+
+
 def test_accepting_project_files_dialog_adds_pages_to_main_window_project(
-    main_window: MainWindowManager,
+    project_window: MainWindowManager, page_images: "PageImages"
 ):
-    assert hasattr(main_window, "project")
-    assert main_window.project.images
+    assert project_window.project is not None
+    assert [info.id.file_path for info in project_window.project.images] == (
+        page_images.paths
+    )
+
+
+def test_adding_a_further_file_appends_a_page_and_marks_project_modified(
+    project_window: MainWindowManager,
+    dialog_factory: "DialogFactory",
+    page_images: "PageImages",
+    respond_to_modal,
+):
+    extra = page_images.directory / "page_004.png"
+    shutil.copy(page_images.paths[0], extra)
+    project_window.modified = False
+    dialog_factory.names = [path.name for path in page_images.paths] + [extra.name]
+    respond_to_modal(accept=True)
+
+    project_window.actionAddFiles.trigger()
+
+    assert project_window.project is not None
+    assert [info.id.file_path for info in project_window.project.images] == [
+        *page_images.paths,
+        extra,
+    ]
+    assert project_window.modified
+
+
+def test_adding_files_already_in_the_project_changes_nothing(
+    project_window: MainWindowManager, respond_to_modal
+):
+    project_window.modified = False
+    respond_to_modal(accept=True)
+
+    project_window.actionAddFiles.trigger()
+
+    assert len(project_window.pages()) == 3
+    assert not project_window.modified
+
+
+def test_add_files_without_a_project_does_nothing(main_window: MainWindowManager):
+    main_window.addFiles()
+
+    assert main_window.project is None
+    assert QtWidgets.QApplication.activeModalWidget() is None

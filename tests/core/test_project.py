@@ -51,7 +51,7 @@ class TestImageMetadata:
             dpi=Dpi(horizontal=10000, vertical=300),
         )
         assert metadata.horizontal_dpi_status() == DpiStatus.TOO_LARGE
-        assert metadata.is_dpi_ok() is False
+        assert metadata.is_dpi_ok() is True
 
     def test_dpi_status_too_small(self):
         metadata = ImageMetadata(
@@ -60,7 +60,42 @@ class TestImageMetadata:
             dpi=Dpi(horizontal=20, vertical=300),
         )
         assert metadata.horizontal_dpi_status() == DpiStatus.TOO_SMALL
+        assert metadata.is_dpi_ok() is True
+
+    def test_is_dpi_ok_rejects_undefined_dpi_on_either_axis(self):
+        metadata = ImageMetadata(
+            width=100, height=100, dpi=Dpi(horizontal=300, vertical=0)
+        )
         assert metadata.is_dpi_ok() is False
+
+    @pytest.mark.parametrize(
+        ("dpi", "size", "expected"),
+        [
+            (0, 100, DpiStatus.UNDEFINED),
+            (1, 100, DpiStatus.UNDEFINED),
+            (2, 100, DpiStatus.TOO_SMALL),
+            (149, 100, DpiStatus.TOO_SMALL),
+            (150, 100, DpiStatus.OK),
+            (9999, 100, DpiStatus.OK),
+            (10000, 100, DpiStatus.TOO_LARGE),
+            (300, 5900, DpiStatus.OK),
+            (300, 6000, DpiStatus.TOO_SMALL_FOR_PIXEL_SIZE),
+            (150, 3000, DpiStatus.TOO_SMALL_FOR_PIXEL_SIZE),
+        ],
+    )
+    def test_dpi_status_thresholds(self, dpi: int, size: int, expected: DpiStatus):
+        metadata = ImageMetadata(width=size, height=100, dpi=Dpi.uniform(dpi))
+
+        assert metadata.horizontal_dpi_status() == expected
+
+    def test_dpi_status_uses_height_for_vertical_dpi(self):
+        metadata = ImageMetadata(
+            width=100, height=6000, dpi=Dpi(horizontal=300, vertical=300)
+        )
+
+        assert metadata.horizontal_dpi_status() == DpiStatus.OK
+        assert metadata.vertical_dpi_status() == DpiStatus.TOO_SMALL_FOR_PIXEL_SIZE
+        assert metadata.is_dpi_ok() is True
 
     def test_json_round_trip(self):
         original = ImageMetadata(
