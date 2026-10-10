@@ -557,7 +557,7 @@ def process_batch(
         options = PipelineOptions()
 
     if options.end_stage >= FilterStage.PAGE_LAYOUT:
-        _fix_aggregate_page_size(images, sequence, options)
+        fix_aggregate_page_size(images, sequence, options)
         detect_from = FilterStage.OUTPUT
     else:
         detect_from = options.start_stage
@@ -568,7 +568,7 @@ def process_batch(
     ]
 
 
-def _fix_aggregate_page_size(
+def fix_aggregate_page_size(
     images: list[tuple[NDArray[np.uint8], PageId]],
     sequence: StageSequence,
     options: PipelineOptions,
