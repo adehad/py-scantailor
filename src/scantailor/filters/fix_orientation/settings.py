@@ -5,11 +5,12 @@ This module provides storage for per-image rotation settings.
 
 import threading
 from collections.abc import Iterable
-from typing import Self
+from typing import Any, Self
 
 from pydantic import BaseModel, Field, PrivateAttr
 
 from scantailor.core.models import ImageId, OrthogonalRotation, PageId
+from scantailor.core.project import StageParamsEntry
 
 
 class Settings(BaseModel):
@@ -93,28 +94,42 @@ class Settings(BaseModel):
         with self._lock:
             self.rotations.pop(image_id, None)
 
-    def to_dict(self) -> dict[str, OrthogonalRotation]:
-        """Export rotations as a serializable dictionary.
+    def to_dict(self) -> list[dict[str, Any]]:
+        """Export the stored rotations in the project file's stage-params shape.
 
         Returns:
-            Dictionary mapping image path strings to rotations.
+            list[dict[str, Any]]: One ``{"page": ..., "params": ...}`` entry per
+                image, JSON-compatible. The page is the image's single-page id.
         """
         with self._lock:
-            return {
-                f"{img_id.file_path}:{img_id.page}": rotation
-                for img_id, rotation in self.rotations.items()
-            }
+            rotations = dict(self.rotations)
+        return [
+            StageParamsEntry(
+                page=PageId(image_id=image_id),
+                params=rotation.model_dump(mode="json"),
+            ).model_dump(mode="json")
+            for image_id, rotation in rotations.items()
+        ]
 
     @classmethod
-    def from_dict(cls, data: dict[str, dict]) -> Self:
-        """Create Settings from a serialized dictionary.
+    def from_dict(cls, data: list[dict[str, Any]]) -> Self:
+        """Create Settings from the output of :meth:`to_dict`.
 
         Args:
-            data: Dictionary from to_dict() or JSON deserialization.
+            data (list[dict[str, Any]]): Entries as produced by ``to_dict`` or
+                read from a project file's ``fix_orientation`` stage params.
 
         Returns:
-            New Settings instance.
+            Self: New Settings holding every entry's rotation.
+
+        Raises:
+            pydantic.ValidationError: If an entry is malformed or holds a
+                rotation that is not a multiple of 90 degrees.
         """
-        # This is a simple implementation; actual project loading uses
-        # the project module's XML/JSON parsing
-        return cls()
+        rotations: dict[ImageId, OrthogonalRotation] = {}
+        for raw in data:
+            entry = StageParamsEntry.model_validate(raw)
+            rotations[entry.page.image_id] = OrthogonalRotation.model_validate(
+                entry.params
+            )
+        return cls(rotations=rotations)

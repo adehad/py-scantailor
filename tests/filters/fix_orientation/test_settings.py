@@ -1,8 +1,15 @@
 """Tests for Fix Orientation settings."""
 
+import json
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from scantailor.core.models import ImageId, OrthogonalRotation, PageId, SubPage
+from scantailor.core.project import StageParamsEntry
+from scantailor.core.stage_params import collect_stage_params
+from scantailor.core.stage_sequence import StageSequence
 from scantailor.filters.fix_orientation.settings import Settings
 
 
@@ -123,12 +130,56 @@ class TestSettings:
         settings.apply_rotation(image_id_page2, OrthogonalRotation(degrees=90))
         assert settings.get_rotation_for(image_id_page2).degrees == 90
 
-    def test_to_dict_serialization(self):
-        """to_dict should serialize rotations."""
+    def test_to_dict_uses_stage_params_entry_shape(self):
+        """to_dict yields one page/params entry per image."""
         settings = Settings()
         image_id = ImageId(file_path=Path("/scan.tiff"))
         settings.apply_rotation(image_id, OrthogonalRotation(degrees=90))
 
         data = settings.to_dict()
 
-        assert "/scan.tiff:0" in data or "\\scan.tiff:0" in str(data)
+        assert len(data) == 1
+        entry = StageParamsEntry.model_validate(data[0])
+        assert entry.page == PageId(image_id=image_id)
+        assert entry.params == {"degrees": 90}
+
+    def test_round_trip_restores_rotations_through_json(self):
+        """from_dict(to_dict()) survives a JSON round trip, including page numbers."""
+        settings = Settings()
+        single = ImageId(file_path=Path("/scan.tiff"))
+        multi = ImageId(file_path=Path("/book.tiff"), page=3)
+        settings.apply_rotation(single, OrthogonalRotation(degrees=270))
+        settings.apply_rotation(multi, OrthogonalRotation(degrees=180))
+
+        restored = Settings.from_dict(json.loads(json.dumps(settings.to_dict())))
+
+        assert restored.rotations == settings.rotations
+
+    def test_from_dict_empty_gives_empty_settings(self):
+        """No entries means no rotations."""
+        assert Settings.from_dict([]).rotations == {}
+
+    def test_from_dict_rejects_non_orthogonal_rotation(self):
+        """A rotation that is not a multiple of 90 degrees is an error."""
+        bad = [
+            {
+                "page": {"image_id": {"file_path": "/scan.tiff", "page": 0}},
+                "params": {"degrees": 45},
+            }
+        ]
+
+        with pytest.raises(ValidationError):
+            Settings.from_dict(bad)
+
+    def test_from_dict_loads_collect_stage_params_output(self):
+        """Entries written by core.stage_params load back through from_dict."""
+        stages = StageSequence()
+        page = PageId(image_id=ImageId(file_path=Path("/scan.tiff")))
+        stages.fix_orientation_filter.settings.apply_rotation(
+            page.image_id, OrthogonalRotation(degrees=90)
+        )
+        exported = collect_stage_params(stages, [page])["fix_orientation"]
+
+        restored = Settings.from_dict([e.model_dump(mode="json") for e in exported])
+
+        assert restored.get_rotation_for(page.image_id).degrees == 90
