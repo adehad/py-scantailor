@@ -7,7 +7,17 @@ and noise reduction.
 import cv2
 import numpy as np
 from numpy.typing import NDArray
-from scipy import signal
+from scipy import ndimage
+
+_VARIANCE_EPSILON = 1e-6
+# Added before truncating to 8 bits so that a value that is an integer up to
+# floating-point error (99.99999999999999) does not drop to the level below.
+_TRUNCATION_GUARD = 1e-6
+# Luma weights (R, G, B) in 1/32 units.
+_LUMA_R = 11
+_LUMA_G = 16
+_LUMA_B = 5
+_LUMA_SCALE = 32
 
 
 def gaussian_blur(
@@ -77,72 +87,277 @@ def sobel_magnitude(
     return magnitude
 
 
-def wiener_filter(
-    image: NDArray[np.uint8],
-    noise_variance: float | None = None,
-) -> NDArray[np.uint8]:
-    """Apply Wiener filter for noise reduction.
-
-    The Wiener filter is optimal for reducing additive noise while
-    preserving edges better than simple smoothing filters.
+def bgr_to_gray(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
+    """Convert BGR(A) to gray with integer weights 11/16/5 over 32.
 
     Args:
-        image: Input grayscale image.
-        noise_variance: Noise variance. If None, estimated from the image.
+        image (NDArray[np.uint8]): 2-D gray or (H, W, 3|4) BGR(A) image.
 
     Returns:
-        Filtered image.
+        NDArray[np.uint8]: 2-D gray image. Aliases ``image`` for gray input.
     """
-    # Convert to float for processing
-    img_float = image.astype(np.float64)
+    if image.ndim == 2:
+        return image
+    blue = image[..., 0].astype(np.uint16)
+    green = image[..., 1].astype(np.uint16)
+    red = image[..., 2].astype(np.uint16)
+    luma = (_LUMA_R * red + _LUMA_G * green + _LUMA_B * blue) // _LUMA_SCALE
+    return luma.astype(np.uint8)
 
-    # Apply Wiener filter
-    # scipy.signal.wiener expects a 2D array and optional noise parameter
-    if noise_variance is not None:
-        filtered = signal.wiener(img_float, noise=noise_variance)
+
+def _window_shape(window_size: int | tuple[int, int]) -> tuple[int, int]:
+    """Return (width, height) for a square side or a (width, height) pair."""
+    width, height = (
+        (window_size, window_size) if isinstance(window_size, int) else window_size
+    )
+    if width < 1 or height < 1:
+        msg = f"window size must be positive, got {width}x{height}"
+        raise ValueError(msg)
+    return width, height
+
+
+def _samples_in_window(length: int, size: int) -> NDArray[np.float64]:
+    """Count of positions inside ``[0, length)`` covered by each window.
+
+    The window around position ``i`` spans ``i - size // 2`` up to, excluding,
+    ``i + size - size // 2``.
+    """
+    index = np.arange(length)
+    low = np.clip(index - size // 2, 0, length)
+    high = np.clip(index + size - size // 2, 0, length)
+    return (high - low).astype(np.float64)
+
+
+def wiener_filter(
+    image: NDArray[np.uint8],
+    window_size: int | tuple[int, int] = 5,
+    noise_sigma: float = 0.0,
+) -> NDArray[np.uint8]:
+    """Adaptive Wiener filter over a window that is clipped at the image border.
+
+    Each pixel moves towards its local mean by the share of the local variance
+    that exceeds the noise variance. Flat areas (variance at most 1e-6) are
+    left alone.
+
+    Args:
+        image (NDArray[np.uint8]): 2-D gray image. Not modified.
+        window_size (int | tuple[int, int]): Window as one side or (width, height).
+        noise_sigma (float): Noise standard deviation in gray levels.
+
+    Returns:
+        NDArray[np.uint8]: New filtered image of the same shape.
+
+    Raises:
+        ValueError: If the window is empty or ``noise_sigma`` is negative.
+    """
+    width, height = _window_shape(window_size)
+    if noise_sigma < 0:
+        msg = "noise_sigma must not be negative"
+        raise ValueError(msg)
+    if image.size == 0:
+        return image.copy()
+
+    pixels = image.astype(np.float64)
+    box = {
+        "ksize": (width, height),
+        "anchor": (width // 2, height // 2),
+        "normalize": False,
+        "borderType": cv2.BORDER_CONSTANT,
+    }
+    area = _samples_in_window(image.shape[0], height)[:, None] * _samples_in_window(
+        image.shape[1], width
+    )
+    mean = cv2.boxFilter(pixels, cv2.CV_64F, **box) / area
+    variance = cv2.boxFilter(pixels * pixels, cv2.CV_64F, **box) / area - mean * mean
+
+    active = variance > _VARIANCE_EPSILON
+    gain = np.maximum(variance - noise_sigma * noise_sigma, 0.0) / np.where(
+        active, variance, 1.0
+    )
+    filtered = np.clip(mean + (pixels - mean) * gain + _TRUNCATION_GUARD, 0.0, 255.0)
+    return np.where(active, filtered, pixels).astype(np.uint8)
+
+
+def wiener_color_filter(
+    image: NDArray[np.uint8],
+    window_size: int | tuple[int, int] = 5,
+    coef: float = 0.0,
+) -> NDArray[np.uint8]:
+    """Denoise the brightness of a gray or colour image and keep its hues.
+
+    The brightness is Wiener filtered and every colour channel is rescaled by
+    the ratio of filtered to original brightness.
+
+    Args:
+        image (NDArray[np.uint8]): 2-D gray or (H, W, 3|4) BGR(A) image. Not
+            modified; an alpha channel is passed through.
+        window_size (int | tuple[int, int]): Window as one side or (width, height).
+        coef (float): Noise strength from 0 to 1 (sigma is 255 * coef). Zero or
+            less returns an unchanged copy.
+
+    Returns:
+        NDArray[np.uint8]: New image of the same shape.
+    """
+    width, height = _window_shape(window_size)
+    if coef <= 0.0 or image.size == 0:
+        return image.copy()
+
+    gray = bgr_to_gray(image)
+    smooth = wiener_filter(gray, (width, height), 255.0 * coef)
+    scale = (smooth.astype(np.float32) + 1.0) / (gray.astype(np.float32) + 1.0)
+    delta = smooth.astype(np.float32) - gray.astype(np.float32) * scale
+
+    result = image.copy()
+    if image.ndim == 2:
+        result[:] = _apply_scale(image, scale, delta)
     else:
-        filtered = signal.wiener(img_float)
+        result[..., :3] = _apply_scale(
+            image[..., :3], scale[..., None], delta[..., None]
+        )
+    return result
 
-    # Clip and convert back to uint8
-    filtered = np.clip(filtered, 0, 255).astype(np.uint8)
-    return filtered
+
+def _apply_scale(
+    channels: NDArray[np.uint8],
+    scale: NDArray[np.float32],
+    delta: NDArray[np.float32],
+) -> NDArray[np.uint8]:
+    """Return ``channels * scale + delta`` clipped to 0..255 and rounded."""
+    value = channels.astype(np.float32) * scale + delta
+    return (np.clip(value, 0.0, 255.0) + 0.5).astype(np.uint8)
+
+
+def _savgol_hat_matrix(window: int, degree: int) -> NDArray[np.float64]:
+    """Least-squares polynomial fit operator for one window.
+
+    Args:
+        window (int): Number of samples.
+        degree (int): Polynomial degree; below ``window``.
+
+    Returns:
+        NDArray[np.float64]: (window, window) matrix whose row ``o`` holds the
+            weights that evaluate the fitted polynomial at sample ``o``.
+    """
+    positions = np.linspace(-1.0, 1.0, window) if window > 1 else np.zeros(1)
+    design = np.vander(positions, degree + 1, increasing=True)
+    return np.asarray(design @ np.linalg.pinv(design), dtype=np.float64)
+
+
+def _savgol_axis(
+    data: NDArray[np.float32],
+    window: int,
+    degree: int,
+    axis: int,
+) -> NDArray[np.float32]:
+    """Savitzky-Golay smooth along one axis.
+
+    Positions within half a window of either end use the first or last full
+    window with the evaluation point moved, so nothing outside the image is read.
+    """
+    length = data.shape[axis]
+    hat = _savgol_hat_matrix(window, degree)
+    left = window // 2
+    right = window - left - 1
+
+    result = ndimage.correlate1d(data, hat[left].astype(np.float32), axis=axis)
+    source = np.moveaxis(data, axis, 0)
+    target = np.moveaxis(result, axis, 0)
+    target[:left] = np.tensordot(hat[:left], source[:window], axes=(1, 0))
+    if right:
+        target[length - right :] = np.tensordot(
+            hat[window - right :], source[length - window :], axes=(1, 0)
+        )
+    return result
 
 
 def savgol_filter_2d(
     image: NDArray[np.uint8],
-    window_size: int = 5,
-    poly_order: int = 2,
+    window_size: int | tuple[int, int] = 5,
+    hor_degree: int = 2,
+    vert_degree: int = 2,
 ) -> NDArray[np.uint8]:
-    """Apply 2D Savitzky-Golay filter for smoothing while preserving edges.
+    """Smooth a gray image by local least-squares polynomial fitting.
 
-    The Savitzky-Golay filter fits a polynomial to a window of data points
-    and uses the polynomial value at the center. This preserves higher moments
-    of the data better than simple moving average filters.
+    Each pixel becomes the value of the polynomial that best fits its window.
+    The fit is separable, so it runs as one pass per axis. Near the border the
+    window stays inside the image and the polynomial is evaluated off centre.
 
     Args:
-        image: Input grayscale image.
-        window_size: Size of the filter window (must be odd).
-        poly_order: Order of the polynomial (must be less than window_size).
+        image (NDArray[np.uint8]): 2-D gray image. Not modified.
+        window_size (int | tuple[int, int]): Window as one side or (width, height).
+        hor_degree (int): Polynomial degree along x; below the window width.
+        vert_degree (int): Polynomial degree along y; below the window height.
 
     Returns:
-        Filtered image.
+        NDArray[np.uint8]: New smoothed image. An image smaller than the window
+            in either direction is returned unchanged (as a copy).
+
+    Raises:
+        ValueError: If a degree is negative or not below its window side.
     """
-    # Ensure window_size is odd
-    if window_size % 2 == 0:
-        window_size += 1
+    width, height = _window_shape(window_size)
+    if hor_degree < 0 or vert_degree < 0:
+        msg = "polynomial degree must not be negative"
+        raise ValueError(msg)
+    if hor_degree >= width or vert_degree >= height:
+        msg = "polynomial degree must be below the window size"
+        raise ValueError(msg)
+    if width > image.shape[1] or height > image.shape[0]:
+        return image.copy()
 
-    # Ensure poly_order is valid
-    if poly_order >= window_size:
-        poly_order = window_size - 1
+    smooth = _savgol_axis(image.astype(np.float32), width, hor_degree, axis=1)
+    smooth = _savgol_axis(smooth, height, vert_degree, axis=0)
+    return np.clip(np.floor(smooth + 0.5), 0, 255).astype(np.uint8)
 
-    # Convert to float for processing
-    img_float = image.astype(np.float64)
 
-    # Apply 1D Savitzky-Golay filter to rows then columns
-    # This is a separable approximation of 2D Savitzky-Golay
-    filtered = signal.savgol_filter(img_float, window_size, poly_order, axis=0)
-    filtered = signal.savgol_filter(filtered, window_size, poly_order, axis=1)
+def stretch_gray_range(
+    image: NDArray[np.uint8],
+    black_clip: float,
+    white_clip: float,
+) -> NDArray[np.uint8]:
+    """Stretch the used gray range to 0..255, optionally clipping the tails.
 
-    # Clip and convert back to uint8
-    filtered = np.clip(filtered, 0, 255).astype(np.uint8)
-    return filtered
+    Args:
+        image (NDArray[np.uint8]): 2-D gray image. Not modified.
+        black_clip (float): Fraction of pixels (below 1.0) clipped to black, or
+            an absolute gray level when at least 1.0.
+        white_clip (float): Fraction of pixels (below 1.0) clipped to white, or
+            an absolute gray level when at least 1.0.
+
+    Returns:
+        NDArray[np.uint8]: New stretched image.
+    """
+    if image.size == 0:
+        return image.copy()
+    hist = np.bincount(image.ravel(), minlength=256)
+    count = image.size
+    if black_clip >= 1.0:
+        low = int(black_clip + 0.5)
+    else:
+        low = _tail_level(hist, int(black_clip * count + 0.5))
+    if white_clip >= 1.0:
+        high = int(white_clip + 0.5)
+    else:
+        high = 255 - _tail_level(hist[::-1], int(white_clip * count + 0.5))
+
+    levels = np.arange(256)
+    if low >= high:
+        mapping = np.where(levels <= (low + high) // 2, 0, 255)
+    else:
+        span = high - low
+        mapping = (255 * (np.clip(levels, low, high) - low) + span // 2) // span
+    return mapping.astype(np.uint8)[image]
+
+
+def _tail_level(hist: NDArray[np.int64], clip_pixels: int) -> int:
+    """Index of the first histogram bin that remains after clipping the tail.
+
+    Args:
+        hist (NDArray[np.int64]): Histogram read from the end being clipped.
+        clip_pixels (int): Number of pixels to discard from that end.
+
+    Returns:
+        int: Bin index; one past the last bin when everything is clipped.
+    """
+    survivors = np.flatnonzero(np.cumsum(hist) > clip_pixels)
+    return int(survivors[0]) if survivors.size else len(hist)

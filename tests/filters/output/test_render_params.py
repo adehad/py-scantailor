@@ -150,7 +150,9 @@ class TestRenderParams:
         """needs_smoothing returns False if no smoothing enabled."""
         params = Params(
             color_mode=ColorMode.BLACK_AND_WHITE,
-            binarization=BinarizationOptions(morphological_smoothing=False),
+            binarization=BinarizationOptions(
+                morphological_smoothing=False, savitzky_golay_smoothing=False
+            ),
         )
         render = RenderParams.from_params(params)
 

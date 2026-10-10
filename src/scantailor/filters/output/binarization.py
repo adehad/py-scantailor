@@ -37,6 +37,26 @@ class BinarizationMethod(Enum):
         return self.value
 
 
+class ColorSegmenterOptions(BaseModel):
+    """Options for colouring the binarised foreground from the original page.
+
+    Attributes:
+        enabled: Segment the foreground into a few colours instead of black.
+        noise_reduction: Strength of noise removal, higher removes more.
+        red_threshold_adjustment: Shift of the red channel threshold.
+        green_threshold_adjustment: Shift of the green channel threshold.
+        blue_threshold_adjustment: Shift of the blue channel threshold.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    enabled: bool = False
+    noise_reduction: int = Field(default=7, ge=0)
+    red_threshold_adjustment: int = 0
+    green_threshold_adjustment: int = 0
+    blue_threshold_adjustment: int = 0
+
+
 class BinarizationOptions(BaseModel):
     """Options for image binarization (black and white conversion).
 
@@ -59,7 +79,9 @@ class BinarizationOptions(BaseModel):
         edge_div_kbd: EdgeDiv blur division weight (0.0-1.0).
             Higher = more illumination normalization.
         normalize_illumination: Normalize illumination before binarization.
+        savitzky_golay_smoothing: Smooth the gray image before binarization.
         morphological_smoothing: Apply morphological smoothing after binarization.
+        color_segmenter: Options for colouring the foreground.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -75,7 +97,11 @@ class BinarizationOptions(BaseModel):
     edge_div_kep: float = Field(default=0.5, ge=0.0, le=1.0)
     edge_div_kbd: float = Field(default=0.5, ge=0.0, le=1.0)
     normalize_illumination: bool = True
+    savitzky_golay_smoothing: bool = True
     morphological_smoothing: bool = True
+    color_segmenter: ColorSegmenterOptions = Field(
+        default_factory=ColorSegmenterOptions
+    )
 
     def with_method(self, method: BinarizationMethod) -> "BinarizationOptions":
         """Create a copy with a different binarization method."""

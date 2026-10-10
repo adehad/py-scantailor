@@ -12,12 +12,9 @@ from scantailor.filters.output.binarization import (
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.output.dewarping_options import DewarpingMode, DewarpingOptions
-from scantailor.filters.output.generator import (
-    _fill_outside,
-    _polygon_mask,
-    generate_output,
-)
+from scantailor.filters.output.generator import generate_output
 from scantailor.filters.output.params import Params
+from scantailor.filters.output.raster import fill_masked, polygon_mask
 
 
 class TestGenerateOutput:
@@ -417,18 +414,18 @@ class TestDegeneratePolygons:
     def test_fill_outside_ignores_polygon_with_fewer_than_three_vertices(self, polygon):
         image = np.full((40, 40), 77, dtype=np.uint8)
 
-        result = _fill_outside(image, polygon, 0)
+        result = fill_masked(image, ~polygon_mask(image.shape, polygon), 0)
 
         assert np.array_equal(result, image)
 
     def test_polygon_mask_of_degenerate_polygon_selects_everything(self):
-        assert _polygon_mask((5, 6), []).all()
+        assert polygon_mask((5, 6), []).all()
 
     def test_fill_outside_with_valid_polygon_still_fills(self):
         image = np.full((40, 40), 77, dtype=np.uint8)
         polygon = [(10.0, 10.0), (30.0, 10.0), (30.0, 30.0), (10.0, 30.0)]
 
-        result = _fill_outside(image, polygon, 0)
+        result = fill_masked(image, ~polygon_mask(image.shape, polygon), 0)
 
         assert result[0, 0] == 0
         assert result[20, 20] == 77
