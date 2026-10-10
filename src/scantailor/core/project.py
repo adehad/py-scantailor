@@ -7,13 +7,18 @@ Handles loading, saving, and managing ScanTailor projects. Supports:
 
 from enum import IntEnum
 from pathlib import Path
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, Field
 
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 
 LayoutDirection = Literal["LTR", "RTL"]
+
+_MM_PER_INCH = 25.4
+_MIN_RELIABLE_DPI = 150
+_MAX_DPI = 9999
+_MAX_PHYSICAL_SIZE_MM = 500
 
 
 class DpiStatus(IntEnum):
@@ -40,10 +45,14 @@ class ImageMetadata(BaseModel):
     dpi: Dpi = Field(default_factory=Dpi)
 
     def is_dpi_ok(self) -> bool:
-        """Check if DPI values are within acceptable range."""
+        """Check that the DPI is defined on both axes.
+
+        Implausible but defined values still count as OK; only the finer
+        ``*_dpi_status`` methods report them.
+        """
         return (
-            self.horizontal_dpi_status() == DpiStatus.OK
-            and self.vertical_dpi_status() == DpiStatus.OK
+            self.horizontal_dpi_status() != DpiStatus.UNDEFINED
+            and self.vertical_dpi_status() != DpiStatus.UNDEFINED
         )
 
     def horizontal_dpi_status(self) -> DpiStatus:
@@ -59,20 +68,21 @@ class ImageMetadata(BaseModel):
         """Determine DPI status based on pixel size and DPI value.
 
         Args:
-            pixel_size (int): Size in pixels.
+            pixel_size (int): Size in pixels along the axis the DPI applies to.
             dpi (int): DPI value.
 
         Returns:
             DpiStatus: The status of the DPI value.
         """
-        if dpi <= 0:
+        if dpi <= 1:
             return DpiStatus.UNDEFINED
-        if dpi > 9999:
-            return DpiStatus.TOO_LARGE
-        if dpi < 25:
+        if dpi < _MIN_RELIABLE_DPI:
             return DpiStatus.TOO_SMALL
-        # Check if DPI is too small for the pixel size (huge images need higher DPI)
-        if pixel_size > 0 and dpi < 150 and pixel_size > 10000:
+        if dpi > _MAX_DPI:
+            return DpiStatus.TOO_LARGE
+        # A physical size this large usually means the DPI is wrong, and a DPI
+        # that is too low inflates memory use quadratically.
+        if _MM_PER_INCH * pixel_size / dpi > _MAX_PHYSICAL_SIZE_MM:
             return DpiStatus.TOO_SMALL_FOR_PIXEL_SIZE
         return DpiStatus.OK
 
@@ -107,6 +117,19 @@ class PageInfo(BaseModel):
     image_info: ImageInfo
 
 
+class StageParamsEntry(BaseModel):
+    """Serialised parameters of one filter stage for one page.
+
+    Args:
+        page (PageId): The page the parameters belong to. Stages that store
+            parameters per image use the image's single-page id.
+        params (dict[str, Any]): The stage's Params model dumped as JSON data.
+    """
+
+    page: PageId
+    params: dict[str, Any]
+
+
 class Project(BaseModel):
     """A ScanTailor project.
 
@@ -116,6 +139,8 @@ class Project(BaseModel):
         layout_direction (LayoutDirection): Text layout direction (LTR or RTL).
         images (list[ImageInfo]): List of images in the project.
         selected_page (PageId | None): Currently selected page.
+        stage_params (dict[str, list[StageParamsEntry]]): Explicitly set per-page
+            parameters, keyed by stage key (see ``core.stage_params``).
     """
 
     version: int = 1
@@ -123,6 +148,7 @@ class Project(BaseModel):
     layout_direction: LayoutDirection = "LTR"
     images: list[ImageInfo] = Field(default_factory=list)
     selected_page: PageId | None = None
+    stage_params: dict[str, list[StageParamsEntry]] = Field(default_factory=dict)
 
     def get_pages(self) -> list[PageId]:
         """Get all page IDs in the project, respecting layout direction.

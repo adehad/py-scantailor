@@ -16,7 +16,8 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from pytestqt.qtbot import QtBot
 
 from scantailor.app._ui import resources_rc
-from scantailor.app.ui.MainWindow import MainWindowManager
+from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
+from scantailor.app.ui.MainWindow import MainWindowManager, SaveChoice
 from scantailor.main import setup_qcore
 
 PAGE_WIDTH = 600
@@ -66,11 +67,17 @@ def main_window(
 ) -> Iterator[MainWindowManager]:
     """Construct, show and activate the main window; close it on teardown."""
     manager = MainWindowManager()
-    qtbot.addWidget(manager.ui)
+
+    def discard_changes(_widget: QtWidgets.QWidget) -> None:
+        # Closing a modified project would otherwise block on the save prompt.
+        manager.modified = False
+
+    qtbot.addWidget(manager.ui, before_close_func=discard_changes)
     manager.ui.show()
     qtbot.wait_active(manager.ui)
     yield manager
     if shiboken6.isValid(manager.ui):
+        discard_changes(manager.ui)
         manager.ui.close()
 
 
@@ -187,3 +194,67 @@ def log_messages() -> Iterator[list[str]]:
     )
     yield messages
     logger.remove(handler_id)
+
+
+@dataclasses.dataclass
+class DialogFactory:
+    """Project files dialog factory that records the dialogs it created."""
+
+    input_dir: pathlib.Path
+    names: list[str]
+    output_dir: pathlib.Path | None = None
+    created: list[ProjectFilesDialog] = dataclasses.field(default_factory=list)
+
+    def __call__(self, parent: QtWidgets.QWidget) -> ProjectFilesDialog:
+        dialog = ProjectFilesDialog(
+            input_dir=self.input_dir,
+            output_dir=self.output_dir,
+            project_files=self.names,
+            parent=parent,
+        )
+        self.created.append(dialog)
+        return dialog
+
+
+@pytest.fixture
+def dialog_factory(page_images: PageImages, tmp_path: pathlib.Path) -> DialogFactory:
+    """Factory choosing all synthetic page images, with an output dir in tmp_path."""
+    return DialogFactory(
+        input_dir=page_images.directory,
+        names=[path.name for path in page_images.paths],
+        output_dir=tmp_path / "out",
+    )
+
+
+@pytest.fixture
+def project_window(
+    main_window: MainWindowManager,
+    dialog_factory: DialogFactory,
+    respond_to_modal: Callable[..., None],
+) -> MainWindowManager:
+    """Main window with a new, unsaved project holding the three synthetic pages."""
+    main_window.project_files_dialog_factory = dialog_factory
+    respond_to_modal(accept=True)
+    main_window.actionNewProject.trigger()
+    assert main_window.project is not None
+    return main_window
+
+
+@dataclasses.dataclass
+class SavePromptScript:
+    """Scripted answers for the unsaved-changes prompt."""
+
+    answers: list[SaveChoice] = dataclasses.field(default_factory=list)
+    prompts: int = 0
+
+    def __call__(self) -> SaveChoice:
+        self.prompts += 1
+        return self.answers.pop(0)
+
+
+@pytest.fixture
+def save_prompt(main_window: MainWindowManager) -> SavePromptScript:
+    """Replace the unsaved-changes prompt with a scripted one."""
+    script = SavePromptScript()
+    main_window.save_prompt = script
+    return script
