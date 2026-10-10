@@ -663,7 +663,12 @@ def render_transformed(
         NDArray[np.uint8]: New array with the same channel layout as the input
         and the size of transformation.resulting_rect, rounded to whole pixels
         and at least 1x1. The input is not modified.
+
+    Raises:
+        TypeError: If the image is not uint8.
     """
+    if image.dtype != np.uint8:
+        raise TypeError(f"render_transformed needs a uint8 image, got {image.dtype}")
     rect = transformation.resulting_rect
     out_width = max(1, round(rect.width))
     out_height = max(1, round(rect.height))

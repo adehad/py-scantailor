@@ -52,11 +52,13 @@ class TestParams:
     """Tests for Params class."""
 
     def test_default_values(self):
-        """Default values should have zero margins and centered alignment."""
+        """Defaults are 10/5/10/5 mm fixed margins and centered alignment."""
         params = Params()
-        assert params.hard_margins_mm.top == 0.0
+        assert params.hard_margins_mm == Margins(
+            left=10.0, top=5.0, right=10.0, bottom=5.0
+        )
         assert params.alignment.aligned_with_others() is True
-        assert params.auto_margins is True
+        assert params.auto_margins is False
 
     def test_hard_width_mm(self):
         """hard_width_mm should sum content width and horizontal margins."""

@@ -48,24 +48,29 @@ class ContentSize(BaseModel):
         return self.width_mm <= 0 or self.height_mm <= 0
 
 
+def _default_hard_margins() -> Margins:
+    return Margins(left=10.0, top=5.0, right=10.0, bottom=5.0)
+
+
 class Params(BaseModel):
     """Parameters for a single page's layout settings.
 
     Attributes:
-        hard_margins_mm: User-specified margins in millimeters.
+        hard_margins_mm: User-specified margins in millimeters (default
+            10 mm left and right, 5 mm top and bottom).
         alignment: How the page is aligned relative to others.
         content_rect: Content bounding box in pixels (from select_content).
         page_rect: Page bounding box in pixels.
         content_size_mm: Content size in millimeters.
-        auto_margins: If True, margins were auto-calculated.
+        auto_margins: If True, margins follow the content's position in the page.
     """
 
-    hard_margins_mm: Margins = Field(default_factory=Margins)
+    hard_margins_mm: Margins = Field(default_factory=_default_hard_margins)
     alignment: Alignment = Field(default_factory=Alignment.centered)
     content_rect: ContentRect = Field(default_factory=ContentRect)
     page_rect: ContentRect = Field(default_factory=ContentRect)
     content_size_mm: ContentSize = Field(default_factory=ContentSize)
-    auto_margins: bool = True
+    auto_margins: bool = False
 
     def hard_width_mm(self) -> float:
         """Calculate total hard width including margins."""

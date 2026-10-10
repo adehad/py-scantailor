@@ -228,9 +228,9 @@ def calc_page_polygon(
         hard_size_mm,
         aggregate_hard_size_mm,
         params.alignment,
-        _rect_from_params(params.content_rect),
+        rect_from_params(params.content_rect),
         (params.content_size_mm.width_mm, params.content_size_mm.height_mm),
-        _rect_from_params(params.page_rect),
+        rect_from_params(params.page_rect),
     )
     page_mm = _extend_with_margins(with_hard, soft)
 
@@ -238,8 +238,15 @@ def calc_page_polygon(
     return _shift_to_rounded_origin(page_polygon)
 
 
-def _rect_from_params(rect: ContentRect) -> Rect:
-    """Copy a stored rectangle into a Rect."""
+def rect_from_params(rect: ContentRect) -> Rect:
+    """Copy a stored rectangle into a Rect.
+
+    Args:
+        rect (ContentRect): Rectangle as stored in Params.
+
+    Returns:
+        Rect: Equivalent geometry rectangle.
+    """
     return Rect(x=rect.x, y=rect.y, width=rect.width, height=rect.height)
 
 
