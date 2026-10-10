@@ -96,18 +96,16 @@ class RenderParams:
                 if render.need_binarization and splitting_options.original_background:
                     render.original_background = True
 
-        # Set binarization-related flags
+        color_common = params.color_common
         if render.need_binarization:
             binarization = params.binarization
-
-            # Smoothing options
             render.morphological_smoothing = binarization.morphological_smoothing
-
-            # Illumination normalization
             render.normalize_illumination = binarization.normalize_illumination
+        else:
+            render.normalize_illumination = color_common.normalize_illumination
 
-        # Fill margins is a common option
-        render.fill_margins = True  # Default to filling margins
+        render.fill_margins = color_common.fill_margins
+        render.normalize_illumination_color = color_common.normalize_illumination
 
         return render
 

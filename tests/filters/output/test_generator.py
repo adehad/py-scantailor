@@ -1,7 +1,9 @@
 """Tests for output generator."""
 
 import numpy as np
+import pytest
 
+from scantailor.core.models import Dpi
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
 from scantailor.filters.output.binarization import (
     BinarizationMethod,
@@ -10,7 +12,11 @@ from scantailor.filters.output.binarization import (
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.output.dewarping_options import DewarpingMode, DewarpingOptions
-from scantailor.filters.output.generator import generate_output
+from scantailor.filters.output.generator import (
+    _fill_outside,
+    _polygon_mask,
+    generate_output,
+)
 from scantailor.filters.output.params import Params
 
 
@@ -361,3 +367,68 @@ class TestDewarpingIntegration:
         assert result.was_dewarped is True
         # Rotated image may be larger due to rotation
         assert result.image.shape[0] >= 100 or result.image.shape[1] >= 100
+
+
+class TestDespeckleInOutput:
+    """Despeckling keeps marks near text and drops stray specks."""
+
+    @staticmethod
+    def _page() -> np.ndarray:
+        image = np.full((300, 300), 255, dtype=np.uint8)
+        image[150:190, 100:104] = 0  # stem
+        image[136:140, 100:104] = 0  # i-dot
+        image[20:24, 250:254] = 0  # stray speck
+        return image
+
+    def test_cautious_keeps_i_dot_and_removes_stray_speck(self):
+        params = Params(
+            output_dpi=Dpi.uniform(300),
+            despeckle_level=DespeckleLevel.CAUTIOUS,
+            binarization=BinarizationOptions(
+                method=BinarizationMethod.OTSU, morphological_smoothing=False
+            ),
+        )
+
+        result = generate_output(self._page(), params)
+
+        assert (result.image[136:140, 100:104] == 0).all()
+        assert (result.image[20:24, 250:254] == 255).all()
+
+    def test_off_keeps_stray_speck(self):
+        params = Params(
+            output_dpi=Dpi.uniform(300),
+            despeckle_level=DespeckleLevel.OFF,
+            binarization=BinarizationOptions(
+                method=BinarizationMethod.OTSU, morphological_smoothing=False
+            ),
+        )
+
+        result = generate_output(self._page(), params)
+
+        assert (result.image[20:24, 250:254] == 0).all()
+
+
+class TestDegeneratePolygons:
+    """Polygons that cannot enclose an area count as no polygon."""
+
+    @pytest.mark.parametrize(
+        "polygon", [[], [(10.0, 10.0)], [(0.0, 0.0), (50.0, 50.0)]]
+    )
+    def test_fill_outside_ignores_polygon_with_fewer_than_three_vertices(self, polygon):
+        image = np.full((40, 40), 77, dtype=np.uint8)
+
+        result = _fill_outside(image, polygon, 0)
+
+        assert np.array_equal(result, image)
+
+    def test_polygon_mask_of_degenerate_polygon_selects_everything(self):
+        assert _polygon_mask((5, 6), []).all()
+
+    def test_fill_outside_with_valid_polygon_still_fills(self):
+        image = np.full((40, 40), 77, dtype=np.uint8)
+        polygon = [(10.0, 10.0), (30.0, 10.0), (30.0, 30.0), (10.0, 30.0)]
+
+        result = _fill_outside(image, polygon, 0)
+
+        assert result[0, 0] == 0
+        assert result[20, 20] == 77

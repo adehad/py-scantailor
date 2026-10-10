@@ -32,20 +32,23 @@ class DespeckleLevel(Enum):
         """Return the string value."""
         return self.value
 
-    def to_component_size(self) -> int:
-        """Return the minimum connected component size to keep.
+    def to_factor(self) -> float:
+        """Return the despeckle strength passed to the despeckling algorithm.
 
-        Components smaller than this size will be removed.
-        Returns 0 for OFF (no filtering).
+        Returns:
+            float: 0.0 for OFF, otherwise 1.0, 2.0 or 3.0 for cautious, normal
+                or aggressive.
         """
-        if self == DespeckleLevel.OFF:
-            return 0
-        if self == DespeckleLevel.CAUTIOUS:
-            return 10
-        if self == DespeckleLevel.NORMAL:
-            return 20
-        return 40  # AGGRESSIVE
+        return _FACTORS[self]
 
     def is_enabled(self) -> bool:
         """Return True if despeckling is enabled."""
         return self != DespeckleLevel.OFF
+
+
+_FACTORS: dict[DespeckleLevel, float] = {
+    DespeckleLevel.OFF: 0.0,
+    DespeckleLevel.CAUTIOUS: 1.0,
+    DespeckleLevel.NORMAL: 2.0,
+    DespeckleLevel.AGGRESSIVE: 3.0,
+}

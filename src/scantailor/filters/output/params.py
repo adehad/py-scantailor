@@ -12,6 +12,7 @@ from scantailor.core.models import Dpi
 
 from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode
+from .color_options import ColorCommonOptions
 from .despeckle import DespeckleLevel
 from .dewarping_options import DewarpingOptions
 
@@ -26,6 +27,7 @@ class Params(BaseModel):
         despeckle_level: Noise removal level.
         black_on_white: True for black text on white background.
         dewarping: Dewarping options for curved page correction.
+        color_common: Options shared by the grayscale and colour output paths.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -33,9 +35,10 @@ class Params(BaseModel):
     output_dpi: Dpi = Field(default_factory=lambda: Dpi.uniform(600))
     color_mode: ColorMode = ColorMode.BLACK_AND_WHITE
     binarization: BinarizationOptions = Field(default_factory=BinarizationOptions)
-    despeckle_level: DespeckleLevel = DespeckleLevel.NORMAL
+    despeckle_level: DespeckleLevel = DespeckleLevel.CAUTIOUS
     black_on_white: bool = True
     dewarping: DewarpingOptions = Field(default_factory=DewarpingOptions)
+    color_common: ColorCommonOptions = Field(default_factory=ColorCommonOptions)
 
     def with_output_dpi(self, dpi: Dpi) -> Self:
         """Create a copy with different output DPI."""
@@ -65,6 +68,10 @@ class Params(BaseModel):
     def with_dewarping(self, options: DewarpingOptions) -> Self:
         """Create a copy with different dewarping options."""
         return self.model_copy(update={"dewarping": options})
+
+    def with_color_common(self, options: ColorCommonOptions) -> Self:
+        """Create a copy with different grayscale and colour options."""
+        return self.model_copy(update={"color_common": options})
 
     def needs_binarization(self) -> bool:
         """Return True if the color mode requires binarization."""
