@@ -8,6 +8,7 @@ from scantailor.filters.output.binarization import (
     BinarizationOptions,
 )
 from scantailor.filters.output.color_mode import ColorMode
+from scantailor.filters.output.color_options import ColorCommonOptions
 from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.output.params import Params
 
@@ -20,7 +21,7 @@ class TestParams:
         params = Params()
         assert params.output_dpi == Dpi.uniform(600)
         assert params.color_mode == ColorMode.BLACK_AND_WHITE
-        assert params.despeckle_level == DespeckleLevel.NORMAL
+        assert params.despeckle_level == DespeckleLevel.CAUTIOUS
         assert params.black_on_white is True
 
     def test_with_output_dpi(self):
@@ -82,3 +83,17 @@ class TestParams:
         params = Params()
         with pytest.raises(Exception):
             params.color_mode = ColorMode.MIXED  # type: ignore[misc]
+
+
+class TestColorCommon:
+    """Tests for the colour options carried by Params."""
+
+    def test_default_color_common(self):
+        """Default colour options are the ColorCommonOptions defaults."""
+        assert Params().color_common == ColorCommonOptions()
+
+    def test_with_color_common(self):
+        """Create params with different colour options."""
+        options = ColorCommonOptions(fill_margins=False, normalize_illumination=True)
+        new_params = Params().with_color_common(options)
+        assert new_params.color_common == options

@@ -25,7 +25,7 @@ class Settings:
     # Default settings
     DEFAULT_DPI: int = 600
     DEFAULT_COLOR_MODE: ColorMode = ColorMode.BLACK_AND_WHITE
-    DEFAULT_DESPECKLE: DespeckleLevel = DespeckleLevel.NORMAL
+    DEFAULT_DESPECKLE: DespeckleLevel = DespeckleLevel.CAUTIOUS
 
     def __init__(self) -> None:
         """Initialize empty settings."""

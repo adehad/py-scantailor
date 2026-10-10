@@ -226,7 +226,7 @@ class Filter:
             OutputResult with the processed image.
         """
         params = self.get_params(page_id)
-        return generate_output(image, params)
+        return generate_output(image, params, color_options=params.color_common)
 
     def process_with_params(
         self,
@@ -244,4 +244,4 @@ class Filter:
         Returns:
             OutputResult with the processed image.
         """
-        return generate_output(image, params)
+        return generate_output(image, params, color_options=params.color_common)

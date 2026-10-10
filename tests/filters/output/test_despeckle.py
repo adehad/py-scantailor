@@ -46,21 +46,12 @@ class TestDespeckleLevel:
         """String representation returns value."""
         assert str(DespeckleLevel.NORMAL) == "normal"
 
-    def test_to_component_size_off(self):
-        """Off returns 0 component size."""
-        assert DespeckleLevel.OFF.to_component_size() == 0
-
-    def test_to_component_size_cautious(self):
-        """Cautious returns small component size."""
-        assert DespeckleLevel.CAUTIOUS.to_component_size() == 10
-
-    def test_to_component_size_normal(self):
-        """Normal returns medium component size."""
-        assert DespeckleLevel.NORMAL.to_component_size() == 20
-
-    def test_to_component_size_aggressive(self):
-        """Aggressive returns large component size."""
-        assert DespeckleLevel.AGGRESSIVE.to_component_size() == 40
+    def test_to_factor_maps_levels_to_cpp_factors(self):
+        """Levels map to the factors 0, 1, 2 and 3."""
+        assert DespeckleLevel.OFF.to_factor() == 0.0
+        assert DespeckleLevel.CAUTIOUS.to_factor() == 1.0
+        assert DespeckleLevel.NORMAL.to_factor() == 2.0
+        assert DespeckleLevel.AGGRESSIVE.to_factor() == 3.0
 
     def test_is_enabled(self):
         """is_enabled returns correct values."""
