@@ -15,6 +15,7 @@ from .color_mode import ColorMode
 from .color_options import ColorCommonOptions
 from .despeckle import DespeckleLevel
 from .dewarping_options import DewarpingOptions
+from .picture_shape import PictureShapeOptions
 
 
 class Params(BaseModel):
@@ -28,6 +29,7 @@ class Params(BaseModel):
         black_on_white: True for black text on white background.
         dewarping: Dewarping options for curved page correction.
         color_common: Options shared by the grayscale and colour output paths.
+        picture_shape: Automatic picture detection for mixed output.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -39,6 +41,7 @@ class Params(BaseModel):
     black_on_white: bool = True
     dewarping: DewarpingOptions = Field(default_factory=DewarpingOptions)
     color_common: ColorCommonOptions = Field(default_factory=ColorCommonOptions)
+    picture_shape: PictureShapeOptions = Field(default_factory=PictureShapeOptions)
 
     def with_output_dpi(self, dpi: Dpi) -> Self:
         """Create a copy with different output DPI."""
@@ -72,6 +75,10 @@ class Params(BaseModel):
     def with_color_common(self, options: ColorCommonOptions) -> Self:
         """Create a copy with different grayscale and colour options."""
         return self.model_copy(update={"color_common": options})
+
+    def with_picture_shape(self, options: PictureShapeOptions) -> Self:
+        """Create a copy with different picture detection options."""
+        return self.model_copy(update={"picture_shape": options})
 
     def needs_binarization(self) -> bool:
         """Return True if the color mode requires binarization."""

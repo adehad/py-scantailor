@@ -99,12 +99,18 @@ class RenderParams:
         color_common = params.color_common
         if render.need_binarization:
             binarization = params.binarization
+            render.savitzky_golay_smoothing = binarization.savitzky_golay_smoothing
             render.morphological_smoothing = binarization.morphological_smoothing
             render.normalize_illumination = binarization.normalize_illumination
+            if binarization.color_segmenter.enabled:
+                render.color_segmentation = True
+                render.posterize = color_common.posterization.enabled
         else:
             render.normalize_illumination = color_common.normalize_illumination
+            render.posterize = color_common.posterization.enabled
 
         render.fill_margins = color_common.fill_margins
+        render.fill_offcut = color_common.fill_offcut
         render.normalize_illumination_color = color_common.normalize_illumination
 
         return render
