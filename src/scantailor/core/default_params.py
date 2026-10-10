@@ -106,7 +106,7 @@ class PageLayoutDefaults(BaseModel):
     """
 
     hard_margins_mm: Margins = Field(
-        default_factory=lambda: Margins(left=10.0, right=5.0, top=10.0, bottom=5.0)
+        default_factory=lambda: Margins(left=10.0, right=10.0, top=5.0, bottom=5.0)
     )
     alignment: Alignment = Field(default_factory=Alignment.centered)
     auto_margins: bool = False
@@ -134,7 +134,7 @@ class OutputDefaults(BaseModel):
     dpi: Dpi = Field(default_factory=lambda: Dpi.uniform(600))
     color_mode: ColorMode = ColorMode.BLACK_AND_WHITE
     binarization: BinarizationOptions = Field(default_factory=BinarizationOptions)
-    despeckle_level: DespeckleLevel = DespeckleLevel.NORMAL
+    despeckle_level: DespeckleLevel = DespeckleLevel.CAUTIOUS
     black_on_white: bool = True
 
     def to_params(self) -> OutputParams:
