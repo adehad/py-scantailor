@@ -16,7 +16,7 @@ the oriented source image through the accumulated transformation, either to
 give a later stage something to detect on or to produce the result.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 from loguru import logger
@@ -91,6 +91,9 @@ class _PageState:
         self._view: NDArray[np.uint8] | None = None
         self.source = source
         self.xform = self._new_transformation(source)
+        # Content rectangle in source coordinates, set by the page layout stage;
+        # kept there because the later transformation changes the view's frame.
+        self.content_polygon_source: NDArray[np.float64] | None = None
 
     def _new_transformation(self, source: NDArray[np.uint8]) -> ImageTransformation:
         height, width = source.shape[:2]
@@ -100,6 +103,7 @@ class _PageState:
         """Swap in new source pixels and discard the accumulated transformation."""
         self.source = source
         self.xform = self._new_transformation(source)
+        self.content_polygon_source = None
         self._view = None
 
     def view(self) -> NDArray[np.uint8]:
@@ -166,30 +170,63 @@ def process_page(
     """
     if options is None:
         options = PipelineOptions()
+    return _run_stages(
+        image, page_id, sequence, options, detect_from=options.start_stage
+    )
 
+
+def _run_stages(
+    image: NDArray[np.uint8],
+    page_id: PageId,
+    sequence: StageSequence,
+    options: PipelineOptions,
+    detect_from: FilterStage,
+    render: bool = True,
+) -> PipelineResult:
+    """Run every stage up to options.end_stage, detecting only from detect_from on.
+
+    Stages before detect_from still shape the transformation, but only from
+    parameters already stored; they never run detection. Only stages from
+    options.start_stage on are reported.
+
+    Args:
+        image: Input image.
+        page_id: The page ID.
+        sequence: The stage sequence.
+        options: Pipeline options.
+        detect_from: First stage allowed to run detection.
+        render: If False, skip resampling; the result image is the source.
+
+    Returns:
+        PipelineResult for the stages from options.start_stage on.
+    """
     state = _PageState(image.copy(), options.dpi)
     stages_completed: list[FilterStage] = []
     metadata: dict = {}
     output_image: NDArray[np.uint8] | None = None
 
     for stage in FilterStage:
-        if stage < options.start_stage:
-            continue
         if stage > options.end_stage:
             break
+        detect = stage >= detect_from
 
         if stage == FilterStage.OUTPUT:
             stage_meta, output_image = _process_output(
                 state, page_id, sequence, options
             )
         else:
-            stage_meta = _process_stage(state, page_id, sequence, stage, options)
+            stage_meta = _process_stage(
+                state, page_id, sequence, stage, options, detect
+            )
+        if stage < options.start_stage:
+            continue
         stages_completed.append(stage)
         if stage_meta:
             metadata[stage.name] = stage_meta
 
     if output_image is None:
-        output_image = state.source if options.detect_only else state.view()
+        skip_pixels = options.detect_only or not render
+        output_image = state.source if skip_pixels else state.view()
 
     return PipelineResult(
         image=output_image,
@@ -205,6 +242,7 @@ def _process_stage(
     sequence: StageSequence,
     stage: FilterStage,
     options: PipelineOptions,
+    detect: bool,
 ) -> dict:
     """Process a single stage of the pipeline.
 
@@ -214,6 +252,7 @@ def _process_stage(
         sequence: The stage sequence.
         stage: The stage to execute.
         options: Pipeline options.
+        detect: Whether the stage may detect parameters that are not stored.
 
     Returns:
         Stage metadata.
@@ -221,11 +260,11 @@ def _process_stage(
     if stage == FilterStage.FIX_ORIENTATION:
         return _process_fix_orientation(state, page_id, sequence, options)
     if stage == FilterStage.PAGE_SPLIT:
-        return _process_page_split(state, page_id, sequence, options)
+        return _process_page_split(state, page_id, sequence, options, detect)
     if stage == FilterStage.DESKEW:
-        return _process_deskew(state, page_id, sequence, options)
+        return _process_deskew(state, page_id, sequence, detect)
     if stage == FilterStage.SELECT_CONTENT:
-        return _process_select_content(state, page_id, sequence, options)
+        return _process_select_content(state, page_id, sequence, options, detect)
     return _process_page_layout(state, page_id, sequence, options)
 
 
@@ -253,11 +292,12 @@ def _process_page_split(
     page_id: PageId,
     sequence: StageSequence,
     options: PipelineOptions,
+    detect: bool,
 ) -> dict:
     """Process the Page Split stage, cropping to this page's region."""
     filter_ = sequence.page_split_filter
 
-    if not filter_.is_params_set(page_id):
+    if detect and not filter_.is_params_set(page_id):
         filter_.process(state.source, page_id, dpi=options.dpi)
 
     params = filter_.get_params(page_id)
@@ -307,12 +347,12 @@ def _process_deskew(
     state: _PageState,
     page_id: PageId,
     sequence: StageSequence,
-    options: PipelineOptions,
+    detect: bool,
 ) -> dict:
     """Process the Deskew stage, rotating by the correction angle."""
     filter_ = sequence.deskew_filter
 
-    if not filter_.settings.is_params_set(page_id):
+    if detect and not filter_.settings.is_params_set(page_id):
         filter_.detect_skew(state.view(), page_id)
 
     params = filter_.get_params(page_id)
@@ -328,14 +368,19 @@ def _process_select_content(
     page_id: PageId,
     sequence: StageSequence,
     options: PipelineOptions,
+    detect: bool,
 ) -> dict:
     """Process the Select Content stage.
 
     Boxes are expressed in the transformed view's coordinates and the
-    transformation itself is left unchanged.
+    transformation itself is left unchanged. Without detection the stored
+    boxes are used as they are.
     """
     filter_ = sequence.select_content_filter
-    params = filter_.process(state.view(), page_id, dpi=options.dpi)
+    if detect:
+        params = filter_.process(state.view(), page_id, dpi=options.dpi)
+    else:
+        params = filter_.get_params(page_id)
 
     box = params.content_box
     page_box = params.page_box
@@ -391,21 +436,22 @@ def _process_page_layout(
     )
     adapted_content = adapt_content_rect(xform, content_rect)
 
-    params = filter_.get_params(page_id)
     content_width_mm, content_height_mm = rect_size_mm(xform, content_rect)
-    updates: dict[str, object] = {
-        "content_rect": _as_content_rect(content_rect),
-        "page_rect": _as_content_rect(page_rect),
-        "content_size_mm": ContentSize(
-            width_mm=content_width_mm, height_mm=content_height_mm
-        ),
-    }
-    if params.auto_margins:
-        updates["hard_margins_mm"] = calc_margins_mm(xform, page_rect, adapted_content)
-    params = params.model_copy(update=updates)
-    filter_.set_params(page_id, params)
-
-    aggregate = filter_.get_aggregate_hard_size()
+    auto_margins_mm = (
+        calc_margins_mm(xform, page_rect, content_rect)
+        if filter_.get_params(page_id).auto_margins
+        else None
+    )
+    update = filter_.settings.update_content_size_and_get_aggregate(
+        page_id,
+        _as_content_rect(page_rect),
+        _as_content_rect(content_rect),
+        ContentSize(width_mm=content_width_mm, height_mm=content_height_mm),
+        auto_margins_mm,
+    )
+    params = update.params
+    aggregate = update.aggregate_after
+    content_polygon_source = xform.map_polygon_back(adapted_content.to_polygon())
     page_polygon = calc_page_polygon(
         xform,
         adapted_content,
@@ -413,6 +459,9 @@ def _process_page_layout(
         (aggregate.width_mm, aggregate.height_mm),
     )
     state.crop_to_page(page_polygon)
+    state.content_polygon_source = (
+        None if content_rect.is_empty() else content_polygon_source
+    )
 
     margins = params.hard_margins_mm
     final_rect = state.xform.resulting_rect
@@ -460,7 +509,19 @@ def _process_output(
     if options.detect_only:
         return metadata, None
 
-    result = generate_output(state.view(), params, dewarper=options.dewarper)
+    polygon = state.content_polygon_source
+    content_polygon = (
+        None
+        if polygon is None
+        else [(float(x), float(y)) for x, y in state.xform.map_polygon(polygon)]
+    )
+    result = generate_output(
+        state.view(),
+        params,
+        dewarper=options.dewarper,
+        color_options=params.color_common,
+        content_polygon=content_polygon,
+    )
 
     metadata["is_binary"] = result.is_binary
     metadata["was_dewarped"] = result.was_dewarped
@@ -474,6 +535,9 @@ def process_batch(
     options: PipelineOptions | None = None,
 ) -> list[PipelineResult]:
     """Process multiple images through the pipeline.
+
+    When the run reaches Page Layout, every page's geometry is computed first so
+    that all pages are sized against the same aggregate, whatever their order.
 
     Args:
         images: List of (image, page_id) tuples.
@@ -489,6 +553,38 @@ def process_batch(
         ...     sequence,
         ... )
     """
+    if options is None:
+        options = PipelineOptions()
+
+    if options.end_stage >= FilterStage.PAGE_LAYOUT:
+        _fix_aggregate_page_size(images, sequence, options)
+        detect_from = FilterStage.OUTPUT
+    else:
+        detect_from = options.start_stage
+
     return [
-        process_page(image, page_id, sequence, options) for image, page_id in images
+        _run_stages(image, page_id, sequence, options, detect_from)
+        for image, page_id in images
     ]
+
+
+def _fix_aggregate_page_size(
+    images: list[tuple[NDArray[np.uint8], PageId]],
+    sequence: StageSequence,
+    options: PipelineOptions,
+) -> None:
+    """Run every page's geometry so the page layout settings know all content sizes.
+
+    The final page size depends on the largest aligned page, which is only
+    known once every page has been measured. Pixels from this pass are discarded.
+    """
+    geometry_options = replace(options, end_stage=FilterStage.PAGE_LAYOUT)
+    for image, page_id in images:
+        _run_stages(
+            image,
+            page_id,
+            sequence,
+            geometry_options,
+            detect_from=options.start_stage,
+            render=False,
+        )

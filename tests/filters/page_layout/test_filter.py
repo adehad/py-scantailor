@@ -43,7 +43,9 @@ class TestFilter:
 
         params = filter.get_params(page_id)
 
-        assert params.hard_margins_mm.top == 0.0
+        assert params.hard_margins_mm == Margins(
+            left=10.0, top=5.0, right=10.0, bottom=5.0
+        )
         assert params.alignment.aligned_with_others() is True
 
     def test_get_margins(self):
@@ -311,3 +313,38 @@ class TestFilterSoftMargins:
         assert total.right == 35.0
         assert total.top == 60.0
         assert total.bottom == 60.0
+
+
+class TestSoftMargins:
+    """Soft margins come from the shared page geometry calculation."""
+
+    def test_filter_matches_page_rect_calculation(self):
+        """Filter.calculate_soft_margins gives what calc_soft_margins_mm gives."""
+        filter = Filter()
+        page_id = make_page_id("a")
+        params = Params(
+            hard_margins_mm=Margins(),
+            alignment=Alignment.top_left(),
+            content_size_mm=ContentSize(width_mm=10.0, height_mm=20.0),
+        )
+        filter.set_params(page_id, params)
+        aggregate = ContentSize(width_mm=30.0, height_mm=50.0)
+
+        margins = filter.calculate_soft_margins(page_id, aggregate)
+
+        assert margins == Margins(left=0.0, top=0.0, right=20.0, bottom=30.0)
+
+    def test_independent_alignment_has_no_soft_margins(self):
+        """A page that is not aligned with others is never padded."""
+        filter = Filter()
+        page_id = make_page_id("a")
+        filter.set_params(
+            page_id,
+            Params(alignment=Alignment.independent(), hard_margins_mm=Margins()),
+        )
+
+        margins = filter.calculate_soft_margins(
+            page_id, ContentSize(width_mm=99.0, height_mm=99.0)
+        )
+
+        assert margins == Margins()

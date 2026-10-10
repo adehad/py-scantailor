@@ -166,6 +166,8 @@ class TestPageLayoutMargins:
         """With auto margins the page rectangle, not the content, sets the size."""
         sequence = StageSequence()
         page_id = _configure_spread(sequence, SubPage.LEFT_PAGE)
+        layout = sequence.page_layout_filter
+        layout.set_params(page_id, layout.get_params(page_id).with_auto_margins())
 
         image = _run(_spread(), page_id, sequence, FilterStage.PAGE_LAYOUT).image
 
@@ -184,6 +186,7 @@ class TestPageLayoutMargins:
             other_id,
             layout.get_params(other_id).model_copy(
                 update={
+                    "hard_margins_mm": Margins(),
                     "content_size_mm": ContentSize(width_mm=30.0, height_mm=40.0),
                     "alignment": Alignment.top_left(),
                 }
@@ -274,6 +277,7 @@ class TestSinglePagePassThrough:
         )
         sequence.deskew_filter.set_manual_angle(page_id, 0.0)
         sequence.select_content_filter.disable_content_detection(page_id)
+        sequence.page_layout_filter.set_margins(page_id, Margins())
         image = _spread()
 
         result = _run(image, page_id, sequence, FilterStage.PAGE_LAYOUT)
@@ -289,6 +293,7 @@ class TestSinglePagePassThrough:
         )
         sequence.deskew_filter.set_manual_angle(page_id, 2.0)
         sequence.select_content_filter.disable_content_detection(page_id)
+        sequence.page_layout_filter.set_margins(page_id, Margins())
         image = _spread()
 
         result = _run(image, page_id, sequence, FilterStage.PAGE_LAYOUT)

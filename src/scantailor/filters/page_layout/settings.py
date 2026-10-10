@@ -5,12 +5,32 @@ This module provides storage for per-page layout parameters.
 
 import threading
 from collections.abc import Iterable
+from typing import NamedTuple
 
 from pydantic import BaseModel, Field, PrivateAttr
 
 from scantailor.core.models import Margins, PageId
 from scantailor.filters.page_layout.alignment import Alignment
-from scantailor.filters.page_layout.params import ContentSize, Params
+from scantailor.filters.page_layout.params import ContentRect, ContentSize, Params
+
+
+class ContentSizeUpdate(NamedTuple):
+    """Outcome of Settings.update_content_size_and_get_aggregate.
+
+    Attributes:
+        params: The page's parameters after the update.
+        aggregate_before: Aggregate hard size before the update.
+        aggregate_after: Aggregate hard size after the update.
+    """
+
+    params: Params
+    aggregate_before: ContentSize
+    aggregate_after: ContentSize
+
+    @property
+    def aggregate_changed(self) -> bool:
+        """True if the update changed the aggregate size other pages align to."""
+        return self.aggregate_before != self.aggregate_after
 
 
 class Settings(BaseModel):
@@ -148,15 +168,67 @@ class Settings(BaseModel):
             The aggregate size in millimeters.
         """
         with self._lock:
-            max_width = 0.0
-            max_height = 0.0
+            return self._aggregate_hard_size_locked()
 
-            for params in self.params.values():
-                if params.alignment.aligned_with_others():
-                    max_width = max(max_width, params.hard_width_mm())
-                    max_height = max(max_height, params.hard_height_mm())
+    def update_content_size_and_get_aggregate(
+        self,
+        page_id: PageId,
+        page_rect: ContentRect,
+        content_rect: ContentRect,
+        content_size_mm: ContentSize,
+        auto_margins_mm: Margins | None = None,
+    ) -> ContentSizeUpdate:
+        """Record a page's content geometry and read the aggregate size atomically.
 
-            return ContentSize(width_mm=max_width, height_mm=max_height)
+        Other threads cannot change any page between the update and the
+        aggregate reads, so the returned aggregate is the one that includes
+        exactly this update.
+
+        Args:
+            page_id (PageId): Page to update; created with default layout
+                parameters if unknown.
+            page_rect (ContentRect): Page rectangle in pixels.
+            content_rect (ContentRect): Content rectangle in pixels.
+            content_size_mm (ContentSize): Content size in millimetres.
+            auto_margins_mm (Margins | None): Hard margins to adopt when the page
+                has auto margins enabled; ignored otherwise.
+
+        Returns:
+            ContentSizeUpdate: Page parameters after the update plus the
+            aggregate hard size before and after it.
+        """
+        with self._lock:
+            existing = self.params.get(page_id)
+            if (
+                existing is not None
+                and existing.auto_margins
+                and auto_margins_mm is not None
+            ):
+                existing = existing.model_copy(
+                    update={"hard_margins_mm": auto_margins_mm}
+                )
+                self.params[page_id] = existing
+            before = self._aggregate_hard_size_locked()
+            params = (existing or Params()).model_copy(
+                update={
+                    "page_rect": page_rect,
+                    "content_rect": content_rect,
+                    "content_size_mm": content_size_mm,
+                }
+            )
+            self.params[page_id] = params
+            after = self._aggregate_hard_size_locked()
+        return ContentSizeUpdate(params, before, after)
+
+    def _aggregate_hard_size_locked(self) -> ContentSize:
+        """Aggregate hard size; the caller must hold the lock."""
+        max_width = 0.0
+        max_height = 0.0
+        for params in self.params.values():
+            if params.alignment.aligned_with_others():
+                max_width = max(max_width, params.hard_width_mm())
+                max_height = max(max_height, params.hard_height_mm())
+        return ContentSize(width_mm=max_width, height_mm=max_height)
 
     def get_all_margins(self) -> dict[PageId, Margins]:
         """Get all stored margins.

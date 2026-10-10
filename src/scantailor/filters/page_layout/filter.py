@@ -6,6 +6,10 @@ consistent page sizes in the final output.
 
 from scantailor.core.models import Margins, PageId
 from scantailor.filters.page_layout.alignment import Alignment
+from scantailor.filters.page_layout.page_rect import (
+    calc_soft_margins_mm,
+    rect_from_params,
+)
 from scantailor.filters.page_layout.params import ContentSize, Params
 from scantailor.filters.page_layout.settings import Settings
 
@@ -183,75 +187,17 @@ class Filter:
             The soft margins in millimeters.
         """
         params = self.get_params(page_id)
-
-        if params.alignment.is_null:
-            # Independent page, no soft margins
-            return Margins()
-
         if aggregate_size is None:
             aggregate_size = self.get_aggregate_hard_size()
 
-        # Calculate size difference
-        width_diff = aggregate_size.width_mm - params.hard_width_mm()
-        height_diff = aggregate_size.height_mm - params.hard_height_mm()
-
-        # Distribute based on alignment
-        left = 0.0
-        right = 0.0
-        top = 0.0
-        bottom = 0.0
-
-        # Horizontal distribution
-        if width_diff > 0:
-            left, right = self._distribute_margin(
-                width_diff,
-                params.alignment.horizontal.value,
-                is_horizontal=True,
-            )
-
-        # Vertical distribution
-        if height_diff > 0:
-            top, bottom = self._distribute_margin(
-                height_diff,
-                params.alignment.vertical.value,
-                is_horizontal=False,
-            )
-
-        return Margins(top=top, bottom=bottom, left=left, right=right)
-
-    def _distribute_margin(
-        self, total: float, alignment: str, is_horizontal: bool
-    ) -> tuple[float, float]:
-        """Distribute a margin based on alignment.
-
-        Args:
-            total: Total margin to distribute.
-            alignment: Alignment value string.
-            is_horizontal: True for horizontal, False for vertical.
-
-        Returns:
-            Tuple of (before, after) margins.
-        """
-        if alignment in ("left", "top"):
-            return (0.0, total)
-        elif alignment in ("right", "bottom"):
-            return (total, 0.0)
-        elif alignment in ("hcenter", "vcenter"):
-            half = total / 2.0
-            return (half, half)
-        elif alignment in ("hauto", "vauto"):
-            # Auto uses 3:1 ratio favoring center
-            # Simplified: treat as center for now
-            half = total / 2.0
-            return (half, half)
-        elif alignment in ("horiginal", "voriginal"):
-            # Original preserves proportion - simplified to center
-            half = total / 2.0
-            return (half, half)
-        else:
-            # Default to center
-            half = total / 2.0
-            return (half, half)
+        return calc_soft_margins_mm(
+            (params.hard_width_mm(), params.hard_height_mm()),
+            (aggregate_size.width_mm, aggregate_size.height_mm),
+            params.alignment,
+            rect_from_params(params.content_rect),
+            (params.content_size_mm.width_mm, params.content_size_mm.height_mm),
+            rect_from_params(params.page_rect),
+        )
 
     def get_total_margins(self, page_id: PageId) -> Margins:
         """Get total margins (hard + soft) for a page.
