@@ -1,11 +1,14 @@
 """Tests for raster dewarping functions."""
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
 from scantailor.dewarping.raster_dewarper import (
     InterpolationMethod,
+    _compute_dewarp_maps,
     compute_dewarped_size,
     dewarp_image,
 )
@@ -247,3 +250,67 @@ class TestComputeDewarpedSize:
 
         assert dst_size[0] >= 1
         assert dst_size[1] >= 1
+
+
+def _dewarp_maps_reference(dewarper, dst_width, dst_height, left, top, right, bottom):
+    """Scalar per-pixel evaluation used only to pin down the expected maps."""
+    map_x = np.zeros((dst_height, dst_width), dtype=np.float32)
+    map_y = np.zeros((dst_height, dst_width), dtype=np.float32)
+    for dst_x in range(dst_width):
+        g = dewarper.map_generatrix(left + (dst_x + 0.5) * (right - left) / dst_width)
+        p1, p2 = g.img_line
+        h = g.pln2img_1d
+        for dst_y in range(dst_height):
+            model_y = top + (dst_y + 0.5) * (bottom - top) / dst_height
+            denom = h[1, 0] * model_y + h[1, 1]
+            t = 0.5 if abs(denom) < 1e-10 else (h[0, 0] * model_y + h[0, 1]) / denom
+            map_x[dst_y, dst_x] = p1[0] + t * (p2[0] - p1[0])
+            map_y[dst_y, dst_x] = p1[1] + t * (p2[1] - p1[1])
+    return map_x, map_y
+
+
+class _DegenerateGeneratrices:
+    """Columns right of x=0.5 get a homography whose denominator is ~0."""
+
+    def map_generatrix(self, x: float) -> SimpleNamespace:
+        h = np.eye(2) if x < 0.5 else np.array([[2.0, 1.0], [0.0, 1e-12]])
+        line = (np.array([x * 10, 1.0]), np.array([x * 10 + 3.0, 50.0 + x]))
+        return SimpleNamespace(img_line=line, pln2img_1d=h)
+
+
+class TestComputeDewarpMaps:
+    """Tests for the remap grids behind dewarp_image."""
+
+    @pytest.mark.parametrize(
+        "size, bounds",
+        [
+            ((64, 48), (0.0, 0.0, 1.0, 1.0)),
+            ((1, 1), (0.0, 0.0, 1.0, 1.0)),
+            ((1, 37), (0.0, 0.0, 1.0, 1.0)),
+            ((37, 1), (0.0, 0.0, 1.0, 1.0)),
+            ((50, 41), (0.5, 0.5, 1.0, 1.0)),
+            ((50, 41), (-0.2, -0.1, 1.2, 1.1)),
+        ],
+    )
+    def test_matches_per_pixel_evaluation_on_curved_page(
+        self, curved_dewarper, size, bounds
+    ):
+        width, height = size
+        expected = _dewarp_maps_reference(curved_dewarper, width, height, *bounds)
+
+        map_x, map_y = _compute_dewarp_maps(curved_dewarper, width, height, *bounds)
+
+        assert map_x.dtype == map_y.dtype == np.float32
+        assert map_x.shape == map_y.shape == (height, width)
+        np.testing.assert_allclose(map_x, expected[0], rtol=0, atol=1e-3)
+        np.testing.assert_allclose(map_y, expected[1], rtol=0, atol=1e-3)
+
+    def test_degenerate_homography_maps_to_generatrix_midpoint(self):
+        dewarper = _DegenerateGeneratrices()
+        expected = _dewarp_maps_reference(dewarper, 20, 15, 0.0, 0.0, 1.0, 1.0)
+
+        map_x, map_y = _compute_dewarp_maps(dewarper, 20, 15, 0.0, 0.0, 1.0, 1.0)
+
+        assert np.allclose(map_y[:, -1], 1.0 + 0.5 * (50.0 + 0.975 - 1.0))
+        np.testing.assert_allclose(map_x, expected[0], rtol=0, atol=1e-3)
+        np.testing.assert_allclose(map_y, expected[1], rtol=0, atol=1e-3)
