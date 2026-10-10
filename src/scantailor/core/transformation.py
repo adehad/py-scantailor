@@ -15,6 +15,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Self
 
+import cv2
 import numpy as np
 from numpy.typing import NDArray
 
@@ -57,6 +58,14 @@ class Rect:
     def size(self) -> tuple[float, float]:
         """Return (width, height)."""
         return (self.width, self.height)
+
+    def is_empty(self) -> bool:
+        """Return True if the rectangle has no area."""
+        return self.width <= 0 or self.height <= 0
+
+    def to_polygon(self) -> NDArray[np.float64]:
+        """Return corners as a (4, 2) array, clockwise from the top-left."""
+        return _rect_to_polygon(self)
 
     @classmethod
     def from_size(cls, width: float, height: float) -> "Rect":
@@ -150,36 +159,40 @@ def _rotation_matrix(degrees: float) -> NDArray[np.float64]:
     return m
 
 
+def _then(*matrices: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Compose column-vector transforms so the first argument is applied first.
+
+    Args:
+        *matrices: 3x3 transforms in application order.
+
+    Returns:
+        The single 3x3 matrix equivalent to applying them in sequence.
+    """
+    combined = _identity_matrix()
+    for matrix in matrices:
+        combined = matrix @ combined
+    return combined
+
+
 def _orthogonal_rotation_matrix(
     rotation: OrthogonalRotation, width: float, height: float
 ) -> NDArray[np.float64]:
-    """Create transformation matrix for orthogonal rotation.
+    """Create the clockwise orthogonal rotation of a width x height image.
 
-    The rotation is around the image center, with size adjustment.
+    The result maps onto a rectangle whose top-left corner is the origin.
     """
     degrees = rotation.degrees
     if degrees == 0:
         return _identity_matrix()
 
     if degrees == 90:
-        # 90 CW: (x, y) -> (height - y - 1, x)
-        m = np.array(
-            [[0, 1, 0], [-1, 0, height], [0, 0, 1]],
-            dtype=np.float64,
-        )
-    elif degrees == 180:
-        # 180: (x, y) -> (width - x - 1, height - y - 1)
-        m = np.array(
-            [[-1, 0, width], [0, -1, height], [0, 0, 1]],
-            dtype=np.float64,
-        )
-    else:  # 270
-        # 270 CW (90 CCW): (x, y) -> (y, width - x - 1)
-        m = np.array(
-            [[0, -1, width], [1, 0, 0], [0, 0, 1]],
-            dtype=np.float64,
-        )
-    return m
+        # (x, y) -> (height - y, x)
+        return np.array([[0, -1, height], [1, 0, 0], [0, 0, 1]], dtype=np.float64)
+    if degrees == 180:
+        # (x, y) -> (width - x, height - y)
+        return np.array([[-1, 0, width], [0, -1, height], [0, 0, 1]], dtype=np.float64)
+    # 270: (x, y) -> (y, width - x)
+    return np.array([[0, 1, 0], [-1, 0, width], [0, 0, 1]], dtype=np.float64)
 
 
 @dataclass
@@ -341,7 +354,10 @@ class ImageTransformation:
         new_height = self.orig_rect.height * yscale
 
         # Save old transforms for recalculation
-        old_pre_scale_rotate = self._pre_scale_xform @ self._pre_rotate_xform
+        old_pre_scale_rotate = _then(self._pre_scale_xform, self._pre_rotate_xform)
+        old_post_rotate_chain = _then(
+            old_pre_scale_rotate, self._pre_crop_xform, self._post_rotate_xform
+        )
 
         # Update pre-scale
         self._pre_scale_xform = _scale_matrix(xscale, yscale)
@@ -352,7 +368,7 @@ class ImageTransformation:
         )
 
         # Recalculate pre-crop area in new coordinates
-        new_pre_scale_rotate = self._pre_scale_xform @ self._pre_rotate_xform
+        new_pre_scale_rotate = _then(self._pre_scale_xform, self._pre_rotate_xform)
         if len(self._pre_crop_area) > 0:
             # Transform through: old_inv -> new
             old_inv = np.asarray(np.linalg.inv(old_pre_scale_rotate), dtype=np.float64)
@@ -367,18 +383,13 @@ class ImageTransformation:
 
         # Recalculate post-crop area
         if len(self._post_crop_area) > 0:
-            old_pre_crop_post_rotate = (
-                old_pre_scale_rotate @ self._pre_crop_xform @ self._post_rotate_xform
+            new_post_rotate_chain = _then(
+                new_pre_scale_rotate, self._pre_crop_xform, self._post_rotate_xform
             )
-            new_pre_crop_post_rotate = (
-                new_pre_scale_rotate @ self._pre_crop_xform @ self._post_rotate_xform
-            )
-            old_inv = np.asarray(
-                np.linalg.inv(old_pre_crop_post_rotate), dtype=np.float64
-            )
+            old_inv = np.asarray(np.linalg.inv(old_post_rotate_chain), dtype=np.float64)
             self._post_crop_area = _transform_polygon(
                 _transform_polygon(self._post_crop_area, old_inv),
-                new_pre_crop_post_rotate,
+                new_post_rotate_chain,
             )
             self._post_crop_xform = self._calc_crop_xform(self._post_crop_area)
 
@@ -474,6 +485,14 @@ class ImageTransformation:
         w = result[0, 2] if abs(result[0, 2]) > 1e-10 else 1.0
         return (float(result[0, 0] / w), float(result[0, 1] / w))
 
+    def map_polygon(self, polygon: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Map an Nx2 polygon from original to resulting coordinates."""
+        return _transform_polygon(polygon, self._transform)
+
+    def map_polygon_back(self, polygon: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Map an Nx2 polygon from resulting to original coordinates."""
+        return _transform_polygon(polygon, self._inv_transform)
+
     # Private methods
 
     def _calc_crop_xform(self, area: NDArray[np.float64]) -> NDArray[np.float64]:
@@ -491,7 +510,7 @@ class ImageTransformation:
         # Get center of pre-crop area
         if len(self._pre_crop_area) == 0:
             # Use original rect transformed through pre-scale and pre-rotate
-            pre_scale_rotate = self._pre_scale_xform @ self._pre_rotate_xform
+            pre_scale_rotate = _then(self._pre_scale_xform, self._pre_rotate_xform)
             poly = _transform_polygon(
                 _rect_to_polygon(self.orig_rect), pre_scale_rotate
             )
@@ -501,11 +520,11 @@ class ImageTransformation:
         bounds = _polygon_bounding_rect(poly)
         cx, cy = bounds.center()
 
-        # Rotate around center
-        t1 = _translation_matrix(-cx, -cy)
-        r = _rotation_matrix(degrees)
-        t2 = _translation_matrix(cx, cy)
-        xform = t1 @ r @ t2
+        xform = _then(
+            _translation_matrix(-cx, -cy),
+            _rotation_matrix(degrees),
+            _translation_matrix(cx, cy),
+        )
 
         # Calculate size change and adjust
         pre_rotate_poly = _transform_polygon(poly, self._pre_crop_xform)
@@ -517,9 +536,7 @@ class ImageTransformation:
         # Translate to align top-left corners
         dx = pre_rotate_bounds.left - post_rotate_bounds.left
         dy = pre_rotate_bounds.top - post_rotate_bounds.top
-        adjust = _translation_matrix(dx, dy)
-
-        return xform @ adjust
+        return _then(xform, _translation_matrix(dx, dy))
 
     def _calc_post_scale_xform(self, target_dpi: Dpi) -> NDArray[np.float64]:
         """Calculate post-scale transformation to achieve target DPI."""
@@ -529,12 +546,12 @@ class ImageTransformation:
         # Calculate effective DPI at this point in the pipeline
         # We need to measure how a unit length in resulting coords
         # maps back to original coords
-        current_transform = (
-            self._pre_scale_xform
-            @ self._pre_rotate_xform
-            @ self._pre_crop_xform
-            @ self._post_rotate_xform
-            @ self._post_crop_xform
+        current_transform = _then(
+            self._pre_scale_xform,
+            self._pre_rotate_xform,
+            self._pre_crop_xform,
+            self._post_rotate_xform,
+            self._post_crop_xform,
         )
         inv_current = np.asarray(np.linalg.inv(current_transform), dtype=np.float64)
 
@@ -581,13 +598,14 @@ class ImageTransformation:
     def _update(self) -> None:
         """Recalculate the combined transformation and resulting areas."""
         # Combine transforms: 1*2, 3*4, 5*6
-        pre_scale_then_pre_rotate = self._pre_scale_xform @ self._pre_rotate_xform
-        pre_crop_then_post_rotate = self._pre_crop_xform @ self._post_rotate_xform
-        post_crop_then_post_scale = self._post_crop_xform @ self._post_scale_xform
+        pre_scale_then_pre_rotate = _then(self._pre_scale_xform, self._pre_rotate_xform)
+        pre_crop_then_post_rotate = _then(self._pre_crop_xform, self._post_rotate_xform)
+        post_crop_then_post_scale = _then(self._post_crop_xform, self._post_scale_xform)
 
-        # Full pipeline: 12 * 34 * 56
-        pre_crop_and_further = pre_crop_then_post_rotate @ post_crop_then_post_scale
-        self._transform = pre_scale_then_pre_rotate @ pre_crop_and_further
+        pre_crop_and_further = _then(
+            pre_crop_then_post_rotate, post_crop_then_post_scale
+        )
+        self._transform = _then(pre_scale_then_pre_rotate, pre_crop_and_further)
 
         # Inverse transform
         try:
@@ -617,3 +635,124 @@ class ImageTransformation:
             self._post_crop_area, post_crop_then_post_scale
         )
         self._resulting_rect = _polygon_bounding_rect(self._resulting_post_crop_area)
+
+
+_WHITE = 255
+_INTEGER_SHIFT_TOLERANCE = 1e-6
+_FILL_SHIFT_BITS = 4
+
+
+def render_transformed(
+    image: NDArray[np.uint8], transformation: ImageTransformation
+) -> NDArray[np.uint8]:
+    """Resample an image through a transformation in a single pass.
+
+    Every step of ImageTransformation is affine, so one cv2.warpAffine call
+    covers pre-crop, deskew rotation and post-crop. Areas of the result with no
+    source pixels, or outside the pre-crop area, are white. Translation-only
+    transforms by whole pixels are served by slicing, which keeps pixel values
+    exact.
+
+    Args:
+        image (NDArray[np.uint8]): Source image, (H, W) or (H, W, C) with at
+            most 4 channels. Its size must match transformation.orig_rect.
+        transformation (ImageTransformation): Maps source to resulting
+            coordinates.
+
+    Returns:
+        NDArray[np.uint8]: New array with the same channel layout as the input
+        and the size of transformation.resulting_rect, rounded to whole pixels
+        and at least 1x1. The input is not modified.
+    """
+    rect = transformation.resulting_rect
+    out_width = max(1, round(rect.width))
+    out_height = max(1, round(rect.height))
+
+    # OpenCV addresses pixel centres at integer coordinates while the
+    # transformation addresses pixel corners, hence the half pixel shifts.
+    dst_to_src = _then(
+        _translation_matrix(rect.x + 0.5, rect.y + 0.5),
+        transformation.transform_back,
+        _translation_matrix(-0.5, -0.5),
+    )
+
+    shift = _whole_pixel_shift(dst_to_src)
+    window = _crop_window(image, shift, out_width, out_height) if shift else None
+    if window is not None:
+        result = window
+    else:
+        result = np.asarray(
+            cv2.warpAffine(
+                image,
+                dst_to_src[:2],
+                (out_width, out_height),
+                flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP,
+                borderMode=cv2.BORDER_CONSTANT,
+                borderValue=(_WHITE,) * 4,
+            ),
+            dtype=np.uint8,
+        )
+
+    if result.ndim < image.ndim:
+        # cv2.warpAffine drops a trailing singleton channel axis.
+        result = result.reshape(out_height, out_width, 1)
+
+    crop_area = transformation.resulting_pre_crop_area - [rect.x, rect.y]
+    _whiten_outside(result, crop_area)
+    return result
+
+
+def _whiten_outside(image: NDArray[np.uint8], area: NDArray[np.float64]) -> None:
+    """Paint white everything outside a convex polygon, in place.
+
+    Margins can reach past the pre-crop area, where the source holds pixels of
+    a neighbouring page that must not show through.
+
+    Args:
+        image: Array to modify; the polygon is in its pixel-corner coordinates.
+        area: (N, 2) convex polygon.
+    """
+    height, width = image.shape[:2]
+    lo, hi = area.min(axis=0), area.max(axis=0)
+    axis_aligned = bool(
+        np.all(np.isclose(area[:, 0], lo[0]) | np.isclose(area[:, 0], hi[0]))
+        and np.all(np.isclose(area[:, 1], lo[1]) | np.isclose(area[:, 1], hi[1]))
+    )
+    if axis_aligned:
+        # A pixel is inside when its centre is.
+        first_col, first_row = np.ceil(lo - 0.5 - _INTEGER_SHIFT_TOLERANCE).astype(int)
+        end_col, end_row = np.floor(hi - 0.5 + _INTEGER_SHIFT_TOLERANCE).astype(int) + 1
+        image[:, : max(first_col, 0)] = _WHITE
+        image[:, max(min(end_col, width), 0) :] = _WHITE
+        image[: max(first_row, 0), :] = _WHITE
+        image[max(min(end_row, height), 0) :, :] = _WHITE
+        return
+
+    inside = np.zeros((height, width), dtype=np.uint8)
+    # fillConvexPoly takes pixel-centre coordinates in fixed point.
+    centre_coords = np.round((area - 0.5) * (1 << _FILL_SHIFT_BITS)).astype(np.int32)
+    cv2.fillConvexPoly(inside, centre_coords, 1, shift=_FILL_SHIFT_BITS)
+    image[inside == 0] = _WHITE
+
+
+def _whole_pixel_shift(dst_to_src: NDArray[np.float64]) -> tuple[int, int] | None:
+    """Return (dx, dy) when the matrix is a translation by whole pixels."""
+    if not np.allclose(dst_to_src[:2, :2], np.eye(2), atol=_INTEGER_SHIFT_TOLERANCE):
+        return None
+    dx, dy = float(dst_to_src[0, 2]), float(dst_to_src[1, 2])
+    if (
+        abs(dx - round(dx)) > _INTEGER_SHIFT_TOLERANCE
+        or abs(dy - round(dy)) > _INTEGER_SHIFT_TOLERANCE
+    ):
+        return None
+    return round(dx), round(dy)
+
+
+def _crop_window(
+    image: NDArray[np.uint8], shift: tuple[int, int], width: int, height: int
+) -> NDArray[np.uint8] | None:
+    """Copy the window at the given offset, or None if it leaves the image."""
+    dx, dy = shift
+    if dx < 0 or dy < 0 or dx + width > image.shape[1] or dy + height > image.shape[0]:
+        return None
+    return image[dy : dy + height, dx : dx + width].copy()

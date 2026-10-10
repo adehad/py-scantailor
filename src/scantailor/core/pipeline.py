@@ -5,22 +5,42 @@ on images, processing them through each stage in sequence.
 
 The pipeline stages are:
 1. Fix Orientation - Apply orthogonal rotation
-2. Page Split - Detect and apply page splits
-3. Deskew - Detect and correct skew angle
+2. Page Split - Crop to the selected sub-page
+3. Deskew - Rotate by the detected or manual skew angle
 4. Select Content - Detect content and page boundaries
-5. Page Layout - Apply margins and alignment
+5. Page Layout - Apply margins and alignment, fixing the final page size
 6. Output - Generate final output with binarization
+
+Stages 2, 3 and 5 only edit an ImageTransformation. Pixels are resampled from
+the oriented source image through the accumulated transformation, either to
+give a later stage something to detect on or to produce the result.
 """
 
 from dataclasses import dataclass, field
 
 import numpy as np
+from loguru import logger
 from numpy.typing import NDArray
 
-from scantailor.core.models import PageId
+from scantailor.core.models import Dpi, PageId
+from scantailor.core.transformation import (
+    ImageTransformation,
+    Rect,
+    render_transformed,
+)
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
+from scantailor.filters.page_layout.page_rect import (
+    adapt_content_rect,
+    calc_margins_mm,
+    calc_page_polygon,
+    rect_size_mm,
+)
+from scantailor.filters.page_layout.params import ContentRect, ContentSize
 
 from .stage_sequence import FilterStage, StageSequence
+
+# Smallest crop edge, in pixels, that is still worth applying.
+_MIN_CROP_EDGE_PX = 1.0
 
 
 @dataclass
@@ -59,6 +79,51 @@ class PipelineOptions:
     detect_only: bool = False
 
 
+class _PageState:
+    """Oriented source pixels plus the transformation accumulated so far.
+
+    The transformed view is rendered on demand and cached until the
+    transformation changes.
+    """
+
+    def __init__(self, source: NDArray[np.uint8], dpi: float) -> None:
+        self._dpi = Dpi.uniform(max(2, round(dpi)))
+        self._view: NDArray[np.uint8] | None = None
+        self.source = source
+        self.xform = self._new_transformation(source)
+
+    def _new_transformation(self, source: NDArray[np.uint8]) -> ImageTransformation:
+        height, width = source.shape[:2]
+        return ImageTransformation.from_size(width, height, self._dpi)
+
+    def replace_source(self, source: NDArray[np.uint8]) -> None:
+        """Swap in new source pixels and discard the accumulated transformation."""
+        self.source = source
+        self.xform = self._new_transformation(source)
+        self._view = None
+
+    def view(self) -> NDArray[np.uint8]:
+        """Return the source resampled through the current transformation."""
+        if self._view is None:
+            self._view = render_transformed(self.source, self.xform)
+        return self._view
+
+    def crop_to(self, area: NDArray[np.float64]) -> None:
+        """Crop to a polygon given in source coordinates."""
+        self.xform.set_pre_crop_area(area)
+        self._view = None
+
+    def rotate(self, degrees: float) -> None:
+        """Rotate clockwise by the deskew angle, expanding the canvas."""
+        self.xform.set_post_rotation(degrees)
+        self._view = None
+
+    def crop_to_page(self, area: NDArray[np.float64]) -> None:
+        """Crop to a polygon given in the current transformed coordinates."""
+        self.xform.set_post_crop_area(area)
+        self._view = None
+
+
 def process_page(
     image: NDArray[np.uint8],
     page_id: PageId,
@@ -67,8 +132,9 @@ def process_page(
 ) -> PipelineResult:
     """Process an image through the filter pipeline.
 
-    This function executes the specified stages of the pipeline in order,
-    transforming the image at each stage.
+    This function executes the specified stages of the pipeline in order.
+    Geometry stages accumulate an ImageTransformation; the returned image is
+    the source resampled once through it (and binarized etc. by OUTPUT).
 
     Args:
         image: Input image to process.
@@ -101,26 +167,32 @@ def process_page(
     if options is None:
         options = PipelineOptions()
 
-    current_image = image.copy()
+    state = _PageState(image.copy(), options.dpi)
     stages_completed: list[FilterStage] = []
     metadata: dict = {}
+    output_image: NDArray[np.uint8] | None = None
 
-    # Process each stage in order
     for stage in FilterStage:
         if stage < options.start_stage:
             continue
         if stage > options.end_stage:
             break
 
-        current_image, stage_meta = _process_stage(
-            current_image, page_id, sequence, stage, options
-        )
+        if stage == FilterStage.OUTPUT:
+            stage_meta, output_image = _process_output(
+                state, page_id, sequence, options
+            )
+        else:
+            stage_meta = _process_stage(state, page_id, sequence, stage, options)
         stages_completed.append(stage)
         if stage_meta:
             metadata[stage.name] = stage_meta
 
+    if output_image is None:
+        output_image = state.source if options.detect_only else state.view()
+
     return PipelineResult(
-        image=current_image,
+        image=output_image,
         page_id=page_id,
         stages_completed=stages_completed,
         metadata=metadata,
@@ -128,67 +200,65 @@ def process_page(
 
 
 def _process_stage(
-    image: NDArray[np.uint8],
+    state: _PageState,
     page_id: PageId,
     sequence: StageSequence,
     stage: FilterStage,
     options: PipelineOptions,
-) -> tuple[NDArray[np.uint8], dict]:
+) -> dict:
     """Process a single stage of the pipeline.
 
     Args:
-        image: Current image state.
+        state: Source pixels and accumulated transformation.
         page_id: The page ID.
         sequence: The stage sequence.
         stage: The stage to execute.
         options: Pipeline options.
 
     Returns:
-        Tuple of (processed image, stage metadata).
+        Stage metadata.
     """
     if stage == FilterStage.FIX_ORIENTATION:
-        return _process_fix_orientation(image, page_id, sequence, options)
+        return _process_fix_orientation(state, page_id, sequence, options)
     if stage == FilterStage.PAGE_SPLIT:
-        return _process_page_split(image, page_id, sequence, options)
+        return _process_page_split(state, page_id, sequence, options)
     if stage == FilterStage.DESKEW:
-        return _process_deskew(image, page_id, sequence, options)
+        return _process_deskew(state, page_id, sequence, options)
     if stage == FilterStage.SELECT_CONTENT:
-        return _process_select_content(image, page_id, sequence, options)
-    if stage == FilterStage.PAGE_LAYOUT:
-        return _process_page_layout(image, page_id, sequence, options)
-    # OUTPUT stage
-    return _process_output(image, page_id, sequence, options)
+        return _process_select_content(state, page_id, sequence, options)
+    return _process_page_layout(state, page_id, sequence, options)
 
 
 def _process_fix_orientation(
-    image: NDArray[np.uint8],
+    state: _PageState,
     page_id: PageId,
     sequence: StageSequence,
     options: PipelineOptions,
-) -> tuple[NDArray[np.uint8], dict]:
-    """Process the Fix Orientation stage."""
+) -> dict:
+    """Process the Fix Orientation stage.
+
+    The rotation is applied to the pixels directly: an orthogonal rotation is
+    lossless, and every later stage then works in the upright image's coordinates.
+    """
     filter_ = sequence.fix_orientation_filter
     rotation = filter_.get_rotation(page_id.image_id)
 
-    if options.detect_only:
-        return image, {"rotation_degrees": rotation.degrees}
-
-    result = filter_.process_image(image, page_id.image_id)
-    return result, {"rotation_degrees": rotation.degrees}
+    if not options.detect_only:
+        state.replace_source(filter_.process_image(state.source, page_id.image_id))
+    return {"rotation_degrees": rotation.degrees}
 
 
 def _process_page_split(
-    image: NDArray[np.uint8],
+    state: _PageState,
     page_id: PageId,
     sequence: StageSequence,
     options: PipelineOptions,
-) -> tuple[NDArray[np.uint8], dict]:
-    """Process the Page Split stage."""
+) -> dict:
+    """Process the Page Split stage, cropping to this page's region."""
     filter_ = sequence.page_split_filter
 
-    # Run detection if not already set
     if not filter_.is_params_set(page_id):
-        filter_.process(image, page_id, dpi=options.dpi)
+        filter_.process(state.source, page_id, dpi=options.dpi)
 
     params = filter_.get_params(page_id)
     metadata: dict[str, object] = {
@@ -196,85 +266,157 @@ def _process_page_split(
         "is_manual": params.is_manual(),
     }
 
-    if params.page_layout is not None:
-        metadata["num_sub_pages"] = params.page_layout.num_sub_pages
+    if params.page_layout is None:
+        return metadata
 
-    # For page split, we don't transform the image here
-    # The split is applied by selecting the appropriate sub-page region
-    return image, metadata
+    metadata["num_sub_pages"] = params.page_layout.num_sub_pages
+    outline = params.page_layout.get_page_outline(page_id.sub_page)
+    if outline is None:
+        logger.debug(
+            "No {} region in layout {}; keeping the whole image",
+            page_id.sub_page,
+            params.page_layout.layout_type,
+        )
+        return metadata
+
+    area = _clip_to_image(outline, state.source.shape)
+    if area is not None:
+        state.crop_to(area)
+        metadata["crop_area"] = area.tolist()
+    return metadata
+
+
+def _clip_to_image(
+    polygon: NDArray[np.floating], image_shape: tuple[int, ...]
+) -> NDArray[np.float64] | None:
+    """Clamp a polygon to the image bounds; None if it would be degenerate."""
+    height, width = image_shape[:2]
+    clipped = np.column_stack(
+        [
+            np.clip(polygon[:, 0], 0, width),
+            np.clip(polygon[:, 1], 0, height),
+        ]
+    ).astype(np.float64)
+    extent = clipped.max(axis=0) - clipped.min(axis=0)
+    if np.any(extent < _MIN_CROP_EDGE_PX):
+        return None
+    return clipped
 
 
 def _process_deskew(
-    image: NDArray[np.uint8],
+    state: _PageState,
     page_id: PageId,
     sequence: StageSequence,
     options: PipelineOptions,
-) -> tuple[NDArray[np.uint8], dict]:
-    """Process the Deskew stage."""
+) -> dict:
+    """Process the Deskew stage, rotating by the correction angle."""
     filter_ = sequence.deskew_filter
 
-    # Run detection if not already set
     if not filter_.settings.is_params_set(page_id):
-        filter_.detect_skew(image, page_id)
+        filter_.detect_skew(state.view(), page_id)
 
     params = filter_.get_params(page_id)
-    metadata = {
+    state.rotate(params.deskew_angle_deg)
+    return {
         "skew_angle": params.deskew_angle_deg,
         "is_manual": params.is_manual(),
     }
 
-    if options.detect_only:
-        return image, metadata
-
-    result = filter_.process_image(image, page_id)
-    return result, metadata
-
 
 def _process_select_content(
-    image: NDArray[np.uint8],
+    state: _PageState,
     page_id: PageId,
     sequence: StageSequence,
     options: PipelineOptions,
-) -> tuple[NDArray[np.uint8], dict]:
-    """Process the Select Content stage."""
+) -> dict:
+    """Process the Select Content stage.
+
+    Boxes are expressed in the transformed view's coordinates and the
+    transformation itself is left unchanged.
+    """
     filter_ = sequence.select_content_filter
+    params = filter_.process(state.view(), page_id, dpi=options.dpi)
 
-    # Run detection if not already set
-    if not filter_.is_params_set(page_id):
-        filter_.process(image, page_id, dpi=options.dpi)
-
-    params = filter_.get_params(page_id)
-    metadata: dict[str, object] = {
+    box = params.content_box
+    page_box = params.page_box
+    return {
         "content_detection_mode": params.content_detection_mode.value,
         "page_detection_mode": params.page_detection_mode.value,
-    }
-
-    if params.content_box is not None:
-        box = params.content_box
-        metadata["content_box"] = {
+        "content_box": {
             "x": box.x,
             "y": box.y,
             "width": box.width,
             "height": box.height,
-        }
-
-    # For select content, we store the box but don't crop yet
-    # The crop is typically applied during output
-    return image, metadata
+        },
+        "page_box": {
+            "x": page_box.x,
+            "y": page_box.y,
+            "width": page_box.width,
+            "height": page_box.height,
+        },
+    }
 
 
 def _process_page_layout(
-    image: NDArray[np.uint8],
+    state: _PageState,
     page_id: PageId,
     sequence: StageSequence,
     options: PipelineOptions,
-) -> tuple[NDArray[np.uint8], dict]:
-    """Process the Page Layout stage."""
+) -> dict:
+    """Process the Page Layout stage, fixing the final page rectangle.
+
+    Margins and alignment decide the page polygon around the content box; that
+    polygon becomes the transformation's post-crop area.
+    """
     filter_ = sequence.page_layout_filter
+    selection = sequence.select_content_filter.get_params(page_id)
+    xform = state.xform
+
+    view_rect = xform.resulting_rect
+    page_rect = (
+        Rect(
+            x=selection.page_box.x,
+            y=selection.page_box.y,
+            width=selection.page_box.width,
+            height=selection.page_box.height,
+        )
+        if selection.page_box.is_valid()
+        else view_rect
+    )
+    content_rect = Rect(
+        x=selection.content_box.x,
+        y=selection.content_box.y,
+        width=selection.content_box.width,
+        height=selection.content_box.height,
+    )
+    adapted_content = adapt_content_rect(xform, content_rect)
+
     params = filter_.get_params(page_id)
+    content_width_mm, content_height_mm = rect_size_mm(xform, content_rect)
+    updates: dict[str, object] = {
+        "content_rect": _as_content_rect(content_rect),
+        "page_rect": _as_content_rect(page_rect),
+        "content_size_mm": ContentSize(
+            width_mm=content_width_mm, height_mm=content_height_mm
+        ),
+    }
+    if params.auto_margins:
+        updates["hard_margins_mm"] = calc_margins_mm(xform, page_rect, adapted_content)
+    params = params.model_copy(update=updates)
+    filter_.set_params(page_id, params)
+
+    aggregate = filter_.get_aggregate_hard_size()
+    page_polygon = calc_page_polygon(
+        xform,
+        adapted_content,
+        params,
+        (aggregate.width_mm, aggregate.height_mm),
+    )
+    state.crop_to_page(page_polygon)
 
     margins = params.hard_margins_mm
-    metadata = {
+    final_rect = state.xform.resulting_rect
+    return {
         "margins": {
             "left": margins.left,
             "right": margins.right,
@@ -285,20 +427,25 @@ def _process_page_layout(
             "horizontal": params.alignment.horizontal.value,
             "vertical": params.alignment.vertical.value,
         },
+        "page_size_px": (round(final_rect.width), round(final_rect.height)),
     }
 
-    # Page layout doesn't transform the image directly
-    # Margins and alignment are applied during output
-    return image, metadata
+
+def _as_content_rect(rect: Rect) -> ContentRect:
+    return ContentRect(x=rect.x, y=rect.y, width=rect.width, height=rect.height)
 
 
 def _process_output(
-    image: NDArray[np.uint8],
+    state: _PageState,
     page_id: PageId,
     sequence: StageSequence,
     options: PipelineOptions,
-) -> tuple[NDArray[np.uint8], dict]:
-    """Process the Output stage."""
+) -> tuple[dict, NDArray[np.uint8] | None]:
+    """Process the Output stage on the fully transformed view.
+
+    Returns:
+        Tuple of (stage metadata, output image or None in detect-only mode).
+    """
     from scantailor.filters.output.generator import generate_output
 
     filter_ = sequence.output_filter
@@ -311,15 +458,14 @@ def _process_output(
     }
 
     if options.detect_only:
-        return image, metadata
+        return metadata, None
 
-    # Process the output - use generate_output directly to pass dewarper
-    result = generate_output(image, params, dewarper=options.dewarper)
+    result = generate_output(state.view(), params, dewarper=options.dewarper)
 
     metadata["is_binary"] = result.is_binary
     metadata["was_dewarped"] = result.was_dewarped
 
-    return result.image, metadata
+    return metadata, result.image
 
 
 def process_batch(
