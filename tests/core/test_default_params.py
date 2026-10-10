@@ -106,8 +106,8 @@ class TestPageLayoutDefaults:
         defaults = PageLayoutDefaults()
 
         assert defaults.hard_margins_mm.left == 10.0
-        assert defaults.hard_margins_mm.right == 5.0
-        assert defaults.hard_margins_mm.top == 10.0
+        assert defaults.hard_margins_mm.right == 10.0
+        assert defaults.hard_margins_mm.top == 5.0
         assert defaults.hard_margins_mm.bottom == 5.0
         assert defaults.auto_margins is False
 
@@ -131,7 +131,7 @@ class TestOutputDefaults:
         assert defaults.dpi.horizontal == 600
         assert defaults.dpi.vertical == 600
         assert defaults.color_mode == ColorMode.BLACK_AND_WHITE
-        assert defaults.despeckle_level == DespeckleLevel.NORMAL
+        assert defaults.despeckle_level == DespeckleLevel.CAUTIOUS
         assert defaults.black_on_white is True
 
     def test_to_params(self) -> None:
