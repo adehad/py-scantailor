@@ -194,6 +194,7 @@ class TestDpiScaling:
         assert np.array_equal(despeckle(page, 0, NORMAL), despeckle(page, 300, NORMAL))
 
 
+@pytest.mark.slow
 class TestPerformance:
     def test_full_page_with_twenty_thousand_specks_is_fast(self) -> None:
         rng = np.random.default_rng(0)
