@@ -18,6 +18,7 @@ from scantailor.app.ui.options_widgets import (
     select_content,
 )
 from scantailor.core.stage_sequence import FilterStage
+from scantailor.filters.page_layout.params import ContentRect, ContentSize
 
 RENDER_TIMEOUT_MS = 60_000
 
@@ -74,6 +75,16 @@ def test_image_view_receives_the_rendered_first_page_at_each_stage(
     qtbot: QtBot, project_window: MainWindowManager, stage: FilterStage
 ):
     _switch_stage(project_window, stage)
+    if stage is FilterStage.OUTPUT:
+        # Output only renders once every page's size is known.
+        layout = project_window.stages.page_layout_filter.settings
+        for page in project_window.pages():
+            layout.update_content_size_and_get_aggregate(
+                page,
+                ContentRect(width=600, height=800),
+                ContentRect(width=500, height=700),
+                ContentSize(width_mm=100, height_mm=150),
+            )
 
     _render_current_page(qtbot, project_window)
 
@@ -125,7 +136,10 @@ def test_editing_an_option_rerenders_the_current_page(
     ):
         spin_box.setValue(-2.0)
 
-    assert stages_run == [FilterStage.DESKEW]
+    # The edited page's thumbnail is rendered again as well, to the same stage.
+    assert stages_run
+    assert set(stages_run) == {FilterStage.DESKEW}
+    project_window.thumbnails.model.wait_for_idle()
 
 
 def test_options_widget_follows_the_current_page(
@@ -333,9 +347,11 @@ def test_selecting_a_thumbnail_changes_the_current_page_and_image_view(
         thumbnails.view.setCurrentIndex(index)
 
     assert project_window.current_page == target
-    shown = project_window._panels.view.image
-    assert shown is not None
-    assert shown is not first_image
+    view = project_window._panels.view
+    qtbot.waitUntil(
+        lambda: view.image is not None and view.image is not first_image,
+        timeout=RENDER_TIMEOUT_MS,
+    )
 
 
 def test_thumbnails_are_rendered_for_the_pages_of_the_project(
