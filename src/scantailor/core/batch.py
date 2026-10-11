@@ -1,13 +1,16 @@
 """Batch processing of pages through the pipeline on a process pool.
 
-A batch first runs the geometry pass in the calling process, so every page's
-detected parameters and content size are known, then renders and writes the
-pages in worker processes. Workers receive the stage parameters as plain JSON
-data and rebuild their own settings, so no lock-holding object is pickled.
+A batch first detects every page's geometry on the worker pool and stores the
+results in the calling process's settings, so every page's parameters and
+content size are known; it then renders and writes the pages on the same pool.
+Workers receive the stage defaults and parameters as plain JSON data and rebuild
+their own settings, so no lock-holding object is pickled.
 """
 
 import multiprocessing
 import os
+import sys
+import uuid
 from collections import deque
 from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
@@ -31,13 +34,49 @@ from scantailor.core.pipeline import (
     process_page,
 )
 from scantailor.core.project import LayoutDirection, StageParamsEntry
-from scantailor.core.stage_params import apply_stage_params, collect_stage_params
-from scantailor.core.stage_sequence import StageSequence
+from scantailor.core.stage_params import (
+    STAGE_KEYS,
+    apply_stage_params,
+    collect_stage_params,
+)
+from scantailor.core.stage_sequence import FilterStage, StageSequence
+from scantailor.core.transformation import ImageTransformation
+from scantailor.filters.output.color_mode import ColorMode
+from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.output.split_output import write_split_images
+from scantailor.filters.page_split.layout_type import LayoutType
 
 DEFAULT_DPI = 300.0
 
 StageParamsData = dict[str, list[dict[str, Any]]]
+StageDefaultsData = dict[str, Any]
+
+
+@dataclass(frozen=True)
+class PageDetected:
+    """A page's geometry was detected and stored; it is not rendered yet.
+
+    Attributes:
+        page: The measured page.
+    """
+
+    page: PageId
+
+
+@dataclass(frozen=True)
+class RenderInfo:
+    """How a written page relates to its source, for carrying text over.
+
+    Attributes:
+        transformation: Source pixels to output pixels.
+        output_dpi: Resolution of the written image.
+        was_dewarped: True when the output was dewarped, which no affine
+            transformation describes.
+    """
+
+    transformation: ImageTransformation
+    output_dpi: Dpi
+    was_dewarped: bool
 
 
 @dataclass(frozen=True)
@@ -47,10 +86,12 @@ class PageDone:
     Attributes:
         page: The finished page.
         path: Where its output was written.
+        info: Geometry of the written page; None when not recorded.
     """
 
     page: PageId
     path: Path
+    info: RenderInfo | None = None
 
 
 @dataclass(frozen=True)
@@ -67,6 +108,7 @@ class PageFailed:
 
 
 ProgressEvent = PageDone | PageFailed
+BatchEvent = PageDetected | PageDone | PageFailed
 
 
 @dataclass
@@ -75,11 +117,13 @@ class BatchResult:
 
     Attributes:
         written: Output path of every page that finished.
+        render_info: Geometry of every written page.
         failed: Error text of every page that failed.
         cancelled: Pages that were never started because of cancellation.
     """
 
     written: dict[PageId, Path] = field(default_factory=dict)
+    render_info: dict[PageId, RenderInfo] = field(default_factory=dict)
     failed: dict[PageId, str] = field(default_factory=dict)
     cancelled: list[PageId] = field(default_factory=list)
 
@@ -127,6 +171,18 @@ def output_file_names(
     return names
 
 
+# ProcessPoolExecutor refuses more workers than WaitForMultipleObjects can wait on.
+_MAX_WINDOWS_WORKERS = 61
+
+
+def pool_size(max_workers: int | None) -> int:
+    """Worker count to use: the request or the CPU count, within platform limits."""
+    workers = max_workers or os.cpu_count() or 1
+    if sys.platform == "win32":
+        workers = min(workers, _MAX_WINDOWS_WORKERS)
+    return workers
+
+
 def configure_worker_threads() -> None:
     """Limit OpenCV and Numba to one thread in this process.
 
@@ -155,6 +211,7 @@ def run_pool[Job, Result](
     cancel: Event | None = None,
     initializer: Callable[..., None] | None = None,
     initargs: tuple[Any, ...] = (),
+    executor: ProcessPoolExecutor | None = None,
 ) -> list[Job]:
     """Run ``function`` over ``jobs`` in spawned worker processes.
 
@@ -173,36 +230,71 @@ def run_pool[Job, Result](
         initializer (Callable[..., None] | None): Picklable callable run once in
             each worker after the thread limits are applied.
         initargs (tuple[Any, ...]): Arguments for ``initializer``.
+        executor (ProcessPoolExecutor | None): A pool from ``spawn_pool`` to
+            reuse, so consecutive phases pay the worker start-up cost once;
+            ``max_workers`` must then be its size. It is left running.
 
     Returns:
         list[Job]: Jobs that were never scheduled because of cancellation.
     """
-    workers = max_workers or os.cpu_count() or 1
-    queue = deque(jobs)
-    in_flight: dict[Future[Result], Job] = {}
-    with ProcessPoolExecutor(
+    workers = pool_size(max_workers)
+    if executor is None:
+        with spawn_pool(workers, initializer, initargs) as own_pool:
+            return _drain(own_pool, workers, function, jobs, on_outcome, cancel)
+    return _drain(executor, workers, function, jobs, on_outcome, cancel)
+
+
+def spawn_pool(
+    workers: int,
+    initializer: Callable[..., None] | None = None,
+    initargs: tuple[Any, ...] = (),
+) -> ProcessPoolExecutor:
+    """Create a pool of spawned workers with the thread limits applied.
+
+    Args:
+        workers (int): Pool size.
+        initializer (Callable[..., None] | None): Picklable callable run once in
+            each worker after the thread limits are applied.
+        initargs (tuple[Any, ...]): Arguments for ``initializer``.
+
+    Returns:
+        ProcessPoolExecutor: A pool to use as a context manager.
+    """
+    return ProcessPoolExecutor(
         max_workers=workers,
         mp_context=multiprocessing.get_context("spawn"),
         initializer=_init_pool_worker,
         initargs=(initializer, initargs),
-    ) as executor:
-        while True:
-            while queue and len(in_flight) < workers and not _is_set(cancel):
-                job = queue.popleft()
-                try:
-                    in_flight[executor.submit(function, job)] = job
-                except BrokenProcessPool as error:
-                    on_outcome(job, None, error)
-            if not in_flight:
-                break
-            finished, _ = wait(in_flight, return_when=FIRST_COMPLETED)
-            for future in finished:
-                job = in_flight.pop(future)
-                error = future.exception()
-                if error is None:
-                    on_outcome(job, future.result(), None)
-                else:
-                    on_outcome(job, None, error)
+    )
+
+
+def _drain[Job, Result](
+    executor: ProcessPoolExecutor,
+    workers: int,
+    function: Callable[[Job], Result],
+    jobs: Sequence[Job],
+    on_outcome: Callable[[Job, Result | None, BaseException | None], None],
+    cancel: Event | None,
+) -> list[Job]:
+    queue = deque(jobs)
+    in_flight: dict[Future[Result], Job] = {}
+    while True:
+        while queue and len(in_flight) < workers and not _is_set(cancel):
+            job = queue.popleft()
+            try:
+                in_flight[executor.submit(function, job)] = job
+            except BrokenProcessPool as error:
+                on_outcome(job, None, error)
+        if not in_flight:
+            break
+        finished, _ = wait(in_flight, return_when=FIRST_COMPLETED)
+        for future in finished:
+            job = in_flight.pop(future)
+            error = future.exception()
+            if error is None:
+                on_outcome(job, future.result(), None)
+            else:
+                on_outcome(job, None, error)
     return list(queue)
 
 
@@ -210,66 +302,192 @@ def _is_set(event: Event | None) -> bool:
     return event is not None and event.is_set()
 
 
-def _geometry_pass(
-    pages: Sequence[PageId],
-    stages: StageSequence,
-    default_dpi: float,
-    dpi_overrides: DpiOverrides | None,
-    cancel: Event | None,
-    result: BatchResult,
-) -> list[PageId]:
-    """Detect and store every page's geometry, one page in memory at a time.
-
-    Pages that cannot be measured are recorded in ``result.failed`` and
-    dropped; pages left over after cancellation go to ``result.cancelled``.
-
-    Returns:
-        list[PageId]: Pages that are ready to render.
-    """
-    ready: list[PageId] = []
-    for index, page in enumerate(pages):
-        if _is_set(cancel):
-            result.cancelled.extend(pages[index:])
-            break
-        try:
-            loaded = load_page(page.image_id, dpi_overrides)
-            options = PipelineOptions(dpi=loaded.horizontal_dpi(default_dpi))
-            fix_aggregate_page_size([(loaded.pixels, page)], stages, options)
-        except Exception as error:
-            logger.warning("Geometry pass failed for {}: {}", page, error)
-            result.failed[page] = _describe(error)
-        else:
-            ready.append(page)
-    return ready
-
-
 def _describe(error: BaseException) -> str:
     return f"{type(error).__name__}: {error}"
 
 
+def collect_stage_defaults(stages: StageSequence) -> StageDefaultsData:
+    """Read the project-wide defaults that unset pages fall back to.
+
+    Returns:
+        StageDefaultsData: JSON-compatible values for ``apply_stage_defaults``.
+    """
+    output = stages.output_filter.settings
+    select_content = stages.select_content_filter.settings
+    return {
+        "page_split_layout_type": (
+            stages.page_split_filter.settings.get_default_layout_type().value
+        ),
+        "output_dpi": output.get_default_dpi().model_dump(mode="json"),
+        "output_color_mode": output.get_default_color_mode().value,
+        "output_despeckle_level": output.get_default_despeckle_level().value,
+        "page_detection_box": list(select_content.get_page_detection_box()),
+        "page_detection_tolerance": select_content.get_page_detection_tolerance(),
+    }
+
+
+def apply_stage_defaults(stages: StageSequence, defaults: StageDefaultsData) -> None:
+    """Install defaults read by ``collect_stage_defaults`` into fresh stages."""
+    stages.page_split_filter.settings.set_default_layout_type(
+        LayoutType(defaults["page_split_layout_type"])
+    )
+    output = stages.output_filter.settings
+    output.set_default_dpi(Dpi.model_validate(defaults["output_dpi"]))
+    output.set_default_color_mode(ColorMode(defaults["output_color_mode"]))
+    output.set_default_despeckle_level(
+        DespeckleLevel(defaults["output_despeckle_level"])
+    )
+    select_content = stages.select_content_filter.settings
+    select_content.set_page_detection_box(*defaults["page_detection_box"])
+    select_content.set_page_detection_tolerance(defaults["page_detection_tolerance"])
+
+
+def _dump_entries(entries: dict[str, list[StageParamsEntry]]) -> StageParamsData:
+    return {
+        key: [entry.model_dump(mode="json") for entry in stage_entries]
+        for key, stage_entries in entries.items()
+    }
+
+
+def _load_entries(data: StageParamsData) -> dict[str, list[StageParamsEntry]]:
+    return {
+        key: [StageParamsEntry.model_validate(entry) for entry in entries]
+        for key, entries in data.items()
+    }
+
+
+def collect_effective_stage_params(
+    stages: StageSequence, pages: Sequence[PageId]
+) -> StageParamsData:
+    """Gather the parameters every page and stage would use, defaults included.
+
+    Unlike ``collect_stage_params``, pages without explicit parameters are
+    included with the values ``Settings.get_params`` falls back to, so a worker
+    renders them the way the calling process would.
+
+    Args:
+        stages (StageSequence): The stages whose settings are read.
+        pages (Sequence[PageId]): Pages to export.
+
+    Returns:
+        StageParamsData: Entries per stage key, JSON-compatible.
+    """
+    entries = collect_stage_params(stages, list(pages))
+    for stage in FilterStage:
+        if stage is FilterStage.FIX_ORIENTATION:
+            continue
+        settings: Any = stages.filter_at(stage).settings
+        entries[STAGE_KEYS[stage]] = [
+            StageParamsEntry(
+                page=page, params=settings.get_params(page).model_dump(mode="json")
+            )
+            for page in pages
+        ]
+    return _dump_entries(entries)
+
+
 @dataclass(frozen=True)
-class _RenderJob:
+class _PhaseConfig:
+    """Plain-data settings of one batch phase, shared by all of its jobs.
+
+    Workers rebuild their stages when ``token`` differs from the one they hold,
+    so a pool can serve consecutive phases with different settings.
+    """
+
+    token: str
+    stage_params: StageParamsData
+    defaults: StageDefaultsData
+    default_dpi: float
+
+
+@dataclass(frozen=True)
+class _PageJob:
     page: PageId
-    output_path: Path
+    config: _PhaseConfig
+    output_path: Path | None = None
     dpi_override: Dpi | None = None
 
 
-_worker_stages: StageSequence | None = None
-_worker_default_dpi = DEFAULT_DPI
+_worker_token: str | None = None
+_worker_stages = StageSequence()
 
 
-def _init_render_worker(stage_params: StageParamsData, default_dpi: float) -> None:
-    global _worker_stages, _worker_default_dpi
-    stages = StageSequence()
-    apply_stage_params(
-        stages,
-        {
-            key: [StageParamsEntry.model_validate(entry) for entry in entries]
-            for key, entries in stage_params.items()
-        },
+def _worker_stages_for(config: _PhaseConfig) -> StageSequence:
+    global _worker_token, _worker_stages
+    if config.token != _worker_token:
+        stages = StageSequence()
+        apply_stage_defaults(stages, config.defaults)
+        apply_stage_params(stages, _load_entries(config.stage_params))
+        _worker_stages, _worker_token = stages, config.token
+    return _worker_stages
+
+
+def _detect_page(job: _PageJob) -> StageParamsData:
+    """Detect one page's geometry in a worker; returns its parameters as data."""
+    stages = _worker_stages_for(job.config)
+    overrides = {job.page.image_id: job.dpi_override} if job.dpi_override else None
+    loaded = load_page(job.page.image_id, overrides)
+    options = PipelineOptions(dpi=loaded.horizontal_dpi(job.config.default_dpi))
+    fix_aggregate_page_size([(loaded.pixels, job.page)], stages, options)
+    return _dump_entries(collect_stage_params(stages, [job.page]))
+
+
+def _detect_geometry(
+    stages: StageSequence,
+    pages: Sequence[PageId],
+    default_dpi: float,
+    dpi_overrides: DpiOverrides | None,
+    pool: ProcessPoolExecutor,
+    workers: int,
+    cancel: Event | None,
+    report: Callable[[BatchEvent], None],
+    result: BatchResult,
+) -> list[PageId]:
+    """Detect every page's geometry on the pool and store it in ``stages``.
+
+    Pages that cannot be measured are reported as failed and dropped; pages
+    never started because of cancellation go to ``result.cancelled``. The
+    aggregate page size follows from the stored layout parameters of all pages,
+    so it needs no separate step.
+
+    Returns:
+        list[PageId]: Pages that are ready to render, in project order.
+    """
+    overrides = dpi_overrides or {}
+    config = _PhaseConfig(
+        token=uuid.uuid4().hex,
+        stage_params=_dump_entries(collect_stage_params(stages, list(pages))),
+        defaults=collect_stage_defaults(stages),
+        default_dpi=default_dpi,
     )
-    _worker_stages = stages
-    _worker_default_dpi = default_dpi
+    jobs = [
+        _PageJob(page, config, dpi_override=overrides.get(page.image_id))
+        for page in pages
+    ]
+    detected: set[PageId] = set()
+
+    def on_outcome(
+        job: _PageJob, params: StageParamsData | None, error: BaseException | None
+    ) -> None:
+        if params is None:
+            error = error or RuntimeError("no result")
+            logger.warning("Geometry pass failed for {}: {}", job.page, error)
+            report(PageFailed(job.page, _describe(error)))
+            return
+        apply_stage_params(stages, _load_entries(params))
+        detected.add(job.page)
+        report(PageDetected(job.page))
+
+    unscheduled = run_pool(
+        _detect_page,
+        jobs,
+        on_outcome,
+        max_workers=workers,
+        cancel=cancel,
+        executor=pool,
+    )
+    result.cancelled.extend(job.page for job in unscheduled)
+    return [page for page in pages if page in detected]
 
 
 def _as_writable(image: NDArray[np.uint8], is_binary: bool) -> NDArray:
@@ -284,14 +502,15 @@ def _as_writable(image: NDArray[np.uint8], is_binary: bool) -> NDArray:
     return image
 
 
-def _render_page(job: _RenderJob) -> Path:
-    """Render one page in a worker and write it; returns the written path."""
-    if _worker_stages is None:
-        raise RuntimeError("Render worker was not initialised")
+def _render_page(job: _PageJob) -> tuple[Path, RenderInfo]:
+    """Render one page in a worker and write it; returns its path and geometry."""
+    if job.output_path is None:
+        raise ValueError("A render job needs an output path")
+    stages = _worker_stages_for(job.config)
     overrides = {job.page.image_id: job.dpi_override} if job.dpi_override else None
     loaded = load_page(job.page.image_id, overrides)
-    options = PipelineOptions(dpi=loaded.horizontal_dpi(_worker_default_dpi))
-    rendered = process_page(loaded.pixels, job.page, _worker_stages, options)
+    options = PipelineOptions(dpi=loaded.horizontal_dpi(job.config.default_dpi))
+    rendered = process_page(loaded.pixels, job.page, stages, options)
     is_binary = bool(rendered.metadata.get("OUTPUT", {}).get("is_binary"))
     dpi = rendered.dpi or (None if loaded.dpi.is_null() else loaded.dpi)
     job.output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -300,7 +519,14 @@ def _render_page(job: _RenderJob) -> Path:
         write_split_images(
             job.output_path.parent, job.output_path.name, rendered.split, dpi
         )
-    return job.output_path
+    if rendered.transformation is None or dpi is None:
+        raise RuntimeError("The pipeline returned no output geometry")
+    info = RenderInfo(
+        rendered.transformation,
+        dpi,
+        bool(rendered.metadata.get("OUTPUT", {}).get("was_dewarped")),
+    )
+    return job.output_path, info
 
 
 def run_batch(
@@ -311,14 +537,16 @@ def run_batch(
     layout_direction: LayoutDirection = "LTR",
     default_dpi: float = DEFAULT_DPI,
     max_workers: int | None = None,
-    on_progress: Callable[[ProgressEvent], None] | None = None,
+    on_progress: Callable[[BatchEvent], None] | None = None,
     cancel: Event | None = None,
     dpi_overrides: DpiOverrides | None = None,
 ) -> BatchResult:
     """Process pages through the full pipeline and write them as TIFFs.
 
-    The geometry pass runs here and fills ``stages`` with each page's detected
-    parameters, which are then handed to the workers as JSON-compatible data.
+    Geometry detection runs per page on the worker pool and fills ``stages``
+    with each page's detected parameters. Rendering then reuses the same pool,
+    whose workers receive the effective parameters of every page, defaults
+    included, as JSON-compatible data.
 
     Args:
         stages (StageSequence): Settings of the project; updated by detection.
@@ -327,9 +555,10 @@ def run_batch(
         layout_direction (LayoutDirection): Reading direction, for file names.
         default_dpi (float): Resolution for sources that do not define one.
         max_workers (int | None): Worker processes; defaults to the CPU count.
-        on_progress (Callable[[ProgressEvent], None] | None): Receives a
-            ``PageDone`` or ``PageFailed`` for every page that is attempted, from
-            the calling thread.
+        on_progress (Callable[[BatchEvent], None] | None): Receives a
+            ``PageDetected`` per measured page, then a ``PageDone`` or
+            ``PageFailed`` for every page that is attempted, from the calling
+            thread.
         cancel (Event | None): Setting it stops further pages from starting;
             pages already running finish and are reported.
         dpi_overrides (DpiOverrides | None): Project resolutions that win over
@@ -340,46 +569,65 @@ def run_batch(
     """
     result = BatchResult()
 
-    def report(event: ProgressEvent) -> None:
+    def report(event: BatchEvent) -> None:
         if isinstance(event, PageDone):
             result.written[event.page] = event.path
-        else:
+            if event.info is not None:
+                result.render_info[event.page] = event.info
+        elif isinstance(event, PageFailed):
             result.failed[event.page] = event.error
         if on_progress is not None:
             on_progress(event)
 
-    ready = _geometry_pass(pages, stages, default_dpi, dpi_overrides, cancel, result)
-    for page in pages:
-        if page in result.failed:
-            report(PageFailed(page, result.failed[page]))
+    workers = pool_size(max_workers)
+    with spawn_pool(workers) as pool:
+        ready = _detect_geometry(
+            stages,
+            pages,
+            default_dpi,
+            dpi_overrides,
+            pool,
+            workers,
+            cancel,
+            report,
+            result,
+        )
+        names = output_file_names(pages, layout_direction)
+        overrides = dpi_overrides or {}
+        config = _PhaseConfig(
+            token=uuid.uuid4().hex,
+            stage_params=collect_effective_stage_params(stages, ready),
+            defaults=collect_stage_defaults(stages),
+            default_dpi=default_dpi,
+        )
+        jobs = [
+            _PageJob(
+                page,
+                config,
+                Path(output_dir) / names[page],
+                overrides.get(page.image_id),
+            )
+            for page in ready
+        ]
 
-    names = output_file_names(pages, layout_direction)
-    overrides = dpi_overrides or {}
-    jobs = [
-        _RenderJob(page, Path(output_dir) / names[page], overrides.get(page.image_id))
-        for page in ready
-    ]
-    stage_params: StageParamsData = {
-        key: [entry.model_dump(mode="json") for entry in entries]
-        for key, entries in collect_stage_params(stages, list(pages)).items()
-    }
+        def on_outcome(
+            job: _PageJob,
+            rendered: tuple[Path, RenderInfo] | None,
+            error: BaseException | None,
+        ) -> None:
+            if rendered is not None:
+                report(PageDone(job.page, *rendered))
+            else:
+                error = error or RuntimeError("no result")
+                report(PageFailed(job.page, _describe(error)))
 
-    def on_outcome(
-        job: _RenderJob, path: Path | None, error: BaseException | None
-    ) -> None:
-        if path is not None:
-            report(PageDone(job.page, path))
-        else:
-            report(PageFailed(job.page, _describe(error or RuntimeError("no result"))))
-
-    unscheduled = run_pool(
-        _render_page,
-        jobs,
-        on_outcome,
-        max_workers=max_workers,
-        cancel=cancel,
-        initializer=_init_render_worker,
-        initargs=(stage_params, default_dpi),
-    )
+        unscheduled = run_pool(
+            _render_page,
+            jobs,
+            on_outcome,
+            max_workers=workers,
+            cancel=cancel,
+            executor=pool,
+        )
     result.cancelled.extend(job.page for job in unscheduled)
     return result

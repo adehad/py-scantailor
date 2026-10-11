@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from scantailor.core.batch import PageDone, run_batch
+from scantailor.core.batch import PageDetected, PageDone, run_batch
 from scantailor.core.image_io import load_image, write_image
 from scantailor.core.models import Dpi, ImageId, PageId
 from scantailor.core.page_source import DpiOverrides, dpi_overrides_of, load_page
@@ -110,7 +110,7 @@ def _run_batch(
         dpi_overrides=overrides,
     )
     assert result.failed == {}
-    assert [type(e) for e in events] == [PageDone]
+    assert [type(e) for e in events] == [PageDetected, PageDone]
     with Image.open(result.written[page]) as image:
         dpi = (round(image.info["dpi"][0]), round(image.info["dpi"][1]))
         return image.size, dpi
