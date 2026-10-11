@@ -1,37 +1,63 @@
 """New/Open Project panel for the welcome screen."""
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import ClassVar
 
-from PySide6 import QtWidgets
-from PySide6.QtCore import Signal
+from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6.QtCore import Qt, Signal
 
 from scantailor.app.ui import load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
 
 _UI_FOLDER = Path(__file__).parent
+_LINK_STYLE = (
+    "QLabel { color: palette(link); } QLabel:hover { text-decoration: underline; }"
+)
+
+
+def _make_clickable(label: QtWidgets.QLabel, on_click: Callable[[], None]) -> None:
+    """Style ``label`` as a link and call ``on_click`` when it is clicked.
+
+    Args:
+        label (QtWidgets.QLabel): The label to turn into a link.
+        on_click (Callable[[], None]): Called on a left click.
+    """
+    label.setCursor(Qt.CursorShape.PointingHandCursor)
+    label.setStyleSheet(_LINK_STYLE)
+    label.installEventFilter(_ClickFilter(label, on_click))
+
+
+class _ClickFilter(QtCore.QObject):
+    """Event filter that reports left clicks on the label it is installed on."""
+
+    def __init__(self, label: QtWidgets.QLabel, on_click: Callable[[], None]) -> None:
+        super().__init__(label)
+        self._on_click = on_click
+
+    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        """Handle a left button release over the label."""
+        if (
+            event.type() == QtCore.QEvent.Type.MouseButtonRelease
+            and isinstance(event, QtGui.QMouseEvent)
+            and event.button() == Qt.MouseButton.LeftButton
+        ):
+            self._on_click()
+            return True
+        return super().eventFilter(watched, event)
 
 
 class NewOpenProjectPanel(QtWidgets.QWidget):
-    """Panel for creating new or opening existing projects.
-
-    Displayed on the welcome screen with options to:
-    - Create a new project
-    - Open an existing project
-    - Open recent projects
+    """Welcome panel with New and Open links and the recent projects.
 
     Signals:
-        new_project_requested: Emitted when user clicks "New Project"
-        open_project_requested: Emitted when user clicks "Open Project"
-        recent_project_selected: Emitted when user selects a recent project.
-            Args: project_path (Path)
+        new_project_requested: The user clicked "New Project".
+        open_project_requested: The user clicked "Open Project".
+        recent_project_selected: The user clicked a recent project (its path).
     """
 
     new_project_requested = Signal()
     open_project_requested = Signal()
     recent_project_selected = Signal(Path)
-
-    MAX_RECENT_PROJECTS: ClassVar[int] = 10
 
     def __init__(
         self,
@@ -41,115 +67,44 @@ class NewOpenProjectPanel(QtWidgets.QWidget):
         """Initialize the panel.
 
         Args:
-            recent_projects: List of recent project paths.
-            parent: Parent widget.
+            recent_projects (list[Path] | None): Project files to list, newest first.
+            parent (QtWidgets.QWidget | None): Parent widget.
         """
         super().__init__(parent)
-        self._recent_projects = recent_projects or []
-        self._recent_buttons: list[QtWidgets.QPushButton] = []
-
-        # Load UI
         self.ui = load_ui_widget(_UI_FOLDER / "NewOpenProjectPanel.ui", self)
-        self._setup_widgets()
-        self._populate_recent_projects()
-        self._connect_signals()
+        self.ui.setWindowFlags(Qt.WindowType.Widget)
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(self.ui)
 
-    def _setup_widgets(self) -> None:
-        """Set up widget references."""
-        self._new_project_label = get_cwidget(
-            self.ui, QtWidgets.QLabel, "newProjectLabel"
-        )
-        self._open_project_label = get_cwidget(
-            self.ui, QtWidgets.QLabel, "openProjectLabel"
-        )
         self._recent_group = get_cwidget(
             self.ui, QtWidgets.QGroupBox, "recentProjectsGroup"
         )
-
-        # Make labels clickable by setting cursor and installing event filter
-        self._new_project_label.setCursor(QtWidgets.QApplication.overrideCursor())
-        self._open_project_label.setCursor(QtWidgets.QApplication.overrideCursor())
-
-        # Style the labels to look clickable
-        link_style = (
-            "QLabel { color: palette(link); } "
-            "QLabel:hover { color: palette(highlight); text-decoration: underline; }"
-        )
-        self._new_project_label.setStyleSheet(link_style)
-        self._open_project_label.setStyleSheet(link_style)
-
-    def _populate_recent_projects(self) -> None:
-        """Populate the recent projects list."""
-        # Get the layout of the recent projects group
-        layout = self._recent_group.layout()
-        if not layout:
-            return
-
-        # Remove the spacer temporarily
-        spacer_item = layout.takeAt(0)
-
-        # Clear existing buttons
-        for btn in self._recent_buttons:
-            layout.removeWidget(btn)
-            btn.deleteLater()
-        self._recent_buttons.clear()
-
-        # Add buttons for recent projects
-        for project_path in self._recent_projects[: self.MAX_RECENT_PROJECTS]:
-            btn = QtWidgets.QPushButton(project_path.name)
-            btn.setToolTip(str(project_path))
-            btn.setFlat(True)
-            btn.setStyleSheet(
-                "QPushButton { text-align: left; padding: 4px; } "
-                "QPushButton:hover { background: palette(highlight); "
-                "color: palette(highlighted-text); }"
-            )
-            btn.clicked.connect(
-                lambda checked, p=project_path: self.recent_project_selected.emit(p)
-            )
-            layout.addWidget(btn)
-            self._recent_buttons.append(btn)
-
-        # Re-add spacer at the end
-        if spacer_item:
-            layout.addItem(spacer_item)
-
-        # Show/hide based on whether there are recent projects
-        self._recent_group.setVisible(len(self._recent_buttons) > 0)
-
-    def _connect_signals(self) -> None:
-        """Connect widget signals."""
-        # Use mouse press events on labels
-        self._new_project_label.mousePressEvent = (
-            lambda ev: self.new_project_requested.emit()
-        )
-        self._open_project_label.mousePressEvent = (
-            lambda ev: self.open_project_requested.emit()
-        )
+        self._new_label = get_cwidget(self.ui, QtWidgets.QLabel, "newProjectLabel")
+        self._open_label = get_cwidget(self.ui, QtWidgets.QLabel, "openProjectLabel")
+        _make_clickable(self._new_label, self.new_project_requested.emit)
+        _make_clickable(self._open_label, self.open_project_requested.emit)
+        self._recent_labels: list[QtWidgets.QLabel] = []
+        self.set_recent_projects(recent_projects or [])
 
     def set_recent_projects(self, projects: list[Path]) -> None:
-        """Update the recent projects list.
+        """Show ``projects`` in the recent list; the group hides when it is empty.
 
         Args:
-            projects: List of recent project paths.
+            projects (list[Path]): Project files, newest first.
         """
-        self._recent_projects = projects
-        self._populate_recent_projects()
-
-    def add_recent_project(self, project_path: Path) -> None:
-        """Add a project to the recent projects list.
-
-        Args:
-            project_path: Path to the project.
-        """
-        # Remove if already in list
-        if project_path in self._recent_projects:
-            self._recent_projects.remove(project_path)
-
-        # Add to front
-        self._recent_projects.insert(0, project_path)
-
-        # Trim to max
-        self._recent_projects = self._recent_projects[: self.MAX_RECENT_PROJECTS]
-
-        self._populate_recent_projects()
+        layout = self._recent_group.layout()
+        assert layout is not None
+        for label in self._recent_labels:
+            layout.removeWidget(label)
+            label.deleteLater()
+        self._recent_labels.clear()
+        for project in projects:
+            label = QtWidgets.QLabel(project.stem or "_", self._recent_group)
+            label.setToolTip(str(project))
+            _make_clickable(
+                label, lambda chosen=project: self.recent_project_selected.emit(chosen)
+            )
+            layout.addWidget(label)
+            self._recent_labels.append(label)
+        self._recent_group.setVisible(bool(projects))

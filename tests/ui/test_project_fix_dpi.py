@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from PIL import Image
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 from scantailor.app.ui.dialogs.fix_dpi import FixDpiDialog
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
@@ -162,14 +162,13 @@ def test_ok_is_only_available_once_every_image_has_a_usable_dpi(
     assert fix_dpi.ok_enabled_after_apply == [True]
 
 
-def test_images_with_out_of_range_dpi_are_offered_for_fixing(
+def test_images_with_a_low_but_defined_dpi_do_not_open_the_dialog(
     main_window: MainWindowManager,
     fix_dpi: FixDpiDriver,
     respond_to_modal: Callable[..., None],
     tmp_path: pathlib.Path,
 ):
     _write_scans(tmp_path / "raw", ["low.png"], dpi=72)
-    fix_dpi.schedule(400)
 
     _new_project(
         main_window,
@@ -177,9 +176,9 @@ def test_images_with_out_of_range_dpi_are_offered_for_fixing(
         respond_to_modal,
     )
 
-    assert fix_dpi.listed == [["low.png"]]
+    assert fix_dpi.dialogs == []
     assert main_window.project is not None
-    assert main_window.project.images[0].metadata.dpi == Dpi.uniform(400)
+    assert main_window.project.images[0].metadata.dpi == Dpi.uniform(72)
 
 
 def test_images_with_good_dpi_do_not_open_the_dialog(
@@ -263,6 +262,21 @@ def test_fix_dpi_action_applies_the_dpi_to_the_chosen_images_and_marks_modified(
     assert project_window.modified
 
 
+def test_fix_dpi_action_hands_the_new_dpi_to_rendering_and_batch(
+    project_window: MainWindowManager,
+    fix_dpi: FixDpiDriver,
+):
+    fix_dpi.schedule(600, tab=1)
+
+    project_window.actionFixDpi.trigger()
+
+    assert project_window.project is not None
+    overrides = project_window._dpi_overrides
+    assert {overrides[info.id] for info in project_window.project.images} == {
+        Dpi.uniform(600)
+    }
+
+
 def test_fix_dpi_action_without_changes_leaves_the_project_unmodified(
     project_window: MainWindowManager,
     fix_dpi: FixDpiDriver,
@@ -320,14 +334,73 @@ def test_dialog_reports_only_changed_images_keyed_by_image_id(qtbot):
     assert dialog.images_needing_fix() == []
 
 
-def test_dialog_refuses_a_dpi_that_is_implausible_for_the_image(qtbot):
+def _select_bad_image_and_type(qtbot, text: str) -> FixDpiDialog:
     dialog = _dialog_for([_image("bad.png", Dpi())], qtbot)
     dialog.findChild(QtWidgets.QTreeView, "undefinedDpiView").selectAll()
+    dialog.findChild(QtWidgets.QLineEdit, "xDpi").setText(text)
+    dialog.findChild(QtWidgets.QLineEdit, "yDpi").setText(text)
+    return dialog
 
-    dialog.findChild(QtWidgets.QLineEdit, "xDpi").setText("50")
-    dialog.findChild(QtWidgets.QLineEdit, "yDpi").setText("50")
+
+@pytest.mark.parametrize("text", ["", "0", "1", "-5"])
+def test_dialog_refuses_an_undefined_dpi(qtbot, text: str):
+    dialog = _select_bad_image_and_type(qtbot, text)
 
     assert not dialog.findChild(QtWidgets.QPushButton, "applyBtn").isEnabled()
+
+
+@pytest.mark.parametrize("text", ["2", "50", "149", "9999"])
+def test_dialog_accepts_any_defined_dpi_like_the_original(qtbot, text: str):
+    dialog = _select_bad_image_and_type(qtbot, text)
+
+    assert dialog.findChild(QtWidgets.QPushButton, "applyBtn").isEnabled()
+
+
+def test_dialog_limits_dpi_fields_to_four_characters(qtbot):
+    dialog = _dialog_for([_image("bad.png", Dpi())], qtbot)
+    field = dialog.findChild(QtWidgets.QLineEdit, "xDpi")
+
+    assert field.maxLength() == 4
+
+
+@pytest.mark.parametrize(
+    ("text", "warning"),
+    [
+        ("100", "too small. Even if"),
+        ("150", "too small for this pixel size"),
+    ],
+)
+def test_dialog_warns_about_doubtful_dpi_in_the_field_tooltip(
+    qtbot, text: str, warning: str
+):
+    dialog = _select_bad_image_and_type(qtbot, text)
+
+    tooltips = [
+        dialog.findChild(QtWidgets.QLineEdit, name).toolTip()
+        for name in ("xDpi", "yDpi")
+    ]
+    assert any(warning in tooltip for tooltip in tooltips)
+
+
+def test_dialog_has_no_warning_for_a_good_dpi(qtbot):
+    dialog = _select_bad_image_and_type(qtbot, "300")
+
+    assert dialog.findChild(QtWidgets.QLineEdit, "xDpi").toolTip() == ""
+
+
+def test_dialog_ok_is_available_after_applying_a_low_dpi(qtbot):
+    dialog = _select_bad_image_and_type(qtbot, "100")
+
+    dialog.findChild(QtWidgets.QPushButton, "applyBtn").click()
+
+    buttons = dialog.findChild(QtWidgets.QDialogButtonBox, "buttonBox")
+    assert buttons.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).isEnabled()
+
+
+def test_dialog_combo_follows_typed_values(qtbot):
+    dialog = _select_bad_image_and_type(qtbot, "600")
+
+    assert dialog.findChild(QtWidgets.QComboBox, "dpiCombo").currentText() == "600"
 
 
 def test_dialog_tells_pages_of_one_multi_page_file_apart(qtbot):
@@ -357,7 +430,7 @@ def test_image_without_dpi_is_read_as_undefined(tmp_path: pathlib.Path):
 
     [(_, metadata)] = list_image_pages(path)
 
-    assert not metadata.has_plausible_dpi()
+    assert not metadata.is_dpi_ok()
 
 
 def _save_undefined_dpi_project(tmp_path: pathlib.Path) -> pathlib.Path:
@@ -365,6 +438,7 @@ def _save_undefined_dpi_project(tmp_path: pathlib.Path) -> pathlib.Path:
 
     paths = _write_scans(tmp_path / "raw", ["a.png"], dpi=None)
     project = Project(output_directory=tmp_path / "out")
+    project.output_directory.mkdir()
     for image_id, metadata in list_image_pages(paths[0]):
         project.add_image(image_id, metadata)
     project_file = tmp_path / "book.ScanTailor"
@@ -402,3 +476,47 @@ def test_cancelling_fix_dpi_while_opening_a_project_leaves_it_unopened(
 
     assert len(fix_dpi.dialogs) == 1
     assert main_window.project is None
+
+
+def _select_all_pages(dialog: FixDpiDialog) -> None:
+    dialog.findChild(QtWidgets.QTabWidget, "tabWidget").setCurrentIndex(1)
+    dialog.findChild(QtWidgets.QTreeView, "allPagesView").selectAll()
+
+
+def test_dialog_prefills_fields_with_the_dpi_of_the_selected_image(qtbot):
+    dialog = _dialog_for([_image("ok.png", Dpi.uniform(300))], qtbot)
+
+    _select_all_pages(dialog)
+
+    assert dialog.findChild(QtWidgets.QLineEdit, "xDpi").text() == "300"
+    assert dialog.findChild(QtWidgets.QLineEdit, "yDpi").text() == "300"
+
+
+def test_dialog_leaves_fields_empty_when_selected_images_disagree(qtbot):
+    dialog = _dialog_for(
+        [_image("a.png", Dpi.uniform(300)), _image("b.png", Dpi.uniform(600))], qtbot
+    )
+
+    _select_all_pages(dialog)
+
+    assert dialog.findChild(QtWidgets.QLineEdit, "xDpi").text() == ""
+
+
+def test_dialog_apply_is_disabled_until_the_value_differs_from_the_selection(qtbot):
+    dialog = _dialog_for([_image("ok.png", Dpi.uniform(300))], qtbot)
+    _select_all_pages(dialog)
+    apply_btn = dialog.findChild(QtWidgets.QPushButton, "applyBtn")
+    assert not apply_btn.isEnabled()
+
+    dialog.findChild(QtWidgets.QLineEdit, "xDpi").setText("400")
+
+    assert apply_btn.isEnabled()
+
+
+def test_dialog_marks_an_empty_dpi_field_as_an_error(qtbot):
+    dialog = _select_bad_image_and_type(qtbot, "")
+    field = dialog.findChild(QtWidgets.QLineEdit, "xDpi")
+
+    error_colour = field.palette().color(QtGui.QPalette.ColorRole.Text)
+
+    assert error_colour == QtGui.QColor(QtCore.Qt.GlobalColor.red)
