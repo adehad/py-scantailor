@@ -7,7 +7,7 @@ from pathlib import Path
 from loguru import logger
 from PySide6 import QtCore
 
-from scantailor.core.batch import BatchResult, run_batch
+from scantailor.core.batch import BatchEvent, BatchResult, PageDetected, run_batch
 from scantailor.core.models import PageId
 from scantailor.core.page_source import DpiOverrides
 from scantailor.core.project import LayoutDirection
@@ -15,6 +15,7 @@ from scantailor.core.stage_sequence import StageSequence
 
 
 class _BatchWorker(QtCore.QObject):
+    detected = QtCore.Signal(object)
     progress = QtCore.Signal(object)
     finished = QtCore.Signal(object)
     failed = QtCore.Signal(str)
@@ -36,6 +37,12 @@ class _BatchWorker(QtCore.QObject):
         self._cancel = cancel
         self._dpi_overrides = dpi_overrides
 
+    def _on_event(self, event: BatchEvent) -> None:
+        if isinstance(event, PageDetected):
+            self.detected.emit(event)
+        else:
+            self.progress.emit(event)
+
     @QtCore.Slot()
     def run(self) -> None:
         """Run the batch; called on the worker thread."""
@@ -47,7 +54,7 @@ class _BatchWorker(QtCore.QObject):
                 output_dir,
                 layout_direction=self._layout_direction,
                 max_workers=self._max_workers,
-                on_progress=self.progress.emit,
+                on_progress=self._on_event,
                 cancel=self._cancel,
                 dpi_overrides=self._dpi_overrides,
             )
@@ -65,11 +72,13 @@ class BatchRunner(QtCore.QObject):
     not edit them until ``finished`` or ``failed`` arrives.
 
     Signals:
+        detected: A page's geometry was measured. Args: event (PageDetected).
         progress: A page ended. Args: event (ProgressEvent).
         finished: The batch ended, possibly cancelled. Args: result (BatchResult).
         failed: The batch could not run at all. Args: message (str).
     """
 
+    detected = QtCore.Signal(object)
     progress = QtCore.Signal(object)
     finished = QtCore.Signal(object)
     failed = QtCore.Signal(str)
@@ -131,6 +140,7 @@ class BatchRunner(QtCore.QObject):
         thread = QtCore.QThread(self)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
+        worker.detected.connect(self.detected)
         worker.progress.connect(self.progress)
         worker.finished.connect(self._on_outcome)
         worker.failed.connect(self._on_outcome)
