@@ -1,0 +1,50 @@
+[project]
+name = "jbig2-numba"
+version = "0.1.0"
+description = "Lossless JBIG2 generic-region encoder for bilevel images, in pure Python accelerated by numba"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+dependencies = [
+    "numpy>=2",
+    "numba>=0.60",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics :: Graphics Conversion",
+]
+
+[dependency-groups]
+test = [
+    "pytest",
+    "pymupdf",
+    "pillow",
+]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jbig2_numba"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "D", "SIM", "RUF"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D100", "D101", "D102", "D103"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["jbig2_numba"]
