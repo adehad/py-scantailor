@@ -22,6 +22,8 @@ from scantailor.main import setup_qcore
 
 PAGE_WIDTH = 600
 PAGE_HEIGHT = 800
+# 300 dpi; the default Qt writes (about 100 dpi) would open the Fix DPI dialog.
+SCAN_DOTS_PER_METER = 11811
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -119,6 +121,8 @@ def page_images(tmp_path: pathlib.Path) -> PageImages:
             QtGui.QImage.Format.Format_RGB888,
         )
         path = directory / f"page_{index + 1:03d}.png"
+        image.setDotsPerMeterX(SCAN_DOTS_PER_METER)
+        image.setDotsPerMeterY(SCAN_DOTS_PER_METER)
         assert image.save(str(path)), f"could not write {path}"
         paths.append(path)
     return PageImages(directory=directory, paths=paths)
