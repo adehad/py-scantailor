@@ -12,6 +12,9 @@ dependencies = [
     "scipy>=1.12.0",
     "pillow>=10",
     "numba>=0.60",
+    "pikepdf>=9",
+    "pypdfium2>=4",
+    "jbig2-numba @ file:///${PROJECT_ROOT}/packages/jbig2-numba",
 ]
 requires-python = ">=3.12,<3.13"
 readme = "README.md"
