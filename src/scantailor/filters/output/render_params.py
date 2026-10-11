@@ -10,21 +10,7 @@ from typing import Self
 
 from .color_mode import ColorMode
 from .params import Params
-
-
-@dataclass(frozen=True)
-class SplittingOptions:
-    """Options for splitting output into layers.
-
-    Attributes:
-        split_output: Whether to split output into foreground/background.
-        original_background: Whether to use original image as background.
-        color_foreground: Whether foreground should be color (vs binary).
-    """
-
-    split_output: bool = False
-    original_background: bool = False
-    color_foreground: bool = False
+from .splitting_options import SplittingOptions
 
 
 @dataclass
@@ -70,13 +56,14 @@ class RenderParams:
 
         Args:
             params: The output parameters to derive rendering flags from.
-            splitting_options: Optional splitting configuration.
+            splitting_options: Splitting configuration; defaults to
+                ``params.splitting``.
 
         Returns:
             A new RenderParams instance with computed flags.
         """
         if splitting_options is None:
-            splitting_options = SplittingOptions()
+            splitting_options = params.splitting
 
         # Start with default values
         render = cls()

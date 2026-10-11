@@ -112,6 +112,59 @@ class PolylineIntersector:
         # Fallback: return projection of nearest endpoint
         return self._project_point_to_line(self.polyline[0], line_p1, line_p2)
 
+    def intersect_many(
+        self,
+        line_p1: NDArray[np.floating],
+        line_p2: NDArray[np.floating],
+    ) -> NDArray[np.float64]:
+        """Intersect many lines with the polyline at once.
+
+        Each line takes the first polyline segment that crosses it. A line that
+        misses the polyline gets the projection of the nearer end, and a line
+        parallel to its segment gets the segment's midpoint, as in ``intersect``.
+
+        Args:
+            line_p1: First point of every line, shape (N, 2).
+            line_p2: Second point of every line, shape (N, 2).
+
+        Returns:
+            Intersection points, shape (N, 2).
+        """
+        origin = np.asarray(line_p1, dtype=np.float64)
+        direction = np.asarray(line_p2, dtype=np.float64) - origin
+        normal = np.column_stack([-direction[:, 1], direction[:, 0]])
+
+        # Signed distance, in units of the normal, of every vertex from every line.
+        side = (self.polyline @ normal.T).T - np.sum(origin * normal, axis=1)[:, None]
+        crossing = side[:, :-1] * side[:, 1:] <= 0
+        hit = crossing.any(axis=1)
+        segment = crossing.argmax(axis=1)
+        seg_start = self.polyline[segment]
+        seg_end = self.polyline[segment + 1]
+
+        seg_dir = seg_end - seg_start
+        denominator = direction[:, 0] * seg_dir[:, 1] - direction[:, 1] * seg_dir[:, 0]
+        parallel = np.abs(denominator) < 1e-10
+        offset = seg_start - origin
+        along = (
+            offset[:, 0] * seg_dir[:, 1] - offset[:, 1] * seg_dir[:, 0]
+        ) / np.where(parallel, 1.0, denominator)
+        crossed = origin + along[:, None] * direction
+        crossed = np.where(parallel[:, None], 0.5 * (seg_start + seg_end), crossed)
+
+        # No crossing: project the vertex nearer to the line onto it.
+        nearer_front = np.abs(side[:, 0]) < np.abs(side[:, -1])
+        end_point = np.where(nearer_front[:, None], self.polyline[0], self.polyline[-1])
+        length_sq = np.sum(direction * direction, axis=1)
+        degenerate = length_sq < 1e-10
+        scale = np.sum((end_point - origin) * direction, axis=1) / np.where(
+            degenerate, 1.0, length_sq
+        )
+        projected = np.where(
+            degenerate[:, None], origin, origin + scale[:, None] * direction
+        )
+        return np.where(hit[:, None], crossed, projected)
+
     def _segment_intersects_line(
         self,
         segment: int,

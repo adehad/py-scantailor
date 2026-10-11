@@ -58,34 +58,111 @@ class Generatrix:
     pln2img_1d: NDArray[np.float64]  # Shape (2, 2) for 1D homography
 
 
-def _compute_1d_homography(pairs: list[tuple[float, float]]) -> NDArray[np.float64]:
-    """Compute a 1D homography from three point correspondences.
+@dataclass(frozen=True)
+class GeneratrixBatch:
+    """Many generatrices mapped to image coordinates.
 
-    The 1D homography maps x -> (a*x + b) / (c*x + 1).
+    Attributes:
+        start: First point of each image line, shape (N, 2).
+        end: Second point of each image line, shape (N, 2).
+        pln2img_1d: 1D homography of each line, shape (N, 2, 2).
+    """
+
+    start: NDArray[np.float64]
+    end: NDArray[np.float64]
+    pln2img_1d: NDArray[np.float64]
+
+
+@dataclass(frozen=True)
+class _DirectrixProjections:
+    """Where the directrices and the straight line cross each generatrix.
+
+    Attributes:
+        img_top: Image point of each generatrix at plane y = 0, shape (N, 2).
+        img_bottom: Image point at plane y = 1, shape (N, 2).
+        directrix1: Position of the first directrix along each generatrix, where
+            0 is ``img_top`` and 1 is ``img_bottom``; shape (N,).
+        directrix2: Same for the second directrix.
+        straight: Same for the straight line.
+        straight_y: Plane y of the straight line, or 0.5 when it lies too close
+            to an edge to pin the mapping.
+        straight_near_edge: True when the midpoint stands in for the straight line.
+    """
+
+    img_top: NDArray[np.float64]
+    img_bottom: NDArray[np.float64]
+    directrix1: NDArray[np.float64]
+    directrix2: NDArray[np.float64]
+    straight: NDArray[np.float64]
+    straight_y: float
+    straight_near_edge: bool
+
+    def correspondences(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """Three matched (plane y, position along the generatrix) pairs per line.
+
+        Returns:
+            tuple[NDArray[np.float64], NDArray[np.float64]]: Plane y values and
+                positions along the generatrix, both of shape (N, 3).
+        """
+        count = len(self.directrix1)
+        plane_y = np.column_stack(
+            [np.zeros(count), np.ones(count), np.full(count, self.straight_y)]
+        )
+        third = (
+            0.5 * (self.directrix1 + self.directrix2)
+            if self.straight_near_edge
+            else self.straight
+        )
+        return plane_y, np.column_stack([self.directrix1, self.directrix2, third])
+
+
+def _apply_homography(
+    matrix: NDArray[np.floating], points: NDArray[np.float64]
+) -> NDArray[np.float64]:
+    """Apply a 3x3 homography to points of shape (N, 2) in double precision.
+
+    Raises:
+        ValueError: If a point maps to infinity.
+    """
+    homogeneous = np.column_stack([points, np.ones(len(points))]) @ matrix.T
+    if np.any(np.abs(homogeneous[:, 2]) < 1e-10):
+        raise ValueError("Point maps to infinity")
+    return np.asarray(homogeneous[:, :2] / homogeneous[:, 2:3], dtype=np.float64)
+
+
+def _solve_1d_homographies(
+    source: NDArray[np.float64], target: NDArray[np.float64]
+) -> NDArray[np.float64]:
+    """Fit the 1D homography x -> (a*x + b) / (c*x + 1) through three pairs each.
 
     Args:
-        pairs: List of 3 (from, to) value pairs.
+        source: Input values, shape (N, 3).
+        target: Output values, shape (N, 3).
 
     Returns:
-        2x2 matrix representing the 1D homography.
+        NDArray[np.float64]: Matrices [[a, b], [c, 1]], shape (N, 2, 2).
+
+    Raises:
+        numpy.linalg.LinAlgError: If any of the systems is singular.
     """
-    assert len(pairs) == 3
+    system = np.stack([-source, -np.ones_like(source), source * target], axis=2)
+    coefficients = np.linalg.solve(system, -target[:, :, None])[:, :, 0]
+    matrices = np.empty((len(source), 2, 2), dtype=np.float64)
+    matrices[:, 0, 0] = coefficients[:, 0]
+    matrices[:, 0, 1] = coefficients[:, 1]
+    matrices[:, 1, 0] = coefficients[:, 2]
+    matrices[:, 1, 1] = 1.0
+    return matrices
 
-    # Set up system Ax = b for homography coefficients
-    # For each pair (from, to): -from * a - b + from * to * c = -to
-    A = np.zeros((3, 3), dtype=np.float64)
-    b = np.zeros(3, dtype=np.float64)
 
-    for i, (from_val, to_val) in enumerate(pairs):
-        A[i, 0] = -from_val
-        A[i, 1] = -1
-        A[i, 2] = from_val * to_val
-        b[i] = -to_val
-
-    # Solve for [a, b, c] where homography is [[a, b], [c, 1]]
-    coeffs = np.linalg.solve(A, b)
-
-    return np.array([[coeffs[0], coeffs[1]], [coeffs[2], 1.0]], dtype=np.float64)
+def _apply_1d_homographies(
+    matrices: NDArray[np.float64], values: NDArray[np.float64]
+) -> NDArray[np.float64]:
+    """Apply one 1D homography to each value; a vanishing denominator gives 0."""
+    numerator = matrices[:, 0, 0] * values + matrices[:, 0, 1]
+    denominator = matrices[:, 1, 0] * values + matrices[:, 1, 1]
+    degenerate = np.abs(denominator) < 1e-10
+    return np.where(degenerate, 0.0, numerator / np.where(degenerate, 1.0, denominator))
 
 
 def _apply_1d_homography(H: NDArray[np.float64], x: float) -> float:
@@ -183,6 +260,22 @@ class CylindricalSurfaceDewarper:
         """Arc length of a directrix assuming chord length is one."""
         return self._directrix_arc_length
 
+    def directrix_bounding_box(self) -> tuple[float, float, float, float]:
+        """Bounding box of both directrices in image coordinates.
+
+        Returns:
+            tuple[float, float, float, float]: (left, top, right, bottom).
+        """
+        points = np.vstack(
+            [
+                self._img_directrix1_intersector.polyline,
+                self._img_directrix2_intersector.polyline,
+            ]
+        )
+        left, top = points.min(axis=0)
+        right, bottom = points.max(axis=0)
+        return float(left), float(top), float(right), float(bottom)
+
     def map_generatrix(self, crv_x: float) -> Generatrix:
         """Map a generatrix from dewarped to image coordinates.
 
@@ -194,58 +287,36 @@ class CylindricalSurfaceDewarper:
         Returns:
             Generatrix with image line and 1D homography for Y mapping.
         """
-        # Convert dewarped X to plane X via arc length mapping
-        pln_x = self._arc_length_mapper.arc_len_to_x(crv_x)
-
-        # Get the generatrix line in image coordinates
-        pln_top = np.array([pln_x, 0.0])
-        pln_bottom = np.array([pln_x, 1.0])
-        img_top = self._pln2img.apply_to_point(pln_top)
-        img_bottom = self._pln2img.apply_to_point(pln_bottom)
-        img_generatrix = (img_top, img_bottom)
-
-        # Find intersections with the directrices
-        img_directrix1_pt = self._img_directrix1_intersector.intersect(
-            img_top, img_bottom
-        )
-        img_directrix2_pt = self._img_directrix2_intersector.intersect(
-            img_top, img_bottom
+        batch = self.map_generatrices(np.array([crv_x], dtype=np.float64))
+        return Generatrix(
+            img_line=(batch.start[0], batch.end[0]),
+            pln2img_1d=batch.pln2img_1d[0],
         )
 
-        # Project points onto the generatrix line
-        _, proj1 = project_point_to_line(img_directrix1_pt, img_top, img_bottom)
-        _, proj2 = project_point_to_line(img_directrix2_pt, img_top, img_bottom)
+    def map_generatrices(self, crv_xs: NDArray[np.floating]) -> GeneratrixBatch:
+        """Map many generatrices from dewarped to image coordinates.
 
-        # Straight line point
-        pln_straight = np.array([pln_x, self._pln_straight_line_y])
-        img_straight = self._pln2img.apply_to_point(pln_straight)
-        _, proj_straight = project_point_to_line(img_straight, img_top, img_bottom)
+        Args:
+            crv_xs: X coordinates in dewarped space, shape (N,).
 
-        # Build 1D homography mapping plane Y to image projection
-        pairs: list[tuple[float, float]]
-        if (
-            abs(self._pln_straight_line_y) < 0.05
-            or abs(self._pln_straight_line_y - 1.0) < 0.05
-        ):
-            # Straight line is near an edge, use midpoint instead
-            pairs = [
-                (0.0, proj1),
-                (1.0, proj2),
-                (0.5, 0.5 * (proj1 + proj2)),
-            ]
-        else:
-            pairs = [
-                (0.0, proj1),
-                (1.0, proj2),
-                (self._pln_straight_line_y, proj_straight),
-            ]
+        Returns:
+            GeneratrixBatch of N image lines with their Y homographies.
 
-        pln2img_1d = _compute_1d_homography(pairs)
-
-        return Generatrix(img_line=img_generatrix, pln2img_1d=pln2img_1d)
+        Raises:
+            numpy.linalg.LinAlgError: If a generatrix has no valid homography.
+        """
+        crv_xs = np.asarray(crv_xs, dtype=np.float64)
+        pln_x = self._arc_length_mapper.arc_len_to_x_many(crv_xs)
+        projections = self._project_directrices(pln_x)
+        plane_y, image_y = projections.correspondences()
+        return GeneratrixBatch(
+            start=projections.img_top,
+            end=projections.img_bottom,
+            pln2img_1d=_solve_1d_homographies(plane_y, image_y),
+        )
 
     def map_to_dewarped_space(self, img_pt: NDArray[np.float64]) -> NDArray[np.float64]:
-        """Transform a point from warped image to dewarped coordinates.
+        """Transform a point from warped image coordinates to dewarped coordinates.
 
         Args:
             img_pt: Point in warped image coordinates [x, y].
@@ -253,63 +324,86 @@ class CylindricalSurfaceDewarper:
         Returns:
             Point in dewarped normalized coordinates [x, y].
         """
-        img_pt = np.asarray(img_pt, dtype=np.float64)
+        point = np.asarray(img_pt, dtype=np.float64)
+        return self.map_points_to_dewarped_space(point[None, :])[0]
 
-        # Get plane X coordinate
-        pln_pt = self._img2pln.apply_to_point(img_pt)
-        pln_x = pln_pt[0]
+    def map_points_to_dewarped_space(
+        self, img_pts: NDArray[np.float64]
+    ) -> NDArray[np.float64]:
+        """Transform many points from warped image to dewarped coordinates.
 
-        # Convert to dewarped X via arc length
-        crv_x = self._arc_length_mapper.x_to_arc_len(pln_x)
+        Args:
+            img_pts: Points in warped image coordinates, shape (N, 2).
 
-        # Get the generatrix at this X
-        pln_top = np.array([pln_x, 0.0])
-        pln_bottom = np.array([pln_x, 1.0])
-        img_top = self._pln2img.apply_to_point(pln_top)
-        img_bottom = self._pln2img.apply_to_point(pln_bottom)
+        Returns:
+            Points in dewarped normalized coordinates, shape (N, 2).
+        """
+        img_pts = np.asarray(img_pts, dtype=np.float64)
+        pln_x = _apply_homography(self._img2pln.matrix, img_pts)[:, 0]
+        crv_x = self._arc_length_mapper.x_to_arc_len_many(pln_x)
 
-        # Find intersections with the directrices
-        img_directrix1_pt = self._img_directrix1_intersector.intersect(
+        projections = self._project_directrices(pln_x)
+        plane_y, image_y = projections.correspondences()
+        img_to_crv = _solve_1d_homographies(image_y, plane_y)
+
+        axis = projections.img_bottom - projections.img_top
+        axis_len_sq = np.sum(axis * axis, axis=1)
+        along = np.sum((img_pts - projections.img_top) * axis, axis=1) / np.where(
+            axis_len_sq < 1e-10, 1.0, axis_len_sq
+        )
+        along = np.where(axis_len_sq < 1e-10, 0.0, along)
+        crv_y = _apply_1d_homographies(img_to_crv, along)
+        return np.column_stack([crv_x, crv_y])
+
+    def _project_directrices(self, pln_x: NDArray[np.float64]) -> _DirectrixProjections:
+        """Intersect the generatrices at plane X positions with both directrices.
+
+        Args:
+            pln_x: Plane X coordinates, shape (N,).
+
+        Returns:
+            The generatrix end points and where the directrices and the
+            straight line cross each generatrix, as positions along it.
+        """
+        count = len(pln_x)
+        zeros = np.zeros(count)
+        img_top = _apply_homography(
+            self._pln2img.matrix, np.column_stack([pln_x, zeros])
+        )
+        img_bottom = _apply_homography(
+            self._pln2img.matrix, np.column_stack([pln_x, zeros + 1.0])
+        )
+        img_straight = _apply_homography(
+            self._pln2img.matrix,
+            np.column_stack([pln_x, zeros + self._pln_straight_line_y]),
+        )
+        axis = img_bottom - img_top
+        axis_len_sq = np.sum(axis * axis, axis=1)
+        safe_len_sq = np.where(axis_len_sq < 1e-10, 1.0, axis_len_sq)
+
+        def along(points: NDArray[np.float64]) -> NDArray[np.float64]:
+            scalar = np.sum((points - img_top) * axis, axis=1) / safe_len_sq
+            return np.where(axis_len_sq < 1e-10, 0.0, scalar)
+
+        directrix1 = self._img_directrix1_intersector.intersect_many(
             img_top, img_bottom
         )
-        img_directrix2_pt = self._img_directrix2_intersector.intersect(
+        directrix2 = self._img_directrix2_intersector.intersect_many(
             img_top, img_bottom
         )
-
-        # Project points onto the generatrix line
-        _, proj1 = project_point_to_line(img_directrix1_pt, img_top, img_bottom)
-        _, proj2 = project_point_to_line(img_directrix2_pt, img_top, img_bottom)
-
-        # Straight line point
-        pln_straight = np.array([pln_x, self._pln_straight_line_y])
-        img_straight = self._pln2img.apply_to_point(pln_straight)
-        _, proj_straight = project_point_to_line(img_straight, img_top, img_bottom)
-
-        # Build inverse 1D homography (image projection -> plane Y -> crv Y)
-        pairs: list[tuple[float, float]]
-        if (
+        straight_near_edge = (
             abs(self._pln_straight_line_y) < 0.05
             or abs(self._pln_straight_line_y - 1.0) < 0.05
-        ):
-            pairs = [
-                (proj1, 0.0),
-                (proj2, 1.0),
-                (0.5 * (proj1 + proj2), 0.5),
-            ]
-        else:
-            pairs = [
-                (proj1, 0.0),
-                (proj2, 1.0),
-                (proj_straight, self._pln_straight_line_y),
-            ]
-
-        img2crv_1d = _compute_1d_homography(pairs)
-
-        # Project input point onto generatrix and transform Y
-        _, img_proj = project_point_to_line(img_pt, img_top, img_bottom)
-        crv_y = _apply_1d_homography(img2crv_1d, img_proj)
-
-        return np.array([crv_x, crv_y], dtype=np.float64)
+        )
+        return _DirectrixProjections(
+            img_top=img_top,
+            img_bottom=img_bottom,
+            directrix1=along(directrix1),
+            directrix2=along(directrix2),
+            straight=along(img_straight),
+            straight_y=0.5 if straight_near_edge else self._pln_straight_line_y,
+            straight_near_edge=straight_near_edge,
+        )
 
     def map_to_warped_space(self, crv_pt: NDArray[np.float64]) -> NDArray[np.floating]:
         """Transform a point from dewarped to warped image coordinates.

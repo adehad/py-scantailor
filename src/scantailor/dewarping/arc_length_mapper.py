@@ -154,6 +154,52 @@ class ArcLengthMapper:
         idx = max(0, min(idx, n - 2))
         return self._interpolate_x_in_segment(x, idx)
 
+    def arc_len_to_x_many(self, arc_lens: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Vectorised ``arc_len_to_x``.
+
+        Args:
+            arc_lens: Arc lengths, any shape.
+
+        Returns:
+            X coordinates, same shape; beyond the samples the end segments are
+            extrapolated.
+        """
+        return self._interpolate_many(arc_lens, self._samples_arclen, self._samples_x)
+
+    def x_to_arc_len_many(self, xs: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Vectorised ``x_to_arc_len``.
+
+        Args:
+            xs: X coordinates, any shape.
+
+        Returns:
+            Arc lengths, same shape; beyond the samples the end segments are
+            extrapolated.
+        """
+        return self._interpolate_many(xs, self._samples_x, self._samples_arclen)
+
+    @staticmethod
+    def _interpolate_many(
+        values: NDArray[np.float64],
+        keys: NDArray[np.float64],
+        targets: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
+        """Piecewise-linear map from ``keys`` to ``targets``, extrapolating the ends."""
+        values = np.asarray(values, dtype=np.float64)
+        count = len(keys)
+        if count == 0:
+            return np.zeros_like(values)
+        if count == 1:
+            return np.full_like(values, targets[0])
+        segment = np.clip(np.searchsorted(keys, values, side="right") - 1, 0, count - 2)
+        key_span = keys[segment + 1] - keys[segment]
+        flat = np.abs(key_span) < 1e-10
+        fraction = (values - keys[segment]) / np.where(flat, 1.0, key_span)
+        target_span = targets[segment + 1] - targets[segment]
+        return np.where(
+            flat, targets[segment], targets[segment] + fraction * target_span
+        )
+
     def _interpolate_arc_len_in_segment(self, arc_len: float, segment: int) -> float:
         """Interpolate x value from arc length within a segment.
 

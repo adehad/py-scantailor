@@ -23,7 +23,7 @@ from loguru import logger
 from numpy.typing import NDArray
 
 from scantailor.core.image_io import load_image, write_image
-from scantailor.core.models import Dpi, PageId, SubPage
+from scantailor.core.models import PageId, SubPage
 from scantailor.core.pipeline import (
     PipelineOptions,
     fix_aggregate_page_size,
@@ -32,6 +32,7 @@ from scantailor.core.pipeline import (
 from scantailor.core.project import ImageMetadata, LayoutDirection, StageParamsEntry
 from scantailor.core.stage_params import apply_stage_params, collect_stage_params
 from scantailor.core.stage_sequence import StageSequence
+from scantailor.filters.output.split_output import write_split_images
 
 DEFAULT_DPI = 300.0
 
@@ -293,9 +294,13 @@ def _render_page(job: _RenderJob) -> Path:
     options = PipelineOptions(dpi=_page_dpi(metadata, _worker_default_dpi))
     rendered = process_page(image, job.page, _worker_stages, options)
     is_binary = bool(rendered.metadata.get("OUTPUT", {}).get("is_binary"))
-    dpi: Dpi | None = None if metadata.dpi.is_null() else metadata.dpi
+    dpi = rendered.dpi or (None if metadata.dpi.is_null() else metadata.dpi)
     job.output_path.parent.mkdir(parents=True, exist_ok=True)
     write_image(job.output_path, _as_writable(rendered.image, is_binary), dpi)
+    if rendered.split is not None:
+        write_split_images(
+            job.output_path.parent, job.output_path.name, rendered.split, dpi
+        )
     return job.output_path
 
 
