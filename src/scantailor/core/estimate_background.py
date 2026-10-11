@@ -132,7 +132,8 @@ def estimate_background(
             Not modified.
         area_to_consider (Sequence[tuple[float, float]] | None): Polygon of (x, y)
             vertices in ``gray`` pixel coordinates. Pixels outside it do not take
-            part in the fit. None uses the whole image.
+            part in the fit. None, or a polygon that covers no pixel of the
+            image, uses the whole image.
 
     Returns:
         PolynomialSurface: Background model. ``render(gray.shape)`` gives a
@@ -167,7 +168,8 @@ def estimate_background(
         ).astype(np.int32)
         inside = np.zeros(background.shape, dtype=np.uint8)
         cv2.fillPoly(inside, [polygon], 1)
-        mask = inside.astype(bool)
+        if inside.any():
+            mask = inside.astype(bool)
 
     mask = _mask_outliers(background, mask)
     mask = cv2.erode(mask.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)

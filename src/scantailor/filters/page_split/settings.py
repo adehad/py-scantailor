@@ -4,6 +4,8 @@ This module provides the Settings class which stores per-page parameters
 for the page split filter.
 """
 
+import threading
+
 from scantailor.core.models import PageId
 
 from .layout_type import LayoutType
@@ -19,6 +21,7 @@ class Settings:
 
     def __init__(self) -> None:
         """Initialize empty settings."""
+        self._lock = threading.Lock()
         self._params: dict[PageId, Params] = {}
         self._default_layout_type: LayoutType = LayoutType.AUTO_LAYOUT_TYPE
 
@@ -31,7 +34,12 @@ class Settings:
         Returns:
             The stored parameters or default if not set.
         """
-        return self._params.get(page_id, Params(layout_type=self._default_layout_type))
+        with self._lock:
+            params = self._params.get(page_id)
+            default_layout_type = self._default_layout_type
+        if params is None:
+            return Params(layout_type=default_layout_type)
+        return params
 
     def set_params(self, page_id: "PageId", params: Params) -> None:
         """Set parameters for a page.
@@ -40,7 +48,8 @@ class Settings:
             page_id: The page to set parameters for.
             params: The parameters to store.
         """
-        self._params[page_id] = params
+        with self._lock:
+            self._params[page_id] = params
 
     def is_params_set(self, page_id: "PageId") -> bool:
         """Check if parameters have been explicitly set for a page.
@@ -51,7 +60,8 @@ class Settings:
         Returns:
             True if parameters have been set, False otherwise.
         """
-        return page_id in self._params
+        with self._lock:
+            return page_id in self._params
 
     def clear_params(self, page_id: "PageId") -> None:
         """Clear parameters for a page, reverting to defaults.
@@ -59,11 +69,13 @@ class Settings:
         Args:
             page_id: The page to clear.
         """
-        self._params.pop(page_id, None)
+        with self._lock:
+            self._params.pop(page_id, None)
 
     def get_default_layout_type(self) -> LayoutType:
         """Get the default layout type for new pages."""
-        return self._default_layout_type
+        with self._lock:
+            return self._default_layout_type
 
     def set_default_layout_type(self, layout_type: LayoutType) -> None:
         """Set the default layout type for new pages.
@@ -71,7 +83,8 @@ class Settings:
         Args:
             layout_type: The new default layout type.
         """
-        self._default_layout_type = layout_type
+        with self._lock:
+            self._default_layout_type = layout_type
 
     def apply_params_to_pages(self, page_ids: list["PageId"], params: Params) -> None:
         """Apply the same parameters to multiple pages.
@@ -80,9 +93,12 @@ class Settings:
             page_ids: List of pages to update.
             params: The parameters to apply.
         """
-        for page_id in page_ids:
-            self._params[page_id] = params
+        with self._lock:
+            for page_id in page_ids:
+                self._params[page_id] = params
 
     def clear_all(self) -> None:
-        """Clear all stored parameters."""
-        self._params.clear()
+        """Clear all stored parameters and restore the default layout type."""
+        with self._lock:
+            self._params.clear()
+            self._default_layout_type = LayoutType.AUTO_LAYOUT_TYPE
