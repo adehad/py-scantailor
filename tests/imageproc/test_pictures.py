@@ -179,3 +179,21 @@ class TestReconstructionBackend:
         np.testing.assert_array_equal(
             _reconstruct_by_erosion(marker, gradient), expected
         )
+
+
+class TestDetectionResolution:
+    """The page is resampled to the size C++ to300dpi computes."""
+
+    def test_half_pixel_sizes_round_up(self, monkeypatch):
+        """5x5 pixels at 600 dpi become 3x3, not 2x2 (round half away from zero)."""
+        import scantailor.imageproc.pictures as pictures
+
+        seen = []
+
+        def spy(small, **_kwargs):
+            seen.append(small.shape)
+            return np.zeros_like(small)
+
+        monkeypatch.setattr(pictures, "detect_pictures", spy)
+        pictures.estimate_picture_mask(np.zeros((5, 5), np.uint8), (600, 600))
+        assert seen == [(3, 3)]

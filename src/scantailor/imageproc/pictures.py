@@ -109,8 +109,8 @@ def estimate_picture_mask(
     """
     height, width = gray.shape
     small_size = (
-        max(1, round(width * DETECTION_DPI / dpi[0])),
-        max(1, round(height * DETECTION_DPI / dpi[1])),
+        max(1, int(width * DETECTION_DPI / dpi[0] + 0.5)),
+        max(1, int(height * DETECTION_DPI / dpi[1] + 0.5)),
     )
     shrinking = small_size[0] * small_size[1] < width * height
     small = np.asarray(
