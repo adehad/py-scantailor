@@ -65,6 +65,8 @@ class PipelineResult:
         metadata: Additional metadata from processing.
         dpi: Resolution of ``image`` once the output stage has run; None before.
         split: Foreground and background layers when the output splits them.
+        transformation: Source pixels to output pixels as accumulated by the
+            geometry stages; None only when no stage ran.
     """
 
     image: NDArray[np.uint8]
@@ -73,6 +75,7 @@ class PipelineResult:
     metadata: dict = field(default_factory=dict)
     dpi: Dpi | None = None
     split: SplitImages | None = None
+    transformation: ImageTransformation | None = None
 
 
 @dataclass
@@ -265,6 +268,7 @@ def _run_stages(
         metadata=metadata,
         dpi=output_dpi,
         split=split,
+        transformation=state.xform,
     )
 
 
