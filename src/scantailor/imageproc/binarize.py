@@ -1,13 +1,24 @@
 """Binarization algorithms for converting grayscale images to binary.
 
 All functions take grayscale images as numpy arrays and return binary images.
-Binary images use 0 for black (background) and 255 for white (foreground).
+Binary images use 0 for black (ink, the foreground) and 255 for white (the
+background).
+
+The local methods take ``delta``, the threshold adjustment of the output
+filter. It is added to every local threshold, so a positive value turns more
+pixels black. A pixel is black when its gray level is strictly below the
+(adjusted) threshold.
 """
 
 import cv2
 import numpy as np
 from numpy.typing import NDArray
-from skimage.filters import threshold_sauvola
+
+from .background_color import otsu_threshold
+
+_GRAY_LEVELS = 256
+# Divisor of the local deviation in Sauvola's formula.
+_SAUVOLA_RANGE = 128.0
 
 
 def peak_threshold(image: NDArray[np.uint8]) -> int:
@@ -139,92 +150,108 @@ def binarize_mokji(
     return np.asarray(binary, dtype=np.uint8)
 
 
-def binarize_otsu(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
-    """Binarize an image using Otsu's method.
+def binarize_otsu(
+    image: NDArray[np.uint8],
+    adjustment: int = 0,
+    bounds: tuple[int, int] = (0, _GRAY_LEVELS),
+) -> NDArray[np.uint8]:
+    """Binarize an image with Otsu's global threshold.
 
-    Otsu's method automatically determines the optimal threshold by minimizing
-    intra-class variance. Works well for images with bimodal histograms.
+    The threshold minimises the intra-class variance of the histogram. It is
+    shifted by ``adjustment`` and then clamped to ``bounds``; the clamp keeps a
+    page whose content is all masked out from turning entirely black or white.
 
     Args:
-        image (NDArray[np.uint8]): Grayscale input image.
+        image (NDArray[np.uint8]): 2-D gray image. Not modified.
+        adjustment (int): Added to the Otsu threshold; positive means more ink.
+        bounds (tuple[int, int]): Lowest and highest threshold allowed after
+            the adjustment. A pixel is black when it is below the threshold.
 
     Returns:
-        NDArray[np.uint8]: Binary image (0 or 255).
+        NDArray[np.uint8]: New array of the same shape, 0 for ink and 255 for
+            background.
     """
-    _, binary = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    return np.asarray(binary, dtype=np.uint8)
+    threshold = _adjusted_otsu_threshold(image, adjustment, bounds)
+    return np.where(image < threshold, 0, 255).astype(np.uint8)
+
+
+def _adjusted_otsu_threshold(
+    image: NDArray[np.uint8],
+    adjustment: int,
+    bounds: tuple[int, int],
+) -> int:
+    """Otsu threshold of ``image`` plus ``adjustment``, clamped to ``bounds``."""
+    histogram = np.bincount(image.ravel(), minlength=_GRAY_LEVELS).astype(np.int64)
+    low, high = bounds
+    return int(np.clip(otsu_threshold(histogram) + adjustment, low, high))
 
 
 def binarize_sauvola(
     image: NDArray[np.uint8],
     window_size: int = 25,
     k: float = 0.2,
+    delta: float = 0.0,
 ) -> NDArray[np.uint8]:
     """Binarize an image using Sauvola's adaptive thresholding.
 
-    Sauvola's method computes a local threshold based on the mean and standard
-    deviation within a window. Good for documents with uneven illumination.
+    The local threshold is ``mean * (1 + k * (deviation / 128 - 1))`` over a
+    square window; ``delta`` is added to it. Good for uneven illumination.
 
     Args:
-        image (NDArray[np.uint8]): Grayscale input image.
-        window_size (int): Size of the local window (must be odd).
-        k (float): Sensitivity parameter (typically 0.1-0.5).
+        image (NDArray[np.uint8]): 2-D gray image. Not modified.
+        window_size (int): Side of the local window, clipped at the image
+            border. An even size reaches one pixel further after the centre than
+            before.
+        k (float): Sensitivity, typically 0.1 to 0.5.
+        delta (float): Threshold adjustment; positive means more ink.
 
     Returns:
-        NDArray[np.uint8]: Binary image (0 or 255).
+        NDArray[np.uint8]: New array, 0 for ink and 255 for background.
     """
-    # Ensure window_size is odd
-    if window_size % 2 == 0:
-        window_size += 1
-
-    threshold = threshold_sauvola(image, window_size=window_size, k=k)
-    binary = (image > threshold).astype(np.uint8) * 255
-    return binary
+    mean, deviation = _window_statistics(image, window_size)
+    threshold = mean * (1.0 + k * (deviation / _SAUVOLA_RANGE - 1.0))
+    return _ink_below(image, threshold + delta)
 
 
 def binarize_wolf(
     image: NDArray[np.uint8],
     window_size: int = 25,
     k: float = 0.5,
+    delta: float = 0.0,
+    lower_bound: int = 1,
+    upper_bound: int = 254,
 ) -> NDArray[np.uint8]:
     """Binarize an image using Wolf's adaptive thresholding.
 
-    Wolf's method is a modification of Sauvola's that uses the minimum
-    and maximum grayscale values in addition to mean and standard deviation.
-    It's more robust for low-contrast images.
+    The local threshold is ``mean - k * a * (mean - min)`` where ``min`` is the
+    darkest level of the whole image and ``a = 1 - deviation / max_deviation``.
+    Window statistics are taken over the part of the window inside the image.
+    ``delta`` is added to the threshold. Pixels darker than ``lower_bound`` are
+    always ink and pixels brighter than ``upper_bound`` are always background.
 
     Args:
-        image (NDArray[np.uint8]): Grayscale input image.
-        window_size (int): Size of the local window (must be odd).
-        k (float): Sensitivity parameter (typically 0.3-0.5).
+        image (NDArray[np.uint8]): 2-D gray image. Not modified.
+        window_size (int): Side of the local window, clipped at the image
+            border. An even size reaches one pixel further after the centre than
+            before.
+        k (float): Sensitivity, typically 0.3 to 0.5.
+        delta (float): Threshold adjustment; positive means more ink.
+        lower_bound (int): Gray levels below this are ink whatever the threshold.
+        upper_bound (int): Gray levels above this are background.
 
     Returns:
-        NDArray[np.uint8]: Binary image (0 or 255).
+        NDArray[np.uint8]: New array, 0 for ink and 255 for background.
     """
-    # Ensure window_size is odd
-    if window_size % 2 == 0:
-        window_size += 1
+    mean, deviation = _window_statistics(image, window_size)
+    max_deviation = float(deviation.max())
+    if max_deviation <= 0.0:
+        max_deviation = 1.0
+    darkest = float(image.min())
+    scale = 1.0 - deviation / max_deviation
+    threshold = mean - k * scale * (mean - darkest)
 
-    # Compute local mean using box filter
-    mean = cv2.blur(image.astype(np.float64), (window_size, window_size))
-
-    # Compute local standard deviation
-    sq_mean = cv2.blur((image.astype(np.float64)) ** 2, (window_size, window_size))
-    std = np.sqrt(np.maximum(sq_mean - mean**2, 0))
-
-    # Get min value of image
-    min_val = float(np.min(image))
-
-    # Get max standard deviation
-    max_std = float(np.max(std))
-    if max_std < 1e-6:
-        max_std = 1.0
-
-    # Wolf's formula: T = (1-k)*mean + k*min + k*(std/max_std)*(mean - min)
-    threshold = (1 - k) * mean + k * min_val + k * (std / max_std) * (mean - min_val)
-
-    binary = (image > threshold).astype(np.uint8) * 255
-    return binary
+    ink = (image < lower_bound) | ((image <= upper_bound) & (image < threshold + delta))
+    return np.where(ink, 0, 255).astype(np.uint8)
 
 
 def binarize_edge_div(
@@ -232,6 +259,7 @@ def binarize_edge_div(
     window_size: int = 25,
     kep: float = 0.5,
     kbd: float = 0.5,
+    delta: float = 0.0,
 ) -> NDArray[np.uint8]:
     """Binarize an image using edge division preprocessing with Otsu.
 
@@ -241,22 +269,23 @@ def binarize_edge_div(
     - BlurDiv: Normalizes by the local mean to handle uneven illumination
 
     Args:
-        image: Grayscale input image.
-        window_size: Size of the local window (must be odd).
-        kep: Edge enhancement weight (0-1). Higher = more edge enhancement.
-        kbd: Blur division weight (0-1). Higher = more illumination normalization.
+        image (NDArray[np.uint8]): 2-D gray image. Not modified.
+        window_size (int): Side of the local window, clipped at the image
+            border. An even size reaches one pixel further after the centre than
+            before.
+        kep (float): Edge enhancement weight (0-1). Higher = more edge enhancement.
+        kbd (float): Blur division weight (0-1). Higher = more illumination
+            normalization.
+        delta (float): Added to the Otsu threshold of the normalised image
+            without clamping; positive means more ink. Rounded to an integer.
 
     Returns:
-        Binary image (0 or 255).
+        NDArray[np.uint8]: New array, 0 for ink and 255 for background.
     """
-    # Ensure window_size is odd
-    if window_size % 2 == 0:
-        window_size += 1
-
     img_float = image.astype(np.float64)
 
     # Compute local mean using box filter
-    local_mean = cv2.blur(img_float, (window_size, window_size))
+    local_mean = _window_mean(image, window_size)
 
     # Start with original values
     result = img_float.copy()
@@ -282,47 +311,83 @@ def binarize_edge_div(
     # Clip to valid range and convert back to uint8
     result = np.clip(result, 0, 255).astype(np.uint8)
 
-    # Apply Otsu thresholding
-    return binarize_otsu(result)
+    return binarize_otsu(result, round(delta))
 
 
 def binarize_bradley(
     image: NDArray[np.uint8],
     window_size: int = 25,
     k: float = 0.15,
+    delta: float = 0.0,
 ) -> NDArray[np.uint8]:
     """Binarize an image using Bradley's adaptive thresholding.
 
-    Bradley's method computes a local threshold based only on the mean
-    within a window. A pixel is set to black if it's sufficiently darker
-    than the local mean. Simple and fast, works well for clean documents.
-
-    The threshold at each pixel is: mean * (1 - k)
-    Pixels below this threshold are classified as foreground (black).
+    The local threshold is ``mean * (1 - k)`` over a square window, plus
+    ``delta``; for ``k >= 1`` it is ``delta`` alone. Simple and fast, works
+    well for clean documents.
 
     Args:
-        image: Grayscale input image.
-        window_size: Size of the local window (must be odd).
-        k: Sensitivity parameter (0-1). Higher values make it
-            easier for pixels to be classified as foreground (black).
-            Typically 0.1-0.2.
+        image (NDArray[np.uint8]): 2-D gray image. Not modified.
+        window_size (int): Side of the local window, clipped at the image
+            border. An even size reaches one pixel further after the centre than
+            before.
+        k (float): Sensitivity (0-1). Higher values make it easier for pixels to
+            be classified as ink. Typically 0.1-0.2.
+        delta (float): Threshold adjustment; positive means more ink.
 
     Returns:
-        Binary image (0 or 255).
+        NDArray[np.uint8]: New array, 0 for ink and 255 for background.
     """
-    # Ensure window_size is odd
-    if window_size % 2 == 0:
-        window_size += 1
+    local_mean = _window_mean(image, window_size)
+    threshold = local_mean * (1.0 - k) if k < 1.0 else np.zeros_like(local_mean)
+    return _ink_below(image, threshold + delta)
 
-    # Compute local mean using box filter (efficient via integral image internally)
-    local_mean = cv2.blur(image.astype(np.float64), (window_size, window_size))
 
-    # Bradley threshold: pixel < mean * (1 - k) -> black
-    # For k >= 1, threshold is 0 (everything white except pure black)
-    if k >= 1.0:
-        threshold = np.zeros_like(local_mean)
-    else:
-        threshold = local_mean * (1.0 - k)
+def _ink_below(
+    image: NDArray[np.uint8],
+    threshold: NDArray[np.floating],
+) -> NDArray[np.uint8]:
+    """Return 0 where ``image`` is strictly below ``threshold`` and 255 elsewhere."""
+    return np.where(image < threshold, 0, 255).astype(np.uint8)
 
-    binary = (image >= threshold).astype(np.uint8) * 255
-    return binary
+
+def _window_statistics(
+    image: NDArray[np.uint8],
+    window_size: int,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Mean and standard deviation over a window clipped at the image border.
+
+    Args:
+        image (NDArray[np.uint8]): 2-D gray image.
+        window_size (int): Window side in pixels.
+
+    Returns:
+        tuple[NDArray[np.float64], NDArray[np.float64]]: Local mean and standard
+            deviation, both float64 and of the image's shape.
+    """
+    gray = image.astype(np.float64)
+    area = _window_sum(np.ones_like(gray), window_size)
+    mean = _window_sum(gray, window_size) / area
+    variance = _window_sum(gray * gray, window_size) / area - mean * mean
+    return mean, np.sqrt(np.abs(variance))
+
+
+def _window_mean(image: NDArray[np.uint8], window_size: int) -> NDArray[np.float64]:
+    """Mean over a window clipped at the image border."""
+    gray = image.astype(np.float64)
+    return _window_sum(gray, window_size) / _window_sum(np.ones_like(gray), window_size)
+
+
+def _window_sum(values: NDArray[np.float64], window_size: int) -> NDArray[np.float64]:
+    """Sum over a ``window_size`` square around each pixel, zero outside the image.
+
+    An even window reaches one pixel further after the centre than before.
+    """
+    summed = cv2.boxFilter(
+        values,
+        cv2.CV_64F,
+        (window_size, window_size),
+        normalize=False,
+        borderType=cv2.BORDER_CONSTANT,
+    )
+    return np.asarray(summed, dtype=np.float64)
