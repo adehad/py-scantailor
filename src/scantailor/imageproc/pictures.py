@@ -4,9 +4,9 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 from scipy import ndimage
-from skimage.morphology import reconstruction
 
 from .filters import stretch_gray_range
+from .reconstruction import reconstruction
 
 # Resolution the detector is tuned for.
 DETECTION_DPI = 300
@@ -22,7 +22,6 @@ _HIGHER_SENSITIVITY_BLACK_CLIP = 5.0
 PICTURE_THRESHOLD = 48
 # Distance in pixels at 300 dpi under which neighbouring picture runs are one picture.
 _JOIN_DISTANCE = 16
-_FOOTPRINT_8 = np.ones((3, 3), dtype=bool)
 
 
 def detect_pictures(
@@ -89,10 +88,7 @@ def _reconstruct_by_erosion(
     mask and is lighter wherever no dark path leads to a dark seed pixel
     (8-connectivity).
     """
-    filled = reconstruction(
-        np.maximum(seed, mask), mask, method="erosion", footprint=_FOOTPRINT_8
-    )
-    return np.asarray(filled, dtype=np.uint8)
+    return reconstruction(np.maximum(seed, mask), mask, "erosion", 8)
 
 
 def estimate_picture_mask(
