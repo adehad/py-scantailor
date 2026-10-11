@@ -146,6 +146,29 @@ class TestEstimateBackground:
             estimate_background(bad)
 
 
+class TestAreaToConsiderMissingImage:
+    """An area polygon that misses the image must not blank the page."""
+
+    def test_polygon_outside_image_matches_whole_image_estimate(self):
+        """A polygon entirely off the page gives the same surface as no polygon."""
+        page, _, _ = _lit_page()
+        off_page = [(1000.0, 1000.0), (1100.0, 1000.0), (1100.0, 1100.0)]
+
+        fallback = estimate_background(page, off_page).render(page.shape)
+        whole = estimate_background(page).render(page.shape)
+
+        np.testing.assert_array_equal(fallback, whole)
+
+    def test_polygon_outside_image_does_not_blank_page(self):
+        """Normalising with an off-page polygon keeps the paper bright."""
+        page, ink, _ = _lit_page()
+        off_page = [(-500.0, -500.0), (-400.0, -500.0), (-400.0, -400.0)]
+
+        result = normalize_illumination_gray(page, off_page)
+
+        assert np.median(result[~ink]) > 200
+
+
 class TestRaiseAboveBackground:
     """Pixel mapping that turns the background white."""
 
