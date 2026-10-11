@@ -28,7 +28,9 @@ def _find_all_modules(package) -> list[str]:
 
 ALL_MODULES = _find_all_modules(scantailor)
 
-pytestmark = pytest.mark.slow
+# The module fixture starts one interpreter per module; one xdist worker must own
+# them all, or every worker spawns the full set and the imports time out.
+pytestmark = [pytest.mark.slow, pytest.mark.xdist_group("imports")]
 
 
 def _import_in_clean_interpreter(module_name: str) -> subprocess.CompletedProcess[str]:
