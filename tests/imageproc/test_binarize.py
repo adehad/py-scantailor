@@ -9,6 +9,7 @@ from scantailor.imageproc.binarize import (
     binarize_otsu,
     binarize_peak,
     binarize_sauvola,
+    mokji_threshold,
     peak_threshold,
 )
 
@@ -275,6 +276,53 @@ class TestBinarizeMokji:
         assert result.shape == (10, 10)
 
 
+def _mokji_reference_threshold(image, max_edge_width, min_edge_magnitude):
+    """Direct transcription of the C++ pair matrix, one pixel at a time."""
+    size = (max_edge_width + 1) * 2 - 1
+    half = size // 2
+    height, width = image.shape
+    matrix = np.zeros((256, 256), dtype=np.int64)
+    for y in range(max_edge_width, height - max_edge_width):
+        for x in range(max_edge_width, width - max_edge_width):
+            window = image[
+                max(0, y - half) : y + half + 1, max(0, x - half) : x + half + 1
+            ]
+            matrix[window.min(), image[y, x]] += 1
+    numerator = denominator = 0
+    for m in range(256 - min_edge_magnitude):
+        for n in range(m + min_edge_magnitude, 256):
+            numerator += (m + n) * matrix[m, n]
+            denominator += matrix[m, n]
+    if denominator == 0:
+        return 128
+    return int(0.5 * numerator / denominator + 0.5)
+
+
+class TestMokjiThreshold:
+    """Tests for the Mokji threshold against the C++ definition."""
+
+    def test_matches_pair_matrix_reference_on_random_image(self):
+        """Threshold equals the C++ pair-matrix computation."""
+        rng = np.random.default_rng(3)
+        image = rng.integers(0, 256, (40, 50), dtype=np.uint8)
+        assert mokji_threshold(image, 3, 20) == _mokji_reference_threshold(image, 3, 20)
+
+    def test_image_without_edges_gives_128(self):
+        """A flat image has no edge pairs, so the threshold is 128."""
+        image = np.full((30, 30), 90, dtype=np.uint8)
+        assert mokji_threshold(image, 3, 20) == 128
+
+    def test_pixel_equal_to_threshold_is_background(self):
+        """A pixel exactly at the threshold is white (strict comparison)."""
+        image = np.full((60, 60), 60, dtype=np.uint8)
+        image[:, :15] = 20
+        image[25:35, 35:45] = 40
+        assert mokji_threshold(image, 3, 30) == 40
+        result = binarize_mokji(image, max_edge_width=3, min_edge_magnitude=30)
+        assert np.all(result[25:35, 35:45] == 255)
+        assert np.all(result[:, :15] == 0)
+
+
 class TestBinarizeEdgeDiv:
     """Tests for edge division binarization."""
 
@@ -329,3 +377,19 @@ class TestBinarizeEdgeDiv:
         # Result should be binary
         unique_values = np.unique(result)
         assert all(v in [0, 255] for v in unique_values)
+
+
+class TestEdgeDivFractionalDelta:
+    """The C++ adds delta to the Otsu threshold and truncates the sum."""
+
+    def test_fractional_delta_is_truncated_not_rounded(self):
+        """A delta of 1.5 moves the threshold by one level, like a delta of 1."""
+        ramp = np.arange(256, dtype=np.uint8).reshape(16, 16)
+        flat_dark = np.full((16, 16), 50, np.uint8)
+        flat_light = np.full((16, 16), 200, np.uint8)
+        image = np.vstack([flat_dark, ramp, flat_light])
+
+        fractional = binarize_edge_div(image, kep=0.0, kbd=0.0, delta=1.5)
+        whole = binarize_edge_div(image, kep=0.0, kbd=0.0, delta=1.0)
+
+        np.testing.assert_array_equal(fractional, whole)

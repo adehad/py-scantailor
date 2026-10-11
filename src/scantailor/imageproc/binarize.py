@@ -80,74 +80,71 @@ def binarize_peak(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
     return np.asarray(binary, dtype=np.uint8)
 
 
-def binarize_mokji(
+def mokji_threshold(
     image: NDArray[np.uint8],
     max_edge_width: int = 3,
     min_edge_magnitude: int = 20,
-) -> NDArray[np.uint8]:
-    """Binarize an image using Mokji's edge-based thresholding.
+) -> int:
+    """Global threshold from edge pixels, after Mokji and Abu-Bakar.
 
-    Mokji's method computes a threshold based on edge transitions. It dilates
-    the image to find the darkest neighbor within a window, then builds a
-    histogram of (pixel, darkest_neighbor) pairs. The threshold is computed
-    as the average midpoint of pairs with sufficient edge magnitude.
+    Every pixel is paired with the darkest pixel within ``max_edge_width`` of
+    it. Pairs whose difference reaches ``min_edge_magnitude`` are edges; the
+    threshold is the mean of their midpoints. A margin of ``max_edge_width``
+    pixels is skipped so that every window lies inside the image.
 
     Args:
-        image: Grayscale input image.
-        max_edge_width: Maximum edge width to consider (pixels).
-        min_edge_magnitude: Minimum brightness difference to consider as an edge.
+        image (NDArray[np.uint8]): 2-D gray image. Not modified.
+        max_edge_width (int): Widest edge to consider, in pixels; at least 1.
+        min_edge_magnitude (int): Smallest gray-level step that counts as an
+            edge; at least 1.
 
     Returns:
-        Binary image (0 or 255).
+        int: Threshold; 128 when the image has no edges.
+
+    Raises:
+        ValueError: If ``max_edge_width`` or ``min_edge_magnitude`` is below 1.
     """
     if max_edge_width < 1:
         raise ValueError("max_edge_width must be >= 1")
     if min_edge_magnitude < 1:
         raise ValueError("min_edge_magnitude must be >= 1")
 
-    # Dilate the image (max filter) to find brightest neighbor
-    # Note: C++ code uses dilateGray which finds MINIMUM (darkest),
-    # but calls it "dilated". We need the minimum/erosion for correct behavior.
-    dilate_size = (max_edge_width + 1) * 2 - 1
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (dilate_size, dilate_size))
-    # Use erode to find minimum (darkest neighbor in each window)
-    eroded = cv2.erode(image, kernel)
+    window = 2 * max_edge_width + 1
+    darkest = cv2.erode(image, np.ones((window, window), dtype=np.uint8))
+    inner = (slice(max_edge_width, -max_edge_width),) * 2
+    pairs = darkest[inner].astype(np.int64) * _GRAY_LEVELS + image[inner]
+    counts = np.bincount(pairs.ravel(), minlength=_GRAY_LEVELS**2).reshape(
+        _GRAY_LEVELS, _GRAY_LEVELS
+    )
 
-    # Crop to avoid boundary effects
-    h, w = image.shape
-    y_start, y_end = max_edge_width, h - max_edge_width
-    x_start, x_end = max_edge_width, w - max_edge_width
+    dark_level, pixel_level = np.indices(counts.shape)
+    is_edge = pixel_level - dark_level >= min_edge_magnitude
+    edge_counts = np.where(is_edge, counts, 0)
+    edge_total = int(edge_counts.sum())
+    if edge_total == 0:
+        return 128
+    midpoint_sum = int(((dark_level + pixel_level) * edge_counts).sum())
+    return int(0.5 * midpoint_sum / edge_total + 0.5)
 
-    if y_end <= y_start or x_end <= x_start:
-        # Image too small, use default threshold
-        _, binary = cv2.threshold(image, 128, 255, cv2.THRESH_BINARY)
-        return np.asarray(binary, dtype=np.uint8)
 
-    src_region = image[y_start:y_end, x_start:x_end]
-    eroded_region = eroded[y_start:y_end, x_start:x_end]
+def binarize_mokji(
+    image: NDArray[np.uint8],
+    max_edge_width: int = 3,
+    min_edge_magnitude: int = 20,
+) -> NDArray[np.uint8]:
+    """Binarize an image with Mokji's edge-based global threshold.
 
-    # Build matrix of (darkest_neighbor, pixel) pairs
-    # Use vectorized operations for efficiency
-    pixels = src_region.flatten().astype(np.int32)
-    darkest = eroded_region.flatten().astype(np.int32)
+    Args:
+        image (NDArray[np.uint8]): 2-D gray image. Not modified.
+        max_edge_width (int): See ``mokji_threshold``.
+        min_edge_magnitude (int): See ``mokji_threshold``.
 
-    # Only consider pixels where there's sufficient edge magnitude
-    edge_magnitude = pixels - darkest
-    valid_mask = edge_magnitude >= min_edge_magnitude
-
-    if not np.any(valid_mask):
-        # No edges found, use default threshold
-        _, binary = cv2.threshold(image, 128, 255, cv2.THRESH_BINARY)
-        return np.asarray(binary, dtype=np.uint8)
-
-    # Compute threshold as average of midpoints weighted by occurrence
-    valid_pixels = pixels[valid_mask]
-    valid_darkest = darkest[valid_mask]
-    midpoints = (valid_pixels + valid_darkest) / 2.0
-    threshold = int(np.mean(midpoints) + 0.5)
-
-    _, binary = cv2.threshold(image, threshold, 255, cv2.THRESH_BINARY)
-    return np.asarray(binary, dtype=np.uint8)
+    Returns:
+        NDArray[np.uint8]: New array, 0 for pixels below the threshold and 255
+            elsewhere.
+    """
+    threshold = mokji_threshold(image, max_edge_width, min_edge_magnitude)
+    return np.where(image < threshold, 0, 255).astype(np.uint8)
 
 
 def binarize_otsu(
@@ -277,7 +274,8 @@ def binarize_edge_div(
         kbd (float): Blur division weight (0-1). Higher = more illumination
             normalization.
         delta (float): Added to the Otsu threshold of the normalised image
-            without clamping; positive means more ink. Rounded to an integer.
+            without clamping; positive means more ink. The sum is truncated
+            to an integer.
 
     Returns:
         NDArray[np.uint8]: New array, 0 for ink and 255 for background.
@@ -311,7 +309,9 @@ def binarize_edge_div(
     # Clip to valid range and convert back to uint8
     result = np.clip(result, 0, 255).astype(np.uint8)
 
-    return binarize_otsu(result, round(delta))
+    histogram = np.bincount(result.ravel(), minlength=_GRAY_LEVELS).astype(np.int64)
+    threshold = int(np.clip(int(otsu_threshold(histogram) + delta), 0, _GRAY_LEVELS))
+    return np.where(result < threshold, 0, 255).astype(np.uint8)
 
 
 def binarize_bradley(
