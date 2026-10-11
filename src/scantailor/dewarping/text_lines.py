@@ -5,11 +5,10 @@ in scanned document images, which are used to build distortion models
 for page dewarping.
 
 The algorithm works as follows:
-1. Downscale image to ~200 DPI for performance
-2. Binarize and detect vertical content boundaries
-3. Extract text lines using directional gradient analysis
-4. Refine text lines using snake/active contour optimization
-5. Filter out invalid lines (too short, wrong curvature, etc.)
+1. Downscale the image to ~200 DPI for performance
+2. Binarize, dropping border-touching components and specks
+3. Detect the vertical content bounds
+4. Merge letters into line blobs and trace the middle of each blob
 """
 
 from dataclasses import dataclass, field
@@ -17,8 +16,24 @@ from dataclasses import dataclass, field
 import cv2
 import numpy as np
 from numpy.typing import NDArray
+from scipy.ndimage import uniform_filter1d
 
 from scantailor.core.models import Dpi
+
+# Resolution the tracer works at.
+_WORKING_DPI = 200.0
+_KEEP_SCALE_TOLERANCE = 0.1
+# Smallest component, in pixels at the working resolution, that can be a letter.
+_MIN_SPECK_AREA = 6
+# Letters closer than this horizontally belong to one line.
+_WORD_GAP_INCH = 0.2
+# Runs narrower than this fraction of the content width are not lines.
+_MIN_LINE_SPAN = 0.4
+# Blobs thicker than this are several lines merged together.
+_MAX_LINE_THICKNESS_INCH = 0.4
+_SAMPLE_SPACING_INCH = 0.04
+# Width over which a line's ink is averaged to find its centre.
+_CENTRE_WINDOW_INCH = 0.2
 
 
 @dataclass
@@ -124,18 +139,15 @@ def _calculate_vertical_ranges(
     Returns:
         List of (top, bottom) tuples for each column, or None if column is empty.
     """
-    height, width = binary.shape[:2]
-    ranges: list[tuple[int, int] | None] = []
-
-    for x in range(width):
-        col = binary[:, x]
-        nonzero = np.nonzero(col)[0]
-        if len(nonzero) == 0:
-            ranges.append(None)
-        else:
-            ranges.append((int(nonzero[0]), int(nonzero[-1])))
-
-    return ranges
+    height = binary.shape[0]
+    foreground = binary != 0
+    occupied = foreground.any(axis=0)
+    tops = foreground.argmax(axis=0)
+    bottoms = height - 1 - foreground[::-1].argmax(axis=0)
+    return [
+        (int(top), int(bottom)) if has_ink else None
+        for has_ink, top, bottom in zip(occupied, tops, bottoms, strict=True)
+    ]
 
 
 def _build_convex_envelope(
@@ -339,120 +351,6 @@ def _fit_line_ransac(
     return (x_top, x_bottom)
 
 
-def trace_text_lines(
-    image: NDArray[np.uint8],
-    dpi: Dpi | tuple[float, float] | float = 300.0,
-    content_rect: tuple[int, int, int, int] | None = None,
-) -> TextLineResult:
-    """Trace text lines in an image.
-
-    This is the main entry point for text line detection. It:
-    1. Downscales the image to ~200 DPI
-    2. Binarizes and detects vertical bounds
-    3. Extracts text lines using gradient analysis
-    4. Refines and filters the lines
-
-    Args:
-        image: Grayscale input image.
-        dpi: Image resolution (scalar or (horizontal, vertical)).
-        content_rect: Optional (x, y, width, height) content rectangle.
-
-    Returns:
-        TextLineResult with detected lines and vertical bounds.
-    """
-    # Normalize DPI
-    if isinstance(dpi, tuple):
-        dpi_h, dpi_v = dpi
-    elif isinstance(dpi, int | float):
-        dpi_h = dpi_v = float(dpi)
-    else:
-        dpi_h, dpi_v = float(dpi.horizontal), float(dpi.vertical)
-
-    # Ensure grayscale
-    if len(image.shape) == 3:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    else:
-        gray = image
-
-    height, width = gray.shape[:2]
-
-    # Downscale to ~200 DPI
-    target_dpi = 200.0
-    downscale_x = target_dpi / dpi_h
-    downscale_y = target_dpi / dpi_v
-
-    if downscale_x < 0.9 or downscale_x > 1.1 or downscale_y < 0.9 or downscale_y > 1.1:
-        new_width = max(1, int(width * downscale_x))
-        new_height = max(1, int(height * downscale_y))
-        downscaled = cv2.resize(
-            gray, (new_width, new_height), interpolation=cv2.INTER_AREA
-        )
-    else:
-        downscaled = gray
-        downscale_x = downscale_y = 1.0
-
-    # Binarize using Wolf's method (similar to C++)
-    binary = _binarize_wolf(downscaled, window_size=31)
-
-    # Sanitize: remove border-touching components and despeckle
-    if content_rect is not None:
-        scaled_rect = (
-            int(content_rect[0] * downscale_x),
-            int(content_rect[1] * downscale_y),
-            int(content_rect[2] * downscale_x),
-            int(content_rect[3] * downscale_y),
-        )
-    else:
-        scaled_rect = None
-
-    binary = _sanitize_binary_image(binary, scaled_rect)
-
-    # Detect vertical bounds
-    vert_bounds = detect_vertical_bounds(binary)
-
-    # Extract text lines
-    polylines = _extract_text_lines(downscaled, vert_bounds)
-
-    # Filter lines
-    polylines = _filter_short_curves(polylines, vert_bounds)
-    polylines = _filter_out_of_bounds_curves(polylines, vert_bounds)
-    polylines = _filter_edgy_curves(polylines)
-
-    # Refine lines
-    unit_down = _calc_avg_unit_vector(vert_bounds)
-    polylines = _refine_text_lines(downscaled, polylines, unit_down, iterations=100)
-
-    # Filter again after refinement
-    polylines = _filter_edgy_curves(polylines)
-
-    # Scale back to original coordinates
-    scale_x = 1.0 / downscale_x
-    scale_y = 1.0 / downscale_y
-
-    result_lines = []
-    for polyline in polylines:
-        scaled_points = [(p[0] * scale_x, p[1] * scale_y) for p in polyline]
-        result_lines.append(TextLine(points=scaled_points))
-
-    scaled_bounds = VerticalBounds(
-        left_top=(vert_bounds.left_top[0] * scale_x, vert_bounds.left_top[1] * scale_y),
-        left_bottom=(
-            vert_bounds.left_bottom[0] * scale_x,
-            vert_bounds.left_bottom[1] * scale_y,
-        ),
-        right_top=(
-            vert_bounds.right_top[0] * scale_x,
-            vert_bounds.right_top[1] * scale_y,
-        ),
-        right_bottom=(
-            vert_bounds.right_bottom[0] * scale_x,
-            vert_bounds.right_bottom[1] * scale_y,
-        ),
-    )
-
-    return TextLineResult(lines=result_lines, vertical_bounds=scaled_bounds)
-
-
 def _binarize_wolf(
     image: np.ndarray,
     window_size: int = 31,
@@ -500,777 +398,197 @@ def _binarize_wolf(
     return binary
 
 
-def _sanitize_binary_image(
-    binary: NDArray[np.uint8],
+def trace_text_lines(
+    image: NDArray[np.uint8],
+    dpi: Dpi | tuple[float, float] | float = 300.0,
     content_rect: tuple[int, int, int, int] | None = None,
-) -> NDArray[np.uint8]:
-    """Remove border-touching components and despeckle.
+) -> TextLineResult:
+    """Trace text lines in a page image.
+
+    The page is reduced to about 200 DPI and binarised. Letters are merged into
+    line-shaped blobs and each wide blob yields one polyline through the middle
+    of its ink, whatever its curvature.
 
     Args:
-        binary: Binary image.
-        content_rect: Optional (x, y, w, h) content rectangle.
+        image (NDArray[np.uint8]): 2-D gray, or BGR(A), page with dark text on a
+            light background.
+        dpi (Dpi | tuple[float, float] | float): Resolution of ``image``, as one
+            value or (horizontal, vertical).
+        content_rect (tuple[int, int, int, int] | None): (x, y, width, height)
+            of the area to search, in ``image`` pixels. None searches everything.
 
     Returns:
-        Sanitized binary image.
+        TextLineResult: Lines and vertical bounds in ``image`` pixels.
     """
-    h, w = binary.shape[:2]
+    if isinstance(dpi, tuple):
+        dpi_h, dpi_v = dpi
+    elif isinstance(dpi, int | float):
+        dpi_h = dpi_v = float(dpi)
+    else:
+        dpi_h, dpi_v = float(dpi.horizontal), float(dpi.vertical)
 
-    # Remove components touching borders using morphological reconstruction
-    seed = np.zeros_like(binary)
-    seed[0, :] = binary[0, :]
-    seed[-1, :] = binary[-1, :]
-    seed[:, 0] = binary[:, 0]
-    seed[:, -1] = binary[:, -1]
+    gray = np.asarray(
+        cv2.cvtColor(image[..., :3], cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image,
+        dtype=np.uint8,
+    )
+    height, width = gray.shape[:2]
 
-    # Reconstruct
-    kernel = np.ones((3, 3), dtype=np.uint8)
-    prev = seed.copy()
-    for _ in range(max(h, w)):
-        dilated = cv2.dilate(prev, kernel)
-        current = cv2.bitwise_and(dilated, binary)
-        if np.array_equal(current, prev):
-            break
-        prev = current
+    scale_x = _WORKING_DPI / dpi_h
+    scale_y = _WORKING_DPI / dpi_v
+    if (
+        abs(scale_x - 1.0) <= _KEEP_SCALE_TOLERANCE
+        and abs(scale_y - 1.0) <= _KEEP_SCALE_TOLERANCE
+    ):
+        scale_x = scale_y = 1.0
+        reduced = gray
+    else:
+        reduced = np.asarray(
+            cv2.resize(
+                gray,
+                (max(1, int(width * scale_x)), max(1, int(height * scale_y))),
+                interpolation=cv2.INTER_AREA,
+            ),
+            dtype=np.uint8,
+        )
+    working_dpi = 0.5 * (dpi_h * scale_x + dpi_v * scale_y)
 
-    # Subtract border-touching components
-    result = cv2.subtract(binary, prev)
-
-    # Despeckle using opening
-    se_h = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 3))
-    se_v = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 2))
-    seeds = cv2.morphologyEx(result, cv2.MORPH_OPEN, se_h)
-    seeds = cv2.bitwise_or(seeds, cv2.morphologyEx(result, cv2.MORPH_OPEN, se_v))
-
-    # Reconstruct from seeds
-    prev = seeds.copy()
-    for _ in range(max(h, w)):
-        dilated = cv2.dilate(prev, kernel)
-        current = cv2.bitwise_and(dilated, result)
-        if np.array_equal(current, prev):
-            break
-        prev = current
-
-    result = prev
-
-    # Clear outside content rect
+    scaled_rect = None
     if content_rect is not None:
-        x, y, rw, rh = content_rect
-        mask = np.zeros_like(result)
-        mask[y : y + rh, x : x + rw] = 255
-        result = cv2.bitwise_and(result, mask)
+        x, y, rect_width, rect_height = content_rect
+        scaled_rect = (
+            int(x * scale_x),
+            int(y * scale_y),
+            int(rect_width * scale_x),
+            int(rect_height * scale_y),
+        )
+    ink = _ink_mask(reduced, scaled_rect, working_dpi)
+    bounds = detect_vertical_bounds(ink)
+    lines = _trace_lines(ink, bounds, working_dpi)
 
-    return np.asarray(result, dtype=np.uint8)
-
-
-def _calc_avg_unit_vector(bounds: VerticalBounds) -> NDArray[np.float64]:
-    """Calculate average unit vector from vertical bounds.
-
-    Args:
-        bounds: Vertical bounds.
-
-    Returns:
-        Unit vector pointing downward.
-    """
-    v1 = np.array(
-        [
-            bounds.left_bottom[0] - bounds.left_top[0],
-            bounds.left_bottom[1] - bounds.left_top[1],
-        ]
-    )
-    v1 /= np.linalg.norm(v1) + 1e-10
-
-    v2 = np.array(
-        [
-            bounds.right_bottom[0] - bounds.right_top[0],
-            bounds.right_bottom[1] - bounds.right_top[1],
-        ]
-    )
-    v2 /= np.linalg.norm(v2) + 1e-10
-
-    v3 = v1 + v2
-    norm = np.linalg.norm(v3)
-    if norm > 1e-10:
-        v3 /= norm
-
-    # Ensure pointing downward
-    if v3[1] < 0:
-        v3 = -v3
-
-    return v3
-
-
-def _extract_text_lines(
-    image: np.ndarray,
-    bounds: VerticalBounds,
-) -> list[list[tuple[float, float]]]:
-    """Extract text lines using gradient analysis.
-
-    Uses directional second derivative to find text line centers.
-
-    Args:
-        image: Grayscale image.
-        bounds: Vertical content bounds.
-
-    Returns:
-        List of polylines (each a list of (x, y) points).
-    """
-    height, width = image.shape[:2]
-    direction = _calc_avg_unit_vector(bounds).astype(np.float32)
-
-    # Compute directional gradient
-    # First derivative in the direction perpendicular to text lines
-    img_f32 = image.astype(np.float32)
-    sobel_x = cv2.Sobel(img_f32, cv2.CV_32F, 1, 0, ksize=3) / 8.0 / 255.0
-    sobel_y = cv2.Sobel(img_f32, cv2.CV_32F, 0, 1, ksize=3) / 8.0 / 255.0
-
-    first_deriv = (sobel_x * direction[0] + sobel_y * direction[1]).astype(np.float32)
-
-    # Blur
-    first_deriv = cv2.GaussianBlur(first_deriv, (0, 0), 6.0)
-
-    # Second derivative
-    sobel_x2 = cv2.Sobel(first_deriv, cv2.CV_32F, 1, 0, ksize=3)
-    sobel_y2 = cv2.Sobel(first_deriv, cv2.CV_32F, 0, 1, ksize=3)
-    second_deriv = (sobel_x2 * direction[0] + sobel_y2 * direction[1]).astype(
-        np.float32
+    return TextLineResult(
+        lines=[
+            TextLine(points=[(px / scale_x, py / scale_y) for px, py in line])
+            for line in lines
+        ],
+        vertical_bounds=VerticalBounds(
+            left_top=(bounds.left_top[0] / scale_x, bounds.left_top[1] / scale_y),
+            left_bottom=(
+                bounds.left_bottom[0] / scale_x,
+                bounds.left_bottom[1] / scale_y,
+            ),
+            right_top=(bounds.right_top[0] / scale_x, bounds.right_top[1] / scale_y),
+            right_bottom=(
+                bounds.right_bottom[0] / scale_x,
+                bounds.right_bottom[1] / scale_y,
+            ),
+        ),
     )
 
-    # Find threshold
-    max_val = np.max(second_deriv)
-    threshold = max_val * 15.0 / 255.0
 
-    # Initial binarization (positive second derivative = ridge)
-    initial_binary = (second_deriv > threshold).astype(np.uint8) * 255
-
-    # Obstacles (negative second derivative = valley)
-    obstacles = (second_deriv < -threshold).astype(np.uint8) * 255
-
-    # Close with obstacles
-    closed = _close_with_obstacles(initial_binary, obstacles, (21, 21))
-
-    # Compute SEDM (Squared Euclidean Distance Map)
-    _, binary_mask = cv2.threshold(closed, 127, 255, cv2.THRESH_BINARY)
-    sedm = cv2.distanceTransform(binary_mask, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
-
-    # Find seeds along mid-line
-    mid_line = _calc_mid_line(bounds)
-    seeds = _find_mid_line_seeds(sedm, mid_line, height, width)
-
-    # Trace from each seed
-    polylines = []
-    for seed in seeds:
-        polyline = _trace_from_seed(sedm, second_deriv, seed, bounds, height, width)
-        if len(polyline) >= 2:
-            polylines.append(polyline)
-
-    return polylines
-
-
-def _close_with_obstacles(
-    image: NDArray[np.uint8],
-    obstacles: NDArray[np.uint8],
-    brick_size: tuple[int, int],
+def _ink_mask(
+    gray: NDArray[np.uint8],
+    content_rect: tuple[int, int, int, int] | None,
+    dpi: float,
 ) -> NDArray[np.uint8]:
-    """Morphological closing avoiding obstacles.
+    """Binarise a page and keep only components that can be text.
+
+    Components that touch the image border (scanner shadows, page edges) and
+    specks too small to be letters are dropped, as is everything outside
+    ``content_rect``.
 
     Args:
-        image: Binary image.
-        obstacles: Obstacle mask.
-        brick_size: Structuring element size.
+        gray (NDArray[np.uint8]): 2-D gray page.
+        content_rect (tuple[int, int, int, int] | None): (x, y, width, height)
+            to search in, or None.
+        dpi (float): Resolution of ``gray``.
 
     Returns:
-        Closed image.
+        NDArray[np.uint8]: 255 where there is ink, 0 elsewhere.
     """
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, brick_size)
-    closed = cv2.morphologyEx(image, cv2.MORPH_CLOSE, kernel)
-    closed = cv2.subtract(closed, obstacles)
+    ink = (_binarize_wolf(gray) == 0).astype(np.uint8)
+    if content_rect is not None:
+        x, y, rect_width, rect_height = content_rect
+        inside = np.zeros_like(ink)
+        inside[max(0, y) : y + rect_height, max(0, x) : x + rect_width] = 1
+        ink &= inside
 
-    # Reconstruct
-    h, w = image.shape[:2]
-    kernel3 = np.ones((3, 3), dtype=np.uint8)
-    prev = image.copy()
-    for _ in range(max(h, w)):
-        dilated = cv2.dilate(prev, kernel3)
-        current = cv2.bitwise_and(dilated, closed)
-        if np.array_equal(current, prev):
-            break
-        prev = current
-
-    return np.asarray(prev, dtype=np.uint8)
+    height, width = ink.shape
+    _, labels, stats, _ = cv2.connectedComponentsWithStats(ink, connectivity=8)
+    left, top, box_w, box_h, area = stats.T
+    touches_border = (
+        (left == 0) | (top == 0) | (left + box_w == width) | (top + box_h == height)
+    )
+    min_area = _MIN_SPECK_AREA * (dpi / _WORKING_DPI) ** 2
+    keep = ~touches_border & (area >= min_area)
+    keep[0] = False
+    return keep[labels].astype(np.uint8) * 255
 
 
-def _calc_mid_line(
+def _trace_lines(
+    ink: NDArray[np.uint8],
     bounds: VerticalBounds,
-) -> tuple[tuple[float, float], tuple[float, float]]:
-    """Calculate mid-line between vertical bounds.
+    dpi: float,
+) -> list[list[tuple[float, float]]]:
+    """Find a polyline through the middle of every long, thin run of text.
 
     Args:
-        bounds: Vertical bounds.
+        ink (NDArray[np.uint8]): 255 where there is ink.
+        bounds (VerticalBounds): Content bounds; runs much narrower than the
+            distance between them are not lines.
+        dpi (float): Resolution of ``ink``.
 
     Returns:
-        Mid-line as (start_point, end_point).
+        list[list[tuple[float, float]]]: One left-to-right polyline per line,
+            in ``ink`` pixels.
     """
-    left_top = np.array(bounds.left_top)
-    left_bottom = np.array(bounds.left_bottom)
-    right_top = np.array(bounds.right_top)
-    right_bottom = np.array(bounds.right_bottom)
-
-    mid_top = (left_top + right_top) / 2
-    mid_bottom = (left_bottom + right_bottom) / 2
-
-    return (tuple(mid_top), tuple(mid_bottom))
-
-
-def _find_mid_line_seeds(
-    sedm: np.ndarray,
-    mid_line: tuple[tuple[float, float], tuple[float, float]],
-    height: int,
-    width: int,
-) -> list[tuple[int, int]]:
-    """Find seed points along mid-line at local maxima of SEDM.
-
-    Args:
-        sedm: Squared Euclidean Distance Map.
-        mid_line: Mid-line (start, end).
-        height: Image height.
-        width: Image width.
-
-    Returns:
-        List of seed points.
-    """
-    start, end = mid_line
-    start = np.array(start)
-    end = np.array(end)
-
-    # Clip to image bounds
-    direction = end - start
-    length = np.linalg.norm(direction)
-    if length < 1:
+    width = ink.shape[1]
+    closing_width = max(3, round(dpi * _WORD_GAP_INCH))
+    closed = cv2.morphologyEx(
+        ink, cv2.MORPH_CLOSE, np.ones((1, closing_width), dtype=np.uint8)
+    )
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(closed, connectivity=8)
+    if count <= 1:
         return []
-    direction /= length
 
-    seeds = []
-    prev_level = 0.0
-    prev_pt = None
-    going_up = True
-
-    # Walk along line
-    num_steps = int(length)
-    for i in range(num_steps):
-        t = i / num_steps
-        pt = start + t * (end - start)
-        x, y = round(pt[0]), round(pt[1])
-
-        if 0 <= x < width and 0 <= y < height:
-            level = sedm[y, x]
-            if prev_pt is not None:
-                if going_up and level < prev_level:
-                    # Found local maximum
-                    seeds.append(prev_pt)
-                    going_up = False
-                elif not going_up and level > prev_level:
-                    going_up = True
-            prev_level = level
-            prev_pt = (x, y)
-
-    return seeds
-
-
-def _trace_from_seed(
-    sedm: np.ndarray,
-    gradient: np.ndarray,
-    seed: tuple[int, int],
-    bounds: VerticalBounds,
-    height: int,
-    width: int,
-) -> list[tuple[float, float]]:
-    """Trace a text line from a seed point.
-
-    Args:
-        sedm: Distance transform.
-        gradient: Second derivative field.
-        seed: Starting point.
-        bounds: Vertical bounds.
-        height: Image height.
-        width: Image width.
-
-    Returns:
-        List of points along the line.
-    """
-    polyline: list[tuple[float, float]] = []
-
-    # Trace towards left bound
-    left_points = _trace_towards_line(
-        sedm, gradient, seed, bounds.left_line, height, width
+    content_width = 0.5 * (
+        bounds.right_top[0]
+        - bounds.left_top[0]
+        + bounds.right_bottom[0]
+        - bounds.left_bottom[0]
     )
-    polyline.extend(reversed(left_points))
+    long_enough = stats[:, cv2.CC_STAT_WIDTH] >= _MIN_LINE_SPAN * content_width
+    long_enough[0] = False
+    selected = np.flatnonzero(long_enough)
+    if selected.size == 0:
+        return []
 
-    # Add seed
-    polyline.append((float(seed[0]), float(seed[1])))
+    # Per (line, column) pixel count and sum of y, from one pass over the pixels.
+    line_of_label = np.full(count, -1, dtype=np.int64)
+    line_of_label[selected] = np.arange(selected.size)
+    ys, xs = np.nonzero(long_enough[labels])
+    flat = line_of_label[labels[ys, xs]] * width + xs
+    size = selected.size * width
+    counts = np.bincount(flat, minlength=size).reshape(-1, width)
+    y_sums = np.bincount(flat, weights=ys, minlength=size).reshape(-1, width)
 
-    # Trace towards right bound
-    right_points = _trace_towards_line(
-        sedm, gradient, seed, bounds.right_line, height, width
-    )
-    polyline.extend(right_points)
+    # A single column's ink centre jumps with the letter under it (an "h"
+    # against an "a"); the centre of mass over a few letters does not.
+    window = max(3, round(dpi * _CENTRE_WINDOW_INCH))
+    smooth_counts = uniform_filter1d(counts.astype(np.float64), window, axis=1)
+    smooth_sums = uniform_filter1d(y_sums, window, axis=1)
 
-    return polyline
-
-
-def _trace_towards_line(
-    sedm: np.ndarray,
-    gradient: np.ndarray,
-    start: tuple[int, int],
-    target_line: tuple[tuple[float, float], tuple[float, float]],
-    height: int,
-    width: int,
-    step_size: float = 10.0,
-) -> list[tuple[float, float]]:
-    """Trace from start towards target line following SEDM ridge.
-
-    Args:
-        sedm: Distance transform.
-        gradient: Second derivative field.
-        start: Starting point.
-        target_line: Target line to trace towards.
-        height: Image height.
-        width: Image width.
-        step_size: Step size for tracing.
-
-    Returns:
-        List of traced points.
-    """
-    points = []
-    current = np.array(start, dtype=np.float64)
-
-    line_start = np.array(target_line[0])
-    line_end = np.array(target_line[1])
-    line_vec = line_end - line_start
-    line_len = np.linalg.norm(line_vec)
-    if line_len < 1:
-        return points
-    line_vec /= line_len
-
-    for _ in range(1000):  # Max iterations
-        x, y = round(current[0]), round(current[1])
-        if not (0 <= x < width and 0 <= y < height):
-            break
-
-        # Check if reached target line
-        to_line = current - line_start
-        proj_len = np.dot(to_line, line_vec)
-        perp = to_line - proj_len * line_vec
-        dist_to_line = np.linalg.norm(perp)
-        if dist_to_line < step_size:
-            break
-
-        # Direction towards line
-        if np.linalg.norm(perp) > 0:
-            towards_line = -perp / np.linalg.norm(perp)
-        else:
-            towards_line = np.array([1.0, 0.0])
-
-        # Find ridge direction using gradient
-        gx = 0.0
-        gy = 0.0
-        if 1 <= x < width - 1 and 1 <= y < height - 1:
-            gx = float(sedm[y, x + 1] - sedm[y, x - 1])
-            gy = float(sedm[y + 1, x] - sedm[y - 1, x])
-
-        # Move along ridge towards target
-        grad = np.array([gx, gy])
-        grad_norm = np.linalg.norm(grad)
-        if grad_norm > 0:
-            # Move perpendicular to gradient (along ridge)
-            ridge_dir = np.array([-grad[1], grad[0]]) / grad_norm
-            # Choose direction towards target
-            if np.dot(ridge_dir, towards_line) < 0:
-                ridge_dir = -ridge_dir
-            direction = 0.5 * ridge_dir + 0.5 * towards_line
-        else:
-            direction = towards_line
-
-        direction_norm = np.linalg.norm(direction)
-        if direction_norm > 0:
-            direction /= direction_norm
-
-        current = current + step_size * direction
-        points.append((current[0], current[1]))
-
-    return points
-
-
-def _filter_short_curves(
-    polylines: list[list[tuple[float, float]]],
-    bounds: VerticalBounds,
-) -> list[list[tuple[float, float]]]:
-    """Filter out curves that don't span most of the content width.
-
-    Args:
-        polylines: List of polylines.
-        bounds: Vertical bounds.
-
-    Returns:
-        Filtered list of polylines.
-    """
-    result = []
-    for polyline in polylines:
-        if len(polyline) < 2:
+    max_thickness = _MAX_LINE_THICKNESS_INCH * dpi
+    sample_step = max(1, round(dpi * _SAMPLE_SPACING_INCH))
+    polylines = []
+    for row_counts, row_smooth_counts, row_smooth_sums in zip(
+        counts, smooth_counts, smooth_sums, strict=True
+    ):
+        columns = np.flatnonzero(row_counts)
+        if np.median(row_counts[columns]) > max_thickness:
             continue
-
-        front = np.array(polyline[0])
-        back = np.array(polyline[-1])
-
-        # Distance to left bound
-        left_dist = _point_to_line_distance(front, bounds.left_line)
-        # Distance to right bound
-        right_dist = _point_to_line_distance(back, bounds.right_line)
-
-        chord_len = np.linalg.norm(back - front)
-        if chord_len > 0 and (left_dist + right_dist) <= 0.3 * chord_len:
-            result.append(polyline)
-
-    return result
-
-
-def _point_to_line_distance(
-    point: NDArray[np.float64],
-    line: tuple[tuple[float, float], tuple[float, float]],
-) -> float:
-    """Calculate distance from point to line.
-
-    Args:
-        point: Point coordinates.
-        line: Line as (start, end).
-
-    Returns:
-        Distance to line.
-    """
-    start = np.array(line[0])
-    end = np.array(line[1])
-    line_vec = end - start
-    line_len = np.linalg.norm(line_vec)
-    if line_len < 1e-10:
-        return float(np.linalg.norm(point - start))
-
-    line_vec /= line_len
-    to_point = point - start
-    proj_len = np.dot(to_point, line_vec)
-    proj_point = start + proj_len * line_vec
-    return float(np.linalg.norm(point - proj_point))
-
-
-def _filter_out_of_bounds_curves(
-    polylines: list[list[tuple[float, float]]],
-    bounds: VerticalBounds,
-) -> list[list[tuple[float, float]]]:
-    """Filter curves with endpoints outside bounds.
-
-    Args:
-        polylines: List of polylines.
-        bounds: Vertical bounds.
-
-    Returns:
-        Filtered list of polylines.
-    """
-    result = []
-    for polyline in polylines:
-        if len(polyline) < 2:
-            continue
-
-        front_inside = _is_inside_bounds(polyline[0], bounds)
-        back_inside = _is_inside_bounds(polyline[-1], bounds)
-
-        if front_inside or back_inside:
-            result.append(polyline)
-
-    return result
-
-
-def _is_inside_bounds(
-    point: tuple[float, float],
-    bounds: VerticalBounds,
-) -> bool:
-    """Check if point is inside vertical bounds.
-
-    Args:
-        point: Point coordinates.
-        bounds: Vertical bounds.
-
-    Returns:
-        True if inside bounds.
-    """
-    pt = np.array(point)
-
-    # Check left bound
-    left_start = np.array(bounds.left_top)
-    left_end = np.array(bounds.left_bottom)
-    left_vec = left_end - left_start
-    left_normal = np.array([-left_vec[1], left_vec[0]])
-    if left_normal[0] < 0:
-        left_normal = -left_normal
-    if np.dot(left_normal, pt - left_start) < 0:
-        return False
-
-    # Check right bound
-    right_start = np.array(bounds.right_top)
-    right_end = np.array(bounds.right_bottom)
-    right_vec = right_end - right_start
-    right_normal = np.array([-right_vec[1], right_vec[0]])
-    if right_normal[0] > 0:
-        right_normal = -right_normal
-    if np.dot(right_normal, pt - right_start) < 0:
-        return False
-
-    return True
-
-
-def _filter_edgy_curves(
-    polylines: list[list[tuple[float, float]]],
-) -> list[list[tuple[float, float]]]:
-    """Filter curves with inconsistent curvature.
-
-    Removes curves that have both significant convex and concave segments.
-
-    Args:
-        polylines: List of polylines.
-
-    Returns:
-        Filtered list of polylines.
-    """
-    result = []
-    for polyline in polylines:
-        if _is_curvature_consistent(polyline):
-            result.append(polyline)
-    return result
-
-
-def _is_curvature_consistent(
-    polyline: list[tuple[float, float]],
-    angle_threshold_deg: float = 6.0,
-) -> bool:
-    """Check if polyline has consistent curvature.
-
-    Args:
-        polyline: List of points.
-        angle_threshold_deg: Threshold angle in degrees.
-
-    Returns:
-        True if curvature is consistent.
-    """
-    n = len(polyline)
-    if n <= 1:
-        return False
-    if n == 2:
-        return True
-
-    cos_threshold = np.cos(np.radians(90.0 - angle_threshold_deg))
-    cos_sq_threshold = cos_threshold**2
-
-    significant_positive = False
-    significant_negative = False
-
-    prev_segment = np.array(polyline[1]) - np.array(polyline[0])
-    prev_normal = np.array([-prev_segment[1], prev_segment[0]])
-    prev_normal_sqlen = np.dot(prev_normal, prev_normal)
-
-    for i in range(1, n - 1):
-        next_segment = np.array(polyline[i + 1]) - np.array(polyline[i])
-        next_segment_sqlen = np.dot(next_segment, next_segment)
-
-        sqlen_mult = prev_normal_sqlen * next_segment_sqlen
-        if sqlen_mult > 1e-10:
-            dot = np.dot(prev_normal, next_segment)
-            cos_sq = abs(dot) * dot / sqlen_mult
-
-            if abs(cos_sq) >= cos_sq_threshold:
-                if cos_sq > 0:
-                    significant_positive = True
-                else:
-                    significant_negative = True
-
-        prev_normal = np.array([-next_segment[1], next_segment[0]])
-        prev_normal_sqlen = next_segment_sqlen
-
-    return not (significant_positive and significant_negative)
-
-
-def _refine_text_lines(
-    image: np.ndarray,
-    polylines: list[list[tuple[float, float]]],
-    unit_down: NDArray[np.float64],
-    iterations: int = 100,
-) -> list[list[tuple[float, float]]]:
-    """Refine text lines using snake optimization.
-
-    Uses active contour/snake approach to align lines with text.
-
-    Args:
-        image: Grayscale image.
-        polylines: Initial polylines.
-        unit_down: Downward unit vector.
-        iterations: Number of optimization iterations.
-
-    Returns:
-        Refined polylines.
-    """
-    if not polylines:
-        return polylines
-
-    # Compute gradient for external energy
-    gradient = _compute_gradient(image, sigma=3.0)
-
-    refined = []
-    for polyline in polylines:
-        if len(polyline) < 3:
-            refined.append(polyline)
-            continue
-
-        # Convert to snake
-        snake = _make_snake(polyline, unit_down)
-
-        # Evolve snake
-        for _ in range(iterations):
-            snake = _evolve_snake(snake, gradient, unit_down)
-
-        # Convert back to polyline
-        refined_polyline = [(node[0], node[1]) for node in snake]
-        refined.append(refined_polyline)
-
-    return refined
-
-
-def _compute_gradient(
-    image: NDArray[np.uint8],
-    sigma: float = 3.0,
-) -> NDArray[np.float32]:
-    """Compute gradient magnitude for snake external energy.
-
-    Args:
-        image: Grayscale image.
-        sigma: Gaussian blur sigma.
-
-    Returns:
-        Gradient magnitude field.
-    """
-    blurred = cv2.GaussianBlur(image.astype(np.float32), (0, 0), sigma)
-    gx = cv2.Sobel(blurred, cv2.CV_32F, 1, 0, ksize=3)
-    gy = cv2.Sobel(blurred, cv2.CV_32F, 0, 1, ksize=3)
-    magnitude = np.sqrt(gx**2 + gy**2)
-    return magnitude
-
-
-def _make_snake(
-    polyline: list[tuple[float, float]],
-    unit_down: NDArray[np.float64],
-    rib_half_length: float = 10.0,
-) -> list[tuple[float, float, float]]:
-    """Convert polyline to snake (nodes with rib half-lengths).
-
-    Args:
-        polyline: Input polyline.
-        unit_down: Downward unit vector.
-        rib_half_length: Half-length of perpendicular ribs.
-
-    Returns:
-        Snake as list of (x, y, rib_half_length).
-    """
-    return [(p[0], p[1], rib_half_length) for p in polyline]
-
-
-def _evolve_snake(
-    snake: list[tuple[float, float, float]],
-    gradient: NDArray[np.float32],
-    unit_down: NDArray[np.float64],
-    step_size: float = 0.5,
-) -> list[tuple[float, float, float]]:
-    """Evolve snake one iteration.
-
-    Args:
-        snake: Current snake state.
-        gradient: Gradient field.
-        unit_down: Downward unit vector.
-        step_size: Movement step size.
-
-    Returns:
-        Updated snake.
-    """
-    height, width = gradient.shape[:2]
-    n = len(snake)
-
-    if n < 3:
-        return snake
-
-    new_snake = []
-    for i in range(n):
-        x, y, rib = snake[i]
-
-        # Sample gradient along rib
-        best_offset = 0.0
-        best_energy = _sample_gradient(gradient, x, y, width, height)
-
-        for offset in np.linspace(-rib, rib, 11):
-            test_x = x + offset * unit_down[0]
-            test_y = y + offset * unit_down[1]
-            energy = _sample_gradient(gradient, test_x, test_y, width, height)
-            if energy > best_energy:
-                best_energy = energy
-                best_offset = offset
-
-        # Move towards best position
-        new_x = x + step_size * best_offset * unit_down[0]
-        new_y = y + step_size * best_offset * unit_down[1]
-
-        # Apply smoothing with neighbors
-        if 0 < i < n - 1:
-            prev = snake[i - 1]
-            next_node = snake[i + 1]
-            smooth_x = (prev[0] + next_node[0]) / 2
-            smooth_y = (prev[1] + next_node[1]) / 2
-            alpha = 0.1  # Smoothing weight
-            new_x = (1 - alpha) * new_x + alpha * smooth_x
-            new_y = (1 - alpha) * new_y + alpha * smooth_y
-
-        new_snake.append((new_x, new_y, rib))
-
-    return new_snake
-
-
-def _sample_gradient(
-    gradient: NDArray[np.float32],
-    x: float,
-    y: float,
-    width: int,
-    height: int,
-) -> float:
-    """Sample gradient at a position with bilinear interpolation.
-
-    Args:
-        gradient: Gradient field.
-        x: X coordinate.
-        y: Y coordinate.
-        width: Field width.
-        height: Field height.
-
-    Returns:
-        Interpolated gradient value.
-    """
-    if x < 0 or x >= width - 1 or y < 0 or y >= height - 1:
-        return 0.0
-
-    x0 = int(x)
-    y0 = int(y)
-    fx = x - x0
-    fy = y - y0
-
-    v00 = gradient[y0, x0]
-    v10 = gradient[y0, x0 + 1]
-    v01 = gradient[y0 + 1, x0]
-    v11 = gradient[y0 + 1, x0 + 1]
-
-    return float(
-        v00 * (1 - fx) * (1 - fy)
-        + v10 * fx * (1 - fy)
-        + v01 * (1 - fx) * fy
-        + v11 * fx * fy
-    )
+        picked = columns[::sample_step]
+        centres = row_smooth_sums[picked] / row_smooth_counts[picked] + 0.5
+        polylines.append(
+            list(zip((picked + 0.5).tolist(), centres.tolist(), strict=True))
+        )
+    return polylines

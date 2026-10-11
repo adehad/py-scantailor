@@ -4,17 +4,24 @@ This module provides functions for generating final output images
 with binarization, despeckling, dewarping, and other processing.
 """
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, replace
 
 import cv2
 import numpy as np
+from loguru import logger
 from numpy.typing import NDArray
 
 from scantailor.core.estimate_background import normalize_illumination_gray
 from scantailor.core.models import Dpi
 from scantailor.core.zones import FillZoneProperties, Zone
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
+from scantailor.dewarping.raster_dewarper import (
+    InterpolationMethod,
+    compute_dewarp_maps,
+    output_model_domain,
+    remap_with_maps,
+)
 from scantailor.imageproc.background_color import dominant_background_color
 from scantailor.imageproc.binarize import (
     binarize_bradley,
@@ -36,17 +43,32 @@ from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode
 from .color_options import ColorCommonOptions, FillingColor
 from .despeckle import DespeckleLevel
+from .dewarping_options import DewarpingMode
 from .mixed import (
+    PictureLayers,
     apply_picture_layers,
+    build_mixed_layer,
+    colorize_ink,
     compose_mixed,
+    compose_mixed_colored,
+    compose_over_original,
     detect_picture_mask,
     rasterize_picture_zones,
 )
 from .params import Params
 from .raster import fill_masked, polygon_mask
 from .render_params import RenderParams
+from .split_output import SplitImages, split_mixed_output
 
 Polygon = Sequence[tuple[float, float]]
+# Receives the illumination-normalised gray page and returns the page's
+# dewarper, or None when no usable distortion model can be built from it.
+DewarperFactory = Callable[[NDArray[np.uint8]], CylindricalSurfaceDewarper | None]
+DewarperSource = CylindricalSurfaceDewarper | DewarperFactory
+_DEWARPING_ERRORS = (ValueError, ArithmeticError, np.linalg.LinAlgError, IndexError)
+_POST_DESKEW_MODES = frozenset({DewarpingMode.MANUAL, DewarpingMode.MARGINAL})
+_MASK_ON = 255
+_WHITE = 255
 
 # Window side and polynomial degree of the smoothing before binarisation, by the
 # smaller output DPI: (largest DPI of the band, window, degree).
@@ -66,12 +88,18 @@ class OutputResult:
         was_dewarped: True when the dewarper was applied.
         picture_mask: Mixed mode only; True where the output keeps the original
             gray levels or colours instead of black and white. None otherwise.
+        ink_mask: Mixed mode with binarisation only; True where text ink is
+            drawn. None otherwise.
+        split: Layers of the page when split output is on, always with black
+            text on a white page whatever ``black_on_white`` says; None otherwise.
     """
 
     image: NDArray[np.uint8]
     is_binary: bool = False
     was_dewarped: bool = False
     picture_mask: NDArray[np.bool_] | None = None
+    ink_mask: NDArray[np.bool_] | None = None
+    split: SplitImages | None = None
 
 
 @dataclass(frozen=True)
@@ -83,11 +111,14 @@ class _PageLayout:
         page: True inside the page outline, or None when it covers the image.
         keep: True where pixels are kept; everything else gets the margin colour.
             None when nothing is to be filled.
+        normalized: Illumination-normalised gray of the page, already computed
+            (for instance before dewarping); None to compute it when needed.
     """
 
     page_outline: Polygon | None
     page: NDArray[np.bool_] | None
     keep: NDArray[np.bool_] | None
+    normalized: NDArray[np.uint8] | None = None
 
     @classmethod
     def build(
@@ -119,7 +150,7 @@ class _PageLayout:
 def generate_output(
     image: NDArray[np.uint8],
     params: Params,
-    dewarper: CylindricalSurfaceDewarper | None = None,
+    dewarper: DewarperSource | None = None,
     *,
     color_options: ColorCommonOptions | None = None,
     content_polygon: Polygon | None = None,
@@ -129,13 +160,16 @@ def generate_output(
 ) -> OutputResult:
     """Generate the output image according to parameters.
 
-    Polygons and zones are in the coordinates of the image after dewarping.
+    Polygons and zones are in the coordinates of ``image``. When the page is
+    dewarped, the masks they produce are dewarped with it.
 
     Args:
         image (NDArray[np.uint8]): Input image, 2-D gray or BGR(A) colour. Not modified.
         params (Params): Output parameters.
-        dewarper (CylindricalSurfaceDewarper | None): Optional dewarper for
-            curved page correction. Required if dewarping mode is AUTO or MANUAL.
+        dewarper (DewarperSource | None): The page's dewarper, or a function
+            that builds it from the illumination-normalised gray page. Used
+            when ``params`` enable dewarping; None skips dewarping. A function
+            that returns None skips it too.
         color_options (ColorCommonOptions | None): Options for the grayscale and
             colour paths; margin filling also applies to bilevel output.
             Defaults to ``params.color_common``.
@@ -155,123 +189,225 @@ def generate_output(
     color_options = color_options or params.color_common
     params = params.with_color_common(color_options)
     render = RenderParams.from_params(params)
-    processed = image
-    was_dewarped = False
 
-    # Apply dewarping if enabled and dewarper provided
-    if params.needs_dewarping() and dewarper is not None:
-        processed = _apply_dewarping(processed, params, dewarper)
-        was_dewarped = True
-
-    layout = _PageLayout.build(
-        processed.shape[:2], render, content_polygon, page_outline
+    page = _PageGeometry.build(
+        image, params, render, content_polygon, page_outline, picture_zones, fill_zones
     )
+    if params.needs_dewarping() and dewarper is not None:
+        page = _dewarp_page(page, params, render, dewarper)
+
     if params.color_mode == ColorMode.BLACK_AND_WHITE:
-        result = _generate_binary_output(processed, params, render, layout)
+        result = _generate_binary_output(page.image, params, render, page.layout)
     elif params.color_mode == ColorMode.COLOR_GRAYSCALE:
-        result = _generate_grayscale_output(processed, params, render, layout)
+        result = _generate_grayscale_output(page.image, params, render, page.layout)
     else:
+        assert page.picture_layers is not None
         result = _generate_mixed_output(
-            processed, params, render, layout, picture_zones
+            page.image, params, render, page.layout, page.picture_layers
         )
 
-    if fill_zones:
-        result = _apply_fill_zones(result, fill_zones)
+    if page.fill_zones:
+        result = _apply_fill_zones(result, page.fill_zones)
     if render.posterize and not render.need_binarization:
         result.image = _posterize(result.image, color_options)
-    result.was_dewarped = was_dewarped
+    result.was_dewarped = page.was_dewarped
+    if render.split_output and result.picture_mask is not None:
+        result.split = _split_layers(result, params, render)
     return result
 
 
-def _apply_dewarping(
-    image: NDArray[np.uint8],
-    params: Params,
-    dewarper: CylindricalSurfaceDewarper,
-) -> NDArray[np.uint8]:
-    """Apply dewarping to an image.
+def _split_layers(
+    result: OutputResult, params: Params, render: RenderParams
+) -> SplitImages:
+    """Split a finished mixed page into its layers, with black text on white."""
+    assert result.picture_mask is not None
+    text_region = ~result.picture_mask
+    image = result.image if params.black_on_white else _invert_polarity(result.image)
+    ink = result.ink_mask
+    if ink is None:
+        ink = np.zeros(text_region.shape, dtype=bool)
+    return split_mixed_output(image, render, text_region, ink)
 
-    Args:
-        image: Input image.
-        params: Output parameters with dewarping options.
-        dewarper: The dewarper model.
 
-    Returns:
-        Dewarped image.
+@dataclass(frozen=True)
+class _FillMask:
+    """A fill zone rasterised to the output's pixel grid."""
+
+    inside: NDArray[np.bool_]
+    properties: FillZoneProperties
+
+
+@dataclass(frozen=True)
+class _PageGeometry:
+    """The page's pixels and every mask derived from its geometry.
+
+    All arrays share one pixel grid: the input image's, or the dewarped one.
+
+    Attributes:
+        image: Pixels the output stages work on.
+        layout: Page and fill areas.
+        picture_layers: Manual picture zones by layer; None unless the output is
+            mixed.
+        fill_zones: Fill zones to paint on the result.
+        was_dewarped: True once the grid is the dewarped one.
     """
-    from scantailor.dewarping.raster_dewarper import compute_dewarped_size, dewarp_image
 
-    # Compute output size based on source size and dewarper
-    src_size = (image.shape[1], image.shape[0])  # (width, height)
-    dst_size = compute_dewarped_size(src_size, dewarper)
+    image: NDArray[np.uint8]
+    layout: _PageLayout
+    picture_layers: PictureLayers | None
+    fill_zones: tuple[_FillMask, ...]
+    was_dewarped: bool = False
 
-    # Determine background color based on image type
-    if len(image.shape) == 2:
-        background = 255  # White for grayscale
-    elif image.shape[2] == 3:
-        background = (255, 255, 255)  # White for RGB
-    else:
-        background = (255, 255, 255, 255)  # White for RGBA
+    @classmethod
+    def build(
+        cls,
+        image: NDArray[np.uint8],
+        params: Params,
+        render: RenderParams,
+        content_polygon: Polygon | None,
+        page_outline: Polygon | None,
+        picture_zones: Sequence[Zone],
+        fill_zones: Sequence[Zone],
+    ) -> "_PageGeometry":
+        """Rasterise the layout and zones on the input image's grid."""
+        shape = image.shape[:2]
+        return cls(
+            image=image,
+            layout=_PageLayout.build(shape, render, content_polygon, page_outline),
+            picture_layers=(
+                rasterize_picture_zones(picture_zones, shape)
+                if params.color_mode == ColorMode.MIXED
+                else None
+            ),
+            fill_zones=_rasterize_fill_zones(fill_zones, shape),
+        )
 
-    # Apply dewarping with full model domain
-    dewarped = dewarp_image(
-        image,
-        dewarper,
-        dst_size=dst_size,
-        model_domain=(0.0, 0.0, 1.0, 1.0),
-        background_color=background,
+
+def _rasterize_fill_zones(
+    zones: Sequence[Zone], shape: tuple[int, int]
+) -> tuple[_FillMask, ...]:
+    """Rasterise the valid fill zones; other zones are skipped."""
+    return tuple(
+        _FillMask(polygon_mask(shape, zone.spline.to_polygon()), zone.properties)
+        for zone in zones
+        if isinstance(zone.properties, FillZoneProperties) and zone.is_valid()
     )
 
-    # Apply post-deskew if requested
-    if params.dewarping.post_deskew and params.dewarping.post_deskew_angle != 0.0:
-        dewarped = _apply_post_deskew(dewarped, params.dewarping.post_deskew_angle)
 
-    return dewarped
+def _dewarp_page(
+    page: _PageGeometry,
+    params: Params,
+    render: RenderParams,
+    source: DewarperSource,
+) -> _PageGeometry:
+    """Dewarp the page with its masks, normalising illumination first.
+
+    Illumination is estimated on the warped page, where the page outline still
+    describes the paper, then dewarped with the pixels so that the background
+    surface is not distorted.
+
+    Args:
+        page (_PageGeometry): The page on the input image's grid.
+        params (Params): Output parameters.
+        render (RenderParams): Flags derived from ``params``.
+        source (DewarperSource): A dewarper, or a function that builds one from
+            the normalised gray page.
+
+    Returns:
+        _PageGeometry: The dewarped page, or ``page`` with its illumination
+            already normalised when no usable dewarper exists.
+    """
+    oriented = page.image if params.black_on_white else _invert_polarity(page.image)
+    gray = bgr_to_gray(oriented)
+    normalized: NDArray[np.uint8] | None = None
+    if render.normalize_illumination or render.normalize_illumination_color:
+        normalized = normalize_illumination_gray(gray, page.layout.page_outline)
+        gray = normalized
+
+    dewarper = (
+        source if isinstance(source, CylindricalSurfaceDewarper) else source(gray)
+    )
+    if dewarper is None:
+        return replace(page, layout=replace(page.layout, normalized=normalized))
+
+    height, width = page.image.shape[:2]
+    try:
+        maps = compute_dewarp_maps(
+            dewarper, (width, height), output_model_domain(dewarper, (width, height))
+        )
+    except _DEWARPING_ERRORS as error:
+        logger.warning("Dewarping skipped, the distortion model is unusable: {}", error)
+        return replace(page, layout=replace(page.layout, normalized=normalized))
+
+    options = params.dewarping
+    angle = (
+        options.post_deskew_angle
+        if options.post_deskew and options.mode in _POST_DESKEW_MODES
+        else 0.0
+    )
+
+    def warp(array: NDArray[np.uint8], background: int) -> NDArray[np.uint8]:
+        warped = remap_with_maps(array, maps, background)
+        return _apply_post_deskew(warped, angle, background) if angle else warped
+
+    def warp_mask(mask: NDArray[np.bool_]) -> NDArray[np.bool_]:
+        warped = remap_with_maps(
+            mask.astype(np.uint8) * _MASK_ON, maps, 0, InterpolationMethod.NEAREST
+        )
+        return (_apply_post_deskew(warped, angle, 0) if angle else warped) == _MASK_ON
+
+    layout = page.layout
+    layers = page.picture_layers
+    return _PageGeometry(
+        image=warp(page.image, _WHITE if params.black_on_white else 0),
+        layout=_PageLayout(
+            page_outline=None,
+            page=None if layout.page is None else warp_mask(layout.page),
+            keep=None if layout.keep is None else warp_mask(layout.keep),
+            normalized=None if normalized is None else warp(normalized, _WHITE),
+        ),
+        picture_layers=None
+        if layers is None
+        else PictureLayers(
+            eraser1=warp_mask(layers.eraser1),
+            foreground=warp_mask(layers.foreground),
+            background=warp_mask(layers.background),
+            painter=warp_mask(layers.painter),
+            eraser3=warp_mask(layers.eraser3),
+        ),
+        fill_zones=tuple(
+            _FillMask(warp_mask(zone.inside), zone.properties)
+            for zone in page.fill_zones
+        ),
+        was_dewarped=True,
+    )
 
 
 def _apply_post_deskew(
     image: NDArray[np.uint8],
     angle: float,
+    border: int,
 ) -> NDArray[np.uint8]:
-    """Apply post-dewarping deskew rotation.
+    """Rotate a dewarped image about its centre, keeping its size.
 
     Args:
-        image: Dewarped image.
-        angle: Rotation angle in degrees.
+        image (NDArray[np.uint8]): Dewarped image.
+        angle (float): Rotation in degrees; positive turns the page clockwise.
+        border (int): Gray level of the newly exposed pixels, in every channel.
 
     Returns:
-        Rotated image.
+        NDArray[np.uint8]: Rotated image of the same shape.
     """
     h, w = image.shape[:2]
-    center = (w / 2, h / 2)
-
-    # Get rotation matrix
-    rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-
-    # Compute new bounding box size
-    cos = abs(rotation_matrix[0, 0])
-    sin = abs(rotation_matrix[0, 1])
-    new_w = int(h * sin + w * cos)
-    new_h = int(h * cos + w * sin)
-
-    # Adjust the rotation matrix for the new size
-    rotation_matrix[0, 2] += (new_w - w) / 2
-    rotation_matrix[1, 2] += (new_h - h) / 2
-
-    # Determine background color
-    if len(image.shape) == 2:
-        border_value = 255
-    else:
-        border_value = (255,) * image.shape[2]
-
-    # Apply rotation
+    # cv2 counts positive angles counter-clockwise.
+    rotation_matrix = cv2.getRotationMatrix2D((w / 2, h / 2), -angle, 1.0)
     rotated = cv2.warpAffine(
         image,
         rotation_matrix,
-        (new_w, new_h),
+        (w, h),
         borderMode=cv2.BORDER_CONSTANT,
-        borderValue=border_value,
+        borderValue=(border,) * image.shape[2] if image.ndim == 3 else border,
     )
-
     return np.asarray(rotated, dtype=np.uint8)
 
 
@@ -296,8 +432,9 @@ def _generate_binary_output(
         image = _invert_polarity(image)
     gray = bgr_to_gray(image)
     if render.normalize_illumination:
-        gray = normalize_illumination_gray(gray, layout.page_outline)
+        gray = _normalized_gray(gray, layout)
     gray = _wiener_gray(gray, params.color_common)
+    color_page = _segmentation_source(image, gray, params, render)
 
     binary = _binarize_page(gray, params, render)
 
@@ -312,10 +449,78 @@ def _generate_binary_output(
     if params.despeckle_level.is_enabled():
         binary = _despeckle(binary, params.despeckle_level, params.output_dpi)
 
+    if color_page is not None:
+        return _colored_binary_output(color_page, binary, params, render, layout)
+
     if not params.black_on_white:
         binary = 255 - binary
 
     return OutputResult(image=binary, is_binary=True)
+
+
+def _segmentation_source(
+    image: NDArray[np.uint8],
+    gray: NDArray[np.uint8],
+    params: Params,
+    render: RenderParams,
+) -> NDArray[np.uint8] | None:
+    """Colour page whose colours the segmented text takes; None without segmentation.
+
+    Args:
+        image (NDArray[np.uint8]): Page in black-on-white polarity. Not modified.
+        gray (NDArray[np.uint8]): Its illumination-normalised gray, when
+            ``render`` normalises illumination.
+        params (Params): Output parameters.
+        render (RenderParams): Flags derived from ``params``.
+
+    Returns:
+        NDArray[np.uint8] | None: The page, normalised and Wiener filtered like
+            the binarisation input; None unless colour segmentation is on.
+    """
+    if not render.color_segmentation:
+        return None
+    page = _with_brightness(image, gray) if render.normalize_illumination else image
+    options = params.color_common
+    return wiener_color_filter(page, options.wiener_window_size, options.wiener_coef)
+
+
+def _colored_binary_output(
+    color_page: NDArray[np.uint8],
+    binary: NDArray[np.uint8],
+    params: Params,
+    render: RenderParams,
+    layout: _PageLayout,
+) -> OutputResult:
+    """Colour the ink of a binarised page with the colours of the original.
+
+    Args:
+        color_page (NDArray[np.uint8]): Colour source from ``_segmentation_source``.
+        binary (NDArray[np.uint8]): Despeckled binary page in black-on-white
+            polarity, 0 is ink.
+        params (Params): Output parameters.
+        render (RenderParams): Flags derived from ``params``.
+        layout (_PageLayout): Page and fill areas.
+
+    Returns:
+        OutputResult: Coloured text on white, inverted for white-on-black output.
+    """
+    background = dominant_background_color(color_page, layout.page)
+    if layout.keep is not None:
+        color_page = fill_masked(
+            color_page, ~layout.keep, _per_channel(_WHITE, color_page)
+        )
+    dpi = params.output_dpi
+    text = colorize_ink(
+        color_page,
+        binary == 0,
+        (dpi.horizontal, dpi.vertical),
+        params.binarization.color_segmenter,
+        params.color_common.posterization if render.posterize else None,
+        background,
+    )
+    if not params.black_on_white:
+        text = _invert_polarity(text)
+    return OutputResult(image=text, is_binary=False)
 
 
 def _generate_grayscale_output(
@@ -347,9 +552,7 @@ def _generate_grayscale_output(
         image = _invert_polarity(image)
     result = image
     if render.normalize_illumination:
-        brightness = normalize_illumination_gray(
-            bgr_to_gray(image), layout.page_outline
-        )
+        brightness = _normalized_gray(bgr_to_gray(image), layout)
         result = _with_brightness(image, brightness)
     result = wiener_color_filter(
         result, color_options.wiener_window_size, color_options.wiener_coef
@@ -370,7 +573,7 @@ def _generate_mixed_output(
     params: Params,
     render: RenderParams,
     layout: _PageLayout,
-    picture_zones: Sequence[Zone],
+    picture_layers: PictureLayers,
 ) -> OutputResult:
     """Generate mixed output: pictures keep their grays or colours, text is binarised.
 
@@ -384,7 +587,7 @@ def _generate_mixed_output(
         params (Params): Output parameters.
         render (RenderParams): Flags derived from ``params``.
         layout (_PageLayout): Page and fill areas.
-        picture_zones (Sequence[Zone]): Manual picture zones.
+        picture_layers (PictureLayers): Rasterised manual picture zones.
 
     Returns:
         OutputResult: New uint8 array with the shape of the input. Text pixels
@@ -396,52 +599,122 @@ def _generate_mixed_output(
         image = _invert_polarity(image)
 
     raw_gray = bgr_to_gray(image)
-    normalized = raw_gray
-    if render.normalize_illumination or render.normalize_illumination_color:
-        normalized = normalize_illumination_gray(raw_gray, layout.page_outline)
+    normalized_gray = (
+        _normalized_gray(raw_gray, layout) if render.normalize_illumination else None
+    )
     text_gray = _wiener_gray(
-        normalized if render.normalize_illumination else raw_gray, color_options
+        raw_gray if normalized_gray is None else normalized_gray, color_options
     )
 
     dpi = params.output_dpi
-    picture = detect_picture_mask(
-        text_gray, (dpi.horizontal, dpi.vertical), params.picture_shape
-    )
+    dpi_pair = (dpi.horizontal, dpi.vertical)
+    picture = detect_picture_mask(text_gray, dpi_pair, params.picture_shape)
     binary = _binarize_page(text_gray, params, render)
     if layout.keep is not None:
         binary = fill_masked(binary, ~layout.keep, 255)
     if render.morphological_smoothing:
         binary = _morphological_smooth(binary)
 
-    text_region, ink = apply_picture_layers(
-        ~picture, binary == 0, rasterize_picture_zones(picture_zones, binary.shape)
-    )
+    raw_ink = binary == 0
+    text_region, _ = apply_picture_layers(~picture, raw_ink, picture_layers)
     if layout.keep is not None:
         text_region |= ~layout.keep
-        ink &= layout.keep
-    if params.despeckle_level.is_enabled():
-        speckled = np.where(ink, 0, 255).astype(np.uint8)
-        ink = _despeckle(speckled, params.despeckle_level, dpi) == 0
 
-    layer = image
-    if render.normalize_illumination_color:
-        layer = _with_brightness(image, normalized)
-    layer = wiener_color_filter(
-        layer, color_options.wiener_window_size, color_options.wiener_coef
+    normalized_page = (
+        None if normalized_gray is None else _with_brightness(image, normalized_gray)
     )
-    result = compose_mixed(layer, text_region, ink)
+    layer = build_mixed_layer(image, normalized_page, render, color_options)
+    ink: NDArray[np.bool_] | None = None
+    if render.need_binarization:
+        ink = raw_ink
+        if params.despeckle_level.is_enabled():
+            speckled = np.where(ink, 0, 255).astype(np.uint8)
+            ink = _despeckle(speckled, params.despeckle_level, dpi) == 0
+        result = _compose_text(
+            layer, ink, text_region, params, render, layout, dpi_pair
+        )
+    else:
+        result = layer.copy()
 
     if layout.keep is not None:
-        margin = 0 if color_options.filling_color == FillingColor.BLACK else 255
-        result = fill_masked(result, ~layout.keep, _per_channel(margin, result))
+        result = fill_masked(
+            result, ~layout.keep, _mixed_margin_color(result, params, render, layout)
+        )
     if not params.black_on_white:
         result = _invert_polarity(result)
-    return OutputResult(image=result, is_binary=False, picture_mask=~text_region)
+    return OutputResult(
+        image=result,
+        is_binary=False,
+        picture_mask=~text_region,
+        ink_mask=None if ink is None else ink & text_region,
+    )
+
+
+def _compose_text(
+    layer: NDArray[np.uint8],
+    ink: NDArray[np.bool_],
+    text_region: NDArray[np.bool_],
+    params: Params,
+    render: RenderParams,
+    layout: _PageLayout,
+    dpi: tuple[int, int],
+) -> NDArray[np.uint8]:
+    """Put the page's ink, black or coloured, over the picture layer.
+
+    Args:
+        layer (NDArray[np.uint8]): Picture layer from ``build_mixed_layer``.
+        ink (NDArray[np.bool_]): Despeckled ink of the whole page, pictures
+            included; colour segmentation sees all of it and the text region
+            then limits where it is drawn.
+        text_region (NDArray[np.bool_]): True where the output is binarised.
+        params (Params): Output parameters.
+        render (RenderParams): Flags derived from ``params``.
+        layout (_PageLayout): Page area, for the background colour.
+        dpi (tuple[int, int]): Horizontal and vertical output resolution.
+
+    Returns:
+        NDArray[np.uint8]: The composed page.
+    """
+    colored = None
+    if render.color_segmentation:
+        colored = colorize_ink(
+            layer,
+            ink,
+            dpi,
+            params.binarization.color_segmenter,
+            params.color_common.posterization if render.posterize else None,
+            dominant_background_color(layer, layout.page),
+        )
+    if render.original_background:
+        return compose_over_original(layer, ink, colored)
+    if colored is None:
+        return compose_mixed(layer, text_region, ink)
+    return compose_mixed_colored(layer, text_region, colored)
+
+
+def _mixed_margin_color(
+    result: NDArray[np.uint8],
+    params: Params,
+    render: RenderParams,
+    layout: _PageLayout,
+) -> int | tuple[int, ...]:
+    """Margin colour of a mixed page, before any white-on-black inversion."""
+    if render.need_binarization and not render.original_background:
+        black = params.color_common.filling_color == FillingColor.BLACK
+        return _per_channel(0 if black else 255, result)
+    return _margin_color(result, params, layout)
+
+
+def _normalized_gray(gray: NDArray[np.uint8], layout: _PageLayout) -> NDArray[np.uint8]:
+    """Illumination-normalise a gray page, unless that was already done."""
+    if layout.normalized is not None:
+        return layout.normalized
+    return normalize_illumination_gray(gray, layout.page_outline)
 
 
 def _apply_fill_zones(
     result: OutputResult,
-    zones: Sequence[Zone],
+    zones: Sequence[_FillMask],
 ) -> OutputResult:
     """Paint fill zones over an output.
 
@@ -450,8 +723,7 @@ def _apply_fill_zones(
 
     Args:
         result (OutputResult): Output to paint. Not modified.
-        zones (Sequence[Zone]): Zones in output coordinates; non-fill zones and
-            zones with fewer than three vertices are skipped.
+        zones (Sequence[_FillMask]): Zones rasterised on the output's grid.
 
     Returns:
         OutputResult: A painted copy.
@@ -466,12 +738,9 @@ def _apply_fill_zones(
         bilevel = np.zeros(shape, dtype=bool)
 
     for zone in zones:
-        properties = zone.properties
-        if not isinstance(properties, FillZoneProperties) or not zone.is_valid():
-            continue
-        red, green, blue = properties.color
+        red, green, blue = zone.properties.color
         level = (11 * red + 16 * green + 5 * blue) // 32
-        inside = polygon_mask(shape, zone.spline.to_polygon())
+        inside = zone.inside
         exact = (level, level, level) if image.ndim == 2 else (blue, green, red)
         snapped = 0 if level < _BILEVEL_GRAY_SPLIT else 255
         image[inside & ~bilevel] = _match_channels(exact, image)
@@ -481,6 +750,7 @@ def _apply_fill_zones(
         is_binary=result.is_binary,
         was_dewarped=result.was_dewarped,
         picture_mask=result.picture_mask,
+        ink_mask=result.ink_mask,
     )
 
 

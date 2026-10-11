@@ -9,6 +9,7 @@ import pytest
 from scantailor.core.models import ImageId, Margins, PageId, SubPage
 from scantailor.core.pipeline import PipelineOptions, process_page
 from scantailor.core.stage_sequence import FilterStage, StageSequence
+from scantailor.filters.output.settings import Settings as OutputSettings
 from scantailor.filters.page_layout.alignment import Alignment
 from scantailor.filters.page_layout.params import ContentSize
 from scantailor.filters.page_split.layout_type import LayoutType
@@ -30,6 +31,12 @@ RIGHT_INK = 10
 
 # (x, y, width, height) of the ink block on the left page, in source pixels.
 LEFT_BLOCK = (40, 60, 110, 140)
+
+
+@pytest.fixture(autouse=True)
+def _output_at_source_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep output pixels one to one with the source so sizes stay in millimetres."""
+    monkeypatch.setattr(OutputSettings, "DEFAULT_DPI", int(DPI))
 
 
 def _page_id(sub_page: SubPage, name: str = "spread.tiff") -> PageId:
