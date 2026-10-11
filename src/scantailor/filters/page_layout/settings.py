@@ -220,6 +220,53 @@ class Settings(BaseModel):
             after = self._aggregate_hard_size_locked()
         return ContentSizeUpdate(params, before, after)
 
+    def check_everything_defined(
+        self, pages: Iterable[PageId], ignore: PageId | None = None
+    ) -> bool:
+        """Check that every page has a recorded content geometry.
+
+        Output sizes depend on the largest aligned page, so none can be fixed
+        until each page has been measured. A page counts as measured once a
+        processing run recorded a page rectangle or a content size for it;
+        editing only margins or alignment does not.
+
+        Args:
+            pages (Iterable[PageId]): The pages of the project.
+            ignore (PageId | None): A page to leave out, typically the one about
+                to be processed, which records its own geometry.
+
+        Returns:
+            bool: True if every page that is not ignored has been measured.
+        """
+        with self._lock:
+            recorded = [self.params.get(page) for page in pages if page != ignore]
+        return all(
+            params is not None
+            and not (params.content_size_mm.is_empty() and params.page_rect.is_empty())
+            for params in recorded
+        )
+
+    def invalidate_content_size(self, page_id: PageId) -> None:
+        """Forget a page's measured geometry, keeping its margins and alignment.
+
+        The page then counts as unmeasured until a processing run records it
+        again. Unknown pages are left alone.
+
+        Args:
+            page_id (PageId): The page to invalidate.
+        """
+        with self._lock:
+            existing = self.params.get(page_id)
+            if existing is None:
+                return
+            self.params[page_id] = existing.model_copy(
+                update={
+                    "page_rect": ContentRect(),
+                    "content_rect": ContentRect(),
+                    "content_size_mm": ContentSize(),
+                }
+            )
+
     def _aggregate_hard_size_locked(self) -> ContentSize:
         """Aggregate hard size; the caller must hold the lock."""
         max_width = 0.0
