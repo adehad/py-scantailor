@@ -77,16 +77,38 @@ def dewarp_image(
         ...     model_domain=(0, 0, 1, 1)
         ... )
     """
-    dst_width, dst_height = dst_size
-    left, top, right, bottom = model_domain
+    maps = compute_dewarp_maps(dewarper, dst_size, model_domain)
+    return remap_with_maps(src, maps, background_color, interpolation)
 
-    if right <= left or bottom <= top:
-        raise ValueError("model_domain must have positive width and height")
 
-    # Compute the mapping grid
-    map_x, map_y = _compute_dewarp_maps(
-        dewarper, dst_width, dst_height, left, top, right, bottom
-    )
+def remap_with_maps(
+    src: NDArray[np.uint8],
+    maps: tuple[NDArray[np.float32], NDArray[np.float32]],
+    background_color: int | tuple[int, int, int] | tuple[int, int, int, int] = 255,
+    interpolation: InterpolationMethod = InterpolationMethod.BILINEAR,
+) -> NDArray[np.uint8]:
+    """Sample an image through precomputed dewarp maps.
+
+    Computing the maps costs far more than sampling, so a page that needs
+    several images dewarped (pixels, illumination-normalised gray, masks)
+    builds the maps once with ``compute_dewarp_maps`` and reuses them.
+
+    Args:
+        src (NDArray[np.uint8]): Source image, gray or 3 or 4 channels.
+        maps (tuple[NDArray[np.float32], NDArray[np.float32]]): ``(map_x, map_y)``
+            of shape (height, width) in source pixel coordinates.
+        background_color (int | tuple[int, ...]): Colour for output pixels whose
+            source position falls outside ``src``.
+        interpolation (InterpolationMethod): Sampling filter.
+
+    Returns:
+        NDArray[np.uint8]: New image of the maps' size with ``src``'s channel layout.
+
+    Raises:
+        ValueError: If ``src`` has an unsupported shape.
+    """
+    map_x, map_y = maps
+    dst_height, dst_width = map_x.shape
 
     # Prepare background
     if src.ndim == 2:
@@ -129,6 +151,80 @@ def dewarp_image(
     return dst
 
 
+def compute_dewarp_maps(
+    dewarper: CylindricalSurfaceDewarper,
+    dst_size: tuple[int, int],
+    model_domain: tuple[float, float, float, float],
+) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
+    """Compute the source coordinates of every output pixel.
+
+    Args:
+        dewarper (CylindricalSurfaceDewarper): The dewarping model.
+        dst_size (tuple[int, int]): Output (width, height).
+        model_domain (tuple[float, float, float, float]): (left, top, right,
+            bottom) in model coordinates that the output spans. Values outside
+            [0, 1] extrapolate the model.
+
+    Returns:
+        tuple[NDArray[np.float32], NDArray[np.float32]]: ``(map_x, map_y)``
+            for ``remap_with_maps`` or ``cv2.remap``.
+
+    Raises:
+        ValueError: If the domain has no extent.
+    """
+    left, top, right, bottom = model_domain
+    if right <= left or bottom <= top:
+        raise ValueError("model_domain must have positive width and height")
+    map_x, map_y = _compute_dewarp_maps(
+        dewarper, dst_size[0], dst_size[1], left, top, right, bottom
+    )
+    # The grids address pixel corners; cv2.remap addresses pixel centres.
+    return map_x - np.float32(0.5), map_y - np.float32(0.5)
+
+
+def output_model_domain(
+    dewarper: CylindricalSurfaceDewarper,
+    dst_size: tuple[int, int],
+) -> tuple[float, float, float, float]:
+    """Place the model's bounding box inside an output of a given size.
+
+    The model's bounding box is where the flattened page content lands, so
+    margins around it stay margins. Unrolling a curved page stretches the lines,
+    so the box is shrunk vertically, about the output's centre, by the arc
+    length factor; stretching it horizontally instead would push content out of
+    the page.
+
+    Args:
+        dewarper (CylindricalSurfaceDewarper): The dewarping model.
+        dst_size (tuple[int, int]): Output (width, height) in the pixel space the
+            dewarper's directrices are in.
+
+    Returns:
+        tuple[float, float, float, float]: Model-space (left, top, right, bottom)
+            covered by the output, for ``compute_dewarp_maps``.
+
+    Raises:
+        ValueError: If the model's bounding box has no extent.
+    """
+    width, height = dst_size
+    box_left, box_top, box_right, box_bottom = dewarper.directrix_bounding_box()
+    box_width = box_right - box_left
+    box_height = box_bottom - box_top
+    if box_width <= 0 or box_height <= 0:
+        raise ValueError("The distortion model has no extent")
+
+    vertical_scale = 1.0 / dewarper.directrix_arc_length
+    centre_y = height / 2.0
+    domain_top = centre_y - (centre_y - box_top) * vertical_scale
+    domain_height = box_height * vertical_scale
+    return (
+        -box_left / box_width,
+        -domain_top / domain_height,
+        (width - box_left) / box_width,
+        (height - domain_top) / domain_height,
+    )
+
+
 def _compute_dewarp_maps(
     dewarper: CylindricalSurfaceDewarper,
     dst_width: int,
@@ -158,15 +254,12 @@ def _compute_dewarp_maps(
     x_scale = (right - left) / dst_width
     y_scale = (bottom - top) / dst_height
 
-    starts = np.empty((dst_width, 2), dtype=np.float64)
-    directions = np.empty((dst_width, 2), dtype=np.float64)
-    homographies = np.empty((dst_width, 2, 2), dtype=np.float64)
-    for dst_x in range(dst_width):
-        generatrix = dewarper.map_generatrix(left + (dst_x + 0.5) * x_scale)
-        img_p1, img_p2 = generatrix.img_line
-        starts[dst_x] = img_p1
-        directions[dst_x] = np.asarray(img_p2) - np.asarray(img_p1)
-        homographies[dst_x] = generatrix.pln2img_1d
+    generatrices = dewarper.map_generatrices(
+        left + (np.arange(dst_width) + 0.5) * x_scale
+    )
+    starts = generatrices.start
+    directions = generatrices.end - generatrices.start
+    homographies = generatrices.pln2img_1d
 
     # Rows broadcast against columns: (dst_height, 1) with (dst_width,).
     model_y = (top + (np.arange(dst_height) + 0.5) * y_scale)[:, None]

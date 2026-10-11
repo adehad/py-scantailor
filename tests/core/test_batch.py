@@ -27,6 +27,7 @@ from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.select_content.content_box import ContentBox
 
 SOURCE_DPI = 300
+OUTPUT_DPI = 600
 
 
 def _page(path: str, page: int = 0, sub: SubPage = SubPage.SINGLE_PAGE) -> PageId:
@@ -252,7 +253,7 @@ def stages(sources: list[PageId]) -> StageSequence:
 
 
 class TestRunBatch:
-    def test_four_pages_are_written_with_cpp_names_and_source_dpi(
+    def test_four_pages_are_written_with_cpp_names_and_output_dpi(
         self, tmp_path: Path, sources: list[PageId], stages: StageSequence
     ):
         out = tmp_path / "out"
@@ -276,7 +277,7 @@ class TestRunBatch:
         for path in result.written.values():
             with Image.open(path) as image:
                 assert image.info["dpi"] == pytest.approx(
-                    (SOURCE_DPI, SOURCE_DPI), abs=1
+                    (OUTPUT_DPI, OUTPUT_DPI), abs=1
                 )
                 assert image.size[0] > 0 and image.size[1] > 0
 

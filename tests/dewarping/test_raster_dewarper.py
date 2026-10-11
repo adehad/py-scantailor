@@ -277,6 +277,14 @@ class _DegenerateGeneratrices:
         line = (np.array([x * 10, 1.0]), np.array([x * 10 + 3.0, 50.0 + x]))
         return SimpleNamespace(img_line=line, pln2img_1d=h)
 
+    def map_generatrices(self, xs: np.ndarray) -> SimpleNamespace:
+        each = [self.map_generatrix(float(x)) for x in xs]
+        return SimpleNamespace(
+            start=np.array([g.img_line[0] for g in each]),
+            end=np.array([g.img_line[1] for g in each]),
+            pln2img_1d=np.array([g.pln2img_1d for g in each]),
+        )
+
 
 class TestComputeDewarpMaps:
     """Tests for the remap grids behind dewarp_image."""
