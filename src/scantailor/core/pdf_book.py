@@ -17,13 +17,15 @@ from scantailor.core.batch import (
     BatchResult,
     PageDetected,
     PageDone,
+    pool_size,
     run_batch,
+    spawn_pool,
 )
 from scantailor.core.models import Dpi, ImageId, PageId
 from scantailor.core.pdf_export import BilevelCodec, export_pdf
 from scantailor.core.pdf_import import import_pdf
 from scantailor.core.stage_sequence import StageSequence
-from scantailor.core.text_layer import TextLayer, build_text_layer
+from scantailor.core.text_layer import TextLayer, TextLayerJob, build_text_layers
 
 
 @dataclass
@@ -80,68 +82,86 @@ def rebuild_pdf(
 
     Returns:
         BookResult: Timings, failures and the output location. Pages that
-        failed or were cancelled are absent from the PDF.
+        failed are absent from the PDF. No PDF is written, and an existing one
+        is left alone, when the batch was cancelled or no page was written.
     """
     result = BookResult(out_path)
     clock = _PhaseClock(result.seconds)
+    workers = pool_size(max_workers)
 
-    clock.start("import")
-    images = import_pdf(pdf_path, work_dir / "source", dpi)
-    pages = [PageId(image_id=ImageId(file_path=path)) for path in images]
-    index_of = {page: index for index, page in enumerate(pages)}
+    with spawn_pool(workers) as pool:
+        clock.start("import")
+        images = import_pdf(
+            pdf_path, work_dir / "source", dpi, executor=pool, max_workers=workers
+        )
+        pages = [PageId(image_id=ImageId(file_path=path)) for path in images]
+        index_of = {page: index for index, page in enumerate(pages)}
 
-    if stages is None:
-        stages = StageSequence()
-        stages.output_filter.settings.set_default_dpi(Dpi.uniform(output_dpi or dpi))
-
-    def forward(event: BatchEvent) -> None:
-        if isinstance(event, PageDetected):
-            clock.start("detect")
-        elif isinstance(event, PageDone):
-            clock.start("render")
-        if on_progress is not None:
-            on_progress(event)
-
-    clock.start("detect")
-    batch = run_batch(
-        stages,
-        pages,
-        work_dir / "output",
-        max_workers=max_workers,
-        on_progress=forward,
-        cancel=cancel,
-    )
-    for page, error in batch.failed.items():
-        result.failed[index_of[page]] = error
-
-    clock.start("text")
-    exported = [page for page in pages if page in batch.written]
-    layers: list[TextLayer | None] = []
-    for page in exported:
-        info = batch.render_info.get(page)
-        layer = None
-        if carry_text and info is not None:
-            layer = build_text_layer(
-                pdf_path,
-                index_of[page],
-                info.transformation,
-                Dpi.uniform(dpi),
-                info.output_dpi,
-                dewarped=info.was_dewarped,
+        if stages is None:
+            stages = StageSequence()
+            stages.output_filter.settings.set_default_dpi(
+                Dpi.uniform(output_dpi or dpi)
             )
-        layers.append(layer)
-    result.text_pages = sum(layer is not None for layer in layers)
 
-    clock.start("export")
-    export_pdf(
-        [
-            (batch.written[page], _output_dpi(batch, page, output_dpi or dpi))
-            for page in exported
-        ],
-        out_path,
-        bilevel_codec=bilevel_codec,
-        text_layers=layers if carry_text else None,
-    )
+        def forward(event: BatchEvent) -> None:
+            if isinstance(event, PageDetected):
+                clock.start("detect")
+            elif isinstance(event, PageDone):
+                clock.start("render")
+            if on_progress is not None:
+                on_progress(event)
+
+        clock.start("detect")
+        batch = run_batch(
+            stages,
+            pages,
+            work_dir / "output",
+            max_workers=workers,
+            on_progress=forward,
+            cancel=cancel,
+            executor=pool,
+        )
+        for page, error in batch.failed.items():
+            result.failed[index_of[page]] = error
+
+        exported = [page for page in pages if page in batch.written]
+        if batch.cancelled or not exported:
+            clock.stop()
+            return result
+
+        clock.start("text")
+        layers: list[TextLayer | None] = []
+        if carry_text:
+            jobs = [
+                TextLayerJob.of(
+                    pdf_path,
+                    index_of[page],
+                    info.transformation,
+                    Dpi.uniform(dpi),
+                    info.output_dpi,
+                    dewarped=info.was_dewarped,
+                )
+                for page in exported
+                if (info := batch.render_info.get(page)) is not None
+            ]
+            built = iter(build_text_layers(jobs, executor=pool, max_workers=workers))
+            layers = [
+                next(built) if page in batch.render_info else None for page in exported
+            ]
+        result.text_pages = sum(layer is not None for layer in layers)
+
+        clock.start("export")
+        export_pdf(
+            [
+                (batch.written[page], _output_dpi(batch, page, output_dpi or dpi))
+                for page in exported
+            ],
+            out_path,
+            bilevel_codec=bilevel_codec,
+            text_layers=layers if carry_text else None,
+            executor=pool,
+            max_workers=workers,
+        )
     clock.stop()
     result.pages_exported = len(exported)
     logger.info("Rebuilt {} pages into {}", result.pages_exported, out_path)

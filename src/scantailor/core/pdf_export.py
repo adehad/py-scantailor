@@ -7,7 +7,9 @@ stored losslessly as JBIG2 or CCITT G4, grey and colour pages as JPEG.
 from __future__ import annotations
 
 import io
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
@@ -18,6 +20,7 @@ from jbig2_numba import encode_pdf_stream
 from numpy.typing import NDArray
 from PIL import Image
 
+from scantailor.core.batch import map_pool
 from scantailor.core.text_layer import TextLayer
 
 PDF_POINTS_PER_INCH = 72.0
@@ -33,6 +36,8 @@ def export_pdf(
     bilevel_codec: BilevelCodec = "jbig2",
     colour_quality: int = 85,
     text_layers: Sequence[TextLayer | None] | None = None,
+    executor: ProcessPoolExecutor | None = None,
+    max_workers: int | None = None,
 ) -> None:
     """Write pages to one PDF.
 
@@ -46,6 +51,10 @@ def export_pdf(
         colour_quality (int): JPEG quality, 1 to 100, for grey and colour pages.
         text_layers (Sequence[TextLayer | None] | None): One entry per page, or
             ``None`` for no text.
+        executor (ProcessPoolExecutor | None): A pool from ``spawn_pool`` whose
+            workers load and encode the page images; this process assembles the
+            PDF in page order. Pages are encoded in this process when None.
+        max_workers (int | None): Size of ``executor``.
 
     Raises:
         ValueError: On an unknown codec, a mismatched ``text_layers`` length, a
@@ -57,12 +66,19 @@ def export_pdf(
     if text_layers is not None and len(text_layers) != len(pages):
         raise ValueError("text_layers must have one entry per page")
 
+    jobs = [
+        _EncodeJob(source, *_dpi_pair(dpi), bilevel_codec, colour_quality)
+        for source, dpi in pages
+    ]
+    if executor is None:
+        encoded: Iterable[EncodedPage] = (_encode_page(job) for job in jobs)
+    else:
+        encoded = map_pool(_encode_page, jobs, executor, max_workers)
+
     pdf = pikepdf.Pdf.new()
-    for index, (source, dpi) in enumerate(pages):
-        image = _load(source)
-        dpi_x, dpi_y = _dpi_pair(dpi)
+    for index, page in enumerate(encoded):
         text = text_layers[index] if text_layers is not None else None
-        _add_page(pdf, image, dpi_x, dpi_y, bilevel_codec, colour_quality, text)
+        _add_page(pdf, page, text)
 
     pdf.save(
         str(out_path),
@@ -133,23 +149,80 @@ def _encode_g4(black: NDArray[np.bool_]) -> bytes:
     return b"".join(raw[o : o + c] for o, c in zip(offsets, counts, strict=True))
 
 
-def _add_page(
-    pdf: pikepdf.Pdf,
-    image: NDArray[Any],
-    dpi_x: float,
-    dpi_y: float,
-    bilevel_codec: BilevelCodec,
-    colour_quality: int,
-    text: TextLayer | None,
-) -> None:
-    height, width = image.shape[:2]
-    page_w = width / dpi_x * PDF_POINTS_PER_INCH
-    page_h = height / dpi_y * PDF_POINTS_PER_INCH
+@dataclass(frozen=True)
+class _EncodeJob:
+    source: PageSource
+    dpi_x: float
+    dpi_y: float
+    codec: BilevelCodec
+    quality: int
 
+
+@dataclass(frozen=True)
+class EncodedPage:
+    """A page image as stream data plus the dictionary entries that describe it.
+
+    Attributes:
+        data (bytes): Image stream data in ``codec_filter``'s encoding.
+        codec_filter (str): ``JBIG2Decode``, ``CCITTFaxDecode`` or ``DCTDecode``.
+        width (int): Image width in pixels.
+        height (int): Image height in pixels.
+        colour_space (str): ``DeviceGray`` or ``DeviceRGB``.
+        bits_per_component (int): 1 for bilevel images, otherwise 8.
+        page_width (float): Page width in points.
+        page_height (float): Page height in points.
+    """
+
+    data: bytes
+    codec_filter: str
+    width: int
+    height: int
+    colour_space: str
+    bits_per_component: int
+    page_width: float
+    page_height: float
+
+
+def _encode_page(job: _EncodeJob) -> EncodedPage:
+    """Load one page image and encode it; runs in a worker or in this process."""
+    image = _load(job.source)
+    height, width = image.shape[:2]
+    page_width = width / job.dpi_x * PDF_POINTS_PER_INCH
+    page_height = height / job.dpi_y * PDF_POINTS_PER_INCH
     if _is_bilevel(image):
-        xobject = _bilevel_xobject(pdf, image, bilevel_codec, dpi_x, dpi_y)
-    else:
-        xobject = _jpeg_xobject(pdf, image, colour_quality)
+        black = _black_mask(image)
+        if job.codec == "jbig2":
+            metadata_dpi = (max(1, round(job.dpi_x)), max(1, round(job.dpi_y)))
+            data = encode_pdf_stream(black, dpi=metadata_dpi)
+            codec_filter = "JBIG2Decode"
+        else:
+            data = _encode_g4(black)
+            codec_filter = "CCITTFaxDecode"
+        return EncodedPage(
+            data, codec_filter, width, height, "DeviceGray", 1, page_width, page_height
+        )
+    if image.dtype != np.uint8:
+        raise ValueError(f"Grey and colour pages must be uint8, got {image.dtype}")
+    ok, encoded = cv2.imencode(
+        ".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, int(job.quality)]
+    )
+    if not ok:
+        raise ValueError("JPEG encoding failed")
+    return EncodedPage(
+        encoded.tobytes(),
+        "DCTDecode",
+        width,
+        height,
+        "DeviceGray" if image.ndim == 2 else "DeviceRGB",
+        8,
+        page_width,
+        page_height,
+    )
+
+
+def _add_page(pdf: pikepdf.Pdf, page: EncodedPage, text: TextLayer | None) -> None:
+    xobject = _image_xobject(pdf, page)
+    page_w, page_h = page.page_width, page.page_height
 
     resources = pikepdf.Dictionary(XObject=pikepdf.Dictionary(Im0=xobject))
     parts: list[bytes] = []
@@ -210,51 +283,17 @@ def _serialise(value: Any) -> bytes:
     )
 
 
-def _bilevel_xobject(
-    pdf: pikepdf.Pdf,
-    image: NDArray[Any],
-    codec: BilevelCodec,
-    dpi_x: float,
-    dpi_y: float,
-) -> pikepdf.Stream:
-    black = _black_mask(image)
-    height, width = black.shape
-    if codec == "jbig2":
-        metadata_dpi = (max(1, round(dpi_x)), max(1, round(dpi_y)))
-        stream = pdf.make_stream(encode_pdf_stream(black, dpi=metadata_dpi))
-        stream["/Filter"] = pikepdf.Name.JBIG2Decode
-    else:
-        stream = pdf.make_stream(_encode_g4(black))
-        stream["/Filter"] = pikepdf.Name.CCITTFaxDecode
+def _image_xobject(pdf: pikepdf.Pdf, page: EncodedPage) -> pikepdf.Stream:
+    stream = pdf.make_stream(page.data)
+    stream["/Type"] = pikepdf.Name.XObject
+    stream["/Subtype"] = pikepdf.Name.Image
+    stream["/Width"] = page.width
+    stream["/Height"] = page.height
+    stream["/ColorSpace"] = pikepdf.Name(f"/{page.colour_space}")
+    stream["/BitsPerComponent"] = page.bits_per_component
+    stream["/Filter"] = pikepdf.Name(f"/{page.codec_filter}")
+    if page.codec_filter == "CCITTFaxDecode":
         stream["/DecodeParms"] = pikepdf.Dictionary(
-            K=-1, Columns=width, Rows=height, BlackIs1=False
+            K=-1, Columns=page.width, Rows=page.height, BlackIs1=False
         )
-    stream["/Type"] = pikepdf.Name.XObject
-    stream["/Subtype"] = pikepdf.Name.Image
-    stream["/Width"] = width
-    stream["/Height"] = height
-    stream["/ColorSpace"] = pikepdf.Name.DeviceGray
-    stream["/BitsPerComponent"] = 1
-    return stream
-
-
-def _jpeg_xobject(
-    pdf: pikepdf.Pdf, image: NDArray[Any], quality: int
-) -> pikepdf.Stream:
-    if image.dtype != np.uint8:
-        raise ValueError(f"Grey and colour pages must be uint8, got {image.dtype}")
-    ok, encoded = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, int(quality)])
-    if not ok:
-        raise ValueError("JPEG encoding failed")
-    height, width = image.shape[:2]
-    stream = pdf.make_stream(encoded.tobytes())
-    stream["/Type"] = pikepdf.Name.XObject
-    stream["/Subtype"] = pikepdf.Name.Image
-    stream["/Width"] = width
-    stream["/Height"] = height
-    stream["/ColorSpace"] = (
-        pikepdf.Name.DeviceGray if image.ndim == 2 else pikepdf.Name.DeviceRGB
-    )
-    stream["/BitsPerComponent"] = 8
-    stream["/Filter"] = pikepdf.Name.DCTDecode
     return stream
