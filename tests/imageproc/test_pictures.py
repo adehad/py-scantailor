@@ -2,9 +2,11 @@
 
 import cv2
 import numpy as np
+from skimage.morphology import reconstruction as skimage_reconstruction
 
 from scantailor.imageproc.pictures import (
     PICTURE_THRESHOLD,
+    _reconstruct_by_erosion,
     detect_pictures,
     estimate_picture_mask,
     find_picture_rectangles,
@@ -155,3 +157,25 @@ class TestFindPictureRectangles:
         mask[20:80, 20:80] = True
 
         assert find_picture_rectangles(mask, 100) == [(20, 20, 79, 79)]
+
+
+class TestReconstructionBackend:
+    """The numba reconstruction must give what scikit-image gave."""
+
+    def test_erosion_step_matches_skimage_on_a_photo_page(self):
+        page = _text_page()
+        _add_photo(page, slice(250, 370), slice(60, 240))
+        window = np.ones((3, 3), np.uint8)
+        gradient = np.asarray(cv2.dilate(page, window) - cv2.erode(page, window))
+        marker = np.asarray(cv2.dilate(gradient, np.ones((35, 35), np.uint8)))
+
+        expected = skimage_reconstruction(
+            np.maximum(marker, gradient),
+            gradient,
+            method="erosion",
+            footprint=np.ones((3, 3), dtype=bool),
+        )
+
+        np.testing.assert_array_equal(
+            _reconstruct_by_erosion(marker, gradient), expected
+        )

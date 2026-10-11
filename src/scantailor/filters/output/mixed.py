@@ -2,7 +2,9 @@
 
 Mixed output keeps the gray levels or colours of pictures and binarises the
 rest. This module finds the picture regions, applies manual picture zones and
-combines the two parts.
+combines the two parts. It also holds the steps for colouring the ink and for
+keeping the original background, which the generator applies in binary and
+mixed output.
 """
 
 from collections.abc import Sequence
@@ -12,13 +14,19 @@ import numpy as np
 from numpy.typing import NDArray
 
 from scantailor.core.zones import PictureLayer, PictureZoneProperties, Zone
+from scantailor.imageproc.color_segmenter import segment_colors
+from scantailor.imageproc.filters import wiener_color_filter
 from scantailor.imageproc.pictures import (
     estimate_picture_mask,
     find_picture_rectangles,
 )
+from scantailor.imageproc.posterizer import posterize
 
+from .binarization import ColorSegmenterOptions
+from .color_options import ColorCommonOptions, PosterizationOptions
 from .picture_shape import PictureShape, PictureShapeOptions
 from .raster import polygon_mask
+from .render_params import RenderParams
 
 _PURE_BLACK = 0
 _PURE_WHITE = 255
@@ -194,3 +202,180 @@ def _reserve_black_and_white(
     result[black, :_COLOR_CHANNELS] = _NEAR_BLACK
     result[white, :_COLOR_CHANNELS] = _NEAR_WHITE
     return result
+
+
+def build_mixed_layer(
+    original: NDArray[np.uint8],
+    normalized: NDArray[np.uint8] | None,
+    render: RenderParams,
+    options: ColorCommonOptions,
+) -> NDArray[np.uint8]:
+    """Pick the picture layer of a mixed page.
+
+    With binarisation on, the layer is the untouched original unless colour
+    illumination normalisation is on. Only then does it get the Wiener colour
+    filter, and it is the normalised page only when the binarisation also
+    normalises illumination.
+
+    =============  =============  ===============================
+    colour norm    binarisation   layer
+    =============  =============  ===============================
+    off            any            original, no Wiener filter
+    on             on             normalised, Wiener filtered
+    on             off            original, Wiener filtered
+    =============  =============  ===============================
+
+    Without binarisation (colour foreground), the layer is the normalised page
+    if ``render.normalize_illumination`` says so, otherwise the original, and
+    is always Wiener filtered.
+
+    Args:
+        original (NDArray[np.uint8]): Original page, gray or (H, W, 3|4) BGR(A).
+        normalized (NDArray[np.uint8] | None): The page with illumination
+            normalised, same shape; only read when the layer is the normalised page.
+        render (RenderParams): Flags of the page.
+        options (ColorCommonOptions): Wiener filter settings.
+
+    Returns:
+        NDArray[np.uint8]: ``original`` itself when it is used unchanged,
+            otherwise a new array. Callers must not modify it.
+
+    Raises:
+        ValueError: If the layer must be normalised but ``normalized`` is None.
+    """
+    if render.need_binarization and not render.normalize_illumination_color:
+        return original
+    layer = original
+    if render.normalize_illumination:
+        if normalized is None:
+            msg = "normalized page is required when illumination is normalised"
+            raise ValueError(msg)
+        layer = normalized
+    return wiener_color_filter(layer, options.wiener_window_size, options.wiener_coef)
+
+
+def background_lightness(color: int | tuple[int, ...]) -> int:
+    """Lightness of a colour on the 0 to 255 scale, the posterizer's white level.
+
+    Args:
+        color (int | tuple[int, ...]): A gray level, or BGR(A) levels.
+
+    Returns:
+        int: Mean of the largest and smallest colour channel, halves rounded up.
+    """
+    if isinstance(color, int):
+        return color
+    channels = color[:_COLOR_CHANNELS]
+    return (max(channels) + min(channels) + 1) // 2
+
+
+def colorize_ink(
+    image: NDArray[np.uint8],
+    ink: NDArray[np.bool_],
+    dpi: tuple[int, int],
+    segmenter: ColorSegmenterOptions,
+    posterization: PosterizationOptions | None = None,
+    background_color: int | tuple[int, ...] | None = None,
+) -> NDArray[np.uint8]:
+    """Colour the ink with the colours of the original and optionally posterise it.
+
+    Args:
+        image (NDArray[np.uint8]): Original page, gray or (H, W, 3|4) BGR(A).
+            Not modified.
+        ink (NDArray[np.bool_]): True where binarisation found ink.
+        dpi (tuple[int, int]): Horizontal and vertical resolution of ``image``.
+        segmenter (ColorSegmenterOptions): Noise reduction and thresholds.
+        posterization (PosterizationOptions | None): Posterise the result with
+            these options when given and enabled.
+        background_color (int | tuple[int, ...] | None): Page background, whose
+            lightness is the white level when stretching colours before
+            posterising; white when None.
+
+    Returns:
+        NDArray[np.uint8]: Ink in colour on white paper, same shape as ``image``.
+    """
+    segmented = segment_colors(
+        ink,
+        image,
+        dpi,
+        segmenter.noise_reduction,
+        (
+            segmenter.red_threshold_adjustment,
+            segmenter.green_threshold_adjustment,
+            segmenter.blue_threshold_adjustment,
+        ),
+    )
+    if posterization is None or not posterization.enabled:
+        return segmented
+    white_level = (
+        _PURE_WHITE
+        if background_color is None
+        else background_lightness(background_color)
+    )
+    return posterize(
+        segmented,
+        posterization.level,
+        normalize=posterization.normalization_enabled,
+        force_black_and_white=posterization.force_black_and_white,
+        normalize_white_level=white_level,
+    )
+
+
+def compose_mixed_colored(
+    layer: NDArray[np.uint8],
+    text_region: NDArray[np.bool_],
+    colored_text: NDArray[np.uint8],
+) -> NDArray[np.uint8]:
+    """Put coloured text, from ``colorize_ink``, over the picture layer.
+
+    Args:
+        layer (NDArray[np.uint8]): Picture layer, gray or (H, W, 3|4) BGR(A).
+            Not modified.
+        text_region (NDArray[np.bool_]): True where the text replaces the layer.
+        colored_text (NDArray[np.uint8]): Text on white paper, same shape as ``layer``.
+
+    Returns:
+        NDArray[np.uint8]: New image. Outside the text region pure black and
+            white of the layer become 1 and 254.
+    """
+    result = _reserve_black_and_white(layer, ~text_region)
+    result[text_region] = colored_text[text_region]
+    return result
+
+
+def compose_over_original(
+    layer: NDArray[np.uint8],
+    ink: NDArray[np.bool_],
+    colored_text: NDArray[np.uint8] | None = None,
+) -> NDArray[np.uint8]:
+    """Draw ink over the original page, which stays as the background.
+
+    Args:
+        layer (NDArray[np.uint8]): Original page, gray or (H, W, 3|4) BGR(A).
+            Not modified.
+        ink (NDArray[np.bool_]): True where ink is drawn.
+        colored_text (NDArray[np.uint8] | None): Ink colours from ``colorize_ink``;
+            pure white pixels of it are not drawn. Ink is black when None.
+
+    Returns:
+        NDArray[np.uint8]: New image. Pure black and white of the page become 1
+            and 254 away from the ink, so only ink is exactly black.
+    """
+    result = layer.copy()
+    if colored_text is None:
+        drawn = ink
+        source = np.zeros_like(layer)
+    else:
+        colors = (
+            colored_text[..., :_COLOR_CHANNELS]
+            if colored_text.ndim == 3
+            else colored_text
+        )
+        is_color = colors != _PURE_WHITE
+        drawn = ink & (is_color if is_color.ndim == 2 else is_color.any(axis=2))
+        source = colored_text
+    if result.ndim == 2:
+        result[drawn] = source[drawn]
+    else:
+        result[drawn, :_COLOR_CHANNELS] = source[drawn, :_COLOR_CHANNELS]
+    return _reserve_black_and_white(result, ~ink)
