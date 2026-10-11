@@ -24,8 +24,10 @@ from scantailor.app.ui.batch_runner import BatchRunner
 from scantailor.app.ui.dialogs.about import AboutDialog
 from scantailor.app.ui.dialogs.apply_to import ApplyToDialog
 from scantailor.app.ui.dialogs.batch_progress import BatchProgressDialog
+from scantailor.app.ui.dialogs.fix_dpi import FixDpiDialog
 from scantailor.app.ui.dialogs.load_files_status import LoadFilesStatusDialog
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
+from scantailor.app.ui.dialogs.relinking import RelinkingDialog
 from scantailor.app.ui.page_renderer import PageRenderer, render_thumbnail
 from scantailor.app.ui.stage_panels import StagePanels
 from scantailor.app.ui.thumbnails import ThumbnailListWidget
@@ -37,7 +39,9 @@ from scantailor.core import propagation
 from scantailor.core.batch import BatchResult, ProgressEvent
 from scantailor.core.image_io import ImageLoadError, list_image_pages
 from scantailor.core.models import ImageId, PageId
-from scantailor.core.project import ImageMetadata, LayoutDirection, Project
+from scantailor.core.project import ImageInfo, ImageMetadata, LayoutDirection, Project
+from scantailor.core.recent_projects import RecentProjects
+from scantailor.core.relinker import Relinker, image_directories
 from scantailor.core.stage_params import apply_stage_params, collect_stage_params
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 
@@ -67,6 +71,9 @@ LoadStatusPresenter = Callable[
     [list[pathlib.Path], list[tuple[pathlib.Path, str]], QWidget], bool
 ]
 SavePrompt = Callable[[], SaveChoice]
+FixDpiDialogFactory = Callable[[list[ImageInfo], QWidget], FixDpiDialog]
+RelinkingDialogFactory = Callable[[list[pathlib.Path], QWidget], RelinkingDialog]
+PageMetadata = list[tuple[ImageId, ImageMetadata]]
 
 
 def _message_widget(text: str) -> QtWidgets.QLabel:
@@ -123,6 +130,8 @@ class MainWindowManager:
         project_files_dialog_factory: ProjectFilesDialogFactory | None = None,
         load_status_presenter: LoadStatusPresenter | None = None,
         save_prompt: SavePrompt | None = None,
+        fix_dpi_dialog_factory: FixDpiDialogFactory | None = None,
+        relinking_dialog_factory: RelinkingDialogFactory | None = None,
     ):
         """Application Initialize.
 
@@ -135,6 +144,10 @@ class MainWindowManager:
             load_status_presenter (LoadStatusPresenter | None): Shows which files
                 failed to load; returns False when the user abandons the import.
             save_prompt (SavePrompt | None): Asks what to do with unsaved changes.
+            fix_dpi_dialog_factory (FixDpiDialogFactory | None): Builds the dialog
+                that corrects undefined or implausible DPI.
+            relinking_dialog_factory (RelinkingDialogFactory | None): Builds the
+                dialog that points moved image folders at their new location.
         """
         super().__init__()
         self.ui = load_ui_widget(
@@ -149,6 +162,12 @@ class MainWindowManager:
             load_status_presenter or self._default_load_status_presenter
         )
         self.save_prompt: SavePrompt = save_prompt or self._ask_save_changes
+        self.fix_dpi_dialog_factory: FixDpiDialogFactory = (
+            fix_dpi_dialog_factory or FixDpiDialog
+        )
+        self.relinking_dialog_factory: RelinkingDialogFactory = (
+            relinking_dialog_factory or RelinkingDialog
+        )
 
         self.project: Project | None = None
         self.stages = StageSequence()
@@ -168,6 +187,8 @@ class MainWindowManager:
         self.batch_dialog: BatchProgressDialog | None = None
         self.last_batch_result: BatchResult | None = None
         self._modified = False
+        # Serialised project as last saved or opened; None while never saved.
+        self._saved_state: str | None = None
         self.workerThreadPool = None  # std::make_unique<WorkerThreadPool>()
         self.interactiveQueue = None  # std::make_unique<ProcessingTaskQueue>()
         self.outOfMemoryDialog = None  # std::make_unique<OutOfMemoryDialog>()
@@ -258,6 +279,8 @@ class MainWindowManager:
         self.filterList = get_cwidget(self.ui, StageListView, "filterList")
         self.actionAddFiles = QtGui.QAction(self.ui.tr("Add Files..."), self.ui)
         self._insert_add_files_action()
+        self.menuOpenRecent = QtWidgets.QMenu(self.ui.tr("Open Recent"), self.ui)
+        self._insert_recent_menu()
 
         # Layouts
         self.imageFrameLayout = QStackedLayout(self.imageViewFrame)
@@ -338,6 +361,7 @@ class MainWindowManager:
         self._attach_stages()
         self._update_project_actions()
         self._update_window_title()
+        self._rebuild_recent_menu()
 
     def _render_page_thumbnail(self, page: PageId, stage: str) -> QtGui.QImage:
         """Render a thumbnail on a worker thread; settings are only read."""
@@ -386,6 +410,42 @@ class MainWindowManager:
         actions = file_menu.actions()
         save_index = actions.index(self.actionSaveProject)
         file_menu.insertAction(actions[save_index - 1], self.actionAddFiles)
+
+    def _insert_recent_menu(self) -> None:
+        """Place the recent projects submenu right below Open Project."""
+        file_menu = get_cwidget(self.ui, QtWidgets.QMenu, "menuFile")
+        actions = file_menu.actions()
+        following = actions[actions.index(self.actionOpenProject) + 1]
+        file_menu.insertMenu(following, self.menuOpenRecent)
+        self.menuOpenRecent.aboutToShow.connect(self._rebuild_recent_menu)
+
+    def _rebuild_recent_menu(self) -> None:
+        """List the recent projects that still exist, dropping the others."""
+        recent = RecentProjects.read(self.settings)
+        if not recent.validate():
+            recent.write(self.settings)
+        self.menuOpenRecent.clear()
+        for path in recent.enumerate():
+            action = self.menuOpenRecent.addAction(path.replace("&", "&&"))
+            action.setToolTip(path)
+            action.triggered.connect(
+                lambda _checked=False, chosen=path: self.open_project_file(
+                    pathlib.Path(chosen)
+                )
+            )
+        self.menuOpenRecent.setEnabled(not self.menuOpenRecent.isEmpty())
+
+    def _remember_project(self, path: pathlib.Path) -> None:
+        """Record ``path`` as the most recently used project and the last folder.
+
+        Args:
+            path (pathlib.Path): A project file that was opened or saved.
+        """
+        recent = RecentProjects.read(self.settings)
+        recent.set_most_recent(path)
+        recent.write(self.settings)
+        self.settings.setValue(_LAST_DIR_KEY, str(path.parent))
+        self._rebuild_recent_menu()
 
     def _switch_filter_actions(self) -> list[QtGui.QAction]:
         """Return the stage switching actions in stage order."""
@@ -872,26 +932,112 @@ class MainWindowManager:
             self._last_project_dir(),
             f"{self.ui.tr('Scan Tailor Projects')} (*{PROJECT_SUFFIX})",
         )
-        if not project_file:
-            return
-        _LOG.info(f"Opening project: {project_file}")
-        path = pathlib.Path(project_file)
+        if project_file:
+            self.open_project_file(pathlib.Path(project_file))
+
+    def open_project_file(self, path: pathlib.Path) -> bool:
+        """Open a project file, replacing the current project.
+
+        Image folders that no longer exist are offered for relinking first.
+
+        Args:
+            path (pathlib.Path): The project file.
+
+        Returns:
+            bool: True if the project is now open; False if loading failed or the
+                user cancelled relinking or the save prompt.
+        """
+        _LOG.info(f"Opening project: {path}")
         try:
             project = Project.load(path)
+        except (OSError, ValueError, SyntaxError) as error:
+            self._warn_cannot_open(path, error)
+            return False
+        relinker = self._relink_missing_images(project)
+        if relinker is None:
+            return False
+        try:
+            project.remap_image_paths(relinker.substitute)
             stages = StageSequence()
             apply_stage_params(stages, project.stage_params)
-        except (OSError, ValueError, SyntaxError) as error:
-            _LOG.warning(f"Cannot open project {path}: {error}")
-            QMessageBox.warning(
-                self.ui,
-                self.ui.tr("Error"),
-                self.ui.tr("Unable to open the project file.") + f"\n{error}",
-            )
-            return
+        except ValueError as error:
+            self._warn_cannot_open(path, error)
+            return False
+        dpi_fixed = self._fix_dpi_of_opened_project(project)
+        if dpi_fixed is None:
+            return False
         if not self._close_project_interactive():
-            return
-        self._install_project(project, stages, project_file=path, modified=False)
-        self.settings.setValue(_LAST_DIR_KEY, str(path.parent))
+            return False
+        self._install_project(
+            project,
+            stages,
+            project_file=path,
+            modified=dpi_fixed or not relinker.is_empty(),
+        )
+        self._remember_project(path)
+        return True
+
+    def _fix_dpi_of_opened_project(self, project: Project) -> bool | None:
+        """Ask for the DPI of stored images that have none, as on opening in C++.
+
+        Args:
+            project (Project): A freshly loaded project; updated in place.
+
+        Returns:
+            bool | None: Whether any DPI was changed, or None if the user cancelled.
+        """
+        if all(info.metadata.is_dpi_ok() for info in project.images):
+            return False
+        dialog = self.fix_dpi_dialog_factory(list(project.images), self.ui)
+        if not self._run_dialog(dialog):
+            return None
+        changes = dialog.get_dpi_changes()
+        for info in project.images:
+            if info.id in changes:
+                info.metadata = info.metadata.model_copy(
+                    update={"dpi": changes[info.id]}
+                )
+        return bool(changes)
+
+    def _warn_cannot_open(self, path: pathlib.Path, error: Exception) -> None:
+        """Tell the user a project file could not be read."""
+        _LOG.warning(f"Cannot open project {path}: {error}")
+        QMessageBox.warning(
+            self.ui,
+            self.ui.tr("Error"),
+            self.ui.tr("Unable to open the project file.") + f"\n{error}",
+        )
+
+    def _relink_missing_images(self, project: Project) -> Relinker | None:
+        """Let the user relink the folders of image files that are missing.
+
+        Args:
+            project (Project): A freshly loaded project.
+
+        Returns:
+            Relinker | None: The mapping to apply (empty when nothing is missing),
+                or None when the user cancelled.
+        """
+        missing = image_directories(
+            [info.id.file_path for info in project.images], only_missing=True
+        )
+        if not missing:
+            return Relinker()
+        return self._ask_relinker(missing)
+
+    def _ask_relinker(self, directories: list[pathlib.Path]) -> Relinker | None:
+        """Show the relinking dialog.
+
+        Args:
+            directories (list[pathlib.Path]): Folders to offer for relinking.
+
+        Returns:
+            Relinker | None: What the user chose, or None if they cancelled.
+        """
+        dialog = self.relinking_dialog_factory(directories, self.ui)
+        if not self._run_dialog(dialog):
+            return None
+        return dialog.relinker()
 
     def _go_to_page_index(self, index: int) -> None:
         """Make the page at ``index`` current, clamping to the valid range.
@@ -1008,12 +1154,43 @@ class MainWindowManager:
         self._select_stage_row(5)
 
     def fixDpiDialogRequested(self) -> None:
-        """Fix DPI dialog requested."""
-        _LOG.info("Fix DPI dialog requested")
+        """Let the user correct the DPI of the project's images."""
+        project = self.project
+        if project is None or self.batch_runner.is_running:
+            return
+        dialog = self.fix_dpi_dialog_factory(list(project.images), self.ui)
+        if not self._run_dialog(dialog):
+            return
+        changes = dialog.get_dpi_changes()
+        if not changes:
+            return
+        for info in project.images:
+            if info.id in changes:
+                info.metadata = info.metadata.model_copy(
+                    update={"dpi": changes[info.id]}
+                )
+        self.modified = True
+        self._invalidate_thumbnails()
+        self._request_render()
 
     def showRelinkingDialog(self) -> None:
-        """Show relinking dialog."""
-        _LOG.info("Show relinking dialog")
+        """Let the user point the folders of the project's images elsewhere."""
+        project = self.project
+        if project is None or self.batch_runner.is_running:
+            return
+        directories = image_directories(
+            [info.id.file_path for info in project.images], only_missing=False
+        )
+        relinker = self._ask_relinker(directories)
+        if relinker is None or relinker.is_empty():
+            return
+        project.stage_params = collect_stage_params(self.stages, project.get_pages())
+        project.selected_page = self.current_page
+        project.remap_image_paths(relinker.substitute)
+        stages = StageSequence()
+        apply_stage_params(stages, project.stage_params)
+        project_file = pathlib.Path(self.projectFile) if self.projectFile else None
+        self._install_project(project, stages, project_file=project_file, modified=True)
 
     def debugToggled(self, enabled: bool) -> None:
         """Debug toggled."""
@@ -1048,6 +1225,8 @@ class MainWindowManager:
             )
             return
         pages = self._read_pages([input_dir / name for name in names])
+        if pages is not None:
+            pages = self._fix_dpi_of_new_pages(pages)
         if pages is None:
             return
         project = Project(
@@ -1078,6 +1257,8 @@ class MainWindowManager:
             if input_dir / name not in present
         ]
         pages = self._read_pages(paths)
+        if pages:
+            pages = self._fix_dpi_of_new_pages(pages)
         if not pages:
             return
         for image_id, metadata in pages:
@@ -1087,11 +1268,11 @@ class MainWindowManager:
         self.modified = True
 
     @staticmethod
-    def _run_dialog(dialog: ProjectFilesDialog) -> bool:
+    def _run_dialog(dialog: QtWidgets.QDialog) -> bool:
         """Run a modal dialog and release it, as it is parented to the window.
 
         Args:
-            dialog (ProjectFilesDialog): The dialog to run.
+            dialog (QtWidgets.QDialog): The dialog to run.
 
         Returns:
             bool: True if the user accepted it.
@@ -1126,6 +1307,28 @@ class MainWindowManager:
             return None
         return pages
 
+    def _fix_dpi_of_new_pages(self, pages: PageMetadata) -> PageMetadata | None:
+        """Ask for the DPI of new images when any has an undefined or odd one.
+
+        Args:
+            pages (PageMetadata): Metadata read from the image files.
+
+        Returns:
+            PageMetadata | None: The pages with the chosen DPI applied, or None
+                when the user cancelled.
+        """
+        if all(metadata.has_plausible_dpi() for _, metadata in pages):
+            return pages
+        infos = [ImageInfo(id=image_id, metadata=meta) for image_id, meta in pages]
+        dialog = self.fix_dpi_dialog_factory(infos, self.ui)
+        if not self._run_dialog(dialog):
+            return None
+        changes = dialog.get_dpi_changes()
+        return [
+            (image_id, meta.model_copy(update={"dpi": changes.get(image_id, meta.dpi)}))
+            for image_id, meta in pages
+        ]
+
     def _install_project(
         self,
         project: Project,
@@ -1150,6 +1353,7 @@ class MainWindowManager:
         self.thumbnails.set_project(project)
         self.projectFile = str(project_file) if project_file else ""
         self._modified = modified
+        self._saved_state = None if modified else self._state_snapshot()
         pages = project.get_pages()
         if project.selected_page in pages:
             self.current_page = project.selected_page
@@ -1229,7 +1433,7 @@ class MainWindowManager:
             return False
         self.projectFile = str(path)
         self._update_window_title()
-        self.settings.setValue(_LAST_DIR_KEY, str(path.parent))
+        self._remember_project(path)
         return True
 
     def _write_project(self, path: pathlib.Path) -> bool:
@@ -1256,7 +1460,39 @@ class MainWindowManager:
                 self.ui.tr("Error saving the project file!") + f"\n{error}",
             )
             return False
+        self._saved_state = self._state_snapshot()
         self.modified = False
+        return True
+
+    def _state_snapshot(self) -> str:
+        """Serialise what a project file holds, apart from the selected page.
+
+        Returns:
+            str: JSON text that is equal for equal project content.
+        """
+        project = self.project
+        if project is None:
+            return ""
+        stage_params = collect_stage_params(self.stages, project.get_pages())
+        return project.model_copy(
+            update={"stage_params": stage_params, "selected_page": None}
+        ).model_dump_json()
+
+    def has_unsaved_changes(self) -> bool:
+        """Whether the open project differs from what is on disk.
+
+        Edits that were undone again do not count.
+
+        Returns:
+            bool: True if closing the project would lose changes.
+        """
+        if self.project is None or not self._modified:
+            return False
+        if self._saved_state is None:
+            return True
+        if self._state_snapshot() == self._saved_state:
+            self.modified = False
+            return False
         return True
 
     def _last_project_dir(self) -> str:
@@ -1285,7 +1521,7 @@ class MainWindowManager:
         if self.project is None:
             return True
         self._abort_batch()
-        if self._modified:
+        if self.has_unsaved_changes():
             choice = self.save_prompt()
             if choice is SaveChoice.CANCEL:
                 return False
@@ -1304,6 +1540,7 @@ class MainWindowManager:
         self.projectFile = ""
         self.current_page = None
         self._modified = False
+        self._saved_state = None
         self._attach_stages()
         self._update_project_actions()
         self._update_window_title()

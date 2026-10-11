@@ -5,6 +5,9 @@ Handles loading, saving, and managing ScanTailor projects. Supports:
 - XML format (read-only, for C++ ScanTailor compatibility)
 """
 
+import json
+import os
+from collections.abc import Callable, Iterator
 from enum import IntEnum
 from pathlib import Path
 from typing import Any, Literal, Self
@@ -53,6 +56,18 @@ class ImageMetadata(BaseModel):
         return (
             self.horizontal_dpi_status() != DpiStatus.UNDEFINED
             and self.vertical_dpi_status() != DpiStatus.UNDEFINED
+        )
+
+    def has_plausible_dpi(self) -> bool:
+        """Check that both DPI values are usable for processing.
+
+        Unlike ``is_dpi_ok`` this also rejects values that are defined but out
+        of range for the image size, which is when the user should be asked to
+        correct them.
+        """
+        return (
+            self.horizontal_dpi_status() == DpiStatus.OK
+            and self.vertical_dpi_status() == DpiStatus.OK
         )
 
     def horizontal_dpi_status(self) -> DpiStatus:
@@ -204,16 +219,49 @@ class Project(BaseModel):
         self.images.append(info)
         return info
 
+    def image_ids(self) -> list[ImageId]:
+        """Return the id of every image in the project."""
+        return [info.id for info in self.images]
+
+    def remap_image_paths(self, remap: Callable[[Path], Path]) -> None:
+        """Replace the file path of every image, including in stored parameters.
+
+        Args:
+            remap (Callable[[Path], Path]): Maps an image file path to its new path.
+        """
+
+        def remap_id(image_id: ImageId) -> ImageId:
+            return ImageId(file_path=remap(image_id.file_path), page=image_id.page)
+
+        def remap_page(page: PageId) -> PageId:
+            return PageId(image_id=remap_id(page.image_id), sub_page=page.sub_page)
+
+        self.images = [
+            info.model_copy(update={"id": remap_id(info.id)}) for info in self.images
+        ]
+        if self.selected_page is not None:
+            self.selected_page = remap_page(self.selected_page)
+        self.stage_params = {
+            stage: [
+                StageParamsEntry(page=remap_page(entry.page), params=entry.params)
+                for entry in entries
+            ]
+            for stage, entries in self.stage_params.items()
+        }
+
     def save(self, path: Path) -> None:
         """Save the project to a JSON file.
+
+        Image and output paths are written relative to the project file when
+        they can be, so a project moved together with its images still opens.
 
         Args:
             path (Path): Path to save the project to.
         """
-        path.write_text(
-            self.model_dump_json(indent=2),
-            encoding="utf-8",
-        )
+        data = self.model_dump(mode="json")
+        base = path.resolve().parent
+        _map_paths(data, lambda stored: _to_stored_path(Path(stored), base))
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     @classmethod
     def load(cls, path: Path) -> Self:
@@ -235,7 +283,10 @@ class Project(BaseModel):
         # Detect format by content
         stripped = content.lstrip()
         if stripped.startswith("{"):
-            return cls.model_validate_json(content)
+            data = json.loads(content)
+            base = path.resolve().parent
+            _map_paths(data, lambda stored: _from_stored_path(stored, base))
+            return cls.model_validate(data)
         if stripped.startswith("<?xml") or stripped.startswith("<project"):
             return cls._load_xml(path, content)
 
@@ -257,3 +308,88 @@ class Project(BaseModel):
         from scantailor.core.xml_compat import parse_xml_project
 
         return parse_xml_project(path, content)
+
+
+def _is_drive_less_rooted(path: Path) -> bool:
+    """Whether ``path`` starts at a root but names no drive (``/x`` on Windows).
+
+    Such a path is neither absolute nor relative on Windows, so it is kept as is.
+    """
+    return bool(path.root) and not path.drive and not path.is_absolute()
+
+
+def _to_stored_path(path: Path, base: Path) -> str:
+    """Express ``path`` relative to ``base`` with forward slashes when possible.
+
+    Args:
+        path (Path): Path to store; relative paths are taken relative to the
+            working directory.
+        base (Path): Absolute directory of the project file.
+
+    Returns:
+        str: The relative path, or the absolute path when none exists (e.g. on
+            another drive).
+    """
+    if _is_drive_less_rooted(path):
+        return path.as_posix()
+    absolute = Path(os.path.abspath(path))
+    try:
+        return Path(os.path.relpath(absolute, base)).as_posix()
+    except ValueError:
+        return absolute.as_posix()
+
+
+def _from_stored_path(stored: str, base: Path) -> str:
+    """Resolve a stored path against the project file's directory.
+
+    Args:
+        stored (str): Absolute path, or one relative to ``base``.
+        base (Path): Absolute directory of the project file.
+
+    Returns:
+        str: The absolute, normalised path.
+    """
+    path = Path(stored)
+    if path.is_absolute() or _is_drive_less_rooted(path):
+        return str(path)
+    return str(Path(os.path.normpath(base / path)))
+
+
+def _dicts(value: object) -> list[dict[str, Any]]:
+    """Return the mappings in a JSON list, or nothing for any other value."""
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _path_holders(data: dict[str, Any]) -> Iterator[tuple[dict[str, Any], str]]:
+    """Yield every ``(mapping, key)`` of a dumped project that holds a path.
+
+    Malformed parts are skipped so validation reports them instead.
+    """
+    yield data, "output_directory"
+    image_ids = [info.get("id") for info in _dicts(data.get("images"))]
+    pages = [data.get("selected_page")]
+    stage_params = data.get("stage_params")
+    if isinstance(stage_params, dict):
+        for entries in stage_params.values():
+            pages.extend(entry.get("page") for entry in _dicts(entries))
+    image_ids.extend(page.get("image_id") for page in pages if isinstance(page, dict))
+    for image_id in image_ids:
+        if isinstance(image_id, dict):
+            yield image_id, "file_path"
+
+
+def _map_paths(data: dict[str, Any], convert: Callable[[str], str]) -> None:
+    """Convert, in place, every path string of a dumped project.
+
+    Args:
+        data (dict[str, Any]): Project data as produced by ``model_dump(mode="json")``.
+        convert (Callable[[str], str]): Maps one stored path string to another.
+    """
+    if not isinstance(data, dict):
+        return
+    for holder, key in _path_holders(data):
+        value = holder.get(key)
+        if isinstance(value, str):
+            holder[key] = convert(value)
