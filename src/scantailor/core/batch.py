@@ -15,6 +15,7 @@ from collections import deque
 from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
 from concurrent.futures.process import BrokenProcessPool
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Event
@@ -266,6 +267,46 @@ def spawn_pool(
         initializer=_init_pool_worker,
         initargs=(initializer, initargs),
     )
+
+
+def map_pool[Job, Result](
+    function: Callable[[Job], Result],
+    jobs: Sequence[Job],
+    executor: ProcessPoolExecutor,
+    max_workers: int | None = None,
+) -> list[Result]:
+    """Run ``function`` over ``jobs`` on a shared pool and return results in job order.
+
+    Args:
+        function (Callable[[Job], Result]): Picklable module-level callable.
+        jobs (Sequence[Job]): Picklable job arguments.
+        executor (ProcessPoolExecutor): A pool from ``spawn_pool``; left running.
+        max_workers (int | None): The pool's size.
+
+    Returns:
+        list[Result]: One result per job, in the order of ``jobs``.
+
+    Raises:
+        BaseException: The error of the first failed job in job order, after
+            every scheduled job has finished.
+    """
+    position = {id(job): index for index, job in enumerate(jobs)}
+    results: dict[int, Result] = {}
+    errors: dict[int, BaseException] = {}
+
+    def on_outcome(
+        job: Job, result: Result | None, error: BaseException | None
+    ) -> None:
+        index = position[id(job)]
+        if error is not None:
+            errors[index] = error
+        else:
+            results[index] = result  # type: ignore[assignment]
+
+    run_pool(function, jobs, on_outcome, max_workers=max_workers, executor=executor)
+    if errors:
+        raise errors[min(errors)]
+    return [results[index] for index in range(len(jobs))]
 
 
 def _drain[Job, Result](
@@ -540,6 +581,7 @@ def run_batch(
     on_progress: Callable[[BatchEvent], None] | None = None,
     cancel: Event | None = None,
     dpi_overrides: DpiOverrides | None = None,
+    executor: ProcessPoolExecutor | None = None,
 ) -> BatchResult:
     """Process pages through the full pipeline and write them as TIFFs.
 
@@ -563,6 +605,9 @@ def run_batch(
             pages already running finish and are reported.
         dpi_overrides (DpiOverrides | None): Project resolutions that win over
             each image file's; handed to the workers as plain data.
+        executor (ProcessPoolExecutor | None): A pool from ``spawn_pool`` to
+            reuse across phases; ``max_workers`` must then be its size. It is
+            left running. A private pool is used and closed when None.
 
     Returns:
         BatchResult: Written, failed and never-started pages.
@@ -580,7 +625,8 @@ def run_batch(
             on_progress(event)
 
     workers = pool_size(max_workers)
-    with spawn_pool(workers) as pool:
+    with ExitStack() as stack:
+        pool = executor or stack.enter_context(spawn_pool(workers))
         ready = _detect_geometry(
             stages,
             pages,
