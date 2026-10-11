@@ -1,5 +1,6 @@
 """Tests for page split Settings class."""
 
+import threading
 from pathlib import Path
 
 from scantailor.core.models import ImageId, PageId, SubPage
@@ -97,6 +98,19 @@ class TestSettings:
         for page_id in page_ids:
             assert settings.is_params_set(page_id) is False
 
+    def test_clear_all_resets_default_layout_type(self):
+        """Clearing restores the auto default layout type, as the C++ clear() does."""
+        settings = Settings()
+        settings.set_default_layout_type(LayoutType.TWO_PAGES)
+
+        settings.clear_all()
+
+        assert settings.get_default_layout_type() == LayoutType.AUTO_LAYOUT_TYPE
+        assert (
+            settings.get_params(make_page_id()).layout_type
+            == LayoutType.AUTO_LAYOUT_TYPE
+        )
+
     def test_different_pages_independent(self):
         """Different pages have independent params."""
         settings = Settings()
@@ -108,3 +122,45 @@ class TestSettings:
 
         assert settings.get_params(page1).layout_type == LayoutType.TWO_PAGES
         assert settings.get_params(page2).layout_type == LayoutType.SINGLE_PAGE_UNCUT
+
+
+class TestSettingsConcurrency:
+    """Concurrent access must not lose writes or raise."""
+
+    def test_parallel_writers_and_readers_keep_every_page(self):
+        """Every page written by any thread is stored and readable afterwards."""
+        settings = Settings()
+        threads_count, pages_per_thread = 8, 200
+        errors: list[BaseException] = []
+        start = threading.Barrier(threads_count)
+
+        def work(worker: int) -> None:
+            try:
+                start.wait()
+                for i in range(pages_per_thread):
+                    page_id = make_page_id(f"{worker}_{i}.tiff")
+                    settings.set_params(
+                        page_id, Params(layout_type=LayoutType.TWO_PAGES)
+                    )
+                    settings.get_params(page_id)
+                    settings.is_params_set(page_id)
+                    settings.apply_params_to_pages(
+                        [page_id], Params(layout_type=LayoutType.TWO_PAGES)
+                    )
+            except BaseException as exc:
+                errors.append(exc)
+
+        threads = [
+            threading.Thread(target=work, args=(w,)) for w in range(threads_count)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert errors == []
+        for worker in range(threads_count):
+            for i in range(pages_per_thread):
+                page_id = make_page_id(f"{worker}_{i}.tiff")
+                assert settings.is_params_set(page_id)
+                assert settings.get_params(page_id).layout_type == LayoutType.TWO_PAGES
