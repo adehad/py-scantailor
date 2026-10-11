@@ -13,6 +13,7 @@ from dataclasses import dataclass, replace
 
 import cv2
 import numpy as np
+from numba import njit
 from numpy.typing import NDArray
 from scipy import ndimage
 
@@ -20,7 +21,7 @@ from scantailor.imageproc.binarize import binarize_wolf
 from scantailor.imageproc.despeckle import despeckle
 
 from .flood import limited_flood
-from .max_whitespace import WhitespaceRect, largest_whitespace
+from .max_whitespace import WhitespaceRect, WhitespaceSearch
 
 PROCESSING_DPI = 150
 
@@ -289,7 +290,7 @@ def _cut_whitespace(
     Args:
         blocks (NDArray[np.bool_]): Block mask; modified.
         obstacles (NDArray[np.bool_]): Ink the rectangles must avoid. Not
-            modified; obstacles are added to a copy.
+            modified.
         powers (tuple[int, int]): Width and height exponents of the quality.
         max_count (int): Most rectangles to cut.
         area_threshold (int): Rectangles with a smaller area end the search.
@@ -298,23 +299,23 @@ def _cut_whitespace(
             rectangles may overlap it. None adds the whole rectangle.
         min_size (int): Smallest width and height of a rectangle.
     """
-    obstacles = obstacles.copy()
+    search = WhitespaceSearch(obstacles, *powers, min_size, min_size)
     for _ in range(max_count):
-        found = largest_whitespace(obstacles, *powers, min_size, min_size)
+        found = search.largest()
         if found is None or found.area < area_threshold:
             return
         blocks[
             found.top : found.top + found.height, found.left : found.left + found.width
         ] = False
-        _add_obstacle(obstacles, found, shrink)
+        _block_found(search, found, shrink)
 
 
-def _add_obstacle(
-    obstacles: NDArray[np.bool_],
+def _block_found(
+    search: WhitespaceSearch,
     found: WhitespaceRect,
     shrink: str | None,
 ) -> None:
-    """Mark a found rectangle, optionally shrunk along one axis, as an obstacle."""
+    """Block a found rectangle, optionally shrunk along one axis, in the search."""
     top, left = found.top, found.left
     bottom = found.top + found.height
     right = found.left + found.width
@@ -324,7 +325,7 @@ def _add_obstacle(
     elif shrink == "width":
         margin = found.width // _BLOCK_TRIM_FRACTION
         left, right = left + margin, right - margin
-    obstacles[top:bottom, left:right] = True
+    search.block(top, left, bottom, right)
 
 
 def _trim_blocks_to_content(
@@ -342,15 +343,37 @@ def _trim_blocks_to_content(
     rows = np.vstack([[empty], rows])
     cols = np.vstack([[empty], cols])
 
-    ys = np.arange(blocks.shape[0])[:, None]
-    xs = np.arange(blocks.shape[1])[None, :]
-    return (
-        (labels > 0)
-        & (ys >= rows[labels, 0])
-        & (ys <= rows[labels, 1])
-        & (xs >= cols[labels, 0])
-        & (xs <= cols[labels, 1])
-    )
+    return _keep_inside_label_boxes(np.asarray(labels, dtype=np.int32), rows, cols)
+
+
+@njit(cache=True)
+def _keep_inside_label_boxes(
+    labels: NDArray[np.int32],
+    rows: NDArray[np.int64],
+    cols: NDArray[np.int64],
+) -> NDArray[np.bool_]:
+    """Keep the pixels of each label that lie inside that label's box.
+
+    Args:
+        labels (NDArray[np.int32]): Component labels, 0 for background.
+        rows (NDArray[np.int64]): First and last row of every label's box.
+        cols (NDArray[np.int64]): First and last column of every label's box.
+
+    Returns:
+        NDArray[np.bool_]: Mask of the pixels kept.
+    """
+    height, width = labels.shape
+    kept = np.zeros((height, width), dtype=np.bool_)
+    for y in range(height):
+        for x in range(width):
+            label = labels[y, x]
+            if (
+                label > 0
+                and rows[label, 0] <= y <= rows[label, 1]
+                and cols[label, 0] <= x <= cols[label, 1]
+            ):
+                kept[y, x] = True
+    return kept
 
 
 def _remove_blocks_touching_borders(blocks: NDArray[np.bool_]) -> NDArray[np.bool_]:
