@@ -22,14 +22,15 @@ import numpy as np
 from loguru import logger
 from numpy.typing import NDArray
 
-from scantailor.core.image_io import load_image, write_image
-from scantailor.core.models import PageId, SubPage
+from scantailor.core.image_io import write_image
+from scantailor.core.models import Dpi, PageId, SubPage
+from scantailor.core.page_source import DpiOverrides, load_page
 from scantailor.core.pipeline import (
     PipelineOptions,
     fix_aggregate_page_size,
     process_page,
 )
-from scantailor.core.project import ImageMetadata, LayoutDirection, StageParamsEntry
+from scantailor.core.project import LayoutDirection, StageParamsEntry
 from scantailor.core.stage_params import apply_stage_params, collect_stage_params
 from scantailor.core.stage_sequence import StageSequence
 from scantailor.filters.output.split_output import write_split_images
@@ -209,15 +210,11 @@ def _is_set(event: Event | None) -> bool:
     return event is not None and event.is_set()
 
 
-def _page_dpi(metadata: ImageMetadata, default_dpi: float) -> float:
-    """Horizontal resolution to size a page by, falling back when undefined."""
-    return float(metadata.dpi.horizontal) if metadata.is_dpi_ok() else default_dpi
-
-
 def _geometry_pass(
     pages: Sequence[PageId],
     stages: StageSequence,
     default_dpi: float,
+    dpi_overrides: DpiOverrides | None,
     cancel: Event | None,
     result: BatchResult,
 ) -> list[PageId]:
@@ -235,9 +232,9 @@ def _geometry_pass(
             result.cancelled.extend(pages[index:])
             break
         try:
-            image, metadata = load_image(page.image_id)
-            options = PipelineOptions(dpi=_page_dpi(metadata, default_dpi))
-            fix_aggregate_page_size([(image, page)], stages, options)
+            loaded = load_page(page.image_id, dpi_overrides)
+            options = PipelineOptions(dpi=loaded.horizontal_dpi(default_dpi))
+            fix_aggregate_page_size([(loaded.pixels, page)], stages, options)
         except Exception as error:
             logger.warning("Geometry pass failed for {}: {}", page, error)
             result.failed[page] = _describe(error)
@@ -254,6 +251,7 @@ def _describe(error: BaseException) -> str:
 class _RenderJob:
     page: PageId
     output_path: Path
+    dpi_override: Dpi | None = None
 
 
 _worker_stages: StageSequence | None = None
@@ -290,11 +288,12 @@ def _render_page(job: _RenderJob) -> Path:
     """Render one page in a worker and write it; returns the written path."""
     if _worker_stages is None:
         raise RuntimeError("Render worker was not initialised")
-    image, metadata = load_image(job.page.image_id)
-    options = PipelineOptions(dpi=_page_dpi(metadata, _worker_default_dpi))
-    rendered = process_page(image, job.page, _worker_stages, options)
+    overrides = {job.page.image_id: job.dpi_override} if job.dpi_override else None
+    loaded = load_page(job.page.image_id, overrides)
+    options = PipelineOptions(dpi=loaded.horizontal_dpi(_worker_default_dpi))
+    rendered = process_page(loaded.pixels, job.page, _worker_stages, options)
     is_binary = bool(rendered.metadata.get("OUTPUT", {}).get("is_binary"))
-    dpi = rendered.dpi or (None if metadata.dpi.is_null() else metadata.dpi)
+    dpi = rendered.dpi or (None if loaded.dpi.is_null() else loaded.dpi)
     job.output_path.parent.mkdir(parents=True, exist_ok=True)
     write_image(job.output_path, _as_writable(rendered.image, is_binary), dpi)
     if rendered.split is not None:
@@ -314,6 +313,7 @@ def run_batch(
     max_workers: int | None = None,
     on_progress: Callable[[ProgressEvent], None] | None = None,
     cancel: Event | None = None,
+    dpi_overrides: DpiOverrides | None = None,
 ) -> BatchResult:
     """Process pages through the full pipeline and write them as TIFFs.
 
@@ -332,6 +332,8 @@ def run_batch(
             the calling thread.
         cancel (Event | None): Setting it stops further pages from starting;
             pages already running finish and are reported.
+        dpi_overrides (DpiOverrides | None): Project resolutions that win over
+            each image file's; handed to the workers as plain data.
 
     Returns:
         BatchResult: Written, failed and never-started pages.
@@ -346,13 +348,17 @@ def run_batch(
         if on_progress is not None:
             on_progress(event)
 
-    ready = _geometry_pass(pages, stages, default_dpi, cancel, result)
+    ready = _geometry_pass(pages, stages, default_dpi, dpi_overrides, cancel, result)
     for page in pages:
         if page in result.failed:
             report(PageFailed(page, result.failed[page]))
 
     names = output_file_names(pages, layout_direction)
-    jobs = [_RenderJob(page, Path(output_dir) / names[page]) for page in ready]
+    overrides = dpi_overrides or {}
+    jobs = [
+        _RenderJob(page, Path(output_dir) / names[page], overrides.get(page.image_id))
+        for page in ready
+    ]
     stage_params: StageParamsData = {
         key: [entry.model_dump(mode="json") for entry in entries]
         for key, entries in collect_stage_params(stages, list(pages)).items()

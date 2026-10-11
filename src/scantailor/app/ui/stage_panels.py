@@ -30,14 +30,14 @@ from scantailor.app.ui.options_widgets import (
     page_split,
     select_content,
 )
-from scantailor.app.ui.page_renderer import FALLBACK_DPI
-from scantailor.core.image_io import ImageLoadError, load_image
+from scantailor.core.image_io import ImageLoadError
 from scantailor.core.models import ImageId, Margins, OrthogonalRotation, PageId
 from scantailor.core.page_geometry import (
     build_transformation,
     content_rect_of,
     transformation_dpi,
 )
+from scantailor.core.page_source import DpiOverrides, load_page
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation, Rect
 from scantailor.core.zones import (
@@ -82,23 +82,27 @@ class _SourceTask(QtCore.QRunnable):
     """Decodes one source image; touches no widget."""
 
     def __init__(
-        self, generation: int, image_id: ImageId, signals: _SourceSignals
+        self,
+        generation: int,
+        image_id: ImageId,
+        dpi_overrides: DpiOverrides,
+        signals: _SourceSignals,
     ) -> None:
         super().__init__()
         self.setAutoDelete(True)
         self._generation = generation
         self._image_id = image_id
+        self._dpi_overrides = dpi_overrides
         self._signals = signals
 
     def run(self) -> None:
         """Decode the image and report it, or the failure."""
         try:
-            pixels, metadata = load_image(self._image_id)
+            page = load_page(self._image_id, self._dpi_overrides)
         except (ImageLoadError, OSError) as error:
             self._report(self._signals.failed, str(error))
             return
-        dpi = float(metadata.dpi.horizontal) or FALLBACK_DPI
-        self._report(self._signals.loaded, pixels, dpi)
+        self._report(self._signals.loaded, page.pixels, page.horizontal_dpi())
 
     def _report(self, signal: QtCore.SignalInstance, *args: object) -> None:
         try:
@@ -166,8 +170,20 @@ class StagePanels(QtCore.QObject):
         self._source_signals.loaded.connect(self._on_source_loaded)
         self._source_signals.failed.connect(self._on_source_failed)
         self._source_generation = 0
+        self._dpi_overrides: DpiOverrides = {}
 
         self._connect_view(stage)
+
+    def set_dpi_overrides(self, dpi_overrides: DpiOverrides) -> None:
+        """Use the project's resolutions for sources decoded from now on.
+
+        Args:
+            dpi_overrides (DpiOverrides): Snapshot that is not mutated afterwards,
+                because source decoding reads it on a worker thread.
+        """
+        if dpi_overrides != self._dpi_overrides:
+            self._source = None
+        self._dpi_overrides = dpi_overrides
 
     def _build_options(
         self, stage: FilterStage, sequence: StageSequence
@@ -254,7 +270,12 @@ class StagePanels(QtCore.QObject):
         self._source = None
         self._source_generation += 1
         self._source_pool.start(
-            _SourceTask(self._source_generation, image_id, self._source_signals)
+            _SourceTask(
+                self._source_generation,
+                image_id,
+                self._dpi_overrides,
+                self._source_signals,
+            )
         )
 
     @QtCore.Slot(int, object, object, float)

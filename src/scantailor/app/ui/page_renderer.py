@@ -9,17 +9,21 @@ from numpy.typing import NDArray
 from PySide6 import QtCore, QtGui
 
 from scantailor.core import pipeline
-from scantailor.core.image_io import ImageLoadError, load_image
+from scantailor.core.image_io import ImageLoadError
 from scantailor.core.models import PageId
+from scantailor.core.page_source import FALLBACK_DPI, DpiOverrides, load_page
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 
-# Resolution assumed for images that carry none.
-FALLBACK_DPI = 300.0
+__all__ = ["FALLBACK_DPI", "PageRenderer", "render_page", "render_thumbnail"]
+
 _MAX_THREADS = 2
 
 
 def render_page(
-    page_id: PageId, sequence: StageSequence, end_stage: FilterStage
+    page_id: PageId,
+    sequence: StageSequence,
+    end_stage: FilterStage,
+    dpi_overrides: DpiOverrides | None = None,
 ) -> NDArray[np.uint8]:
     """Load a page and run the pipeline up to ``end_stage``.
 
@@ -27,6 +31,8 @@ def render_page(
         page_id (PageId): Page to render.
         sequence (StageSequence): Stages holding the page's parameters; only read.
         end_stage (FilterStage): Last stage to run.
+        dpi_overrides (DpiOverrides | None): Project resolutions that win over
+            the image file's.
 
     Returns:
         NDArray[np.uint8]: Display image, ``(H, W)`` gray or ``(H, W, 3)`` RGB.
@@ -34,10 +40,9 @@ def render_page(
     Raises:
         ImageLoadError: If the source image cannot be decoded.
     """
-    pixels, metadata = load_image(page_id.image_id)
-    dpi = float(metadata.dpi.horizontal) or FALLBACK_DPI
-    options = pipeline.PipelineOptions(end_stage=end_stage, dpi=dpi)
-    image = pipeline.process_page(pixels, page_id, sequence, options).image
+    page = load_page(page_id.image_id, dpi_overrides)
+    options = pipeline.PipelineOptions(end_stage=end_stage, dpi=page.horizontal_dpi())
+    image = pipeline.process_page(page.pixels, page_id, sequence, options).image
     if image.ndim == 3 and image.shape[2] == 3:
         return np.ascontiguousarray(image[:, :, ::-1])
     return image
@@ -48,6 +53,7 @@ def render_thumbnail(
     sequence: StageSequence,
     end_stage: FilterStage,
     max_size: QtCore.QSize,
+    dpi_overrides: DpiOverrides | None = None,
 ) -> QtGui.QImage:
     """Render a page up to ``end_stage`` and shrink it to fit ``max_size``.
 
@@ -58,6 +64,8 @@ def render_thumbnail(
         sequence (StageSequence): Stages holding the page's parameters.
         end_stage (FilterStage): Last stage to run.
         max_size (QtCore.QSize): Bounding size of the result.
+        dpi_overrides (DpiOverrides | None): Project resolutions that win over
+            the image file's.
 
     Returns:
         QtGui.QImage: Detached image, 8-bit gray or RGB888.
@@ -65,7 +73,7 @@ def render_thumbnail(
     Raises:
         ImageLoadError: If the source image cannot be decoded.
     """
-    image = render_page(page_id, sequence, end_stage)
+    image = _render(page_id, sequence, end_stage, dpi_overrides)
     height, width = image.shape[:2]
     scale = min(max_size.width() / width, max_size.height() / height, 1.0)
     if scale < 1.0:
@@ -83,6 +91,15 @@ def render_thumbnail(
     ).copy()
 
 
+def _render(
+    page_id: PageId,
+    sequence: StageSequence,
+    end_stage: FilterStage,
+    dpi_overrides: DpiOverrides | None,
+) -> NDArray[np.uint8]:
+    return render_page(page_id, sequence, end_stage, dpi_overrides)
+
+
 class _RenderSignals(QtCore.QObject):
     done = QtCore.Signal(int, object, object)
     failed = QtCore.Signal(int, object, str)
@@ -97,6 +114,7 @@ class _RenderTask(QtCore.QRunnable):
         page_id: PageId,
         sequence: StageSequence,
         stage: FilterStage,
+        dpi_overrides: DpiOverrides | None,
         signals: _RenderSignals,
     ) -> None:
         super().__init__()
@@ -106,6 +124,7 @@ class _RenderTask(QtCore.QRunnable):
         self._page_id = page_id
         self._sequence = sequence
         self._stage = stage
+        self._dpi_overrides = dpi_overrides
         self._signals = signals
 
     def run(self) -> None:
@@ -113,7 +132,9 @@ class _RenderTask(QtCore.QRunnable):
         if self.cancelled.is_set():
             return
         try:
-            image = render_page(self._page_id, self._sequence, self._stage)
+            image = _render(
+                self._page_id, self._sequence, self._stage, self._dpi_overrides
+            )
         except Exception as error:
             logger.opt(exception=not isinstance(error, ImageLoadError)).warning(
                 f"Cannot render {self._page_id}: {error}"
@@ -155,7 +176,11 @@ class PageRenderer(QtCore.QObject):
         self._task: _RenderTask | None = None
 
     def request(
-        self, page_id: PageId, sequence: StageSequence, stage: FilterStage
+        self,
+        page_id: PageId,
+        sequence: StageSequence,
+        stage: FilterStage,
+        dpi_overrides: DpiOverrides | None = None,
     ) -> None:
         """Start rendering a page, cancelling any render still pending.
 
@@ -163,9 +188,13 @@ class PageRenderer(QtCore.QObject):
             page_id (PageId): Page to render.
             sequence (StageSequence): Stages holding the parameters to use.
             stage (FilterStage): Last stage to run.
+            dpi_overrides (DpiOverrides | None): Snapshot of the project's
+                resolutions, read on the worker thread; do not mutate it.
         """
         self.cancel()
-        task = _RenderTask(self._generation, page_id, sequence, stage, self._signals)
+        task = _RenderTask(
+            self._generation, page_id, sequence, stage, dpi_overrides, self._signals
+        )
         self._task = task
         self._pool.start(task)
 
