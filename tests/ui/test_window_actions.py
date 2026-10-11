@@ -1,0 +1,828 @@
+"""Batch processing, "Apply to...", propagation, reload and the thumbnail controls."""
+
+import pathlib
+import threading
+from collections.abc import Sequence
+
+import pytest
+from PySide6 import QtCore, QtWidgets
+from pytestqt.qtbot import QtBot
+
+from scantailor.app.ui import batch_runner, page_renderer
+from scantailor.app.ui.dialogs.apply_to import ApplyToDialog
+from scantailor.app.ui.MainWindow import MainWindowManager
+from scantailor.core.batch import BatchResult, PageDone
+from scantailor.core.models import Dpi, Margins, PageId
+from scantailor.core.project import ImageMetadata
+from scantailor.core.propagation import ApplyScope
+from scantailor.core.stage_sequence import FilterStage
+from scantailor.filters.page_layout.params import ContentRect, ContentSize
+from scantailor.filters.select_content.content_box import ContentBox, PageBox
+from scantailor.filters.select_content.params import Params as SelectContentParams
+
+BATCH_TIMEOUT_MS = 300_000
+RENDER_TIMEOUT_MS = 60_000
+_BATCH_THREADS_KEY = "settings/batch_processing_threads"
+
+
+def _switch_stage(window: MainWindowManager, stage: FilterStage) -> None:
+    getattr(window, f"actionSwitchFilter{int(stage) + 1}").trigger()
+
+
+def _answer_apply_dialog(
+    scope: ApplyScope | None, options: dict[str, bool] | None = None
+) -> None:
+    """Answer the next apply dialog: pick ``scope`` and accept, or cancel if None."""
+
+    def poll() -> None:
+        modal = QtWidgets.QApplication.activeModalWidget()
+        if not isinstance(modal, ApplyToDialog):
+            QtCore.QTimer.singleShot(10, poll)
+            return
+        if scope is None:
+            modal.reject()
+            return
+        modal.scope = scope
+        for key, checked in (options or {}).items():
+            modal._options[key].setChecked(checked)
+        modal.accept()
+
+    QtCore.QTimer.singleShot(10, poll)
+
+
+def _measure_every_page(window: MainWindowManager) -> None:
+    settings = window.stages.page_layout_filter.settings
+    for page in window.pages():
+        settings.update_content_size_and_get_aggregate(
+            page,
+            ContentRect(width=600, height=800),
+            ContentRect(width=500, height=700),
+            ContentSize(width_mm=100, height_mm=150),
+        )
+
+
+def _count_renders(
+    window: MainWindowManager, monkeypatch: pytest.MonkeyPatch
+) -> list[PageId]:
+    """Record every page render, from the main view and from thumbnails alike."""
+    rendered: list[PageId] = []
+    real_render = page_renderer.render_page
+
+    def spy(page_id, sequence, end_stage):
+        rendered.append(page_id)
+        return real_render(page_id, sequence, end_stage)
+
+    monkeypatch.setattr(page_renderer, "render_page", spy)
+    return rendered
+
+
+@pytest.fixture
+def settled_window(
+    qtbot: QtBot, project_window: MainWindowManager
+) -> MainWindowManager:
+    """A project window whose first render has been delivered."""
+    project_window.renderer.wait_for_done()
+    qtbot.wait(50)
+    return project_window
+
+
+class TestBatchProcessing:
+    """Batch runs on a worker thread and reports through the window."""
+
+    def test_batch_writes_every_page_and_reports_each_one(
+        self, qtbot: QtBot, project_window: MainWindowManager, tmp_path: pathlib.Path
+    ):
+        project_window.settings.setValue(_BATCH_THREADS_KEY, 1)
+        ticks: list[int] = []
+        timer = QtCore.QTimer()
+        timer.timeout.connect(lambda: ticks.append(1))
+        timer.start(20)
+
+        with qtbot.waitSignal(
+            project_window.batch_runner.finished, timeout=BATCH_TIMEOUT_MS
+        ):
+            project_window.startBatchProcessing()
+            assert project_window.batch_runner.is_running
+        timer.stop()
+
+        result = project_window.last_batch_result
+        assert result is not None
+        assert len(result.written) == 3
+        assert not result.failed
+        assert sorted(path.name for path in (tmp_path / "out").iterdir()) == [
+            "page_001.tif",
+            "page_002.tif",
+            "page_003.tif",
+        ]
+        dialog = project_window.batch_dialog
+        assert dialog is not None
+        assert dialog.reported == 3
+        assert not dialog.is_running
+        assert ticks, "the event loop kept running during the batch"
+
+    def test_ui_is_locked_during_the_batch_and_free_afterwards(
+        self, qtbot: QtBot, project_window: MainWindowManager
+    ):
+        project_window.settings.setValue(_BATCH_THREADS_KEY, 1)
+
+        with qtbot.waitSignal(
+            project_window.batch_runner.finished, timeout=BATCH_TIMEOUT_MS
+        ):
+            project_window.startBatchProcessing()
+            assert not project_window.filterList.isEnabled()
+            assert not project_window.filterOptions.isEnabled()
+            assert project_window.processing_indicator.is_active
+
+        assert project_window.filterList.isEnabled()
+        assert project_window.filterOptions.isEnabled()
+        assert project_window.modified
+
+    def test_batch_starts_from_the_current_page(
+        self, qtbot: QtBot, project_window: MainWindowManager, monkeypatch
+    ):
+        seen: list[Sequence[PageId]] = []
+
+        def fake_run_batch(stages, pages, output_dir, **_kwargs):
+            seen.append(list(pages))
+            return BatchResult()
+
+        monkeypatch.setattr(batch_runner, "run_batch", fake_run_batch)
+        project_window.goNextPage()
+
+        with qtbot.waitSignal(project_window.batch_runner.finished, timeout=10_000):
+            project_window.startBatchProcessing()
+
+        assert seen == [project_window.pages()[1:]]
+
+    def test_thumbnails_are_invalidated_for_each_finished_page(
+        self, qtbot: QtBot, project_window: MainWindowManager, monkeypatch
+    ):
+        pages = project_window.pages()
+
+        def fake_run_batch(stages, pages, output_dir, *, on_progress, **_kwargs):
+            result = BatchResult()
+            for page in pages:
+                result.written[page] = output_dir / "x.tif"
+                on_progress(PageDone(page, output_dir / "x.tif"))
+            return result
+
+        monkeypatch.setattr(batch_runner, "run_batch", fake_run_batch)
+        before = dict(project_window._thumbnail_versions)
+
+        with qtbot.waitSignal(project_window.batch_runner.finished, timeout=10_000):
+            project_window.startBatchProcessing()
+
+        for page in pages:
+            assert project_window._thumbnail_versions[page] > before.get(page, 0)
+
+    def test_stop_cancels_pages_that_have_not_started(
+        self, qtbot: QtBot, project_window: MainWindowManager, monkeypatch
+    ):
+        first_done = threading.Event()
+
+        def fake_run_batch(stages, pages, output_dir, *, on_progress, cancel, **_kw):
+            result = BatchResult()
+            for index, page in enumerate(pages):
+                if cancel.is_set():
+                    result.cancelled.extend(pages[index:])
+                    break
+                result.written[page] = output_dir / f"{index}.tif"
+                on_progress(PageDone(page, result.written[page]))
+                first_done.set()
+                cancel.wait(10)
+            return result
+
+        monkeypatch.setattr(batch_runner, "run_batch", fake_run_batch)
+
+        with qtbot.waitSignal(
+            project_window.batch_runner.finished, timeout=20_000
+        ) as finished:
+            project_window.startBatchProcessing()
+            qtbot.waitUntil(first_done.is_set, timeout=10_000)
+            project_window.stopBatchProcessing()
+
+        result = finished.args[0]
+        assert len(result.written) == 1
+        assert len(result.cancelled) == 2
+        assert project_window.filterList.isEnabled()
+        assert project_window.batch_dialog is not None
+        assert not project_window.batch_dialog.is_running
+
+    def test_stop_button_of_the_progress_dialog_stops_the_batch(
+        self, qtbot: QtBot, project_window: MainWindowManager, monkeypatch
+    ):
+        started = threading.Event()
+
+        def fake_run_batch(stages, pages, output_dir, *, cancel, **_kwargs):
+            started.set()
+            cancel.wait(10)
+            return BatchResult(cancelled=list(pages))
+
+        monkeypatch.setattr(batch_runner, "run_batch", fake_run_batch)
+
+        with qtbot.waitSignal(
+            project_window.batch_runner.finished, timeout=20_000
+        ) as finished:
+            project_window.startBatchProcessing()
+            qtbot.waitUntil(started.is_set, timeout=10_000)
+            dialog = project_window.batch_dialog
+            assert dialog is not None
+            button = dialog.findChild(QtWidgets.QPushButton)
+            assert button is not None
+            qtbot.mouseClick(button, QtCore.Qt.MouseButton.LeftButton)
+
+        assert len(finished.args[0].cancelled) == 3
+
+    def test_closing_the_project_stops_a_running_batch(
+        self, qtbot: QtBot, project_window: MainWindowManager, monkeypatch
+    ):
+        started = threading.Event()
+
+        def fake_run_batch(stages, pages, output_dir, *, cancel, **_kwargs):
+            started.set()
+            cancel.wait(10)
+            return BatchResult(cancelled=list(pages))
+
+        monkeypatch.setattr(batch_runner, "run_batch", fake_run_batch)
+        project_window.startBatchProcessing()
+        qtbot.waitUntil(started.is_set, timeout=10_000)
+        project_window.modified = False
+
+        project_window.closeProject()
+
+        assert not project_window.batch_runner.is_running
+        assert project_window.project is None
+
+    def test_failure_of_the_whole_batch_is_reported_and_unlocks_the_ui(
+        self, qtbot: QtBot, project_window: MainWindowManager, monkeypatch
+    ):
+        def explode(*_args, **_kwargs):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(batch_runner, "run_batch", explode)
+        shown: list[str] = []
+        monkeypatch.setattr(
+            QtWidgets.QMessageBox,
+            "warning",
+            lambda *args, **_kwargs: shown.append(args[2]),
+        )
+
+        with qtbot.waitSignal(project_window.batch_runner.failed, timeout=10_000):
+            project_window.startBatchProcessing()
+
+        assert project_window.filterList.isEnabled()
+        assert any("boom" in text for text in shown)
+
+    def test_launch_button_of_the_stage_list_starts_the_batch(
+        self, qtbot: QtBot, project_window: MainWindowManager, monkeypatch
+    ):
+        monkeypatch.setattr(batch_runner, "run_batch", lambda *_a, **_kw: BatchResult())
+
+        with qtbot.waitSignal(project_window.batch_runner.finished, timeout=10_000):
+            project_window.filterList.launch_batch_processing.emit()
+
+    def test_batch_without_a_project_does_nothing(self, main_window: MainWindowManager):
+        main_window.startBatchProcessing()
+
+        assert not main_window.batch_runner.is_running
+        assert main_window.batch_dialog is None
+
+
+class TestApplyTo:
+    """The "Apply to..." flow copies the current page's settings."""
+
+    def test_applying_deskew_to_all_pages_copies_the_angle_to_each(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.DESKEW)
+        current = window.current_page
+        assert current is not None
+        window.stages.deskew_filter.set_manual_angle(current, 1.5)
+        button = window.filterOptions.findChild(QtWidgets.QPushButton, "applyDeskewBtn")
+        assert button is not None
+
+        _answer_apply_dialog(ApplyScope.ALL_PAGES)
+        button.click()
+
+        for page in window.pages():
+            params = window.stages.deskew_filter.get_params(page)
+            assert params.deskew_angle_deg == pytest.approx(1.5)
+            assert params.is_manual()
+        assert window.modified
+
+    def test_cancelling_the_dialog_changes_nothing(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.DESKEW)
+        current = window.current_page
+        assert current is not None
+        window.stages.deskew_filter.set_manual_angle(current, 1.5)
+        window.modified = False
+
+        _answer_apply_dialog(None)
+        assert not window.show_apply_dialog(FilterStage.DESKEW)
+
+        other = window.pages()[1]
+        assert not window.stages.deskew_filter.settings.is_params_set(other)
+        assert not window.modified
+
+    def test_this_page_only_changes_nothing(self, settled_window: MainWindowManager):
+        window = settled_window
+        _switch_stage(window, FilterStage.DESKEW)
+
+        _answer_apply_dialog(ApplyScope.THIS_PAGE)
+
+        assert not window.show_apply_dialog(FilterStage.DESKEW)
+
+    def test_every_other_page_reaches_pages_of_the_same_parity(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.DESKEW)
+        pages = window.pages()
+        current = window.current_page
+        assert current is not None
+        window.stages.deskew_filter.set_manual_angle(current, -0.5)
+
+        _answer_apply_dialog(ApplyScope.EVERY_OTHER)
+        window.show_apply_dialog(FilterStage.DESKEW)
+
+        settings = window.stages.deskew_filter.settings
+        assert settings.is_params_set(pages[2])
+        assert not settings.is_params_set(pages[1])
+
+    def test_selected_pages_scope_uses_the_thumbnail_selection(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.DESKEW)
+        pages = window.pages()
+        window.selectionModeBtn.setChecked(True)
+        window.thumbnails.view.selectionModel().select(
+            window.thumbnails.model.index(1),
+            QtCore.QItemSelectionModel.SelectionFlag.Select,
+        )
+        window.thumbnails.view.selectionModel().select(
+            window.thumbnails.model.index(2),
+            QtCore.QItemSelectionModel.SelectionFlag.Select,
+        )
+        current = window.current_page
+        assert current is not None
+        window.stages.deskew_filter.set_manual_angle(current, 2.0)
+
+        _answer_apply_dialog(ApplyScope.SELECTED_PAGES)
+        window.show_apply_dialog(FilterStage.DESKEW)
+
+        settings = window.stages.deskew_filter.settings
+        assert settings.is_params_set(pages[1])
+        assert settings.is_params_set(pages[2])
+
+    def test_orientation_is_applied_per_image(self, settled_window: MainWindowManager):
+        window = settled_window
+        pages = window.pages()
+        current = window.current_page
+        assert current is not None
+        window.stages.fix_orientation_filter.rotate_clockwise(current.image_id)
+
+        _answer_apply_dialog(ApplyScope.ALL_PAGES)
+        window.show_apply_dialog(FilterStage.FIX_ORIENTATION)
+
+        for page in pages:
+            assert (
+                window.stages.fix_orientation_filter.get_rotation(page.image_id).degrees
+                == 90
+            )
+
+    def test_select_content_options_decide_whether_manual_boxes_are_copied(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.SELECT_CONTENT)
+        pages = window.pages()
+        current = window.current_page
+        assert current is not None
+        content_filter = window.stages.select_content_filter
+        old_box = ContentBox(x=5, y=5, width=50, height=50)
+        content_filter.set_params(pages[1], SelectContentParams(content_box=old_box))
+        content_filter.set_params(
+            current,
+            SelectContentParams(
+                page_box=PageBox(x=0, y=0, width=600, height=800)
+            ).with_manual_content(ContentBox(x=10, y=20, width=300, height=400)),
+        )
+
+        _answer_apply_dialog(ApplyScope.ALL_PAGES, {"content_box": False})
+        window.show_apply_dialog(FilterStage.SELECT_CONTENT)
+
+        assert content_filter.get_params(pages[1]).content_box == old_box
+        assert content_filter.get_params(pages[2]).is_content_manual()
+
+    def test_margins_and_alignment_have_separate_requests(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.PAGE_LAYOUT)
+        pages = window.pages()
+        current = window.current_page
+        assert current is not None
+        layout = window.stages.page_layout_filter.settings
+        layout.set_margins(current, Margins.uniform(12.0))
+        button = window.filterOptions.findChild(
+            QtWidgets.QPushButton, "applyMarginsBtn"
+        )
+        assert button is not None
+
+        _answer_apply_dialog(ApplyScope.ALL_PAGES)
+        button.click()
+
+        assert layout.get_params(pages[2]).hard_margins_mm == Margins.uniform(12.0)
+
+    def test_output_parameters_are_applied_through_the_button(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.OUTPUT)
+        pages = window.pages()
+        current = window.current_page
+        assert current is not None
+        dpi_params = window.stages.output_filter.get_params(current).with_output_dpi(
+            Dpi.uniform(400)
+        )
+        window.stages.output_filter.set_params(current, dpi_params)
+
+        _answer_apply_dialog(ApplyScope.ALL_PAGES)
+        window.show_apply_dialog(FilterStage.OUTPUT)
+
+        assert window.stages.output_filter.get_params(
+            pages[2]
+        ).output_dpi == Dpi.uniform(400)
+
+    def test_applying_refreshes_the_thumbnails_of_all_pages(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.DESKEW)
+        epoch = window._thumbnail_epoch
+
+        window.apply_to_pages(FilterStage.DESKEW, window.pages()[1:])
+
+        assert window._thumbnail_epoch == epoch + 1
+
+
+class TestApplyToDialog:
+    """The dialog's own behaviour."""
+
+    def test_selection_scopes_are_disabled_without_a_multi_selection(
+        self, project_window: MainWindowManager
+    ):
+        pages = project_window.pages()
+
+        dialog = ApplyToDialog(pages[0], pages, [pages[0]])
+
+        assert not dialog.findChild(
+            QtWidgets.QRadioButton, "selectedPagesRB"
+        ).isEnabled()
+        assert not dialog.findChild(
+            QtWidgets.QRadioButton, "everyOtherSelectedRB"
+        ).isEnabled()
+        assert dialog.findChild(QtWidgets.QRadioButton, "allPagesRB").isEnabled()
+
+    def test_selection_scopes_are_enabled_with_two_selected_pages(
+        self, project_window: MainWindowManager
+    ):
+        pages = project_window.pages()
+
+        dialog = ApplyToDialog(pages[0], pages, pages[:2])
+
+        assert dialog.findChild(QtWidgets.QRadioButton, "selectedPagesRB").isEnabled()
+
+    def test_default_scope_is_this_page(self, project_window: MainWindowManager):
+        pages = project_window.pages()
+
+        dialog = ApplyToDialog(pages[1], pages)
+
+        assert dialog.scope is ApplyScope.THIS_PAGE
+        assert dialog.pages() == [pages[1]]
+
+    def test_extra_options_start_checked_and_can_be_cleared(
+        self, project_window: MainWindowManager
+    ):
+        pages = project_window.pages()
+        dialog = ApplyToDialog(pages[0], pages, options={"flag": "A flag"})
+
+        assert dialog.option_checked("flag")
+        dialog._options["flag"].setChecked(False)
+        assert not dialog.option_checked("flag")
+
+
+class TestPropagationOnStageChange:
+    """Leaving a stage passes its results on, as the C++ main window does."""
+
+    def _make_pages_landscape(self, window: MainWindowManager) -> None:
+        window.renderer.wait_for_done()
+        assert window.project is not None
+        for info in window.project.images:
+            info.metadata = ImageMetadata(width=2000, height=1000, dpi=Dpi.uniform(300))
+
+    def test_leaving_fix_orientation_splits_landscape_images_into_two_pages(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        self._make_pages_landscape(window)
+        window.modified = False
+
+        _switch_stage(window, FilterStage.PAGE_SPLIT)
+
+        assert len(window.pages()) == 6
+        assert len(window.thumbnails.pages()) == 6
+        assert window.modified
+        assert window.current_page in window.pages()
+        window.renderer.wait_for_done()
+
+    def test_rotating_before_leaving_keeps_single_pages(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        self._make_pages_landscape(window)
+        for page in window.pages():
+            window.stages.fix_orientation_filter.rotate_clockwise(page.image_id)
+
+        _switch_stage(window, FilterStage.PAGE_SPLIT)
+
+        assert len(window.pages()) == 3
+        window.renderer.wait_for_done()
+
+    def test_moving_between_later_stages_does_not_touch_the_page_list(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.PAGE_SPLIT)
+        self._make_pages_landscape(window)
+
+        _switch_stage(window, FilterStage.DESKEW)
+
+        assert len(window.pages()) == 3
+        window.renderer.wait_for_done()
+
+    def test_leaving_select_content_records_measured_pages_for_the_layout(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.SELECT_CONTENT)
+        page = window.current_page
+        assert page is not None
+        window.stages.select_content_filter.set_params(
+            page,
+            SelectContentParams(
+                content_box=ContentBox(x=50, y=50, width=400, height=600),
+                page_box=PageBox(x=0, y=0, width=600, height=800),
+            ),
+        )
+
+        _switch_stage(window, FilterStage.PAGE_LAYOUT)
+
+        params = window.stages.page_layout_filter.get_params(page)
+        assert params.content_rect.width == pytest.approx(400)
+        assert not params.content_size_mm.is_empty()
+        window.renderer.wait_for_done()
+
+
+class TestOutputReadiness:
+    """Output waits until every page size is known."""
+
+    def test_output_with_undefined_layout_shows_the_not_ready_message(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+
+        _switch_stage(window, FilterStage.OUTPUT)
+
+        assert window.imageFrameLayout.currentWidget() is window.not_ready_widget
+        assert not window._panels.options.isVisibleTo(window.ui)
+        assert "not yet possible" in window.not_ready_widget.text()
+        assert not window.processing_indicator.is_active
+
+    def test_output_does_not_start_a_render_while_not_ready(
+        self, qtbot: QtBot, settled_window: MainWindowManager, monkeypatch
+    ):
+        window = settled_window
+        requests: list[PageId] = []
+        monkeypatch.setattr(
+            window.renderer, "request", lambda page, *_a: requests.append(page)
+        )
+
+        _switch_stage(window, FilterStage.OUTPUT)
+
+        assert requests == []
+
+    def test_output_renders_once_every_page_is_measured(
+        self, qtbot: QtBot, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.OUTPUT)
+        _measure_every_page(window)
+
+        with qtbot.waitSignal(window.renderer.render_done, timeout=RENDER_TIMEOUT_MS):
+            window._request_render()
+
+        assert window.imageFrameLayout.currentWidget() is window._panels.view
+        assert window._panels.options.isVisibleTo(window.ui)
+
+    def test_current_page_does_not_need_to_be_measured(
+        self, qtbot: QtBot, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.OUTPUT)
+        _measure_every_page(window)
+        current = window.current_page
+        assert current is not None
+        window.stages.page_layout_filter.settings.clear_page(current)
+
+        with qtbot.waitSignal(window.renderer.render_done, timeout=RENDER_TIMEOUT_MS):
+            window._request_render()
+
+        assert window.imageFrameLayout.currentWidget() is window._panels.view
+
+    def test_leaving_output_restores_the_options_and_view(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.OUTPUT)
+
+        _switch_stage(window, FilterStage.DESKEW)
+
+        assert window.imageFrameLayout.currentWidget() is window._panels.view
+        assert window._panels.options.isVisibleTo(window.ui)
+        window.renderer.wait_for_done()
+
+
+class TestReloadAndIndicator:
+    """Reloading renders again; the indicator shows while a render runs."""
+
+    def test_reload_renders_the_current_page_again(
+        self,
+        qtbot: QtBot,
+        settled_window: MainWindowManager,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        window = settled_window
+        delivered: list[PageId] = []
+        window.renderer.render_done.connect(lambda page, _image: delivered.append(page))
+        rendered = _count_renders(window, monkeypatch)
+
+        with qtbot.waitSignal(window.renderer.render_done, timeout=RENDER_TIMEOUT_MS):
+            window.actionReloadPage.trigger()
+
+        assert delivered == [window.current_page]
+        assert window.current_page in rendered
+        window.thumbnails.model.wait_for_idle()
+
+    def test_reload_refreshes_the_thumbnail_of_the_page(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        page = window.current_page
+        assert page is not None
+        before = window._thumbnail_versions.get(page, 0)
+
+        window.reloadCurrentPage()
+
+        assert window._thumbnail_versions[page] == before + 1
+        window.renderer.wait_for_done()
+
+    def test_reload_without_a_project_does_nothing(
+        self, main_window: MainWindowManager
+    ):
+        main_window.reloadCurrentPage()
+
+        assert not main_window.processing_indicator.is_active
+
+    def test_indicator_shows_while_a_render_runs(
+        self, qtbot: QtBot, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        assert not window.processing_indicator.is_active
+
+        with qtbot.waitSignal(window.renderer.render_done, timeout=RENDER_TIMEOUT_MS):
+            window.reloadCurrentPage()
+            assert window.processing_indicator.is_active
+
+        assert not window.processing_indicator.is_active
+
+    def test_indicator_hides_when_a_render_fails(
+        self, qtbot: QtBot, settled_window: MainWindowManager, monkeypatch
+    ):
+        window = settled_window
+
+        def explode(*_args, **_kwargs):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(page_renderer, "render_page", explode)
+
+        with qtbot.waitSignal(window.renderer.render_failed, timeout=RENDER_TIMEOUT_MS):
+            window.reloadCurrentPage()
+            assert window.processing_indicator.is_active
+
+        assert not window.processing_indicator.is_active
+
+
+class TestThumbnailControls:
+    """The focus, selection mode and sort controls drive the thumbnail list."""
+
+    def test_sort_options_mirror_the_thumbnail_orders(
+        self, main_window: MainWindowManager
+    ):
+        combo = main_window.thumbnails.order_combo
+        items = [
+            main_window.sortOptions.itemText(i)
+            for i in range(main_window.sortOptions.count())
+        ]
+
+        assert items == [combo.itemText(i) for i in range(combo.count())]
+        assert combo.isHidden()
+
+    def test_choosing_a_sort_option_changes_the_thumbnail_order(
+        self, main_window: MainWindowManager
+    ):
+        main_window.sortOptions.setCurrentIndex(2)
+
+        assert main_window.thumbnails.order_combo.currentIndex() == 2
+
+    def test_selection_mode_button_toggles_multi_selection(
+        self, main_window: MainWindowManager
+    ):
+        view = main_window.thumbnails.view
+        assert (
+            view.selectionMode()
+            == QtWidgets.QAbstractItemView.SelectionMode.SingleSelection
+        )
+
+        main_window.selectionModeBtn.setChecked(True)
+        assert (
+            view.selectionMode()
+            == QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection
+        )
+
+        main_window.selectionModeBtn.setChecked(False)
+        assert (
+            view.selectionMode()
+            == QtWidgets.QAbstractItemView.SelectionMode.SingleSelection
+        )
+
+    def test_focus_button_decides_whether_the_list_follows_the_current_page(
+        self, settled_window: MainWindowManager, monkeypatch: pytest.MonkeyPatch
+    ):
+        window = settled_window
+        scrolls: list[int] = []
+        monkeypatch.setattr(
+            window.thumbnails, "scroll_to_current", lambda: scrolls.append(1)
+        )
+        view = window.thumbnails.view
+        model = window.thumbnails.model
+
+        window.focusButton.setChecked(True)
+        view.setCurrentIndex(model.index(1))
+        followed = len(scrolls)
+        window.focusButton.setChecked(False)
+        view.setCurrentIndex(model.index(2))
+
+        assert followed >= 1
+        assert len(scrolls) == followed
+        window.renderer.wait_for_done()
+
+    def test_selected_page_navigation_jumps_between_selected_pages(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        pages = window.pages()
+        window.selectionModeBtn.setChecked(True)
+        selection = window.thumbnails.view.selectionModel()
+        for row in (0, 2):
+            selection.select(
+                window.thumbnails.model.index(row),
+                QtCore.QItemSelectionModel.SelectionFlag.Select,
+            )
+
+        window.goNextSelectedPage()
+        assert window.current_page == pages[2]
+        window.goNextSelectedPage()
+        assert window.current_page == pages[2]
+        window.goPrevSelectedPage()
+        assert window.current_page == pages[0]
+        window.renderer.wait_for_done()
+
+    def test_selected_pages_reports_the_thumbnail_selection(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        window.selectionModeBtn.setChecked(True)
+        selection = window.thumbnails.view.selectionModel()
+        selection.select(
+            window.thumbnails.model.index(1),
+            QtCore.QItemSelectionModel.SelectionFlag.Select,
+        )
+
+        assert window.pages()[1] in window.selectedPages()
+        window.renderer.wait_for_done()

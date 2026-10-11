@@ -2,7 +2,8 @@
 
 import enum
 import pathlib
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
+from typing import Any, cast
 
 from loguru import logger as _LOG
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -19,7 +20,10 @@ from PySide6.QtWidgets import (
 )
 
 from scantailor.app.ui import UI_FOLDER, load_ui_widget
+from scantailor.app.ui.batch_runner import BatchRunner
 from scantailor.app.ui.dialogs.about import AboutDialog
+from scantailor.app.ui.dialogs.apply_to import ApplyToDialog
+from scantailor.app.ui.dialogs.batch_progress import BatchProgressDialog
 from scantailor.app.ui.dialogs.load_files_status import LoadFilesStatusDialog
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
 from scantailor.app.ui.page_renderer import PageRenderer, render_thumbnail
@@ -27,7 +31,10 @@ from scantailor.app.ui.stage_panels import StagePanels
 from scantailor.app.ui.thumbnails import ThumbnailListWidget
 from scantailor.app.ui.utils import get_cwidget
 from scantailor.app.ui.widgets.non_owning_widget import NonOwningWidget
+from scantailor.app.ui.widgets.processing_indicator import ProcessingIndicator
 from scantailor.app.ui.widgets.stage_list_view import StageListView
+from scantailor.core import propagation
+from scantailor.core.batch import BatchResult, ProgressEvent
 from scantailor.core.image_io import ImageLoadError, list_image_pages
 from scantailor.core.models import ImageId, PageId
 from scantailor.core.project import ImageMetadata, LayoutDirection, Project
@@ -39,6 +46,12 @@ APP_TITLE = "ScanTailor Advanced"
 _LAST_DIR_KEY = "project/lastDir"
 _LAST_INPUT_DIR_KEY = "project/lastInputDir"
 THUMBNAIL_SIZE = QtCore.QSize(160, 160)
+# Written by SystemLoadWidget: how many pages a batch processes at once.
+_BATCH_THREADS_KEY = "settings/batch_processing_threads"
+_SELECT_CONTENT_OPTIONS = {
+    "content_box": "Apply content box",
+    "page_box": "Apply page box",
+}
 
 
 class SaveChoice(enum.Enum):
@@ -54,6 +67,14 @@ LoadStatusPresenter = Callable[
     [list[pathlib.Path], list[tuple[pathlib.Path, str]], QWidget], bool
 ]
 SavePrompt = Callable[[], SaveChoice]
+
+
+def _message_widget(text: str) -> QtWidgets.QLabel:
+    """Build a centred, wrapping label that fills the main area with a message."""
+    label = QtWidgets.QLabel(text)
+    label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+    label.setWordWrap(True)
+    return label
 
 
 class _CloseGuard(QtCore.QObject):
@@ -137,6 +158,15 @@ class MainWindowManager:
         self.renderer = PageRenderer(self.ui)
         self.renderer.render_done.connect(self._on_render_done)
         self.renderer.render_failed.connect(self._on_render_failed)
+        self._render_pending = False
+        self._thumbnail_epoch = 0
+        self._thumbnail_versions: dict[PageId, int] = {}
+        self.batch_runner = BatchRunner(self.ui)
+        self.batch_runner.progress.connect(self._on_batch_progress)
+        self.batch_runner.finished.connect(self._on_batch_finished)
+        self.batch_runner.failed.connect(self._on_batch_failed)
+        self.batch_dialog: BatchProgressDialog | None = None
+        self.last_batch_result: BatchResult | None = None
         self._modified = False
         self.workerThreadPool = None  # std::make_unique<WorkerThreadPool>()
         self.interactiveQueue = None  # std::make_unique<ProcessingTaskQueue>()
@@ -231,6 +261,18 @@ class MainWindowManager:
 
         # Layouts
         self.imageFrameLayout = QStackedLayout(self.imageViewFrame)
+        self.not_ready_widget = _message_widget(
+            self.ui.tr(
+                "Output is not yet possible, as the final size of pages is not "
+                "yet known.\nTo determine it, run batch processing at "
+                '"Select Content" or "Margins".'
+            )
+        )
+        self.imageFrameLayout.addWidget(self.not_ready_widget)
+        self.processing_indicator = ProcessingIndicator(self.ui.tr("Processing..."))
+        get_cwidget(self.ui, QtWidgets.QStatusBar, "statusBar").addPermanentWidget(
+            self.processing_indicator
+        )
         self.optionsFrameLayout = QVBoxLayout(self.filterOptions)
         self.optionsFrameLayout.setContentsMargins(0, 0, 0, 0)
 
@@ -254,11 +296,6 @@ class MainWindowManager:
         self.actionSwitchFilter4.triggered.connect(self.switchFilter4)
         self.actionSwitchFilter5.triggered.connect(self.switchFilter5)
         self.actionSwitchFilter6.triggered.connect(self.switchFilter6)
-        self.selectionModeBtn.clicked.connect(
-            self.setSelectionModeEnabled
-        )  # m_thumbSequence.get().setSelectionModeEnabled
-        self.focusButton.clicked.connect(self.thumbViewFocusToggled)
-        self.sortOptions.currentIndexChanged.connect(self.pageOrderingChanged)
         self.actionFixDpi.triggered.connect(self.fixDpiDialogRequested)
         self.actionRelinking.triggered.connect(self.showRelinkingDialog)
         self.actionDebug.toggled.connect(self.debugToggled)
@@ -290,10 +327,14 @@ class MainWindowManager:
         # self.updateAutoSaveTimer()
         # self.setupIcons()
         self.thumbnails = ThumbnailListWidget(
-            self._render_page_thumbnail, thumbnail_size=THUMBNAIL_SIZE
+            self._render_page_thumbnail,
+            params_hash=self._thumbnail_digest,
+            thumbnail_size=THUMBNAIL_SIZE,
         )
         self.thumbnails.page_selected.connect(self.page_selected)
         self.set_thumbnail_widget(self.thumbnails)
+        self._wire_thumbnail_controls()
+        self.filterList.launch_batch_processing.connect(self.startBatchProcessing)
         self._attach_stages()
         self._update_project_actions()
         self._update_window_title()
@@ -303,6 +344,41 @@ class MainWindowManager:
         return render_thumbnail(
             page, self.stages, FilterStage(int(stage)), THUMBNAIL_SIZE
         )
+
+    def _thumbnail_digest(self, page: PageId, _stage: str) -> Hashable:
+        """Return what identifies the parameters a page's thumbnail was made with."""
+        return (self._thumbnail_epoch, self._thumbnail_versions.get(page, 0))
+
+    def _invalidate_thumbnails(self, page: PageId | None = None) -> None:
+        """Make thumbnails render again after parameters changed.
+
+        Args:
+            page (PageId | None): The page to refresh, or None for all pages.
+        """
+        if page is None:
+            self._thumbnail_epoch += 1
+        else:
+            self._thumbnail_versions[page] = self._thumbnail_versions.get(page, 0) + 1
+        self.thumbnails.invalidate(page)
+
+    def _wire_thumbnail_controls(self) -> None:
+        """Connect the focus, selection mode and sort controls to the thumbnails."""
+        self.thumbnails.order_combo.hide()
+        self.sortOptions.clear()
+        self.sortOptions.addItems(
+            [
+                self.thumbnails.order_combo.itemText(row)
+                for row in range(self.thumbnails.order_combo.count())
+            ]
+        )
+        self.sortOptions.setCurrentIndex(self.thumbnails.order_combo.currentIndex())
+        self.sortOptions.currentIndexChanged.connect(self.thumbnails.set_order)
+        self.focusButton.toggled.connect(self.thumbnails.set_follow_current)
+        self.selectionModeBtn.toggled.connect(
+            self.thumbnails.set_multi_selection_enabled
+        )
+        self.thumbnails.set_follow_current(self.focusButton.isChecked())
+        self.thumbnails.set_multi_selection_enabled(self.selectionModeBtn.isChecked())
 
     def _insert_add_files_action(self) -> None:
         """Place the add-files action in the File menu, above the save entries."""
@@ -342,7 +418,7 @@ class MainWindowManager:
         if page == self._current_page:
             return
         self._current_page = page
-        if page is not None:
+        if page is not None and page != self.thumbnails.current_page():
             self.thumbnails.set_current_page(page)
         self._show_current_page()
 
@@ -382,21 +458,63 @@ class MainWindowManager:
         panels = self._panels
         if panels and panels.stage == stage and panels.sequence is self.stages:
             return
+        previous = panels.stage if panels and panels.sequence is self.stages else None
         self._discard_panels()
+        if previous is not None:
+            self._propagate_between_stages(previous, stage)
         self.thumbnails.set_stage(str(int(stage)))
         panels = StagePanels(stage, self.stages, self.ui)
         panels.settings_changed.connect(self._on_settings_edited)
+        self._connect_apply_requests(panels)
         self.optionsFrameLayout.addWidget(panels.options)
         self.imageFrameLayout.addWidget(panels.view)
+        self.imageFrameLayout.setCurrentWidget(panels.view)
         self._panels = panels
         self._show_current_page()
+
+    def _propagate_between_stages(
+        self, previous: FilterStage, new: FilterStage
+    ) -> None:
+        """Pass results on to the stages below when the user moves down the list.
+
+        Args:
+            previous (FilterStage): The stage being left.
+            new (FilterStage): The stage being entered.
+        """
+        project = self.project
+        if project is None:
+            return
+        if previous == FilterStage.FIX_ORIENTATION < new:
+            changed = propagation.propagate_page_orientations(project, self.stages)
+            if changed:
+                self.modified = True
+                self._refresh_page_list()
+        if previous <= FilterStage.SELECT_CONTENT < new:
+            propagation.propagate_content_boxes(project, self.stages)
+            self._invalidate_thumbnails()
+
+    def _refresh_page_list(self) -> None:
+        """List the project's pages again after the page count of an image changed."""
+        pages = self.pages()
+        previous = self._current_page
+        if previous in pages or previous is None:
+            target = previous
+        else:
+            same_image = [page for page in pages if page.image_id == previous.image_id]
+            target = (same_image or pages or [None])[0]
+        self.thumbnails.set_project(self.project)
+        self._current_page = target
+        if target is not None:
+            self.thumbnails.set_current_page(target)
+        if target != previous:
+            self._show_current_page()
 
     def _discard_panels(self) -> None:
         """Remove the widgets of the stage that is being left."""
         panels, self._panels = self._panels, None
         if panels is None:
             return
-        self.renderer.cancel()
+        self._cancel_render()
         for widget, layout in (
             (panels.options, self.optionsFrameLayout),
             (panels.view, self.imageFrameLayout),
@@ -418,22 +536,62 @@ class MainWindowManager:
         """Render the current page up to the current stage in the background."""
         panels = self._panels
         if panels is None or self._current_page is None:
-            self.renderer.cancel()
+            self._cancel_render()
             return
+        if self.batch_runner.is_running:
+            return
+        if not self._is_output_ready():
+            self._cancel_render()
+            self._show_not_ready(True)
+            return
+        self._show_not_ready(False)
+        self._set_render_pending(True)
         self.renderer.request(self._current_page, self.stages, panels.stage)
+
+    def _cancel_render(self) -> None:
+        self.renderer.cancel()
+        self._set_render_pending(False)
+
+    def _set_render_pending(self, pending: bool) -> None:
+        self._render_pending = pending
+        self.processing_indicator.set_active(pending or self.batch_runner.is_running)
+
+    def _is_output_ready(self) -> bool:
+        """Whether the Output stage may render the current page.
+
+        Output sizes depend on every page's content size, which Select Content
+        and Page Layout record as pages are processed.
+        """
+        panels = self._panels
+        if panels is None or panels.stage != FilterStage.OUTPUT:
+            return True
+        return self.stages.page_layout_filter.settings.check_everything_defined(
+            self.pages(), ignore=self._current_page
+        )
+
+    def _show_not_ready(self, not_ready: bool) -> None:
+        """Swap the stage's options and view for the not-ready message, or undo it."""
+        panels = self._panels
+        if panels is None:
+            return
+        panels.options.setVisible(not not_ready)
+        self.imageFrameLayout.setCurrentWidget(
+            self.not_ready_widget if not_ready else panels.view
+        )
 
     def _on_settings_edited(self) -> None:
         """React to an edit made in the options widget."""
         self.modified = True
-        self.thumbnails.invalidate(self._current_page)
+        self._invalidate_thumbnails(self._current_page)
         self._request_render()
 
     def _on_render_done(self, page_id: PageId, image: object) -> None:
+        self._set_render_pending(False)
         if self._panels is not None and page_id == self._current_page:
             self._panels.show_image(image)  # type: ignore[arg-type]
 
-    @staticmethod
-    def _on_render_failed(page_id: PageId, message: str) -> None:
+    def _on_render_failed(self, page_id: PageId, message: str) -> None:
+        self._set_render_pending(False)
         _LOG.warning(f"Page {page_id} could not be shown: {message}")
 
     def set_thumbnail_widget(self, widget: QWidget) -> None:
@@ -473,6 +631,7 @@ class MainWindowManager:
     def _update_project_actions(self) -> None:
         """Enable the actions that need an open project."""
         loaded = self.is_project_loaded
+        self.filterList.set_batch_processing_possible(loaded)
         for action in (
             self.actionSaveProject,
             self.actionSaveProjectAs,
@@ -501,13 +660,209 @@ class MainWindowManager:
         """Return all pages."""
         return self.pages()
 
-    def selectedPages(self) -> None:  # std::set<PageId>
-        """Return selected pages."""
-        pass
+    def selectedPages(self) -> list[PageId]:
+        """Return the pages selected in the thumbnail list, in display order."""
+        return self.thumbnails.selected_pages()
 
-    def selectedRanges(self) -> None:  # std::vector<PageRange>
-        """Return selected ranges."""
-        pass
+    def _connect_apply_requests(self, panels: StagePanels) -> None:
+        """Route the options widget's "Apply to..." buttons to the apply dialog.
+
+        Args:
+            panels (StagePanels): The panels of the stage being shown.
+        """
+        options = cast(Any, panels.options)
+        requests: dict[FilterStage, list[tuple[str, str]]] = {
+            FilterStage.FIX_ORIENTATION: [("apply_to_requested", "")],
+            FilterStage.DESKEW: [("apply_to_requested", "")],
+            FilterStage.SELECT_CONTENT: [("apply_to_requested", "")],
+            FilterStage.PAGE_LAYOUT: [
+                ("apply_margins_requested", "margins"),
+                ("apply_alignment_requested", "alignment"),
+            ],
+            FilterStage.OUTPUT: [("apply_to_requested", "")],
+        }
+        for signal_name, part in requests.get(panels.stage, []):
+            getattr(options, signal_name).connect(
+                lambda *_args, stage=panels.stage, part=part: self.show_apply_dialog(
+                    stage, part
+                )
+            )
+
+    def show_apply_dialog(self, stage: FilterStage, part: str = "") -> bool:
+        """Ask which pages should get the current page's settings, then copy them.
+
+        Args:
+            stage (FilterStage): The stage whose settings are copied.
+            part (str): For Page Layout, ``"margins"`` or ``"alignment"``.
+
+        Returns:
+            bool: True if settings were copied to at least one other page.
+        """
+        page = self._current_page
+        if page is None or self.batch_runner.is_running:
+            return False
+        titles = {
+            "margins": self.ui.tr("Apply Margins"),
+            "alignment": self.ui.tr("Apply Alignment"),
+        }
+        option_labels = (
+            {key: self.ui.tr(label) for key, label in _SELECT_CONTENT_OPTIONS.items()}
+            if stage == FilterStage.SELECT_CONTENT
+            else {}
+        )
+        dialog = ApplyToDialog(
+            page,
+            self.pages(),
+            self.selectedPages(),
+            self.ui,
+            title=titles.get(part, self.ui.tr("Apply to")),
+            options=option_labels,
+        )
+        accepted = dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted
+        targets = dialog.pages() if accepted else []
+        flags = {key: dialog.option_checked(key) for key in option_labels}
+        dialog.deleteLater()
+        others = [target for target in targets if target != page]
+        if not others:
+            return False
+        self.apply_to_pages(
+            stage,
+            others,
+            part=part,
+            content_box=flags.get("content_box", True),
+            page_box=flags.get("page_box", True),
+        )
+        return True
+
+    def apply_to_pages(
+        self,
+        stage: FilterStage,
+        targets: list[PageId],
+        *,
+        part: str = "",
+        content_box: bool = True,
+        page_box: bool = True,
+    ) -> None:
+        """Copy the current page's settings of ``stage`` to other pages.
+
+        Args:
+            stage (FilterStage): The stage whose settings are copied.
+            targets (list[PageId]): Pages that receive the settings.
+            part (str): For Page Layout, ``"margins"`` or ``"alignment"``.
+            content_box (bool): Select Content: copy a manual content box.
+            page_box (bool): Select Content: copy a manual page box.
+        """
+        source = self._current_page
+        if source is None or not targets:
+            return
+        stages = self.stages
+        match stage:
+            case FilterStage.FIX_ORIENTATION:
+                propagation.apply_orientation(stages, source, targets)
+            case FilterStage.DESKEW:
+                propagation.apply_deskew(stages, source, targets)
+            case FilterStage.SELECT_CONTENT:
+                propagation.apply_select_content(
+                    stages,
+                    source,
+                    targets,
+                    apply_content_box=content_box,
+                    apply_page_box=page_box,
+                )
+            case FilterStage.PAGE_LAYOUT if part == "alignment":
+                propagation.apply_alignment(stages, source, targets)
+            case FilterStage.PAGE_LAYOUT:
+                propagation.apply_margins(stages, source, targets)
+            case FilterStage.OUTPUT:
+                propagation.apply_output(stages, source, targets)
+            case _:
+                return
+        self.modified = True
+        self._invalidate_thumbnails(None if len(targets) > 1 else targets[0])
+        self._request_render()
+
+    def _batch_pages(self) -> list[PageId]:
+        """Return the pages a batch processes: the current page and those after it."""
+        return self.thumbnails.pages()[max(self._display_position(), 0) :]
+
+    def _batch_worker_count(self) -> int | None:
+        """Return the page parallelism chosen in the system load slider, if any."""
+        saved = self.settings.value(_BATCH_THREADS_KEY, 0, type=int)
+        return saved if isinstance(saved, int) and saved > 0 else None
+
+    def startBatchProcessing(self) -> None:
+        """Process the current page and the following ones in the background."""
+        project = self.project
+        if project is None or self.batch_runner.is_running:
+            return
+        pages = self._batch_pages()
+        if not pages:
+            return
+        self._cancel_render()
+        self._set_batch_ui(True)
+        if self.batch_dialog is not None:
+            self.batch_dialog.deleteLater()
+        dialog = BatchProgressDialog(len(pages), self.ui)
+        dialog.stop_requested.connect(self.stopBatchProcessing)
+        self.batch_dialog = dialog
+        dialog.show()
+        self.batch_runner.start(
+            self.stages,
+            pages,
+            project.output_directory,
+            layout_direction=project.layout_direction,
+            max_workers=self._batch_worker_count(),
+        )
+
+    def stopBatchProcessing(self) -> None:
+        """Stop starting new pages; pages already running finish."""
+        self.batch_runner.cancel()
+
+    def _abort_batch(self) -> None:
+        """Stop the batch and wait for its thread, so settings are free to change."""
+        if self.batch_runner.is_running:
+            self.batch_runner.cancel()
+            self.batch_runner.wait()
+
+    def _set_batch_ui(self, in_progress: bool) -> None:
+        """Lock the stage controls while the worker owns the settings.
+
+        Args:
+            in_progress (bool): True when a batch starts, False when it ends.
+        """
+        self.filterList.set_batch_processing_in_progress(in_progress)
+        self.filterList.setEnabled(not in_progress)
+        self.filterOptions.setEnabled(not in_progress)
+        self.processing_indicator.set_active(in_progress)
+
+    def _on_batch_progress(self, event: ProgressEvent) -> None:
+        if self.batch_dialog is not None:
+            self.batch_dialog.add_result(event)
+        self._invalidate_thumbnails(event.page)
+
+    def _on_batch_finished(self, result: BatchResult) -> None:
+        self.last_batch_result = result
+        self._set_batch_ui(False)
+        if self.batch_dialog is not None:
+            self.batch_dialog.finish(result)
+        if self.project is None:
+            return
+        if result.written or result.failed:
+            self.modified = True
+        self._invalidate_thumbnails()
+        self._request_render()
+
+    def _on_batch_failed(self, message: str) -> None:
+        self._set_batch_ui(False)
+        _LOG.warning(f"Batch processing failed: {message}")
+        if self.batch_dialog is not None:
+            self.batch_dialog.deleteLater()
+            self.batch_dialog = None
+        QMessageBox.warning(
+            self.ui,
+            self.ui.tr("Batch processing"),
+            self.ui.tr("Batch processing failed.") + f"\n{message}",
+        )
 
     def openProject(self, _checked: bool = False) -> None:
         """Ask for a project file and open it, replacing the current project."""
@@ -571,13 +926,46 @@ class MainWindowManager:
         """Go to previous page."""
         self._go_to_page_index(max(self._current_page_index() - 1, 0))
 
+    def _display_position(self) -> int:
+        """Return the row of the current page in the thumbnail list, or -1."""
+        current = self._current_page
+        return next(
+            (
+                row
+                for row, page in enumerate(self.thumbnails.pages())
+                if page == current
+            ),
+            -1,
+        )
+
+    def _go_to_adjacent_selected_page(self, step: int) -> None:
+        """Make the nearest selected page before or after the current one current.
+
+        Args:
+            step (int): 1 for the next selected page in display order, -1 for the
+                previous one.
+        """
+        displayed = self.thumbnails.pages()
+        selected = set(self.thumbnails.selected_pages())
+        index = self._display_position()
+        while 0 <= (index := index + step) < len(displayed):
+            if displayed[index] in selected:
+                # NoUpdate keeps the multi-selection that the user is stepping through.
+                self.thumbnails.view.selectionModel().setCurrentIndex(
+                    self.thumbnails.model.index(
+                        self.thumbnails.model.row_of(displayed[index])
+                    ),
+                    QtCore.QItemSelectionModel.SelectionFlag.NoUpdate,
+                )
+                return
+
     def goNextSelectedPage(self) -> None:
         """Go to next selected page."""
-        _LOG.info("Go to next selected page")
+        self._go_to_adjacent_selected_page(1)
 
     def goPrevSelectedPage(self) -> None:
         """Go to previous selected page."""
-        _LOG.info("Go to previous selected page")
+        self._go_to_adjacent_selected_page(-1)
 
     def execGotoPageDialog(self) -> None:
         """Execute go to page dialog."""
@@ -589,8 +977,11 @@ class MainWindowManager:
         AboutDialog(self.ui).show()
 
     def reloadCurrentPage(self) -> None:
-        """Reload current page."""
-        _LOG.info("Reload current page")
+        """Render the current page again, e.g. after its source file changed."""
+        if self._current_page is None:
+            return
+        self._invalidate_thumbnails(self._current_page)
+        self._request_render()
 
     def switchFilter1(self) -> None:
         """Switch to stage 1."""
@@ -615,18 +1006,6 @@ class MainWindowManager:
     def switchFilter6(self) -> None:
         """Switch to stage 6."""
         self._select_stage_row(5)
-
-    def setSelectionModeEnabled(self, enabled: bool) -> None:
-        """Set selection mode enabled."""
-        _LOG.info(f"Set selection mode enabled: {enabled}")
-
-    def thumbViewFocusToggled(self, checked: bool) -> None:
-        """Toggle thumb view focus."""
-        _LOG.info(f"Thumb view focus toggled: {checked}")
-
-    def pageOrderingChanged(self, index: int) -> None:
-        """Page ordering changed."""
-        _LOG.info(f"Page ordering changed: {index}")
 
     def fixDpiDialogRequested(self) -> None:
         """Fix DPI dialog requested."""
@@ -684,7 +1063,7 @@ class MainWindowManager:
 
     def addFiles(self) -> None:
         """Append images chosen in the project files dialog to the open project."""
-        if self.project is None:
+        if self.project is None or self.batch_runner.is_running:
             return
         dialog = self.project_files_dialog_factory(self.ui)
         if not self._run_dialog(dialog):
@@ -765,6 +1144,7 @@ class MainWindowManager:
             modified (bool): Whether the project has unsaved changes.
         """
         self._discard_panels()
+        self._thumbnail_epoch += 1
         self.project = project
         self.stages = stages
         self.thumbnails.set_project(project)
@@ -904,6 +1284,7 @@ class MainWindowManager:
         """
         if self.project is None:
             return True
+        self._abort_batch()
         if self._modified:
             choice = self.save_prompt()
             if choice is SaveChoice.CANCEL:
@@ -916,6 +1297,7 @@ class MainWindowManager:
     def _close_project_without_saving(self) -> None:
         """Drop the project and reset the window to its empty state."""
         self._discard_panels()
+        self._thumbnail_epoch += 1
         self.project = None
         self.stages = StageSequence()
         self.thumbnails.set_project(None)
