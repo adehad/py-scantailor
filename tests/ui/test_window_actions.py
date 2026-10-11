@@ -89,6 +89,7 @@ def settled_window(
 class TestBatchProcessing:
     """Batch runs on a worker thread and reports through the window."""
 
+    @pytest.mark.slow
     def test_batch_writes_every_page_and_reports_each_one(
         self, qtbot: QtBot, project_window: MainWindowManager, tmp_path: pathlib.Path
     ):
@@ -120,6 +121,7 @@ class TestBatchProcessing:
         assert not dialog.is_running
         assert ticks, "the event loop kept running during the batch"
 
+    @pytest.mark.slow
     def test_ui_is_locked_during_the_batch_and_free_afterwards(
         self, qtbot: QtBot, project_window: MainWindowManager
     ):
@@ -617,6 +619,7 @@ class TestOutputReadiness:
 
         assert requests == []
 
+    @pytest.mark.slow
     def test_output_renders_once_every_page_is_measured(
         self, qtbot: QtBot, settled_window: MainWindowManager
     ):
@@ -630,6 +633,7 @@ class TestOutputReadiness:
         assert window.imageFrameLayout.currentWidget() is window._panels.view
         assert window._panels.options.isVisibleTo(window.ui)
 
+    @pytest.mark.slow
     def test_current_page_does_not_need_to_be_measured(
         self, qtbot: QtBot, settled_window: MainWindowManager
     ):
