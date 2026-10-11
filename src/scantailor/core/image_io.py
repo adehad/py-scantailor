@@ -185,12 +185,16 @@ def _to_array(image: Image.Image) -> NDArray[np.uint8]:
     return np.ascontiguousarray(rgb[..., ::-1])
 
 
-def load_image(image_id: ImageId) -> tuple[NDArray[np.uint8], ImageMetadata]:
+def load_image(
+    image_id: ImageId, dpi: Dpi | None = None
+) -> tuple[NDArray[np.uint8], ImageMetadata]:
     """Decode one page of an image file.
 
     Args:
         image_id (ImageId): File and page; ``page`` is 1-based for multi-page
             TIFFs and 0 (or 1) for single-page files.
+        dpi (Dpi | None): Resolution that replaces the one in the file; ignored
+            when None or null.
 
     Returns:
         tuple[NDArray[np.uint8], ImageMetadata]: Pixels as ``(H, W)`` gray
@@ -211,6 +215,8 @@ def load_image(image_id: ImageId) -> tuple[NDArray[np.uint8], ImageMetadata]:
         except (OSError, SyntaxError, EOFError, ValueError) as exc:
             raise ImageLoadError(f"Cannot decode {path}: {exc}") from exc
         metadata = _metadata_of(image)
+    if dpi is not None and not dpi.is_null():
+        metadata = metadata.model_copy(update={"dpi": dpi})
     logger.debug(
         "Loaded {} page {}: {}x{}", path, image_id.page, metadata.width, metadata.height
     )

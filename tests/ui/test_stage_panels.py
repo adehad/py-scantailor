@@ -132,7 +132,7 @@ def test_editing_an_option_rerenders_the_current_page(
     stages_run: list[FilterStage] = []
     real_render = page_renderer.render_page
 
-    def spy(page_id, sequence, end_stage):
+    def spy(page_id, sequence, end_stage, dpi_overrides=None):
         stages_run.append(end_stage)
         return real_render(page_id, sequence, end_stage)
 
