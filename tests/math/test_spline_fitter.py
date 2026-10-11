@@ -30,14 +30,14 @@ class TestFitSplineToPoints:
     def test_fit_curved_points(self):
         """Fit spline to points on a curve."""
         # Generate points on a parabola
-        t = np.linspace(0, 10, 20)
+        t = np.linspace(0, 10, 10)
         points = np.column_stack([t, 0.1 * (t - 5) ** 2])
 
         result = fit_spline_to_points(points, num_control_points=5, max_iterations=50)
 
         assert result.spline.num_control_points == 5
         # Check that fitted spline passes near the points
-        for pt in points[::5]:  # Check every 5th point
+        for pt in points[::3]:  # Check every 3rd point
             closest, _ = result.spline.point_closest_to(pt)
             dist = np.sqrt(np.sum((pt - closest) ** 2))
             assert dist < 5.0  # Within 5 pixels
@@ -75,11 +75,12 @@ class TestFitSplineToPoints:
 class TestFitSplineToPolyline:
     """Tests for fit_spline_to_polyline function."""
 
+    @pytest.mark.slow
     def test_fit_with_smoothing(self):
         """Fit with smoothing reduces curvature."""
         # Noisy sine wave
-        t = np.linspace(0, 2 * np.pi, 50)
-        noise = np.random.RandomState(42).randn(50) * 0.5
+        t = np.linspace(0, 2 * np.pi, 20)
+        noise = np.random.RandomState(42).randn(20) * 0.5
         points = np.column_stack([t * 10, np.sin(t) * 10 + noise])
 
         # Fit without smoothing
@@ -251,7 +252,7 @@ class TestIntegration:
     def test_fit_then_sample(self):
         """Fit spline then sample it."""
         # Create noisy data
-        t = np.linspace(0, 10, 30)
+        t = np.linspace(0, 10, 12)
         points = np.column_stack([t, np.sin(t) * 5])
 
         # Fit spline

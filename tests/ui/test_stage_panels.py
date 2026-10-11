@@ -70,7 +70,15 @@ def test_switching_stage_replaces_the_image_view(main_window: MainWindowManager)
     assert main_window.imageViewFrame.findChildren(ImageViewBase) == [new_view]
 
 
-@pytest.mark.parametrize("stage", list(FilterStage))
+@pytest.mark.parametrize(
+    "stage",
+    [
+        pytest.param(stage, marks=pytest.mark.slow)
+        if stage is FilterStage.OUTPUT
+        else stage
+        for stage in FilterStage
+    ],
+)
 def test_image_view_receives_the_rendered_first_page_at_each_stage(
     qtbot: QtBot, project_window: MainWindowManager, stage: FilterStage
 ):

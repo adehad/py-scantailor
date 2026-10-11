@@ -70,6 +70,16 @@ typecheck = "pyrefly check"
 ########################################################################################
 # External Tool Config
 ########################################################################################
+[tool.pytest.ini_options]
+# The default run skips tests marked "slow" (those that stay above about 2 s, mostly
+# process-pool spawns and full pipeline renders).
+#   pytest -m slow   runs only the slow tests
+#   pytest -m ''     runs everything (use this as the full gate before merging)
+addopts = "-m 'not slow'"
+markers = [
+    "slow: takes more than about 2 s; excluded from the default run",
+]
+
 [tool.pyrefly]
 python-version = "3.12"
 project-includes = ["src"]

@@ -5,9 +5,11 @@ type checkers). Each subpackage is imported in a subprocess to ensure a
 clean import state.
 """
 
+import os
 import pkgutil
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -26,14 +28,30 @@ def _find_all_modules(package) -> list[str]:
 
 ALL_MODULES = _find_all_modules(scantailor)
 
+pytestmark = pytest.mark.slow
 
-@pytest.mark.parametrize("module_name", ALL_MODULES)
-def test_import(module_name: str):
-    """Each module should import without errors in a clean interpreter."""
-    result = subprocess.run(
+
+def _import_in_clean_interpreter(module_name: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
         [sys.executable, "-c", f"import {module_name}"],
         capture_output=True,
         text=True,
-        timeout=30,
+        timeout=60,
     )
+
+
+@pytest.fixture(scope="module")
+def import_results() -> dict[str, subprocess.CompletedProcess[str]]:
+    """Import every module in its own interpreter, concurrently."""
+    with ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
+        results = pool.map(_import_in_clean_interpreter, ALL_MODULES)
+        return dict(zip(ALL_MODULES, results, strict=True))
+
+
+@pytest.mark.parametrize("module_name", ALL_MODULES)
+def test_import(
+    module_name: str, import_results: dict[str, subprocess.CompletedProcess[str]]
+):
+    """Each module should import without errors in a clean interpreter."""
+    result = import_results[module_name]
     assert result.returncode == 0, f"Failed to import {module_name}:\n{result.stderr}"
