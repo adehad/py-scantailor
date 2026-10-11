@@ -1,4 +1,4 @@
-"""Content box detection algorithm."""
+"""Content box and page edge detection."""
 
 from dataclasses import dataclass
 
@@ -6,9 +6,8 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.imageproc.morphology import remove_small_components
-
 from .content_box import ContentBox
+from .content_box_finder import PROCESSING_DPI, Rect, find_content_rect
 
 
 @dataclass(frozen=True)
@@ -24,7 +23,7 @@ class ContentDetectionResult:
 
 
 # Target DPI for content detection processing
-_TARGET_DPI = 150.0
+_TARGET_DPI = float(PROCESSING_DPI)
 _DEFAULT_DPI = 300.0
 
 
@@ -32,150 +31,88 @@ def find_content_box(
     image: NDArray[np.uint8],
     dpi: float = _DEFAULT_DPI,
     margin: int = 10,
+    page_box: ContentBox | None = None,
+    outside: NDArray[np.bool_] | None = None,
 ) -> ContentDetectionResult:
     """Detect content boundaries in an image.
 
-    Uses a multi-stage algorithm:
-    1. Scale to processing resolution
-    2. Binarize the image
-    3. Detect and remove shadows
-    4. Despeckle to remove noise
-    5. Find content boundaries
+    The image is processed at 150 dpi: it is binarised, shadows along the edges
+    are separated as garbage, the rest is grouped into blocks of text and
+    trimmed from every side where what lies beyond is closer to garbage than
+    to content.
 
     Args:
-        image: Grayscale or color image as numpy array.
-        dpi: Image resolution in DPI.
-        margin: Minimum margin from image edges.
+        image (NDArray[np.uint8]): Gray or BGR image, dark content on a light
+            page. Not modified.
+        dpi (float): Image resolution in DPI.
+        margin (int): Inset from the image edges of the box returned when no
+            content is found, in pixels of ``image``.
+        page_box (ContentBox | None): Area of the page in pixels of ``image``;
+            anything outside it counts as shadow.
+        outside (NDArray[np.bool_] | None): Pixels of ``image`` with no source
+            pixel behind them, such as the corners exposed by a rotation. They
+            are painted with the darkest gray level of the rest of the image,
+            so that a shadow along the edge of the page still reaches the edge
+            of the image.
 
     Returns:
-        ContentDetectionResult with detected box and confidence.
+        ContentDetectionResult: The detected box and a confidence from 0 to 1;
+            the confidence is 0 when no content was found.
     """
-    # Convert to grayscale if needed
-    if len(image.shape) == 3:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    else:
-        gray = image.copy()
-
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image
+    everything_outside = outside is not None and bool(outside.all())
+    if outside is not None and outside.any() and not everything_outside:
+        gray = np.where(outside, gray[~outside].min(), gray).astype(np.uint8)
     h, w = gray.shape[:2]
 
-    # Scale to target DPI for processing
-    scale = _TARGET_DPI / dpi
-    if scale < 1.0:
-        new_w = max(1, int(w * scale))
-        new_h = max(1, int(h * scale))
-        scaled = cv2.resize(gray, (new_w, new_h), interpolation=cv2.INTER_AREA)
-    else:
-        scaled = gray
-        scale = 1.0
-
-    # Binarize using adaptive threshold
-    binary = cv2.adaptiveThreshold(
-        scaled,
-        255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY_INV,
-        51,  # Block size
-        10,  # C constant
+    scaled_w = max(1, round(w * _TARGET_DPI / dpi))
+    scaled_h = max(1, round(h * _TARGET_DPI / dpi))
+    interpolation = cv2.INTER_AREA if scaled_w < w else cv2.INTER_LINEAR
+    scaled = np.asarray(
+        cv2.resize(gray, (scaled_w, scaled_h), interpolation=interpolation),
+        dtype=np.uint8,
     )
+    x_scale = w / scaled_w
+    y_scale = h / scaled_h
 
-    # Remove shadows using morphological operations
-    binary = _remove_shadows(np.asarray(binary, dtype=np.uint8))
-
-    # Despeckle to remove noise
-    binary = remove_small_components(binary, min_size=50, connectivity=8)
-
-    # Find content boundaries
-    content_rect = _find_bounding_rect(binary, margin=int(margin * scale))
-
-    # Scale back to original resolution
-    if content_rect is not None:
-        x, y, cw, ch = content_rect
-        inv_scale = 1.0 / scale
-        content_box = ContentBox(
-            x=x * inv_scale,
-            y=y * inv_scale,
-            width=cw * inv_scale,
-            height=ch * inv_scale,
+    page_rect = None
+    if page_box is not None:
+        page_rect = Rect(
+            max(0, round(page_box.x / x_scale)),
+            max(0, round(page_box.y / y_scale)),
+            min(scaled_w - 1, round(page_box.right / x_scale) - 1),
+            min(scaled_h - 1, round(page_box.bottom / y_scale) - 1),
         )
-        # Calculate confidence based on content area ratio
-        content_area = cw * ch
-        image_area = binary.shape[0] * binary.shape[1]
-        # Content should be substantial but not the entire image
-        area_ratio = content_area / image_area if image_area > 0 else 0
-        if 0.1 <= area_ratio <= 0.95:
-            confidence = 1.0
-        elif area_ratio < 0.1:
-            confidence = area_ratio / 0.1
-        else:
-            confidence = (1.0 - area_ratio) / 0.05
-        confidence = max(0.0, min(1.0, confidence))
+    found = None if everything_outside else find_content_rect(scaled, page_rect)
+
+    if found is None:
+        return ContentDetectionResult(
+            content_box=ContentBox(
+                x=float(margin),
+                y=float(margin),
+                width=float(max(0, w - 2 * margin)),
+                height=float(max(0, h - 2 * margin)),
+            ),
+            confidence=0.0,
+        )
+
+    left = max(0.0, found.left * x_scale)
+    top = max(0.0, found.top * y_scale)
+    right = min(float(w), (found.right + 1) * x_scale)
+    bottom = min(float(h), (found.bottom + 1) * y_scale)
+    content_box = ContentBox(x=left, y=top, width=right - left, height=bottom - top)
+
+    # Content should be substantial but not the entire image
+    area_ratio = content_box.width * content_box.height / (w * h)
+    if 0.1 <= area_ratio <= 0.95:
+        confidence = 1.0
+    elif area_ratio < 0.1:
+        confidence = area_ratio / 0.1
     else:
-        # No content found - return full image minus margin
-        content_box = ContentBox(
-            x=float(margin),
-            y=float(margin),
-            width=float(max(0, w - 2 * margin)),
-            height=float(max(0, h - 2 * margin)),
-        )
-        confidence = 0.0
-
-    return ContentDetectionResult(content_box=content_box, confidence=confidence)
-
-
-def _remove_shadows(binary: NDArray[np.uint8]) -> NDArray[np.uint8]:
-    """Remove shadows from a binary image using morphological operations."""
-    h, w = binary.shape[:2]
-
-    # Detect horizontal shadows (long horizontal structures)
-    h_kernel_size = max(1, min(200, w // 3))
-    h_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (h_kernel_size, 3))
-    h_shadows = cv2.morphologyEx(binary, cv2.MORPH_OPEN, h_kernel)
-
-    # Detect vertical shadows (long vertical structures)
-    v_kernel_size = max(1, min(300, h // 3))
-    v_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, v_kernel_size))
-    v_shadows = cv2.morphologyEx(binary, cv2.MORPH_OPEN, v_kernel)
-
-    # Combine shadows
-    shadows = cv2.bitwise_or(h_shadows, v_shadows)
-
-    # Dilate shadows to extend them fully
-    dilate_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-    shadows = cv2.dilate(shadows, dilate_kernel, iterations=2)
-
-    # Subtract shadows from binary
-    result = cv2.subtract(binary, shadows)
-
-    return np.asarray(result, dtype=np.uint8)
-
-
-def _find_bounding_rect(
-    binary: NDArray[np.uint8], margin: int = 5
-) -> tuple[int, int, int, int] | None:
-    """Find the bounding rectangle of content in a binary image.
-
-    Returns (x, y, width, height) or None if no content found.
-    """
-    h, w = binary.shape[:2]
-
-    # Find non-zero pixels
-    coords = cv2.findNonZero(binary)
-    if coords is None:
-        return None
-
-    # Get bounding rectangle
-    x, y, bw, bh = cv2.boundingRect(coords)
-
-    # Apply margin, staying within image bounds
-    x = max(margin, x - margin)
-    y = max(margin, y - margin)
-    x2 = min(w - margin, x + bw + margin)
-    y2 = min(h - margin, y + bh + margin)
-
-    if x2 <= x or y2 <= y:
-        return None
-
-    return (x, y, x2 - x, y2 - y)
+        confidence = (1.0 - area_ratio) / 0.05
+    return ContentDetectionResult(
+        content_box=content_box, confidence=max(0.0, min(1.0, confidence))
+    )
 
 
 def find_page_edges(

@@ -898,53 +898,60 @@ def _margin_color(
     return _per_channel(255 if wants_white else 0, image)
 
 
+# C++ hard-bounds the adjusted Otsu threshold so that a page whose content is
+# all masked out does not turn entirely black or white.
+_OTSU_BOUNDS = (30, 225)
+
+
 def _binarize(
     gray: NDArray[np.uint8],
     options: BinarizationOptions,
 ) -> NDArray[np.uint8]:
     """Apply binarization to a grayscale image.
 
+    The threshold adjustment shifts the global Otsu threshold (clamped to
+    30..225) and is the ``delta`` added to the local thresholds of the other
+    methods.
+
     Args:
-        gray: Grayscale input image.
-        options: Binarization options.
+        gray (NDArray[np.uint8]): 2-D gray image. Not modified.
+        options (BinarizationOptions): Binarization options.
 
     Returns:
-        Binary image (0 or 255).
+        NDArray[np.uint8]: New binary image, 0 for ink and 255 for background.
     """
-    # Apply threshold adjustment
-    if options.threshold_adjustment != 0:
-        # Adjust by shifting pixel values before binarization
-        adjusted = gray.astype(np.int16) - options.threshold_adjustment
-        adjusted = np.clip(adjusted, 0, 255).astype(np.uint8)
-    else:
-        adjusted = gray
-
+    adjustment = options.threshold_adjustment
     if options.method == BinarizationMethod.OTSU:
-        return binarize_otsu(adjusted)
+        return binarize_otsu(gray, adjustment, _OTSU_BOUNDS)
     if options.method == BinarizationMethod.SAUVOLA:
         return binarize_sauvola(
-            adjusted,
+            gray,
             window_size=options.window_size,
             k=options.sauvola_coef,
+            delta=adjustment,
         )
     if options.method == BinarizationMethod.WOLF:
         return binarize_wolf(
-            adjusted,
+            gray,
             window_size=options.window_size,
             k=options.wolf_coef,
+            delta=adjustment,
+            lower_bound=options.wolf_lower_bound,
+            upper_bound=options.wolf_upper_bound,
         )
     if options.method == BinarizationMethod.BRADLEY:
         return binarize_bradley(
-            adjusted,
+            gray,
             window_size=options.window_size,
             k=options.bradley_coef,
+            delta=adjustment,
         )
-    # EdgeDiv method
     return binarize_edge_div(
-        adjusted,
+        gray,
         window_size=options.window_size,
         kep=options.edge_div_kep,
         kbd=options.edge_div_kbd,
+        delta=adjustment,
     )
 
 

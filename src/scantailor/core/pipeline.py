@@ -395,6 +395,20 @@ def _process_deskew(
     }
 
 
+def _outside_source_mask(state: _PageState) -> NDArray[np.bool_]:
+    """Mark view pixels that have no source pixel (deskew corners, crops).
+
+    Returns:
+        NDArray[np.bool_]: (H, W) mask of the transformed view, True where the
+        resampling had nothing to sample.
+    """
+    rendered = render_transformed(np.zeros_like(state.source), state.xform)
+    mask = rendered > 127
+    if mask.ndim == 3:
+        return np.any(mask, axis=2)
+    return mask
+
+
 def _process_select_content(
     state: _PageState,
     page_id: PageId,
@@ -410,7 +424,12 @@ def _process_select_content(
     """
     filter_ = sequence.select_content_filter
     if detect:
-        params = filter_.process(state.view(), page_id, dpi=options.dpi)
+        params = filter_.process(
+            state.view(),
+            page_id,
+            dpi=options.dpi,
+            outside=_outside_source_mask(state),
+        )
     else:
         params = filter_.get_params(page_id)
 

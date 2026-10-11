@@ -55,6 +55,8 @@ class Filter:
         page_id: PageId,
         dpi: float = 300.0,
         store_result: bool = True,
+        outside: NDArray[np.bool_] | None = None,
+        page_box: ContentBox | None = None,
     ) -> ContentDetectionResult:
         """Detect content boundaries in an image.
 
@@ -63,11 +65,14 @@ class Filter:
             page_id: Page identifier.
             dpi: Image resolution.
             store_result: Whether to store the result in settings.
+            outside: Mask of the pixels that have no source pixel behind them
+                (corners exposed by a rotation); they are treated as shadow.
+            page_box: Area of the page in pixels of ``image``.
 
         Returns:
             ContentDetectionResult with detected box and confidence.
         """
-        result = find_content_box(image, dpi=dpi)
+        result = find_content_box(image, dpi=dpi, page_box=page_box, outside=outside)
 
         if store_result:
             params = self.get_params(page_id)
@@ -126,6 +131,7 @@ class Filter:
         image: NDArray[np.uint8],
         page_id: PageId,
         dpi: float = 300.0,
+        outside: NDArray[np.bool_] | None = None,
     ) -> Params:
         """Process an image to detect content and page boundaries.
 
@@ -135,6 +141,8 @@ class Filter:
             image: Grayscale or color image.
             page_id: Page identifier.
             dpi: Image resolution.
+            outside: Mask of the pixels of ``image`` that have no source pixel
+                behind them; content detection treats them as shadow.
 
         Returns:
             Updated parameters with detected/stored boxes.
@@ -153,7 +161,13 @@ class Filter:
 
         # Handle content detection
         if params.is_content_auto():
-            self.detect_content(image, page_id, dpi=dpi)
+            self.detect_content(
+                image,
+                page_id,
+                dpi=dpi,
+                outside=outside,
+                page_box=params.page_box.to_content_box(),
+            )
             params = self.get_params(page_id)
         elif params.is_content_disabled():
             # Use page box as content
