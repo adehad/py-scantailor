@@ -132,6 +132,7 @@ def _set_offset(offset: int) -> None:
     _WORKER_STATE["offset"] = offset
 
 
+@pytest.mark.slow
 class TestWorkerThreads:
     def test_initializer_limits_opencv_and_numba_to_one_thread(self):
         context = multiprocessing.get_context("spawn")
@@ -164,6 +165,7 @@ class TestWorkerThreads:
         assert seen == {1: 11, 2: 12}
 
 
+@pytest.mark.slow
 class TestRunPool:
     def test_failing_job_is_reported_and_others_complete(self):
         outcomes: dict[int, tuple[int | None, BaseException | None]] = {}
@@ -252,6 +254,7 @@ def stages(sources: list[PageId]) -> StageSequence:
     return sequence
 
 
+@pytest.mark.slow
 class TestRunBatch:
     def test_four_pages_are_written_with_cpp_names_and_output_dpi(
         self, tmp_path: Path, sources: list[PageId], stages: StageSequence
