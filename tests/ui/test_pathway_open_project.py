@@ -8,8 +8,8 @@ from PySide6 import QtCore, QtWidgets
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.MainWindow import APP_TITLE, MainWindowManager, SaveChoice
-from scantailor.core.models import ImageId
-from scantailor.core.project import Project
+from scantailor.core.models import Dpi, ImageId
+from scantailor.core.project import ImageMetadata, Project
 
 if TYPE_CHECKING:
     from conftest import FileDialogStub, PageImages, SavePromptScript
@@ -51,7 +51,10 @@ def test_open_project_with_chosen_file_loads_it_and_names_the_window(
 ):
     project = Project()
     for path in page_images.paths:
-        project.add_image(ImageId(file_path=path))
+        project.add_image(
+            ImageId(file_path=path),
+            ImageMetadata(width=10, height=10, dpi=Dpi.uniform(300)),
+        )
     project_file = tmp_path / "book.ScanTailor"
     project.save(project_file)
     file_dialogs.open_file = str(project_file)
