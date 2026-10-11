@@ -29,6 +29,7 @@ from scantailor.app.ui.dialogs.load_files_status import LoadFilesStatusDialog
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
 from scantailor.app.ui.dialogs.relinking import RelinkingDialog
 from scantailor.app.ui.page_renderer import PageRenderer, render_thumbnail
+from scantailor.app.ui.panels.new_open_project import NewOpenProjectPanel
 from scantailor.app.ui.stage_panels import StagePanels
 from scantailor.app.ui.thumbnails import ThumbnailListWidget
 from scantailor.app.ui.utils import get_cwidget
@@ -39,6 +40,7 @@ from scantailor.core import propagation
 from scantailor.core.batch import BatchResult, ProgressEvent
 from scantailor.core.image_io import ImageLoadError, list_image_pages
 from scantailor.core.models import ImageId, PageId
+from scantailor.core.page_source import DpiOverrides, dpi_overrides_of
 from scantailor.core.project import ImageInfo, ImageMetadata, LayoutDirection, Project
 from scantailor.core.recent_projects import RecentProjects
 from scantailor.core.relinker import Relinker, image_directories
@@ -74,6 +76,14 @@ SavePrompt = Callable[[], SaveChoice]
 FixDpiDialogFactory = Callable[[list[ImageInfo], QWidget], FixDpiDialog]
 RelinkingDialogFactory = Callable[[list[pathlib.Path], QWidget], RelinkingDialog]
 PageMetadata = list[tuple[ImageId, ImageMetadata]]
+
+
+def _create_directory(directory: pathlib.Path) -> None:
+    """Create the output folder if possible; processing reports it when it cannot."""
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        _LOG.warning(f"Cannot create output folder {directory}: {error}")
 
 
 def _message_widget(text: str) -> QtWidgets.QLabel:
@@ -174,11 +184,13 @@ class MainWindowManager:
         self._current_page: PageId | None = None
         self._panels: StagePanels | None = None
         self._thumbnail_widget: QWidget | None = None
+        self._welcome_widget: QWidget | None = None
         self.renderer = PageRenderer(self.ui)
         self.renderer.render_done.connect(self._on_render_done)
         self.renderer.render_failed.connect(self._on_render_failed)
         self._render_pending = False
         self._thumbnail_epoch = 0
+        self._dpi_overrides: DpiOverrides = {}
         self._thumbnail_versions: dict[PageId, int] = {}
         self.batch_runner = BatchRunner(self.ui)
         self.batch_runner.progress.connect(self._on_batch_progress)
@@ -358,6 +370,7 @@ class MainWindowManager:
         self.set_thumbnail_widget(self.thumbnails)
         self._wire_thumbnail_controls()
         self.filterList.launch_batch_processing.connect(self.startBatchProcessing)
+        self._update_welcome_panel()
         self._attach_stages()
         self._update_project_actions()
         self._update_window_title()
@@ -366,8 +379,20 @@ class MainWindowManager:
     def _render_page_thumbnail(self, page: PageId, stage: str) -> QtGui.QImage:
         """Render a thumbnail on a worker thread; settings are only read."""
         return render_thumbnail(
-            page, self.stages, FilterStage(int(stage)), THUMBNAIL_SIZE
+            page,
+            self.stages,
+            FilterStage(int(stage)),
+            THUMBNAIL_SIZE,
+            self._dpi_overrides,
         )
+
+    def _refresh_dpi_overrides(self) -> None:
+        """Snapshot the project's DPIs on the GUI thread for the worker threads."""
+        self._dpi_overrides = (
+            dpi_overrides_of(self.project) if self.project is not None else {}
+        )
+        if self._panels is not None:
+            self._panels.set_dpi_overrides(self._dpi_overrides)
 
     def _thumbnail_digest(self, page: PageId, _stage: str) -> Hashable:
         """Return what identifies the parameters a page's thumbnail was made with."""
@@ -447,6 +472,46 @@ class MainWindowManager:
         self.settings.setValue(_LAST_DIR_KEY, str(path.parent))
         self._rebuild_recent_menu()
 
+    def _update_welcome_panel(self) -> None:
+        """Show the New/Open panel in the image area while no project is open."""
+        if self._welcome_widget is not None:
+            self.imageFrameLayout.removeWidget(self._welcome_widget)
+            self._welcome_widget.deleteLater()
+            self._welcome_widget = None
+        if self.project is not None:
+            return
+        recent = RecentProjects.read(self.settings)
+        if not recent.validate():
+            recent.write(self.settings)
+        panel = NewOpenProjectPanel([pathlib.Path(p) for p in recent.enumerate()])
+        # Handlers run on the next event loop turn because they replace this panel.
+        panel.new_project_requested.connect(
+            lambda: QtCore.QTimer.singleShot(0, self.newProject)
+        )
+        panel.open_project_requested.connect(
+            lambda: QtCore.QTimer.singleShot(0, self.openProject)
+        )
+        panel.recent_project_selected.connect(
+            lambda chosen: QtCore.QTimer.singleShot(
+                0, lambda: self._open_recent_from_welcome(chosen)
+            )
+        )
+        centered = QWidget()
+        grid = QtWidgets.QGridLayout(centered)
+        grid.addWidget(panel, 1, 1)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(2, 1)
+        grid.setRowStretch(0, 1)
+        grid.setRowStretch(2, 1)
+        self.imageFrameLayout.addWidget(centered)
+        self.imageFrameLayout.setCurrentWidget(centered)
+        self._welcome_widget = centered
+
+    def _open_recent_from_welcome(self, path: pathlib.Path) -> None:
+        """Open a recent project; the list is refreshed if it turns out to be gone."""
+        if not self.open_project_file(path) and self.project is None:
+            self._update_welcome_panel()
+
     def _switch_filter_actions(self) -> list[QtGui.QAction]:
         """Return the stage switching actions in stage order."""
         return [
@@ -524,12 +589,15 @@ class MainWindowManager:
             self._propagate_between_stages(previous, stage)
         self.thumbnails.set_stage(str(int(stage)))
         panels = StagePanels(stage, self.stages, self.ui)
+        panels.set_dpi_overrides(self._dpi_overrides)
         panels.settings_changed.connect(self._on_settings_edited)
         self._connect_apply_requests(panels)
         self.optionsFrameLayout.addWidget(panels.options)
         self.imageFrameLayout.addWidget(panels.view)
         self.imageFrameLayout.setCurrentWidget(panels.view)
         self._panels = panels
+        if self._welcome_widget is not None:
+            self.imageFrameLayout.setCurrentWidget(self._welcome_widget)
         self._show_current_page()
 
     def _propagate_between_stages(
@@ -606,7 +674,9 @@ class MainWindowManager:
             return
         self._show_not_ready(False)
         self._set_render_pending(True)
-        self.renderer.request(self._current_page, self.stages, panels.stage)
+        self.renderer.request(
+            self._current_page, self.stages, panels.stage, self._dpi_overrides
+        )
 
     def _cancel_render(self) -> None:
         self.renderer.cancel()
@@ -661,7 +731,10 @@ class MainWindowManager:
             widget (QWidget): The thumbnail list. Replacing it later unparents it.
         """
         previous = self._thumbnail_widget or self.thumbView
-        layout = self.ui.findChild(QVBoxLayout, "verticalLayout")
+        container = self.thumbView.parentWidget()
+        layout = (
+            container.findChild(QVBoxLayout, "verticalLayout") if container else None
+        )
         assert layout is not None
         layout.replaceWidget(previous, widget)
         previous.hide()
@@ -872,6 +945,7 @@ class MainWindowManager:
             project.output_directory,
             layout_direction=project.layout_direction,
             max_workers=self._batch_worker_count(),
+            dpi_overrides=self._dpi_overrides,
         )
 
     def stopBatchProcessing(self) -> None:
@@ -957,7 +1031,7 @@ class MainWindowManager:
         if relinker is None:
             return False
         try:
-            project.remap_image_paths(relinker.substitute)
+            self._apply_relinker(project, relinker)
             stages = StageSequence()
             apply_stage_params(stages, project.stage_params)
         except ValueError as error:
@@ -1008,8 +1082,45 @@ class MainWindowManager:
             self.ui.tr("Unable to open the project file.") + f"\n{error}",
         )
 
+    @staticmethod
+    def _relinkable_directories(
+        project: Project, *, only_missing: bool
+    ) -> list[pathlib.Path]:
+        """List the image folders and the output folder of a project.
+
+        Args:
+            project (Project): The project.
+            only_missing (bool): Keep only folders that do not exist. The output
+                folder is then listed only when an image folder is missing too,
+                because a missing output folder alone is simply recreated.
+
+        Returns:
+            list[pathlib.Path]: Distinct folders in sorted order.
+        """
+        directories = image_directories(
+            [info.id.file_path for info in project.images], only_missing=only_missing
+        )
+        if only_missing and not directories:
+            return []
+        output = project.output_directory
+        if output not in directories and not (only_missing and output.is_dir()):
+            directories = sorted([*directories, output])
+        return directories
+
+    @staticmethod
+    def _apply_relinker(project: Project, relinker: Relinker) -> None:
+        """Point the project's images and output folder at their relinked paths.
+
+        Args:
+            project (Project): The project, updated in place.
+            relinker (Relinker): The chosen mapping.
+        """
+        project.remap_image_paths(relinker.substitute)
+        project.output_directory = relinker.substitute(project.output_directory)
+        _create_directory(project.output_directory)
+
     def _relink_missing_images(self, project: Project) -> Relinker | None:
-        """Let the user relink the folders of image files that are missing.
+        """Let the user relink the image folders and output folder that are missing.
 
         Args:
             project (Project): A freshly loaded project.
@@ -1018,9 +1129,7 @@ class MainWindowManager:
             Relinker | None: The mapping to apply (empty when nothing is missing),
                 or None when the user cancelled.
         """
-        missing = image_directories(
-            [info.id.file_path for info in project.images], only_missing=True
-        )
+        missing = self._relinkable_directories(project, only_missing=True)
         if not missing:
             return Relinker()
         return self._ask_relinker(missing)
@@ -1170,6 +1279,7 @@ class MainWindowManager:
                     update={"dpi": changes[info.id]}
                 )
         self.modified = True
+        self._refresh_dpi_overrides()
         self._invalidate_thumbnails()
         self._request_render()
 
@@ -1178,15 +1288,14 @@ class MainWindowManager:
         project = self.project
         if project is None or self.batch_runner.is_running:
             return
-        directories = image_directories(
-            [info.id.file_path for info in project.images], only_missing=False
+        relinker = self._ask_relinker(
+            self._relinkable_directories(project, only_missing=False)
         )
-        relinker = self._ask_relinker(directories)
         if relinker is None or relinker.is_empty():
             return
         project.stage_params = collect_stage_params(self.stages, project.get_pages())
         project.selected_page = self.current_page
-        project.remap_image_paths(relinker.substitute)
+        self._apply_relinker(project, relinker)
         stages = StageSequence()
         apply_stage_params(stages, project.stage_params)
         project_file = pathlib.Path(self.projectFile) if self.projectFile else None
@@ -1235,6 +1344,7 @@ class MainWindowManager:
         )
         for image_id, metadata in pages:
             project.add_image(image_id, metadata)
+        _create_directory(project.output_directory)
         self._install_project(
             project, StageSequence(), project_file=None, modified=True
         )
@@ -1308,7 +1418,7 @@ class MainWindowManager:
         return pages
 
     def _fix_dpi_of_new_pages(self, pages: PageMetadata) -> PageMetadata | None:
-        """Ask for the DPI of new images when any has an undefined or odd one.
+        """Ask for the DPI of new images when any has an undefined one.
 
         Args:
             pages (PageMetadata): Metadata read from the image files.
@@ -1317,7 +1427,7 @@ class MainWindowManager:
             PageMetadata | None: The pages with the chosen DPI applied, or None
                 when the user cancelled.
         """
-        if all(metadata.has_plausible_dpi() for _, metadata in pages):
+        if all(metadata.is_dpi_ok() for _, metadata in pages):
             return pages
         infos = [ImageInfo(id=image_id, metadata=meta) for image_id, meta in pages]
         dialog = self.fix_dpi_dialog_factory(infos, self.ui)
@@ -1349,6 +1459,7 @@ class MainWindowManager:
         self._discard_panels()
         self._thumbnail_epoch += 1
         self.project = project
+        self._refresh_dpi_overrides()
         self.stages = stages
         self.thumbnails.set_project(project)
         self.projectFile = str(project_file) if project_file else ""
@@ -1359,6 +1470,7 @@ class MainWindowManager:
             self.current_page = project.selected_page
         else:
             self.current_page = pages[0] if pages else None
+        self._update_welcome_panel()
         self._attach_stages()
         self._update_project_actions()
         self._update_window_title()
@@ -1535,12 +1647,14 @@ class MainWindowManager:
         self._discard_panels()
         self._thumbnail_epoch += 1
         self.project = None
+        self._refresh_dpi_overrides()
         self.stages = StageSequence()
         self.thumbnails.set_project(None)
         self.projectFile = ""
         self.current_page = None
         self._modified = False
         self._saved_state = None
+        self._update_welcome_panel()
         self._attach_stages()
         self._update_project_actions()
         self._update_window_title()
