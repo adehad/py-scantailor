@@ -3,7 +3,7 @@
 from PySide6 import QtCore, QtWidgets
 
 from scantailor.app.ui.thumbnails.model import page_label
-from scantailor.core.batch import BatchResult, PageDone, ProgressEvent
+from scantailor.core.batch import BatchResult, PageDetected, PageDone, ProgressEvent
 
 
 class BatchProgressDialog(QtWidgets.QDialog):
@@ -30,6 +30,9 @@ class BatchProgressDialog(QtWidgets.QDialog):
         self.setModal(False)
         self._total = total
         self._running = True
+        self._detected = 0
+        self._rendered = 0
+        self._rendering = False
 
         layout = QtWidgets.QVBoxLayout(self)
         self._status = QtWidgets.QLabel(self)
@@ -52,9 +55,25 @@ class BatchProgressDialog(QtWidgets.QDialog):
         """Number of pages reported so far."""
         return self._results.count()
 
+    @property
+    def phase(self) -> str:
+        """Either ``"detecting"`` or ``"rendering"``."""
+        return "rendering" if self._rendering else "detecting"
+
     def result_lines(self) -> list[str]:
         """Return the per-page result lines in report order."""
         return [self._results.item(row).text() for row in range(self._results.count())]
+
+    def add_detected(self, event: PageDetected) -> None:
+        """Count a page whose geometry was measured.
+
+        Args:
+            event (PageDetected): The measured page.
+        """
+        self._detected += 1
+        if self._detected >= self._total:
+            self._rendering = True
+        self._update_status()
 
     def add_result(self, event: ProgressEvent) -> None:
         """Record how a page ended.
@@ -64,6 +83,8 @@ class BatchProgressDialog(QtWidgets.QDialog):
         """
         name = page_label(event.page)
         if isinstance(event, PageDone):
+            self._rendered += 1
+            self._rendering = True
             line = f"{name}: {event.path.name}"
         else:
             line = f"{name}: {self.tr('failed')} ({event.error})"
@@ -109,8 +130,12 @@ class BatchProgressDialog(QtWidgets.QDialog):
         self.stop_requested.emit()
 
     def _update_status(self) -> None:
-        self._status.setText(
-            self.tr("Processing page {done} of {total}").format(
-                done=min(self._results.count() + 1, self._total), total=self._total
+        if self._rendering:
+            text = self.tr("Rendering {done}/{total}").format(
+                done=self._rendered, total=self._total
             )
-        )
+        else:
+            text = self.tr("Detecting {done}/{total}").format(
+                done=self._detected, total=self._total
+            )
+        self._status.setText(text)

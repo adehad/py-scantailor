@@ -26,10 +26,24 @@ from scantailor.app.ui.dialogs.apply_to import ApplyToDialog
 from scantailor.app.ui.dialogs.batch_progress import BatchProgressDialog
 from scantailor.app.ui.dialogs.fix_dpi import FixDpiDialog
 from scantailor.app.ui.dialogs.load_files_status import LoadFilesStatusDialog
+from scantailor.app.ui.dialogs.pdf_export import PdfExportDialog, PdfExportOptions
+from scantailor.app.ui.dialogs.pdf_import import DEFAULT_IMPORT_DPI, PdfImportDialog
+from scantailor.app.ui.dialogs.pdf_progress import PdfProgressDialog
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
 from scantailor.app.ui.dialogs.relinking import RelinkingDialog
 from scantailor.app.ui.page_renderer import PageRenderer, render_thumbnail
 from scantailor.app.ui.panels.new_open_project import NewOpenProjectPanel
+from scantailor.app.ui.pdf_worker import (
+    ImportedPdf,
+    PagePlan,
+    PdfExportRequest,
+    PdfExportResult,
+    PdfJob,
+    PdfSource,
+    TextRequest,
+    export_pdf_pages,
+    import_pdf_pages,
+)
 from scantailor.app.ui.stage_panels import StagePanels
 from scantailor.app.ui.thumbnails import ThumbnailListWidget
 from scantailor.app.ui.utils import get_cwidget
@@ -37,9 +51,15 @@ from scantailor.app.ui.widgets.non_owning_widget import NonOwningWidget
 from scantailor.app.ui.widgets.processing_indicator import ProcessingIndicator
 from scantailor.app.ui.widgets.stage_list_view import StageListView
 from scantailor.core import propagation
-from scantailor.core.batch import BatchResult, ProgressEvent
+from scantailor.core.batch import (
+    BatchResult,
+    PageDetected,
+    ProgressEvent,
+    RenderInfo,
+    output_file_names,
+)
 from scantailor.core.image_io import ImageLoadError, list_image_pages
-from scantailor.core.models import ImageId, PageId
+from scantailor.core.models import Dpi, ImageId, PageId
 from scantailor.core.page_source import DpiOverrides, dpi_overrides_of
 from scantailor.core.project import ImageInfo, ImageMetadata, LayoutDirection, Project
 from scantailor.core.recent_projects import RecentProjects
@@ -51,6 +71,8 @@ PROJECT_SUFFIX = ".ScanTailor"
 APP_TITLE = "ScanTailor Advanced"
 _LAST_DIR_KEY = "project/lastDir"
 _LAST_INPUT_DIR_KEY = "project/lastInputDir"
+_LAST_PDF_DIR_KEY = "project/lastPdfDir"
+_LAST_PDF_DPI_KEY = "project/lastPdfDpi"
 THUMBNAIL_SIZE = QtCore.QSize(160, 160)
 # Written by SystemLoadWidget: how many pages a batch processes at once.
 _BATCH_THREADS_KEY = "settings/batch_processing_threads"
@@ -75,6 +97,10 @@ LoadStatusPresenter = Callable[
 SavePrompt = Callable[[], SaveChoice]
 FixDpiDialogFactory = Callable[[list[ImageInfo], QWidget], FixDpiDialog]
 RelinkingDialogFactory = Callable[[list[pathlib.Path], QWidget], RelinkingDialog]
+PdfImportDialogFactory = Callable[[pathlib.Path, QWidget], PdfImportDialog]
+PdfExportDialogFactory = Callable[[pathlib.Path, bool, QWidget], PdfExportDialog]
+# Arguments: pages without output, pages in the project.
+RunBatchPrompt = Callable[[int, int], bool]
 PageMetadata = list[tuple[ImageId, ImageMetadata]]
 
 
@@ -178,6 +204,13 @@ class MainWindowManager:
         self.relinking_dialog_factory: RelinkingDialogFactory = (
             relinking_dialog_factory or RelinkingDialog
         )
+        self.pdf_import_dialog_factory: PdfImportDialogFactory = (
+            self._default_pdf_import_dialog
+        )
+        self.pdf_export_dialog_factory: PdfExportDialogFactory = (
+            self._default_pdf_export_dialog
+        )
+        self.run_batch_prompt: RunBatchPrompt = self._ask_run_batch
 
         self.project: Project | None = None
         self.stages = StageSequence()
@@ -193,11 +226,22 @@ class MainWindowManager:
         self._dpi_overrides: DpiOverrides = {}
         self._thumbnail_versions: dict[PageId, int] = {}
         self.batch_runner = BatchRunner(self.ui)
+        self.batch_runner.detected.connect(self._on_batch_detected)
         self.batch_runner.progress.connect(self._on_batch_progress)
         self.batch_runner.finished.connect(self._on_batch_finished)
         self.batch_runner.failed.connect(self._on_batch_failed)
         self.batch_dialog: BatchProgressDialog | None = None
         self.last_batch_result: BatchResult | None = None
+        self.pdf_job = PdfJob(self.ui)
+        self.pdf_job.progress.connect(self._on_pdf_progress)
+        self.pdf_job.finished.connect(self._on_pdf_finished)
+        self.pdf_job.cancelled.connect(self._on_pdf_cancelled)
+        self.pdf_job.failed.connect(self._on_pdf_failed)
+        self._pdf_progress: PdfProgressDialog | None = None
+        self._pdf_on_done: Callable[[Any], None] | None = None
+        self._render_info: dict[PageId, RenderInfo] = {}
+        self.pdf_source: PdfSource | None = None
+        self.last_pdf_export: PdfExportResult | None = None
         self._modified = False
         # Serialised project as last saved or opened; None while never saved.
         self._saved_state: str | None = None
@@ -291,6 +335,9 @@ class MainWindowManager:
         self.filterList = get_cwidget(self.ui, StageListView, "filterList")
         self.actionAddFiles = QtGui.QAction(self.ui.tr("Add Files..."), self.ui)
         self._insert_add_files_action()
+        self.actionOpenPdf = QtGui.QAction(self.ui.tr("Open PDF..."), self.ui)
+        self.actionExportPdf = QtGui.QAction(self.ui.tr("Export PDF..."), self.ui)
+        self._insert_pdf_actions()
         self.menuOpenRecent = QtWidgets.QMenu(self.ui.tr("Open Recent"), self.ui)
         self._insert_recent_menu()
 
@@ -343,6 +390,8 @@ class MainWindowManager:
         self.actionCloseProject.triggered.connect(self.closeProject)
         self.actionQuit.triggered.connect(self.quit)
         self.actionAddFiles.triggered.connect(self.addFiles)
+        self.actionOpenPdf.triggered.connect(self.openPdf)
+        self.actionExportPdf.triggered.connect(self.exportPdf)
 
         # Shortcuts of actions that are not in any menu only fire when attached
         # to a widget.
@@ -435,6 +484,14 @@ class MainWindowManager:
         actions = file_menu.actions()
         save_index = actions.index(self.actionSaveProject)
         file_menu.insertAction(actions[save_index - 1], self.actionAddFiles)
+
+    def _insert_pdf_actions(self) -> None:
+        """Place the PDF actions in the File menu, below the open entries."""
+        file_menu = get_cwidget(self.ui, QtWidgets.QMenu, "menuFile")
+        actions = file_menu.actions()
+        save_index = actions.index(self.actionSaveProject)
+        file_menu.insertAction(actions[save_index - 1], self.actionOpenPdf)
+        file_menu.insertAction(actions[save_index - 1], self.actionExportPdf)
 
     def _insert_recent_menu(self) -> None:
         """Place the recent projects submenu right below Open Project."""
@@ -770,6 +827,7 @@ class MainWindowManager:
             self.actionSaveProjectAs,
             self.actionCloseProject,
             self.actionAddFiles,
+            self.actionExportPdf,
             self.actionFixDpi,
             self.actionRelinking,
         ):
@@ -928,8 +986,12 @@ class MainWindowManager:
         project = self.project
         if project is None or self.batch_runner.is_running:
             return
-        pages = self._batch_pages()
-        if not pages:
+        self._start_batch(self._batch_pages())
+
+    def _start_batch(self, pages: list[PageId]) -> None:
+        """Process ``pages`` in the background with a progress window."""
+        project = self.project
+        if project is None or self.batch_runner.is_running or not pages:
             return
         self._cancel_render()
         self._set_batch_ui(True)
@@ -969,6 +1031,10 @@ class MainWindowManager:
         self.filterOptions.setEnabled(not in_progress)
         self.processing_indicator.set_active(in_progress)
 
+    def _on_batch_detected(self, event: PageDetected) -> None:
+        if self.batch_dialog is not None:
+            self.batch_dialog.add_detected(event)
+
     def _on_batch_progress(self, event: ProgressEvent) -> None:
         if self.batch_dialog is not None:
             self.batch_dialog.add_result(event)
@@ -976,6 +1042,7 @@ class MainWindowManager:
 
     def _on_batch_finished(self, result: BatchResult) -> None:
         self.last_batch_result = result
+        self._render_info.update(result.render_info)
         self._set_batch_ui(False)
         if self.batch_dialog is not None:
             self.batch_dialog.finish(result)
@@ -997,6 +1064,220 @@ class MainWindowManager:
             self.ui.tr("Batch processing"),
             self.ui.tr("Batch processing failed.") + f"\n{message}",
         )
+
+    def _default_pdf_import_dialog(
+        self, pdf_path: pathlib.Path, parent: QWidget
+    ) -> PdfImportDialog:
+        """Build the import resolution dialog, offering the last one used."""
+        dpi = cast(
+            int, self.settings.value(_LAST_PDF_DPI_KEY, DEFAULT_IMPORT_DPI, type=int)
+        )
+        return PdfImportDialog(pdf_path, dpi, parent)
+
+    def _default_pdf_export_dialog(
+        self, default_path: pathlib.Path, can_carry_text: bool, parent: QWidget
+    ) -> PdfExportDialog:
+        """Build the export options dialog."""
+        return PdfExportDialog(
+            default_path, can_carry_text=can_carry_text, parent=parent
+        )
+
+    def _ask_run_batch(self, unprocessed: int, total: int) -> bool:
+        """Ask whether to process the pages that have no output yet."""
+        answer = QMessageBox.question(
+            self.ui,
+            self.ui.tr("Export PDF"),
+            self.ui.tr(
+                "{unprocessed} of {total} pages have not been processed yet.\n"
+                "Process them now? Export the PDF again once processing is done."
+            ).format(unprocessed=unprocessed, total=total),
+        )
+        return answer == QMessageBox.StandardButton.Yes
+
+    def openPdf(self, _checked: bool = False) -> None:
+        """Ask for a PDF, render its pages in the background, open them as a project."""
+        if self.pdf_job.is_running or self.batch_runner.is_running:
+            return
+        start_dir = str(
+            self.settings.value(_LAST_PDF_DIR_KEY, self._last_project_dir(), type=str)
+        )
+        chosen, _selected_filter = QFileDialog.getOpenFileName(
+            self.ui, self.ui.tr("Open PDF"), start_dir, "PDF (*.pdf)"
+        )
+        if not chosen:
+            return
+        pdf_path = pathlib.Path(chosen)
+        dialog = self.pdf_import_dialog_factory(pdf_path, self.ui)
+        accepted = dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted
+        dpi = dialog.dpi()
+        dialog.deleteLater()
+        if not accepted:
+            return
+        self.settings.setValue(_LAST_PDF_DIR_KEY, str(pdf_path.parent))
+        self.settings.setValue(_LAST_PDF_DPI_KEY, dpi)
+        pages_dir = pdf_path.with_name(f"{pdf_path.stem}_pages")
+        self._run_pdf_job(
+            self.ui.tr("Open PDF"),
+            lambda report, cancel: import_pdf_pages(
+                pdf_path, pages_dir, dpi, report, cancel
+            ),
+            lambda imported: self._open_imported_pdf(imported, dpi),
+        )
+
+    def _open_imported_pdf(self, imported: ImportedPdf, dpi: int) -> None:
+        """Replace the open project with one made of the rendered PDF pages."""
+        if not self._close_project_interactive():
+            return
+        pages = self._read_pages(imported.images)
+        if not pages:
+            return
+        pages_dir = imported.images[0].parent
+        project = Project(output_directory=pages_dir / "out")
+        for image_id, metadata in pages:
+            project.add_image(image_id, metadata)
+        _create_directory(project.output_directory)
+        stages = StageSequence()
+        stages.output_filter.settings.set_default_dpi(Dpi.uniform(dpi))
+        self._install_project(project, stages, project_file=None, modified=True)
+
+    def exportPdf(self, _checked: bool = False) -> None:
+        """Write the processed pages of the project to one PDF in the background."""
+        project = self.project
+        if project is None or self.batch_runner.is_running or self.pdf_job.is_running:
+            return
+        pages = project.get_pages()
+        if not pages:
+            return
+        names = output_file_names(pages, project.layout_direction)
+        files = {page: project.output_directory / names[page] for page in pages}
+        unprocessed = [page for page in pages if not files[page].is_file()]
+        if unprocessed:
+            if self.run_batch_prompt(len(unprocessed), len(pages)):
+                self._start_batch(unprocessed)
+            return
+        source = self.pdf_source
+        can_carry_text = source is not None and source.is_available
+        dialog = self.pdf_export_dialog_factory(
+            self._default_pdf_path(), can_carry_text, self.ui
+        )
+        accepted = dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted
+        options = dialog.options()
+        dialog.deleteLater()
+        if not accepted:
+            return
+        request = self._pdf_export_request(files, options)
+        self._run_pdf_job(
+            self.ui.tr("Export PDF"),
+            lambda report, cancel: export_pdf_pages(request, report, cancel),
+            self._on_pdf_exported,
+        )
+
+    def _default_pdf_path(self) -> pathlib.Path:
+        """Return where the exported PDF goes unless the user picks another place."""
+        source = self.pdf_source
+        if source is not None:
+            return source.pdf_path.with_name(f"{source.pdf_path.stem}_processed.pdf")
+        output_directory = self.project.output_directory if self.project else None
+        return (output_directory or pathlib.Path.cwd()) / "output.pdf"
+
+    def _pdf_export_request(
+        self, files: dict[PageId, pathlib.Path], options: PdfExportOptions
+    ) -> PdfExportRequest:
+        """Capture on the GUI thread everything the export thread needs.
+
+        Args:
+            files (dict[PageId, pathlib.Path]): Processed output image per page.
+            options (PdfExportOptions): The user's choices.
+
+        Returns:
+            PdfExportRequest: Plain data; a page carries text only when its
+            geometry is known from a batch run in this session.
+        """
+        source = self.pdf_source if options.carry_text else None
+        output_settings = self.stages.output_filter.settings
+        plans: list[PagePlan] = []
+        for page, file in files.items():
+            info = self._render_info.get(page)
+            dpi = (
+                info.output_dpi if info else output_settings.get_params(page).output_dpi
+            )
+            text = None
+            index = source.page_index(page.image_id.file_path) if source else None
+            if index is not None and info is not None:
+                text = TextRequest(
+                    index, info.transformation, info.output_dpi, info.was_dewarped
+                )
+            plans.append(
+                PagePlan(file, (float(dpi.horizontal), float(dpi.vertical)), text)
+            )
+        return PdfExportRequest(
+            plans,
+            options.out_path,
+            options.bilevel_codec,
+            options.jpeg_quality,
+            source,
+        )
+
+    def _on_pdf_exported(self, result: PdfExportResult) -> None:
+        self.last_pdf_export = result
+        message = self.ui.tr("Exported {pages} pages to {path}").format(
+            pages=result.pages, path=result.out_path
+        )
+        if result.text_pages:
+            message += self.ui.tr(" ({count} with text)").format(
+                count=result.text_pages
+            )
+        get_cwidget(self.ui, QtWidgets.QStatusBar, "statusBar").showMessage(
+            message, 10000
+        )
+
+    def _run_pdf_job(
+        self,
+        title: str,
+        work: Callable[[Any, Any], object],
+        on_done: Callable[[Any], None],
+    ) -> None:
+        """Run ``work`` on the PDF thread behind a modal progress window.
+
+        Args:
+            title (str): Title of the progress window.
+            work (Callable): Called as ``work(report, cancel)`` on the thread.
+            on_done (Callable[[Any], None]): Receives the result on the GUI thread.
+        """
+        dialog = PdfProgressDialog(title, self.ui)
+        dialog.cancel_requested.connect(self.pdf_job.cancel)
+        self._pdf_progress = dialog
+        self._pdf_on_done = on_done
+        dialog.show()
+        self.pdf_job.start(work)
+
+    def _end_pdf_job(self) -> Callable[[Any], None] | None:
+        dialog, self._pdf_progress = self._pdf_progress, None
+        on_done, self._pdf_on_done = self._pdf_on_done, None
+        if dialog is not None:
+            dialog.close_finished()
+            dialog.deleteLater()
+        return on_done
+
+    def _on_pdf_progress(self, done: int, total: int, text: str) -> None:
+        if self._pdf_progress is not None:
+            self._pdf_progress.set_progress(done, total, text)
+
+    def _on_pdf_finished(self, result: object) -> None:
+        on_done = self._end_pdf_job()
+        if on_done is not None:
+            on_done(result)
+
+    def _on_pdf_cancelled(self) -> None:
+        self._end_pdf_job()
+        get_cwidget(self.ui, QtWidgets.QStatusBar, "statusBar").showMessage(
+            self.ui.tr("Cancelled"), 5000
+        )
+
+    def _on_pdf_failed(self, message: str) -> None:
+        self._end_pdf_job()
+        _LOG.warning(f"PDF job failed: {message}")
+        QMessageBox.warning(self.ui, self.ui.tr("PDF"), message)
 
     def openProject(self, _checked: bool = False) -> None:
         """Ask for a project file and open it, replacing the current project."""
@@ -1463,6 +1744,8 @@ class MainWindowManager:
         self.stages = stages
         self.thumbnails.set_project(project)
         self.projectFile = str(project_file) if project_file else ""
+        self.pdf_source = PdfSource.find(info.id.file_path for info in project.images)
+        self._render_info = {}
         self._modified = modified
         self._saved_state = None if modified else self._state_snapshot()
         pages = project.get_pages()
@@ -1651,6 +1934,8 @@ class MainWindowManager:
         self.stages = StageSequence()
         self.thumbnails.set_project(None)
         self.projectFile = ""
+        self.pdf_source = None
+        self._render_info = {}
         self.current_page = None
         self._modified = False
         self._saved_state = None
