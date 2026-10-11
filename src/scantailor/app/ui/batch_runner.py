@@ -9,6 +9,7 @@ from PySide6 import QtCore
 
 from scantailor.core.batch import BatchResult, run_batch
 from scantailor.core.models import PageId
+from scantailor.core.page_source import DpiOverrides
 from scantailor.core.project import LayoutDirection
 from scantailor.core.stage_sequence import StageSequence
 
@@ -26,12 +27,14 @@ class _BatchWorker(QtCore.QObject):
         layout_direction: LayoutDirection,
         max_workers: int | None,
         cancel: threading.Event,
+        dpi_overrides: DpiOverrides,
     ) -> None:
         super().__init__()
         self._arguments = (stages, pages, output_dir)
         self._layout_direction = layout_direction
         self._max_workers = max_workers
         self._cancel = cancel
+        self._dpi_overrides = dpi_overrides
 
     @QtCore.Slot()
     def run(self) -> None:
@@ -46,6 +49,7 @@ class _BatchWorker(QtCore.QObject):
                 max_workers=self._max_workers,
                 on_progress=self.progress.emit,
                 cancel=self._cancel,
+                dpi_overrides=self._dpi_overrides,
             )
         except Exception as error:
             logger.exception("Batch processing failed")
@@ -94,6 +98,7 @@ class BatchRunner(QtCore.QObject):
         output_dir: Path,
         layout_direction: LayoutDirection = "LTR",
         max_workers: int | None = None,
+        dpi_overrides: DpiOverrides | None = None,
     ) -> None:
         """Start a batch on a new thread.
 
@@ -103,6 +108,8 @@ class BatchRunner(QtCore.QObject):
             output_dir (Path): Directory for the output files.
             layout_direction (LayoutDirection): Reading direction, for file names.
             max_workers (int | None): Worker processes; None for the CPU count.
+            dpi_overrides (DpiOverrides | None): Snapshot of the project's
+                resolutions, taken on the calling thread.
 
         Raises:
             RuntimeError: If a batch is already running.
@@ -113,7 +120,13 @@ class BatchRunner(QtCore.QObject):
         self._cancel = threading.Event()
         self._outcome = None
         worker = _BatchWorker(
-            stages, pages, output_dir, layout_direction, max_workers, self._cancel
+            stages,
+            pages,
+            output_dir,
+            layout_direction,
+            max_workers,
+            self._cancel,
+            dpi_overrides or {},
         )
         thread = QtCore.QThread(self)
         worker.moveToThread(thread)

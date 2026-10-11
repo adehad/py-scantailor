@@ -68,7 +68,7 @@ def _count_renders(
     rendered: list[PageId] = []
     real_render = page_renderer.render_page
 
-    def spy(page_id, sequence, end_stage):
+    def spy(page_id, sequence, end_stage, dpi_overrides=None):
         rendered.append(page_id)
         return real_render(page_id, sequence, end_stage)
 
