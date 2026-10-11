@@ -43,6 +43,7 @@ class RelinkingScript:
 
 def _save_project(paths: list[pathlib.Path], project_file: pathlib.Path) -> Project:
     project = Project(output_directory=project_file.parent / "out")
+    project.output_directory.mkdir(exist_ok=True)
     for path in paths:
         for image_id, metadata in list_image_pages(path):
             project.add_image(image_id, metadata)
@@ -258,7 +259,6 @@ def test_relinking_action_rewrites_the_open_project_and_keeps_its_file(
 
     project_window.actionRelinking.trigger()
 
-    assert script.offered == [[page_images.directory]]
     assert project_window.project is not None
     assert {info.id.file_path.parent for info in project_window.project.images} == {
         new_dir
@@ -354,3 +354,122 @@ def test_open_ignores_unsaved_prompt_when_relinking_is_cancelled(
 
     assert save_prompt.prompts == 0
     assert project_window.project is before
+
+
+def test_missing_image_folder_offers_the_missing_output_folder_too(
+    main_window: MainWindowManager,
+    file_dialogs: FileDialogStub,
+    respond_to_modal: Callable[..., None],
+    moved_project: tuple[pathlib.Path, pathlib.Path, pathlib.Path],
+):
+    project_file, old_dir, new_dir = moved_project
+    output = project_file.parent / "out"
+    shutil.rmtree(output)
+    script = RelinkingScript({old_dir: new_dir})
+    main_window.relinking_dialog_factory = script
+    respond_to_modal(accept=True)
+
+    _open(main_window, file_dialogs, project_file)
+
+    assert script.offered == [sorted([old_dir, output])]
+
+
+def test_relinking_the_output_folder_updates_the_project_and_marks_it_modified(
+    main_window: MainWindowManager,
+    file_dialogs: FileDialogStub,
+    respond_to_modal: Callable[..., None],
+    page_images: PageImages,
+    tmp_path: pathlib.Path,
+):
+    project_file = tmp_path / "book.ScanTailor"
+    project = _save_project(page_images.paths, project_file)
+    old_out = project.output_directory
+    new_dir = tmp_path / "scans_moved"
+    shutil.move(str(page_images.directory), str(new_dir))
+    shutil.rmtree(old_out)
+    new_out = tmp_path / "results"
+    new_out.mkdir()
+    main_window.relinking_dialog_factory = RelinkingScript(
+        {page_images.directory: new_dir, old_out: new_out}
+    )
+    respond_to_modal(accept=True)
+
+    _open(main_window, file_dialogs, project_file)
+
+    assert main_window.project is not None
+    assert main_window.project.output_directory == new_out
+    assert main_window.modified
+
+
+def test_missing_output_folder_alone_is_recreated_without_asking(
+    main_window: MainWindowManager,
+    file_dialogs: FileDialogStub,
+    page_images: PageImages,
+    tmp_path: pathlib.Path,
+):
+    project_file = tmp_path / "book.ScanTailor"
+    project = _save_project(page_images.paths, project_file)
+    shutil.rmtree(project.output_directory)
+    script = RelinkingScript()
+    main_window.relinking_dialog_factory = script
+
+    _open(main_window, file_dialogs, project_file)
+
+    assert script.offered == []
+    assert project.output_directory.is_dir()
+
+
+def test_relinking_action_always_lists_the_output_folder_with_the_image_folders(
+    project_window: MainWindowManager,
+    respond_to_modal: Callable[..., None],
+    page_images: PageImages,
+):
+    script = RelinkingScript()
+    project_window.relinking_dialog_factory = script
+    respond_to_modal(accept=True)
+
+    project_window.actionRelinking.trigger()
+
+    assert project_window.project is not None
+    assert script.offered == [
+        sorted([page_images.directory, project_window.project.output_directory])
+    ]
+
+
+def test_relinking_action_moves_the_output_folder(
+    project_window: MainWindowManager,
+    respond_to_modal: Callable[..., None],
+    tmp_path: pathlib.Path,
+):
+    assert project_window.project is not None
+    old_out = project_window.project.output_directory
+    new_out = tmp_path / "elsewhere"
+    new_out.mkdir()
+    project_window.relinking_dialog_factory = RelinkingScript({old_out: new_out})
+    respond_to_modal(accept=True)
+
+    project_window.actionRelinking.trigger()
+
+    assert project_window.project is not None
+    assert project_window.project.output_directory == new_out
+
+
+def test_output_folder_inside_a_relinked_image_folder_moves_with_it(
+    project_window: MainWindowManager,
+    respond_to_modal: Callable[..., None],
+    page_images: PageImages,
+    tmp_path: pathlib.Path,
+):
+    assert project_window.project is not None
+    project_window.project.output_directory = page_images.directory / "out"
+    new_dir = tmp_path / "relocated"
+    shutil.copytree(page_images.directory, new_dir)
+    project_window.relinking_dialog_factory = RelinkingScript(
+        {page_images.directory: new_dir}
+    )
+    respond_to_modal(accept=True)
+
+    project_window.actionRelinking.trigger()
+
+    assert project_window.project is not None
+    assert project_window.project.output_directory == new_dir / "out"

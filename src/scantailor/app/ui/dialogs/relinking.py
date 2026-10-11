@@ -1,4 +1,4 @@
-"""Relinking dialog: point the folders of a project's images at their new location."""
+"""Relinking dialog: point the image and output folders of a project elsewhere."""
 
 from pathlib import Path
 
@@ -12,7 +12,7 @@ _PATH_ROLE = Qt.ItemDataRole.UserRole
 
 
 class RelinkingDialog(QtWidgets.QDialog):
-    """Lets the user choose a new folder for each folder of image files.
+    """Lets the user choose a new folder for each image folder and the output folder.
 
     Relinking a folder also relinks everything below it. The result is a
     ``Relinker`` that the caller applies to the project.
@@ -40,8 +40,8 @@ class RelinkingDialog(QtWidgets.QDialog):
         layout.addWidget(
             QtWidgets.QLabel(
                 self.tr(
-                    "Some image folders could not be found. Select a folder and "
-                    "point it to where its files are now."
+                    "Select a folder and point it to where its files are now. "
+                    "Folders shown in red could not be found."
                 )
             )
         )
