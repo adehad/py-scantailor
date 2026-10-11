@@ -1,733 +1,439 @@
 """Select Content filter image view.
 
-Provides an interactive image view for the Select Content filter with:
-- Draggable content box corners and edges
-- Optional page box display and editing
-- Context menu for creating/removing content boxes
-- Visual feedback for content and page boundaries
+Shows the deskewed page with its content box and, when page detection is
+enabled, its page box. Boxes are resized by their corners and edges and moved
+by their body; a context menu and a double click create or remove the
+content box.
 """
 
 import math
-from enum import IntFlag, auto
+from enum import Enum, auto
+from typing import ClassVar
 
-import numpy as np
-from numpy.typing import NDArray
 from PySide6 import QtGui, QtWidgets
-from PySide6.QtCore import QLineF, QPointF, QRectF, QSizeF, Qt, Signal, Slot
-from PySide6.QtGui import QAction, QColor, QImage, QPainter, QPen
+from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtGui import QAction, QColor, QKeySequence, QPainter, QPen
 
-from scantailor.app.ui.image_views.base import ImageViewBase
-from scantailor.core.transformation import ImageTransformation
+from scantailor.app.ui.image_views.base import (
+    Edge,
+    ImageViewBase,
+    point_to_segment_distance,
+)
 
 
-class Edge(IntFlag):
-    """Flags for rectangle edges."""
+class BoxKind(Enum):
+    """The two boxes the view edits."""
 
-    NONE = 0
-    LEFT = auto()
-    RIGHT = auto()
-    TOP = auto()
-    BOTTOM = auto()
+    CONTENT = auto()
+    PAGE = auto()
 
 
 class SelectContentImageView(ImageViewBase):
-    """Image view for Select Content filter with interactive box editing.
+    """Image view of the Select Content stage with editable boxes.
 
-    Displays the image with content and page boxes that can be resized
-    by dragging corners or edges.
+    Boxes are in virtual coordinates, the coordinates the stage stores.
 
     Signals:
-        manual_content_rect_set: Emitted when content box is manually set.
-        manual_page_rect_set: Emitted when page box is manually set.
-        page_rect_size_changed: Emitted when page box size changes.
+        manual_content_rect_set: The user changed the content box. Args:
+            rect (QRectF); empty when the box was removed.
+        manual_page_rect_set: The user changed the page box. Args: rect (QRectF).
     """
 
     manual_content_rect_set = Signal(QRectF)
     manual_page_rect_set = Signal(QRectF)
-    page_rect_size_changed = Signal(QSizeF)
 
-    # Constants
     CORNER_HIT_RADIUS = 10
     EDGE_HIT_DISTANCE = 8
-    MIN_BOX_SIZE = 10  # Minimum box dimension
+    MIN_BOX_SIZE = 10  # In virtual pixels
+    NEW_BOX_FRACTION = 0.7  # Size of a new content box relative to the page
 
-    # Colors
-    CONTENT_BOX_COLOR = QColor(0, 0, 255, 180)
-    CONTENT_BOX_FILL = QColor(0, 0, 255, 30)
-    PAGE_BOX_COLOR = QColor(255, 0, 0, 180)
-    PAGE_BOX_FILL = QColor(255, 0, 0, 20)
+    BOX_COLORS: ClassVar[dict[BoxKind, tuple[QColor, QColor]]] = {
+        BoxKind.CONTENT: (QColor(0, 0, 255, 180), QColor(0, 0, 255, 30)),
+        BoxKind.PAGE: (QColor(255, 0, 0, 180), QColor(255, 0, 0, 20)),
+    }
     HANDLE_COLOR = QColor(0, 0, 255, 200)
-    HANDLE_HIGHLIGHT = QColor(0, 128, 255, 255)
 
-    def __init__(
-        self,
-        image: QImage | NDArray[np.uint8] | None = None,
-        downscaled_image: QImage | None = None,
-        transformation: ImageTransformation | None = None,
-        content_rect: QRectF | None = None,
-        page_rect: QRectF | None = None,
-        page_rect_enabled: bool = False,
-        parent: QtWidgets.QWidget | None = None,
-    ) -> None:
-        """Initialize the Select Content image view.
+    _CORNERS = (
+        Edge.LEFT | Edge.TOP,
+        Edge.RIGHT | Edge.TOP,
+        Edge.LEFT | Edge.BOTTOM,
+        Edge.RIGHT | Edge.BOTTOM,
+    )
+    _CURSORS: ClassVar[dict[Edge, Qt.CursorShape]] = {
+        Edge.LEFT | Edge.TOP: Qt.CursorShape.SizeFDiagCursor,
+        Edge.RIGHT | Edge.BOTTOM: Qt.CursorShape.SizeFDiagCursor,
+        Edge.RIGHT | Edge.TOP: Qt.CursorShape.SizeBDiagCursor,
+        Edge.LEFT | Edge.BOTTOM: Qt.CursorShape.SizeBDiagCursor,
+        Edge.LEFT: Qt.CursorShape.SizeHorCursor,
+        Edge.RIGHT: Qt.CursorShape.SizeHorCursor,
+        Edge.TOP: Qt.CursorShape.SizeVerCursor,
+        Edge.BOTTOM: Qt.CursorShape.SizeVerCursor,
+    }
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        """Initialize the view.
 
         Args:
-            image: The image to display.
-            downscaled_image: Optional pre-downscaled version.
-            transformation: Image transformation.
-            content_rect: Initial content box in virtual image coordinates.
-            page_rect: Initial page box in virtual image coordinates.
-            page_rect_enabled: Whether page box editing is enabled.
-            parent: Parent widget.
+            parent (QtWidgets.QWidget | None): Parent widget.
         """
-        super().__init__(image, downscaled_image, transformation, parent=parent)
-
-        # Content and page rectangles (in virtual image coordinates)
-        self._content_rect = content_rect or QRectF()
-        self._page_rect = page_rect or QRectF()
-        self._page_rect_enabled = page_rect_enabled
-
-        # Interaction state
-        self._dragging_content_corner: Edge = Edge.NONE
-        self._dragging_content_edge: Edge = Edge.NONE
-        self._dragging_page_corner: Edge = Edge.NONE
-        self._dragging_page_edge: Edge = Edge.NONE
-        self._dragging_content_rect = False
-        self._dragging_page_rect = False
+        super().__init__(parent=parent)
+        self._rects = {BoxKind.CONTENT: QRectF(), BoxKind.PAGE: QRectF()}
+        self._page_rect_enabled = False
+        # Box being dragged, the edges it is resized by (NONE moves the box) and
+        # the grab point relative to the box origin.
+        self._drag: tuple[BoxKind, Edge] | None = None
         self._drag_offset = QPointF()
-
-        # Hover state
-        self._hovered_content_corner: Edge = Edge.NONE
-        self._hovered_content_edge: Edge = Edge.NONE
-        self._hovered_page_corner: Edge = Edge.NONE
-        self._hovered_page_edge: Edge = Edge.NONE
-
-        # Context menus
-        self._setup_context_menus()
-
+        self._drag_moved = False
+        self._page_rect_changed_by_content = False
+        self._hover: tuple[BoxKind, Edge] | None = None
+        self._build_context_menus()
         self.setMouseTracking(True)
 
-    def _setup_context_menus(self) -> None:
-        """Set up context menus for content box operations."""
-        # Menu when no content box exists
+    def _build_context_menus(self) -> None:
         self._no_content_menu = QtWidgets.QMenu(self)
-        create_action = QAction("Create Content Box", self)
-        create_action.triggered.connect(self._create_content_box)
-        self._no_content_menu.addAction(create_action)
+        create = QAction("Create Content Box", self)
+        create.setShortcut(QKeySequence("Ins"))
+        create.triggered.connect(lambda: self._create_content_box(None))
+        self._no_content_menu.addAction(create)
+        self.addAction(create)
 
-        # Menu when content box exists
         self._have_content_menu = QtWidgets.QMenu(self)
-        remove_action = QAction("Remove Content Box", self)
-        remove_action.triggered.connect(self._remove_content_box)
-        self._have_content_menu.addAction(remove_action)
+        remove = QAction("Remove Content Box", self)
+        remove.setShortcut(QKeySequence("Delete"))
+        remove.triggered.connect(self._remove_content_box)
+        self._have_content_menu.addAction(remove)
+        self.addAction(remove)
 
     @property
     def content_rect(self) -> QRectF:
-        """Get the content box rectangle in virtual coordinates."""
-        return self._content_rect
+        """The content box in virtual coordinates; empty when there is none."""
+        return QRectF(self._rects[BoxKind.CONTENT])
 
     def set_content_rect(self, rect: QRectF) -> None:
-        """Set the content box rectangle.
+        """Show a content box.
 
         Args:
-            rect: Rectangle in virtual image coordinates.
+            rect (QRectF): Box in virtual coordinates; empty hides it.
         """
-        self._content_rect = rect
+        self._rects[BoxKind.CONTENT] = QRectF(rect)
         self.update()
 
     @property
     def page_rect(self) -> QRectF:
-        """Get the page box rectangle in virtual coordinates."""
-        return self._page_rect
+        """The page box in virtual coordinates."""
+        return QRectF(self._rects[BoxKind.PAGE])
 
     def set_page_rect(self, rect: QRectF) -> None:
-        """Set the page box rectangle.
+        """Show a page box.
 
         Args:
-            rect: Rectangle in virtual image coordinates.
+            rect (QRectF): Box in virtual coordinates.
         """
-        self._page_rect = rect
+        self._rects[BoxKind.PAGE] = QRectF(rect)
         self.update()
 
-    @Slot(QRectF)
-    def page_rect_set_externally(self, rect: QRectF) -> None:
-        """Slot to set page rect from external source.
-
-        Args:
-            rect: Rectangle in virtual image coordinates.
-        """
-        self.set_page_rect(rect)
-
-    @Slot(bool)
     def set_page_rect_enabled(self, enabled: bool) -> None:
-        """Enable or disable page rect editing.
+        """Show and allow editing of the page box.
 
         Args:
-            enabled: True to enable page rect editing.
+            enabled (bool): True to show the page box.
         """
         self._page_rect_enabled = enabled
         self.update()
 
-    def _create_content_box(self) -> None:
-        """Create a default content box at the center of the image."""
-        # Create a box at 25% margins from the image edges
-        display_area = self._virtual_display_area
-        margin_x = display_area.width() * 0.25
-        margin_y = display_area.height() * 0.25
+    def _editable_boxes(self) -> list[BoxKind]:
+        boxes = [BoxKind.CONTENT]
+        if self._page_rect_enabled:
+            boxes.append(BoxKind.PAGE)
+        return [kind for kind in boxes if not self._rects[kind].isEmpty()]
 
-        self._content_rect = QRectF(
-            display_area.x() + margin_x,
-            display_area.y() + margin_y,
-            display_area.width() - 2 * margin_x,
-            display_area.height() - 2 * margin_y,
-        )
+    def _create_content_box(self, center: QPointF | None) -> None:
+        """Create a content box around a virtual point, or the page centre."""
+        if self._drag is not None or not self._rects[BoxKind.CONTENT].isEmpty():
+            return
+        area = self._virtual_display_area
+        width = area.width() * self.NEW_BOX_FRACTION
+        height = area.height() * self.NEW_BOX_FRACTION
+        centre = area.center() if center is None else center
+        box = QRectF(
+            centre.x() - width / 2, centre.y() - height / 2, width, height
+        ).intersected(area)
+        self._rects[BoxKind.CONTENT] = box
+        self._describe_content_in_page()
         self.update()
-        self.manual_content_rect_set.emit(self._content_rect)
+        self.manual_content_rect_set.emit(box)
+        self._report_page_rect_if_grown()
+
+    def _describe_content_in_page(self) -> None:
+        """Grow the page box to contain the content box."""
+        if not self._page_rect_enabled or self._rects[BoxKind.CONTENT].isEmpty():
+            return
+        page = self._rects[BoxKind.PAGE]
+        grown = page.united(self._rects[BoxKind.CONTENT])
+        if grown != page:
+            self._rects[BoxKind.PAGE] = grown
+            self._page_rect_changed_by_content = True
+
+    def _report_page_rect_if_grown(self) -> None:
+        if self._page_rect_changed_by_content:
+            self._page_rect_changed_by_content = False
+            self.manual_page_rect_set.emit(QRectF(self._rects[BoxKind.PAGE]))
 
     def _remove_content_box(self) -> None:
-        """Remove the content box."""
-        self._content_rect = QRectF()
+        if self._drag is not None:
+            return
+        self._rects[BoxKind.CONTENT] = QRectF()
         self.update()
-        self.manual_content_rect_set.emit(self._content_rect)
+        self.manual_content_rect_set.emit(QRectF())
 
-    def _corner_position(self, rect: QRectF, edge_mask: Edge) -> QPointF:
-        """Get the position of a corner of a rectangle.
-
-        Args:
-            rect: The rectangle.
-            edge_mask: Edge flags indicating which corner.
-
-        Returns:
-            Corner position in virtual coordinates.
-        """
-        x = rect.left() if edge_mask & Edge.LEFT else rect.right()
-        y = rect.top() if edge_mask & Edge.TOP else rect.bottom()
-        return QPointF(x, y)
-
-    def _edge_line(self, rect: QRectF, edge: Edge) -> QLineF:
-        """Get a line representing an edge of a rectangle.
+    def _hit_test(
+        self, widget_pos: QPointF, move_boxes: bool = False
+    ) -> tuple[BoxKind, Edge] | None:
+        """Find the box handle under a widget position.
 
         Args:
-            rect: The rectangle.
-            edge: Which edge.
+            widget_pos (QPointF): Position in widget coordinates.
+            move_boxes (bool): Also hit box bodies, which only move with Shift
+                held; without it a drag in the body pans.
 
         Returns:
-            Line segment in virtual coordinates.
+            The box and the edges a drag would move: two edges for a corner, one
+            for a side, NONE for the body; None when nothing is hit.
         """
+        boxes = self._editable_boxes()
+        for kind in boxes:
+            rect = self._rects[kind]
+            for corner in self._CORNERS:
+                point = self.virtual_to_widget_point(self._corner_point(rect, corner))
+                offset = widget_pos - point
+                if math.hypot(offset.x(), offset.y()) <= self.CORNER_HIT_RADIUS:
+                    return kind, corner
+        for kind in boxes:
+            rect = self._rects[kind]
+            for edge in (Edge.LEFT, Edge.RIGHT, Edge.TOP, Edge.BOTTOM):
+                start, end = self._edge_points(rect, edge)
+                distance = point_to_segment_distance(
+                    widget_pos,
+                    self.virtual_to_widget_point(start),
+                    self.virtual_to_widget_point(end),
+                )
+                if distance <= self.EDGE_HIT_DISTANCE:
+                    return kind, edge
+        virtual = self.widget_to_virtual_point(widget_pos)
+        if move_boxes:
+            for kind in boxes:
+                if self._rects[kind].contains(virtual):
+                    return kind, Edge.NONE
+        return None
+
+    @staticmethod
+    def _corner_point(rect: QRectF, corner: Edge) -> QPointF:
+        return QPointF(
+            rect.left() if corner & Edge.LEFT else rect.right(),
+            rect.top() if corner & Edge.TOP else rect.bottom(),
+        )
+
+    @staticmethod
+    def _edge_points(rect: QRectF, edge: Edge) -> tuple[QPointF, QPointF]:
         if edge == Edge.LEFT:
-            return QLineF(rect.topLeft(), rect.bottomLeft())
-        elif edge == Edge.RIGHT:
-            return QLineF(rect.topRight(), rect.bottomRight())
-        elif edge == Edge.TOP:
-            return QLineF(rect.topLeft(), rect.topRight())
-        else:  # BOTTOM
-            return QLineF(rect.bottomLeft(), rect.bottomRight())
+            return rect.topLeft(), rect.bottomLeft()
+        if edge == Edge.RIGHT:
+            return rect.topRight(), rect.bottomRight()
+        if edge == Edge.TOP:
+            return rect.topLeft(), rect.topRight()
+        return rect.bottomLeft(), rect.bottomRight()
 
-    def _corner_at_position(self, rect: QRectF, widget_pos: QPointF) -> Edge:
-        """Check if a position is over a corner of a rectangle.
+    @staticmethod
+    def _grab_offset(rect: QRectF, edges: Edge, grab: QPointF) -> QPointF:
+        """Return where a grab point lies relative to the edges it will move.
 
-        Args:
-            rect: The rectangle in virtual coordinates.
-            widget_pos: Position in widget coordinates.
-
-        Returns:
-            Edge flags for the corner, or Edge.NONE.
+        Dragging then moves the edges by the pointer's travel instead of
+        snapping them to the pointer. Moving the whole box measures from its
+        top-left corner.
         """
-        if rect.isEmpty():
-            return Edge.NONE
+        if edges == Edge.NONE:
+            return QPointF(grab.x() - rect.x(), grab.y() - rect.y())
+        x_edge = rect.left() if edges & Edge.LEFT else rect.right()
+        y_edge = rect.top() if edges & Edge.TOP else rect.bottom()
+        return QPointF(
+            grab.x() - x_edge if edges & (Edge.LEFT | Edge.RIGHT) else 0.0,
+            grab.y() - y_edge if edges & (Edge.TOP | Edge.BOTTOM) else 0.0,
+        )
 
-        corners = [
-            (Edge.LEFT | Edge.TOP, rect.topLeft()),
-            (Edge.RIGHT | Edge.TOP, rect.topRight()),
-            (Edge.LEFT | Edge.BOTTOM, rect.bottomLeft()),
-            (Edge.RIGHT | Edge.BOTTOM, rect.bottomRight()),
-        ]
+    def _resized(self, rect: QRectF, edges: Edge, pos: QPointF) -> QRectF:
+        """Return the rectangle with the given edges moved towards a virtual point."""
+        area = self._virtual_display_area
+        x = max(area.left(), min(area.right(), pos.x()))
+        y = max(area.top(), min(area.bottom(), pos.y()))
+        result = QRectF(rect)
+        if edges & Edge.LEFT:
+            result.setLeft(min(x, rect.right() - self.MIN_BOX_SIZE))
+        if edges & Edge.RIGHT:
+            result.setRight(max(x, rect.left() + self.MIN_BOX_SIZE))
+        if edges & Edge.TOP:
+            result.setTop(min(y, rect.bottom() - self.MIN_BOX_SIZE))
+        if edges & Edge.BOTTOM:
+            result.setBottom(max(y, rect.top() + self.MIN_BOX_SIZE))
+        return result
 
-        for edge_mask, corner in corners:
-            corner_widget = self.virtual_to_widget_point(corner)
-            dist = math.sqrt(
-                (widget_pos.x() - corner_widget.x()) ** 2
-                + (widget_pos.y() - corner_widget.y()) ** 2
-            )
-            if dist <= self.CORNER_HIT_RADIUS:
-                return edge_mask
+    def _moved(self, kind: BoxKind, rect: QRectF, origin: QPointF) -> QRectF:
+        """Return the rectangle with its top-left corner moved.
 
-        return Edge.NONE
-
-    def _edge_at_position(self, rect: QRectF, widget_pos: QPointF) -> Edge:
-        """Check if a position is over an edge of a rectangle.
-
-        Args:
-            rect: The rectangle in virtual coordinates.
-            widget_pos: Position in widget coordinates.
-
-        Returns:
-            Edge flag for the edge, or Edge.NONE.
+        The content box stays inside the page; the page box keeps containing
+        the content box.
         """
-        if rect.isEmpty():
-            return Edge.NONE
+        moved = QRectF(origin.x(), origin.y(), rect.width(), rect.height())
+        if kind == BoxKind.CONTENT:
+            area = self._virtual_display_area
+            x = max(area.left(), min(area.right() - rect.width(), origin.x()))
+            y = max(area.top(), min(area.bottom() - rect.height(), origin.y()))
+            return QRectF(x, y, rect.width(), rect.height())
 
-        virtual_pos = self.widget_to_virtual_point(widget_pos)
-
-        # Check if inside rect first
-        if not rect.contains(virtual_pos):
-            return Edge.NONE
-
-        edges = [Edge.LEFT, Edge.RIGHT, Edge.TOP, Edge.BOTTOM]
-
-        for edge in edges:
-            line = self._edge_line(rect, edge)
-            line_widget = QLineF(
-                self.virtual_to_widget_point(line.p1()),
-                self.virtual_to_widget_point(line.p2()),
-            )
-
-            # Distance from point to line
-            dist = self._point_to_line_distance(widget_pos, line_widget)
-            if dist <= self.EDGE_HIT_DISTANCE:
-                return edge
-
-        return Edge.NONE
-
-    def _rect_contains_point(self, rect: QRectF, widget_pos: QPointF) -> bool:
-        """Check if a rectangle contains a point.
-
-        Args:
-            rect: Rectangle in virtual coordinates.
-            widget_pos: Point in widget coordinates.
-
-        Returns:
-            True if the point is inside the rectangle.
-        """
-        if rect.isEmpty():
-            return False
-        virtual_pos = self.widget_to_virtual_point(widget_pos)
-        return rect.contains(virtual_pos)
-
-    def _point_to_line_distance(self, point: QPointF, line: QLineF) -> float:
-        """Calculate the distance from a point to a line segment.
-
-        Args:
-            point: The point.
-            line: The line segment.
-
-        Returns:
-            Distance from point to nearest point on line segment.
-        """
-        # Vector from line start to point
-        dx = point.x() - line.x1()
-        dy = point.y() - line.y1()
-
-        # Vector along line
-        line_dx = line.x2() - line.x1()
-        line_dy = line.y2() - line.y1()
-
-        line_len_sq = line_dx * line_dx + line_dy * line_dy
-        if line_len_sq < 0.001:
-            return math.sqrt(dx * dx + dy * dy)
-
-        # Project point onto line
-        t = max(0, min(1, (dx * line_dx + dy * line_dy) / line_len_sq))
-
-        # Nearest point on line
-        nearest_x = line.x1() + t * line_dx
-        nearest_y = line.y1() + t * line_dy
-
-        return math.sqrt((point.x() - nearest_x) ** 2 + (point.y() - nearest_y) ** 2)
-
-    def _move_corner(self, rect: QRectF, edge_mask: Edge, new_pos: QPointF) -> QRectF:
-        """Move a corner of a rectangle to a new position.
-
-        Args:
-            rect: The rectangle.
-            edge_mask: Which corner to move.
-            new_pos: New corner position in virtual coordinates.
-
-        Returns:
-            Updated rectangle.
-        """
-        new_rect = QRectF(rect)
-
-        if edge_mask & Edge.LEFT:
-            new_rect.setLeft(min(new_pos.x(), rect.right() - self.MIN_BOX_SIZE))
-        if edge_mask & Edge.RIGHT:
-            new_rect.setRight(max(new_pos.x(), rect.left() + self.MIN_BOX_SIZE))
-        if edge_mask & Edge.TOP:
-            new_rect.setTop(min(new_pos.y(), rect.bottom() - self.MIN_BOX_SIZE))
-        if edge_mask & Edge.BOTTOM:
-            new_rect.setBottom(max(new_pos.y(), rect.top() + self.MIN_BOX_SIZE))
-
-        return new_rect.normalized()
-
-    def _move_edge(self, rect: QRectF, edge: Edge, new_pos: QPointF) -> QRectF:
-        """Move an edge of a rectangle to a new position.
-
-        Args:
-            rect: The rectangle.
-            edge: Which edge to move.
-            new_pos: New position in virtual coordinates.
-
-        Returns:
-            Updated rectangle.
-        """
-        new_rect = QRectF(rect)
-
-        if edge == Edge.LEFT:
-            new_rect.setLeft(min(new_pos.x(), rect.right() - self.MIN_BOX_SIZE))
-        elif edge == Edge.RIGHT:
-            new_rect.setRight(max(new_pos.x(), rect.left() + self.MIN_BOX_SIZE))
-        elif edge == Edge.TOP:
-            new_rect.setTop(min(new_pos.y(), rect.bottom() - self.MIN_BOX_SIZE))
-        elif edge == Edge.BOTTOM:
-            new_rect.setBottom(max(new_pos.y(), rect.top() + self.MIN_BOX_SIZE))
-
-        return new_rect.normalized()
-
-    def _get_cursor_for_edge(self, edge: Edge) -> Qt.CursorShape:
-        """Get the appropriate cursor for an edge or corner.
-
-        Args:
-            edge: Edge flags.
-
-        Returns:
-            Cursor shape.
-        """
-        if edge == Edge.NONE:
-            return Qt.CursorShape.ArrowCursor
-
-        # Corner cursors
-        if edge == (Edge.LEFT | Edge.TOP) or edge == (Edge.RIGHT | Edge.BOTTOM):
-            return Qt.CursorShape.SizeFDiagCursor
-        if edge == (Edge.RIGHT | Edge.TOP) or edge == (Edge.LEFT | Edge.BOTTOM):
-            return Qt.CursorShape.SizeBDiagCursor
-
-        # Edge cursors
-        if edge in (Edge.LEFT, Edge.RIGHT):
-            return Qt.CursorShape.SizeHorCursor
-        if edge in (Edge.TOP, Edge.BOTTOM):
-            return Qt.CursorShape.SizeVerCursor
-
-        return Qt.CursorShape.ArrowCursor
+        content = self._rects[BoxKind.CONTENT]
+        if not content.isEmpty():
+            moved.translate(min(0.0, content.left() - moved.left()), 0)
+            moved.translate(max(0.0, content.right() - moved.right()), 0)
+            moved.translate(0, min(0.0, content.top() - moved.top()))
+            moved.translate(0, max(0.0, content.bottom() - moved.bottom()))
+        return moved
 
     def _paint_overlay(self, painter: QPainter) -> None:
-        """Paint the content and page box overlays.
+        boxes = self._editable_boxes()
+        for kind in (BoxKind.PAGE, BoxKind.CONTENT):
+            if kind in boxes:
+                self._paint_box(painter, kind)
 
-        Args:
-            painter: The painter.
-        """
-        # Draw page box first (underneath content box)
-        if self._page_rect_enabled and not self._page_rect.isEmpty():
-            self._paint_box(
-                painter,
-                self._page_rect,
-                self.PAGE_BOX_COLOR,
-                self.PAGE_BOX_FILL,
-                show_handles=(
-                    self._hovered_page_corner != Edge.NONE
-                    or self._hovered_page_edge != Edge.NONE
-                    or self._dragging_page_corner != Edge.NONE
-                    or self._dragging_page_edge != Edge.NONE
-                ),
-            )
-
-        # Draw content box
-        if not self._content_rect.isEmpty():
-            self._paint_box(
-                painter,
-                self._content_rect,
-                self.CONTENT_BOX_COLOR,
-                self.CONTENT_BOX_FILL,
-                show_handles=True,
-            )
-
-    def _paint_box(
-        self,
-        painter: QPainter,
-        rect: QRectF,
-        border_color: QColor,
-        fill_color: QColor,
-        show_handles: bool = True,
-    ) -> None:
-        """Paint a box with optional corner handles.
-
-        Args:
-            painter: The painter.
-            rect: Rectangle in virtual coordinates.
-            border_color: Color for the border.
-            fill_color: Color for the fill.
-            show_handles: Whether to draw corner handles.
-        """
-        widget_rect = self.virtual_to_widget_rect(rect)
-
+    def _paint_box(self, painter: QPainter, kind: BoxKind) -> None:
+        border, fill = self.BOX_COLORS[kind]
+        rect = self.virtual_to_widget_rect(self._rects[kind])
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-
-        # Fill
-        painter.setBrush(fill_color)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRect(widget_rect)
-
-        # Border
-        pen = QPen(border_color)
+        pen = QPen(border)
         pen.setWidth(2)
         painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawRect(widget_rect)
+        painter.setBrush(fill)
+        painter.drawRect(rect)
 
-        # Corner handles
-        if show_handles:
-            handle_size = 6
-            painter.setBrush(self.HANDLE_COLOR)
-
-            corners = [
-                widget_rect.topLeft(),
-                widget_rect.topRight(),
-                widget_rect.bottomLeft(),
-                widget_rect.bottomRight(),
-            ]
-
-            for corner in corners:
-                handle_rect = QRectF(
-                    corner.x() - handle_size,
-                    corner.y() - handle_size,
-                    handle_size * 2,
-                    handle_size * 2,
-                )
-                painter.drawRect(handle_rect)
-
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(self.HANDLE_COLOR)
+        size = 6
+        for corner in (
+            rect.topLeft(),
+            rect.topRight(),
+            rect.bottomLeft(),
+            rect.bottomRight(),
+        ):
+            painter.drawRect(
+                QRectF(corner.x() - size, corner.y() - size, 2 * size, 2 * size)
+            )
         painter.restore()
 
+    @staticmethod
+    def _shift_held(event: QtGui.QMouseEvent) -> bool:
+        return bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
-        """Handle mouse press for box manipulation.
+        """Pick up a box, a side or a corner.
 
         Args:
-            event: The mouse event.
+            event (QtGui.QMouseEvent): The mouse event.
         """
         if event.button() == Qt.MouseButton.LeftButton:
-            pos = event.position()
-
-            # Check content box corners first
-            corner = self._corner_at_position(self._content_rect, pos)
-            if corner != Edge.NONE:
-                self._dragging_content_corner = corner
+            hit = self._hit_test(event.position(), self._shift_held(event))
+            if hit is not None:
+                kind, edges = hit
+                self._drag = hit
+                self._drag_moved = False
+                grab = self.widget_to_virtual_point(event.position())
+                self._drag_offset = self._grab_offset(self._rects[kind], edges, grab)
                 event.accept()
                 return
-
-            # Check page box corners
-            if self._page_rect_enabled:
-                corner = self._corner_at_position(self._page_rect, pos)
-                if corner != Edge.NONE:
-                    self._dragging_page_corner = corner
-                    event.accept()
-                    return
-
-            # Check content box edges
-            edge = self._edge_at_position(self._content_rect, pos)
-            if edge != Edge.NONE:
-                self._dragging_content_edge = edge
-                event.accept()
-                return
-
-            # Check page box edges
-            if self._page_rect_enabled:
-                edge = self._edge_at_position(self._page_rect, pos)
-                if edge != Edge.NONE:
-                    self._dragging_page_edge = edge
-                    event.accept()
-                    return
-
-            # Check for rectangle dragging
-            if self._rect_contains_point(self._content_rect, pos):
-                self._dragging_content_rect = True
-                virtual_pos = self.widget_to_virtual_point(pos)
-                self._drag_offset = QPointF(
-                    virtual_pos.x() - self._content_rect.x(),
-                    virtual_pos.y() - self._content_rect.y(),
-                )
-                self.setCursor(Qt.CursorShape.SizeAllCursor)
-                event.accept()
-                return
-
         super().mousePressEvent(event)
 
-    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
-        """Handle mouse release after box manipulation.
-
-        Args:
-            event: The mouse event.
-        """
-        if event.button() == Qt.MouseButton.LeftButton:
-            if self._dragging_content_corner != Edge.NONE:
-                self._dragging_content_corner = Edge.NONE
-                self.manual_content_rect_set.emit(self._content_rect)
-                event.accept()
-                self.update()
-                return
-
-            if self._dragging_content_edge != Edge.NONE:
-                self._dragging_content_edge = Edge.NONE
-                self.manual_content_rect_set.emit(self._content_rect)
-                event.accept()
-                self.update()
-                return
-
-            if self._dragging_page_corner != Edge.NONE:
-                self._dragging_page_corner = Edge.NONE
-                self.manual_page_rect_set.emit(self._page_rect)
-                self.page_rect_size_changed.emit(self._page_rect.size())
-                event.accept()
-                self.update()
-                return
-
-            if self._dragging_page_edge != Edge.NONE:
-                self._dragging_page_edge = Edge.NONE
-                self.manual_page_rect_set.emit(self._page_rect)
-                self.page_rect_size_changed.emit(self._page_rect.size())
-                event.accept()
-                self.update()
-                return
-
-            if self._dragging_content_rect:
-                self._dragging_content_rect = False
-                self.setCursor(Qt.CursorShape.ArrowCursor)
-                self.manual_content_rect_set.emit(self._content_rect)
-                event.accept()
-                self.update()
-                return
-
-        super().mouseReleaseEvent(event)
-
     def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
-        """Handle mouse move for box manipulation and cursor updates.
+        """Resize or move the picked box, or update the cursor.
 
         Args:
-            event: The mouse event.
+            event (QtGui.QMouseEvent): The mouse event.
         """
-        pos = event.position()
-        virtual_pos = self.widget_to_virtual_point(pos)
-
-        # Handle dragging
-        if self._dragging_content_corner != Edge.NONE:
-            self._content_rect = self._move_corner(
-                self._content_rect, self._dragging_content_corner, virtual_pos
-            )
-            self.update()
-            event.accept()
-            return
-
-        if self._dragging_content_edge != Edge.NONE:
-            self._content_rect = self._move_edge(
-                self._content_rect, self._dragging_content_edge, virtual_pos
-            )
-            self.update()
-            event.accept()
-            return
-
-        if self._dragging_page_corner != Edge.NONE:
-            self._page_rect = self._move_corner(
-                self._page_rect, self._dragging_page_corner, virtual_pos
-            )
-            self.update()
-            event.accept()
-            return
-
-        if self._dragging_page_edge != Edge.NONE:
-            self._page_rect = self._move_edge(
-                self._page_rect, self._dragging_page_edge, virtual_pos
-            )
-            self.update()
-            event.accept()
-            return
-
-        if self._dragging_content_rect:
-            new_pos = QPointF(
-                virtual_pos.x() - self._drag_offset.x(),
-                virtual_pos.y() - self._drag_offset.y(),
-            )
-            self._content_rect.moveTo(new_pos)
-            self.update()
-            event.accept()
-            return
-
-        # Update hover state and cursor
-        self._hovered_content_corner = self._corner_at_position(self._content_rect, pos)
-        if self._hovered_content_corner != Edge.NONE:
-            self.setCursor(self._get_cursor_for_edge(self._hovered_content_corner))
-            self.update()
-            super().mouseMoveEvent(event)
-            return
-
-        if self._page_rect_enabled:
-            self._hovered_page_corner = self._corner_at_position(self._page_rect, pos)
-            if self._hovered_page_corner != Edge.NONE:
-                self.setCursor(self._get_cursor_for_edge(self._hovered_page_corner))
+        if self._drag is not None:
+            kind, edges = self._drag
+            virtual = self.widget_to_virtual_point(event.position())
+            rect = self._rects[kind]
+            if edges == Edge.NONE:
+                new_rect = self._moved(kind, rect, virtual - self._drag_offset)
+            else:
+                new_rect = self._resized(rect, edges, virtual - self._drag_offset)
+            if kind == BoxKind.PAGE:
+                new_rect = new_rect.united(self._rects[BoxKind.CONTENT])
+            if new_rect != rect:
+                self._rects[kind] = new_rect
+                if kind == BoxKind.CONTENT:
+                    self._describe_content_in_page()
+                self._drag_moved = True
                 self.update()
-                super().mouseMoveEvent(event)
-                return
-
-        self._hovered_content_edge = self._edge_at_position(self._content_rect, pos)
-        if self._hovered_content_edge != Edge.NONE:
-            self.setCursor(self._get_cursor_for_edge(self._hovered_content_edge))
-            self.update()
-            super().mouseMoveEvent(event)
+            event.accept()
             return
 
-        if self._page_rect_enabled:
-            self._hovered_page_edge = self._edge_at_position(self._page_rect, pos)
-            if self._hovered_page_edge != Edge.NONE:
-                self.setCursor(self._get_cursor_for_edge(self._hovered_page_edge))
-                self.update()
-                super().mouseMoveEvent(event)
-                return
-
-        # Reset cursor if not over anything
-        if not self._dragging:
-            self.setCursor(Qt.CursorShape.ArrowCursor)
-
+        if not self._panning:
+            hit = self._hit_test(event.position(), self._shift_held(event))
+            if hit != self._hover:
+                self._hover = hit
+                edges = Edge.NONE if hit is None else hit[1]
+                if hit is None:
+                    self.setCursor(Qt.CursorShape.ArrowCursor)
+                else:
+                    self.setCursor(
+                        self._CURSORS.get(edges, Qt.CursorShape.SizeAllCursor)
+                    )
         super().mouseMoveEvent(event)
 
-    def mouseDoubleClickEvent(self, event: QtGui.QMouseEvent) -> None:
-        """Handle double-click to create/remove content box.
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
+        """Drop the box and report it if it changed.
 
         Args:
-            event: The mouse event.
+            event (QtGui.QMouseEvent): The mouse event.
         """
-        if event.button() == Qt.MouseButton.LeftButton:
-            pos = event.position()
-
-            if self._content_rect.isEmpty():
-                # Create content box centered at click position
-                virtual_pos = self.widget_to_virtual_point(pos)
-                display_area = self._virtual_display_area
-
-                # Create a reasonably sized box
-                width = display_area.width() * 0.5
-                height = display_area.height() * 0.5
-
-                self._content_rect = QRectF(
-                    virtual_pos.x() - width / 2,
-                    virtual_pos.y() - height / 2,
-                    width,
-                    height,
+        if event.button() == Qt.MouseButton.LeftButton and self._drag is not None:
+            kind, _edges = self._drag
+            self._drag = None
+            event.accept()
+            self.update()
+            if self._drag_moved:
+                signal = (
+                    self.manual_content_rect_set
+                    if kind == BoxKind.CONTENT
+                    else self.manual_page_rect_set
                 )
+                signal.emit(QRectF(self._rects[kind]))
+                self._report_page_rect_if_grown()
+            return
+        super().mouseReleaseEvent(event)
 
-                # Clamp to display area
-                self._content_rect = self._content_rect.intersected(display_area)
+    def mouseDoubleClickEvent(self, event: QtGui.QMouseEvent) -> None:
+        """Create a content box around the click when there is none.
 
-                self.update()
-                self.manual_content_rect_set.emit(self._content_rect)
-                event.accept()
-                return
-
+        Args:
+            event (QtGui.QMouseEvent): The mouse event.
+        """
+        if (
+            event.button() == Qt.MouseButton.LeftButton
+            and self._rects[BoxKind.CONTENT].isEmpty()
+        ):
+            self._create_content_box(self.widget_to_virtual_point(event.position()))
+            event.accept()
+            return
         super().mouseDoubleClickEvent(event)
 
     def contextMenuEvent(self, event: QtGui.QContextMenuEvent) -> None:
-        """Show context menu for content box operations.
+        """Offer to create or remove the content box.
 
         Args:
-            event: The context menu event.
+            event (QtGui.QContextMenuEvent): The context menu event.
         """
-        if self._content_rect.isEmpty():
-            self._no_content_menu.exec_(event.globalPos())
-        else:
-            self._have_content_menu.exec_(event.globalPos())
+        menu = (
+            self._no_content_menu
+            if self._rects[BoxKind.CONTENT].isEmpty()
+            else self._have_content_menu
+        )
+        menu.exec(event.globalPos())
