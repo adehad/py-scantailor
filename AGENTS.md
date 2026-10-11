@@ -3,8 +3,9 @@
 ## Essential Commands
 
 ```bash
-pdm run pytest                            # Run all tests
-pdm run pytest tests/file.py::test_name   # Run specific test
+pdm run pytest                            # Fast default run: parallel (xdist), skips slow tests
+pdm run pytest -m ""                      # Full gate including slow tests (run before merging)
+pdm run pytest -n0 tests/file.py::test_name  # Run specific test serially (for debugging)
 pdm run cov                               # Run tests with coverage
 pdm run typecheck                         # Run type checking
 pre-commit run --all-files                # Run all linters/formatters
@@ -17,7 +18,7 @@ pdm run docs                              # Build documentation
 
 **Application**: ScanTailor Advanced - document scanning post-processor
 **Migration**: C++ → Python
-**Status**: In progress (UI shell complete, backend not started)
+**Status**: In progress (UI, pipeline, batch processing and output stages working; remaining gaps tracked in `plan/PARITY_TRACKER.md`)
 
 ## Source Code Locations
 
@@ -67,7 +68,7 @@ tests/
 - If a comment breaks up a function, extract to a named function instead
 
 ### MUST NOT
-- Wrapper classes around OpenCV/NumPy (use directly)
+- Wrapper classes or pass-through functions around OpenCV/NumPy (call cv2/NumPy directly)
 - XML for any data storage
 - `print()` statements
 - Bare `except:` clauses
