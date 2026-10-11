@@ -10,6 +10,7 @@ from scantailor.core.pipeline import PipelineOptions, process_batch, process_pag
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.output import generator
 from scantailor.filters.output.color_options import ColorCommonOptions
+from scantailor.filters.output.settings import Settings as OutputSettings
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.select_content.content_box import ContentBox
 
@@ -23,6 +24,12 @@ RGB_INK = (10, 120, 220)
 # Default page layout margins: 10 mm left/right, 5 mm top/bottom.
 DEFAULT_SIDE_PX = 10 * PX_PER_MM
 DEFAULT_TOP_PX = 5 * PX_PER_MM
+
+
+@pytest.fixture(autouse=True)
+def _output_at_source_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep output pixels one to one with the source so sizes stay in millimetres."""
+    monkeypatch.setattr(OutputSettings, "DEFAULT_DPI", int(DPI))
 
 
 def _page_id(name: str) -> PageId:

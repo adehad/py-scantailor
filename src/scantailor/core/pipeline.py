@@ -16,19 +16,30 @@ the oriented source image through the accumulated transformation, either to
 give a later stage something to detect on or to produce the result.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 
 import numpy as np
 from loguru import logger
 from numpy.typing import NDArray
 
-from scantailor.core.models import Dpi, PageId
+from scantailor.core.models import Dpi, PageId, SubPage
 from scantailor.core.transformation import (
     ImageTransformation,
     Rect,
     render_transformed,
 )
+from scantailor.core.zones import Zone, ZoneSpline
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
+from scantailor.dewarping.page_dewarper import (
+    auto_dewarper,
+    dewarper_from_polylines,
+    marginal_dewarper,
+)
+from scantailor.filters.output.dewarping_options import DewarpingMode
+from scantailor.filters.output.generator import DewarperSource, OutputResult
+from scantailor.filters.output.params import FillZoneSpec, Params, PictureZoneSpec
+from scantailor.filters.output.split_output import SplitImages
 from scantailor.filters.page_layout.page_rect import (
     adapt_content_rect,
     calc_margins_mm,
@@ -52,12 +63,16 @@ class PipelineResult:
         page_id: The page ID that was processed.
         stages_completed: List of stages that were executed.
         metadata: Additional metadata from processing.
+        dpi: Resolution of ``image`` once the output stage has run; None before.
+        split: Foreground and background layers when the output splits them.
     """
 
     image: NDArray[np.uint8]
     page_id: PageId
     stages_completed: list[FilterStage] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
+    dpi: Dpi | None = None
+    split: SplitImages | None = None
 
 
 @dataclass
@@ -68,7 +83,8 @@ class PipelineOptions:
         start_stage: First stage to execute (default: FIX_ORIENTATION).
         end_stage: Last stage to execute (default: OUTPUT).
         dpi: Image resolution in dots per inch.
-        dewarper: Optional dewarper for curved page correction.
+        dewarper: Dewarper to use for every page instead of the one the output
+            parameters describe.
         detect_only: If True, only run detection without applying transforms.
     """
 
@@ -126,6 +142,16 @@ class _PageState:
         """Crop to a polygon given in the current transformed coordinates."""
         self.xform.set_post_crop_area(area)
         self._view = None
+
+    def scale_to_dpi(self, dpi: Dpi) -> None:
+        """Resample the view to a resolution; pixels are still taken from the source."""
+        self.xform.post_scale_to_dpi(dpi)
+        self._view = None
+
+    def to_view(self, polygon: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Map a polygon from source coordinates to the view's pixel grid."""
+        rect = self.xform.resulting_rect
+        return self.xform.map_polygon(polygon) - [rect.x, rect.y]
 
 
 def process_page(
@@ -204,6 +230,8 @@ def _run_stages(
     stages_completed: list[FilterStage] = []
     metadata: dict = {}
     output_image: NDArray[np.uint8] | None = None
+    output_dpi: Dpi | None = None
+    split: SplitImages | None = None
 
     for stage in FilterStage:
         if stage > options.end_stage:
@@ -211,9 +239,11 @@ def _run_stages(
         detect = stage >= detect_from
 
         if stage == FilterStage.OUTPUT:
-            stage_meta, output_image = _process_output(
-                state, page_id, sequence, options
-            )
+            stage_meta, generated = _process_output(state, page_id, sequence, options)
+            if generated is not None:
+                output_image = generated.image
+                split = generated.split
+                output_dpi = sequence.output_filter.get_params(page_id).output_dpi
         else:
             stage_meta = _process_stage(
                 state, page_id, sequence, stage, options, detect
@@ -233,6 +263,8 @@ def _run_stages(
         page_id=page_id,
         stages_completed=stages_completed,
         metadata=metadata,
+        dpi=output_dpi,
+        split=split,
     )
 
 
@@ -489,16 +521,19 @@ def _process_output(
     page_id: PageId,
     sequence: StageSequence,
     options: PipelineOptions,
-) -> tuple[dict, NDArray[np.uint8] | None]:
-    """Process the Output stage on the fully transformed view.
+) -> tuple[dict, OutputResult | None]:
+    """Process the Output stage.
+
+    The view is resampled once, at the output resolution, through the
+    accumulated transformation. Content, page outline and zones are mapped into
+    that view's pixels.
 
     Returns:
-        Tuple of (stage metadata, output image or None in detect-only mode).
+        Tuple of (stage metadata, generated output or None in detect-only mode).
     """
     from scantailor.filters.output.generator import generate_output
 
-    filter_ = sequence.output_filter
-    params = filter_.get_params(page_id)
+    params = sequence.output_filter.get_params(page_id)
 
     metadata: dict = {
         "color_mode": params.color_mode.value,
@@ -509,24 +544,102 @@ def _process_output(
     if options.detect_only:
         return metadata, None
 
+    state.scale_to_dpi(params.output_dpi)
+    view = state.view()
     polygon = state.content_polygon_source
     content_polygon = (
-        None
-        if polygon is None
-        else [(float(x), float(y)) for x, y in state.xform.map_polygon(polygon)]
+        None if polygon is None else _polygon_points(state.to_view(polygon))
+    )
+    rect = state.xform.resulting_rect
+    page_outline = _polygon_points(
+        state.xform.resulting_pre_crop_area - [rect.x, rect.y]
     )
     result = generate_output(
-        state.view(),
+        view,
         params,
-        dewarper=options.dewarper,
+        dewarper=_dewarper_source(state, view, page_id, params, options),
         color_options=params.color_common,
         content_polygon=content_polygon,
+        page_outline=page_outline,
+        picture_zones=_view_zones(state, params.picture_zones),
+        fill_zones=_view_zones(state, params.fill_zones),
     )
 
     metadata["is_binary"] = result.is_binary
     metadata["was_dewarped"] = result.was_dewarped
+    metadata["output_dpi"] = (params.output_dpi.horizontal, params.output_dpi.vertical)
 
-    return metadata, result.image
+    return metadata, result
+
+
+def _polygon_points(polygon: NDArray[np.float64]) -> list[tuple[float, float]]:
+    return [(float(x), float(y)) for x, y in polygon]
+
+
+def _view_zones(
+    state: _PageState, specs: Sequence[PictureZoneSpec | FillZoneSpec]
+) -> list[Zone]:
+    """Zones from the output parameters, moved into the view's pixels."""
+    return [
+        Zone(
+            spline=ZoneSpline(
+                points=state.to_view(np.asarray(spec.points, dtype=np.float64)),
+                is_smooth=spec.is_smooth,
+            ),
+            properties=spec.properties,
+        )
+        for spec in specs
+        if spec.points
+    ]
+
+
+def _dewarper_source(
+    state: _PageState,
+    view: NDArray[np.uint8],
+    page_id: PageId,
+    params: Params,
+    options: PipelineOptions,
+) -> DewarperSource | None:
+    """Pick how the page is dewarped, as the output parameters ask.
+
+    Automatic and marginal models are detected on the illumination-normalised
+    gray page that the output generator hands to the returned function.
+    """
+    if options.dewarper is not None:
+        return options.dewarper
+    mode = params.dewarping.mode
+    depth = params.depth_perception
+
+    if mode == DewarpingMode.MANUAL:
+        spec = params.distortion_model
+        if not spec.is_defined():
+            return None
+        return dewarper_from_polylines(
+            state.to_view(np.asarray(spec.top, dtype=np.float64)),
+            state.to_view(np.asarray(spec.bottom, dtype=np.float64)),
+            depth,
+        )
+
+    polygon = state.content_polygon_source
+    if polygon is None:
+        content = (0.0, 0.0, float(view.shape[1]), float(view.shape[0]))
+    else:
+        corners = state.to_view(polygon)
+        low, high = corners.min(axis=0), corners.max(axis=0)
+        content = (
+            float(low[0]),
+            float(low[1]),
+            float(high[0] - low[0]),
+            float(high[1] - low[1]),
+        )
+
+    if mode == DewarpingMode.AUTO:
+        dpi = (params.output_dpi.horizontal, params.output_dpi.vertical)
+        return lambda gray: auto_dewarper(gray, dpi, content, depth)
+    if mode == DewarpingMode.MARGINAL:
+        spine_on_right = page_id.sub_page != SubPage.RIGHT_PAGE
+        return lambda gray: marginal_dewarper(gray, content, spine_on_right, depth)
+    return None
 
 
 def process_batch(
