@@ -6,7 +6,6 @@ Provides UI controls for rotating images by 90-degree increments.
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QLabel,
     QPushButton,
     QSizePolicy,
     QSpacerItem,
@@ -15,9 +14,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from scantailor.app.ui.icons import IconLabel, icon
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 from scantailor.core.models import ImageId, OrthogonalRotation
 from scantailor.filters.fix_orientation.filter import Filter
+
+_ARROWS = {0: "arrow-up", 90: "arrow-right", 180: "arrow-down", 270: "arrow-left"}
+_INDICATOR_SIZE = 32
 
 
 class OptionsWidget(QWidget):
@@ -75,15 +78,14 @@ class OptionsWidget(QWidget):
         self._rotate_left_btn.setObjectName("rotateLeftBtn")
         self._rotate_left_btn.setToolTip("Rotate 90° counter-clockwise")
         self._rotate_left_btn.setIconSize(self._rotate_left_btn.iconSize() * 1.5)
-        # Use text as fallback if icons not available
-        self._rotate_left_btn.setText("↶")
+        self._rotate_left_btn.setIcon(icon("rotate-ccw-square"))
         buttons_layout.addWidget(self._rotate_left_btn)
 
         self._rotate_right_btn = QToolButton()
         self._rotate_right_btn.setObjectName("rotateRightBtn")
         self._rotate_right_btn.setToolTip("Rotate 90° clockwise")
         self._rotate_right_btn.setIconSize(self._rotate_right_btn.iconSize() * 1.5)
-        self._rotate_right_btn.setText("↷")
+        self._rotate_right_btn.setIcon(icon("rotate-cw-square"))
         buttons_layout.addWidget(self._rotate_right_btn)
 
         buttons_layout.addItem(
@@ -97,10 +99,8 @@ class OptionsWidget(QWidget):
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
 
-        self._rotation_indicator = QLabel()
+        self._rotation_indicator = IconLabel(_ARROWS[0], _INDICATOR_SIZE)
         self._rotation_indicator.setObjectName("rotationIndicator")
-        self._rotation_indicator.setText("↑")  # Up arrow as default
-        self._rotation_indicator.setStyleSheet("font-size: 32px; font-weight: bold;")
         indicator_layout.addWidget(self._rotation_indicator)
 
         indicator_layout.addItem(
@@ -166,17 +166,11 @@ class OptionsWidget(QWidget):
     def _update_indicator(self) -> None:
         """Update the rotation indicator to show current rotation."""
         if self._current_image_id is None:
-            self._rotation_indicator.setText("↑")
+            self._rotation_indicator.set_glyph(_ARROWS[0])
             return
 
         rotation = self._filter.get_rotation(self._current_image_id)
-        arrows = {
-            0: "↑",
-            90: "→",
-            180: "↓",
-            270: "←",
-        }
-        self._rotation_indicator.setText(arrows.get(rotation.degrees, "↑"))
+        self._rotation_indicator.set_glyph(_ARROWS.get(rotation.degrees, _ARROWS[0]))
 
     def _on_rotate_left(self) -> None:
         """Handle rotate left button click."""
