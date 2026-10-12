@@ -136,12 +136,12 @@
   <customwidget>
    <class>RelinkingListView</class>
    <extends>QListView</extends>
-   <header location="global">RelinkingListView.h</header>
+   <header>scantailor.app.ui.widgets.relinking_list_view</header>
   </customwidget>
   <customwidget>
    <class>RelinkablePathVisualization</class>
    <extends>QWidget</extends>
-   <header location="global">RelinkablePathVisualization.h</header>
+   <header>scantailor.app.ui.widgets.relinkable_path_visualization</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

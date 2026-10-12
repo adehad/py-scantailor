@@ -56,7 +56,7 @@
   <customwidget>
    <class>SystemLoadWidget</class>
    <extends>QWidget</extends>
-   <header>SystemLoadWidget.h</header>
+   <header>scantailor.app.ui.panels.system_load</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
