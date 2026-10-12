@@ -47,7 +47,6 @@ from scantailor.app.ui.pdf_worker import (
 from scantailor.app.ui.stage_panels import StagePanels
 from scantailor.app.ui.thumbnails import ThumbnailListWidget
 from scantailor.app.ui.utils import get_cwidget
-from scantailor.app.ui.widgets.non_owning_widget import NonOwningWidget
 from scantailor.app.ui.widgets.processing_indicator import ProcessingIndicator
 from scantailor.app.ui.widgets.stage_list_view import StageListView
 from scantailor.core import propagation
@@ -58,6 +57,7 @@ from scantailor.core.batch import (
     RenderInfo,
     output_file_names,
 )
+from scantailor.core.filename_ordering import sort_smart
 from scantailor.core.image_io import ImageLoadError, list_image_pages
 from scantailor.core.models import Dpi, ImageId, PageId
 from scantailor.core.page_source import DpiOverrides, dpi_overrides_of
@@ -186,10 +186,7 @@ class MainWindowManager:
                 dialog that points moved image folders at their new location.
         """
         super().__init__()
-        self.ui = load_ui_widget(
-            UI_FOLDER / "MainWindow.ui",
-            extra_widgets=[StageListView, NonOwningWidget],
-        )
+        self.ui = load_ui_widget(UI_FOLDER / "MainWindow.ui")
 
         self.project_files_dialog_factory: ProjectFilesDialogFactory = (
             project_files_dialog_factory or self._default_project_files_dialog
@@ -1604,17 +1601,17 @@ class MainWindowManager:
         # The dialog is deleted once the event loop runs again, e.g. in a nested
         # dialog, so read everything it holds first.
         input_dir = dialog.get_input_directory()
-        names = dialog.get_project_files()
+        files = sort_smart(dialog.get_project_paths())
         output_dir = dialog.get_output_directory()
         layout_direction: LayoutDirection = "RTL" if dialog.is_rtl_layout() else "LTR"
-        if input_dir is None or not names:
+        if input_dir is None or not files:
             QMessageBox.warning(
                 self.ui,
                 self.ui.tr("Error"),
                 self.ui.tr("No files were added to the project."),
             )
             return
-        pages = self._read_pages([input_dir / name for name in names])
+        pages = self._read_pages(files)
         if pages is not None:
             pages = self._fix_dpi_of_new_pages(pages)
         if pages is None:
@@ -1638,14 +1635,11 @@ class MainWindowManager:
         dialog = self.project_files_dialog_factory(self.ui)
         if not self._run_dialog(dialog):
             return
-        input_dir = dialog.get_input_directory()
-        if input_dir is None:
-            return
         present = {info.id.file_path for info in self.project.images}
         paths = [
-            input_dir / name
-            for name in dialog.get_project_files()
-            if input_dir / name not in present
+            path
+            for path in sort_smart(dialog.get_project_paths())
+            if path not in present
         ]
         pages = self._read_pages(paths)
         if pages:

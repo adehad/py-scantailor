@@ -1,12 +1,16 @@
 """Project files dialog for adding/removing files from a project."""
 
+from collections import Counter
+from collections.abc import Sequence
 from pathlib import Path
 
 from PySide6 import QtWidgets
 from PySide6.QtCore import QStringListModel, Signal
 
-from scantailor.app.ui import load_ui_widget
+from scantailor.app.ui import embed_ui, load_ui_widget
+from scantailor.app.ui.icons import icon
 from scantailor.app.ui.utils import get_cwidget
+from scantailor.core.filename_ordering import sort_smart
 
 _UI_FOLDER = Path(__file__).parent
 
@@ -30,7 +34,7 @@ class ProjectFilesDialog(QtWidgets.QDialog):
         self,
         input_dir: Path | None = None,
         output_dir: Path | None = None,
-        project_files: list[str] | None = None,
+        project_files: Sequence[str | Path] | None = None,
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
         """Initialize the dialog.
@@ -38,17 +42,21 @@ class ProjectFilesDialog(QtWidgets.QDialog):
         Args:
             input_dir: Initial input directory path.
             output_dir: Initial output directory path.
-            project_files: List of files already in the project.
+            project_files: Files already in the project. A bare name is taken to
+                be in ``input_dir``.
             parent: Parent widget.
         """
         super().__init__(parent)
         self._input_dir = input_dir
         self._output_dir = output_dir
-        self._project_files = set(project_files or [])
-        self._available_files: set[str] = set()
+        self._project_files: set[Path] = {
+            self._resolve(entry, input_dir) for entry in project_files or []
+        }
+        self._available_files: set[Path] = set()
 
         # Load UI
         self.ui = load_ui_widget(_UI_FOLDER / "ProjectFilesDialog.ui", self)
+        embed_ui(self, self.ui)
         self._setup_widgets()
         self._populate_lists()
         self._connect_signals()
@@ -107,14 +115,15 @@ class ProjectFilesDialog(QtWidgets.QDialog):
             self._output_dir_line.setText(str(self._output_dir))
 
         # Create models for lists
+        self._off_project_paths: list[Path] = []
+        self._in_project_paths: list[Path] = []
         self._off_project_model = QStringListModel()
         self._in_project_model = QStringListModel()
         self._off_project_list.setModel(self._off_project_model)
         self._in_project_list.setModel(self._in_project_model)
 
-        # Set text for arrow buttons (fallback if icons not loaded)
-        self._add_to_project_btn.setText("→")
-        self._remove_from_project_btn.setText("←")
+        self._add_to_project_btn.setIcon(icon("circle-arrow-right"))
+        self._remove_from_project_btn.setIcon(icon("circle-arrow-left"))
 
     def _populate_lists(self) -> None:
         """Populate the file lists."""
@@ -138,17 +147,38 @@ class ProjectFilesDialog(QtWidgets.QDialog):
 
         for file_path in input_dir.iterdir():
             if file_path.is_file() and file_path.suffix.lower() in extensions:
-                self._available_files.add(file_path.name)
+                self._available_files.add(file_path)
 
     def _update_list_models(self) -> None:
         """Update the list models with current file sets."""
-        # Files not in project = available - project
-        off_project = sorted(self._available_files - self._project_files)
-        self._off_project_model.setStringList(off_project)
+        self._off_project_paths = sort_smart(
+            self._available_files - self._project_files
+        )
+        self._off_project_model.setStringList(
+            self._display_names(self._off_project_paths)
+        )
 
-        # Files in project
-        in_project = sorted(self._project_files)
-        self._in_project_model.setStringList(in_project)
+        self._in_project_paths = sort_smart(self._project_files)
+        self._in_project_model.setStringList(
+            self._display_names(self._in_project_paths)
+        )
+
+    @staticmethod
+    def _resolve(entry: str | Path, input_dir: Path | None) -> Path:
+        """Turn a project file entry into a path, anchoring bare names."""
+        path = Path(entry)
+        if input_dir is not None and path.parent == Path():
+            return input_dir / path
+        return path
+
+    @staticmethod
+    def _display_names(paths: list[Path]) -> list[str]:
+        """Name each file by its file name, adding the folder where names repeat."""
+        counts = Counter(path.name for path in paths)
+        return [
+            path.name if counts[path.name] == 1 else f"{path.name} ({path.parent})"
+            for path in paths
+        ]
 
     def _connect_signals(self) -> None:
         """Connect widget signals."""
@@ -192,12 +222,8 @@ class ProjectFilesDialog(QtWidgets.QDialog):
     def _add_selected_to_project(self) -> None:
         """Add selected files to the project."""
         selection = self._off_project_list.selectionModel()
-        indexes = selection.selectedIndexes()
-
-        for index in indexes:
-            filename = self._off_project_model.data(index, 0)
-            if filename:
-                self._project_files.add(filename)
+        for index in selection.selectedIndexes():
+            self._project_files.add(self._off_project_paths[index.row()])
 
         self._update_list_models()
         self.files_changed.emit()
@@ -205,12 +231,8 @@ class ProjectFilesDialog(QtWidgets.QDialog):
     def _remove_selected_from_project(self) -> None:
         """Remove selected files from the project."""
         selection = self._in_project_list.selectionModel()
-        indexes = selection.selectedIndexes()
-
-        for index in indexes:
-            filename = self._in_project_model.data(index, 0)
-            if filename:
-                self._project_files.discard(filename)
+        for index in selection.selectedIndexes():
+            self._project_files.discard(self._in_project_paths[index.row()])
 
         self._update_list_models()
         self.files_changed.emit()
@@ -233,13 +255,21 @@ class ProjectFilesDialog(QtWidgets.QDialog):
         text = self._output_dir_line.text()
         return Path(text) if text else None
 
-    def get_project_files(self) -> list[str]:
-        """Get the list of files in the project.
+    def get_project_paths(self) -> list[Path]:
+        """Get the files in the project, which may come from several folders.
 
         Returns:
-            List of filenames.
+            Full paths in natural filename order.
         """
-        return sorted(self._project_files)
+        return sort_smart(self._project_files)
+
+    def get_project_files(self) -> list[str]:
+        """Get the file names of the files in the project.
+
+        Returns:
+            File names in the order of ``get_project_paths``.
+        """
+        return [path.name for path in self.get_project_paths()]
 
     def is_rtl_layout(self) -> bool:
         """Check if RTL layout is enabled.
@@ -256,7 +286,3 @@ class ProjectFilesDialog(QtWidgets.QDialog):
             True if force fix DPI is enabled.
         """
         return self._force_fix_dpi_cb.isChecked()
-
-    def show(self) -> None:
-        """Show the dialog."""
-        self.ui.show()

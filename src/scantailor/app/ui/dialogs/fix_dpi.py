@@ -7,7 +7,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIntValidator
 
-from scantailor.app.ui import load_ui_widget
+from scantailor.app.ui import embed_ui, load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
 from scantailor.core.models import Dpi, ImageId
 from scantailor.core.project import DpiStatus, ImageInfo, ImageMetadata
@@ -96,20 +96,11 @@ class FixDpiDialog(QtWidgets.QDialog):
         self._initial_text: tuple[str, str] = ("", "")
 
         self.ui = load_ui_widget(_UI_FOLDER / "FixDpiDialog.ui", self)
-        self._embed_ui()
+        embed_ui(self, self.ui)
         self._setup_widgets()
         self._populate_views()
         self._connect_signals()
         self._prefill_from_selection()
-
-    def _embed_ui(self) -> None:
-        """Show the loaded form inside this dialog instead of as a separate window."""
-        self.ui.setWindowFlags(Qt.WindowType.Widget)
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.ui)
-        self.setWindowTitle(self.ui.windowTitle())
-        self.resize(self.ui.size())
 
     def _setup_widgets(self) -> None:
         """Look up the form's widgets and configure them."""
