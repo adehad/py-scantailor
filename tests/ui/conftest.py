@@ -96,7 +96,30 @@ def main_window(
     yield manager
     if shiboken6.isValid(manager.ui):
         discard_changes(manager.ui)
+        # Closing a parent leaves its visible child dialogs (batch progress,
+        # about) showing.
+        for dialog in manager.ui.findChildren(QtWidgets.QDialog):
+            dialog.close()
         manager.ui.close()
+
+
+@pytest.fixture
+def wait_for_thumbnails() -> Callable[[MainWindowManager], None]:
+    """Return a function that waits until the thumbnail workers are done.
+
+    Workers store auto-detected parameters for pages other than the current
+    one, so a test that reads or counts parameters or renders must wait for
+    them first. Their results are delivered through the event loop, which the
+    function also drains.
+    """
+
+    def wait(window: MainWindowManager, timeout_ms: int = 60_000) -> None:
+        assert window.thumbnails.model.wait_for_idle(timeout_ms), (
+            "thumbnail workers still busy"
+        )
+        QtWidgets.QApplication.processEvents()
+
+    return wait
 
 
 @dataclasses.dataclass

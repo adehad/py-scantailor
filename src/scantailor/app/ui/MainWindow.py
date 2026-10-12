@@ -726,6 +726,7 @@ class MainWindowManager:
             (panels.view, self.imageFrameLayout),
         ):
             layout.removeWidget(widget)
+            widget.hide()
             widget.setParent(None)
             widget.deleteLater()
         panels.deleteLater()
