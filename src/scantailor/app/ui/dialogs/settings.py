@@ -7,6 +7,7 @@ from PySide6 import QtCore, QtWidgets
 
 from scantailor.app.ui import embed_ui, load_ui_widget
 from scantailor.app.ui.theme import AUTO, SETTINGS_KEY, apply_theme
+from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.app.ui.utils import get_cwidget
 from scantailor.core.settings import (
     ApplicationSettings,
@@ -21,6 +22,20 @@ _SOURCE_LANGUAGE = "en"
 _OPENGL_UNAVAILABLE = "Your hardware / driver don't provide the necessary features"
 # C++ derives the thumbnail height from the width with this aspect ratio.
 _THUMBNAIL_ASPECT = 16.0 / 25.0
+# Options that nothing in the application reads yet; they stay visible but cannot
+# be edited, and keep the stored value.
+_UNWIRED_WIDGETS = (
+    "languageBox",
+    "blackOnWhiteDetectionCB",
+    "blackOnWhiteDetectionAtOutputCB",
+    "highlightDeviationCB",
+    "deskewDeviationCoefSB",
+    "deskewDeviationThresholdSB",
+    "selectContentDeviationCoefSB",
+    "selectContentDeviationThresholdSB",
+    "marginsDeviationCoefSB",
+    "marginsDeviationThresholdSB",
+)
 
 
 def available_languages() -> list[str]:
@@ -41,9 +56,10 @@ def available_languages() -> list[str]:
 class SettingsDialog(QtWidgets.QDialog):
     """Settings dialog for configuring application preferences.
 
-    Accepting the dialog writes the values to ``settings``, saves them, stores the
-    appearance under the key the theme reads and applies it to the running
-    application.
+    Choosing a colour scheme shows it at once; accepting the dialog writes the
+    values to ``settings``, saves them, stores the appearance under the key the
+    theme reads and announces the unit to ``units_provider``. Rejecting the dialog
+    brings back the scheme that was in use when it opened.
 
     Signals:
         settings_changed: Emitted after the changes were committed.
@@ -55,21 +71,26 @@ class SettingsDialog(QtWidgets.QDialog):
         self,
         settings: ApplicationSettings,
         parent: QtWidgets.QWidget | None = None,
+        units_provider: UnitsProvider | None = None,
     ) -> None:
         """Initialize the settings dialog.
 
         Args:
             settings (ApplicationSettings): Application settings to edit.
             parent (QtWidgets.QWidget | None): Parent widget.
+            units_provider (UnitsProvider | None): Told the chosen unit when the
+                dialog is accepted; the application-wide one when None.
         """
         super().__init__(parent)
         self._settings = settings
+        self._units_provider = units_provider or UnitsProvider.get_instance()
 
         self.ui = load_ui_widget(_UI_FOLDER / "SettingsDialog.ui", self)
         embed_ui(self, self.ui)
         self._setup_widgets()
         self._populate_combo_boxes()
         self._load_settings()
+        self._disable_unwired_options()
         self._connect_signals()
 
     def _setup_widgets(self) -> None:
@@ -130,6 +151,7 @@ class SettingsDialog(QtWidgets.QDialog):
             self._color_scheme_box.addItem(text, mode)
 
         for text, units in (
+            ("Pixels", Units.PIXELS),
             ("Millimetres", Units.MILLIMETERS),
             ("Centimetres", Units.CENTIMETERS),
             ("Inches", Units.INCHES),
@@ -214,6 +236,10 @@ class SettingsDialog(QtWidgets.QDialog):
             ),
         ]
 
+    def _disable_unwired_options(self) -> None:
+        for name in _UNWIRED_WIDGETS:
+            get_cwidget(self.ui, QtWidgets.QWidget, name).setEnabled(False)
+
     @staticmethod
     def _select_data(box: QtWidgets.QComboBox, data: object) -> None:
         """Select the item that carries ``data``, leaving the box as is if none does."""
@@ -228,13 +254,20 @@ class SettingsDialog(QtWidgets.QDialog):
         self._black_on_white_cb.clicked.connect(
             self._black_on_white_output_cb.setEnabled
         )
+        self._color_scheme_box.currentIndexChanged.connect(self._preview_appearance)
 
     def _save_and_accept(self) -> None:
         """Commit the values and close the dialog."""
         self._save_settings()
         self._store_appearance()
+        self._units_provider.set_units(self._settings.units)
         self.settings_changed.emit()
         self.accept()
+
+    def reject(self) -> None:
+        """Close the dialog and bring back the scheme in use before it opened."""
+        self._apply_stored_appearance()
+        super().reject()
 
     def _save_settings(self) -> None:
         """Write the form to the settings object and to disk."""
@@ -288,6 +321,16 @@ class SettingsDialog(QtWidgets.QDialog):
     def _store_appearance(self) -> None:
         """Remember the chosen appearance and show it right away."""
         QtCore.QSettings().setValue(SETTINGS_KEY, self._color_scheme_box.currentData())
+        self._apply_stored_appearance()
+
+    def _preview_appearance(self) -> None:
+        """Show the chosen scheme without remembering it."""
+        app = QtWidgets.QApplication.instance()
+        if isinstance(app, QtWidgets.QApplication):
+            apply_theme(app, self._color_scheme_box.currentData())
+
+    @staticmethod
+    def _apply_stored_appearance() -> None:
         app = QtWidgets.QApplication.instance()
         if isinstance(app, QtWidgets.QApplication):
             apply_theme(app)

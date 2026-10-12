@@ -14,6 +14,9 @@ C++ metadata loaders do; callers decide how to prompt for a fallback using
 ``ImageMetadata.is_dpi_ok()``.
 """
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Final
 
@@ -24,6 +27,7 @@ from PIL import Image, UnidentifiedImageError
 
 from scantailor.core.models import Dpi, ImageId
 from scantailor.core.project import ImageMetadata
+from scantailor.core.settings import TiffCompression, TiffCompressions
 
 # Scans routinely exceed Pillow's default decompression-bomb threshold.
 Image.MAX_IMAGE_PIXELS = None
@@ -37,6 +41,18 @@ _RESUNIT_CENTIMETER: Final = 3
 _CM_PER_INCH: Final = 2.54
 _JFIF_UNIT_INCH: Final = 1
 _JFIF_UNIT_CENTIMETER: Final = 2
+# Pillow's names for the libtiff methods; Adobe deflate is libtiff's
+# COMPRESSION_DEFLATE (8), the older zip variant has another tag value.
+_PILLOW_COMPRESSION: Final = {
+    TiffCompression.NONE: "raw",
+    TiffCompression.LZW: "tiff_lzw",
+    TiffCompression.DEFLATE: "tiff_adobe_deflate",
+    TiffCompression.JPEG: "jpeg",
+    TiffCompression.CCITT_FAX4: "group4",
+}
+_default_compressions: ContextVar[TiffCompressions] = ContextVar(
+    "tiff_compressions", default=TiffCompressions()
+)
 
 
 class ImageLoadError(Exception):
@@ -223,17 +239,47 @@ def load_image(
     return pixels, metadata
 
 
-def write_image(path: Path, pixels: NDArray, dpi: Dpi | None = None) -> None:
-    """Write an image as TIFF (LZW or CCITT G4) or PNG, chosen by file suffix.
+@contextmanager
+def tiff_compressions_in_use(compressions: TiffCompressions) -> Iterator[None]:
+    """Make ``write_image`` calls inside the block default to these methods.
+
+    For callers that write through helpers which do not take a compression
+    argument. The choice is local to the current thread or task.
+
+    Args:
+        compressions (TiffCompressions): The methods to use.
+
+    Yields:
+        None: Control, with the choice in effect.
+    """
+    token = _default_compressions.set(compressions)
+    try:
+        yield
+    finally:
+        _default_compressions.reset(token)
+
+
+def write_image(
+    path: Path,
+    pixels: NDArray,
+    dpi: Dpi | None = None,
+    compressions: TiffCompressions | None = None,
+) -> None:
+    """Write an image as TIFF or PNG, chosen by file suffix.
 
     ``bool`` arrays are bilevel with ``True`` meaning black (the C++ BinaryImage
-    convention) and are stored as 1-bit CCITT G4 in TIFF. ``uint8`` arrays are
-    gray ``(H, W)`` or BGR ``(H, W, 3)``; TIFF output uses lossless LZW.
+    convention); TIFF output uses the black-and-white method, CCITT G4 unless
+    chosen otherwise. ``uint8`` arrays are gray ``(H, W)`` or BGR ``(H, W, 3)``
+    and use the colour method, LZW unless chosen otherwise. Like C++, grey images
+    follow the colour method.
 
     Args:
         path (Path): Destination; suffix must be .tif, .tiff or .png.
         pixels (NDArray): ``bool`` or ``uint8`` array as described above. Not modified.
         dpi (Dpi | None): Resolution tags to store; omitted when None or null.
+        compressions (TiffCompressions | None): TIFF methods; the ones set by
+            ``tiff_compressions_in_use``, else the defaults, when None. PNG ignores
+            them.
 
     Raises:
         ValueError: On unsupported suffix, dtype or shape.
@@ -247,15 +293,16 @@ def write_image(path: Path, pixels: NDArray, dpi: Dpi | None = None) -> None:
     if pixels.size == 0:
         raise ValueError("Cannot write an empty image")
 
+    chosen = compressions or _default_compressions.get()
     if pixels.dtype == np.bool_ and pixels.ndim == 2:
         image = Image.fromarray(~pixels)
-        compression = "group4"
+        compression = _PILLOW_COMPRESSION[chosen.bw]
     elif pixels.dtype == np.uint8 and pixels.ndim == 2:
         image = Image.fromarray(pixels, mode="L")
-        compression = "tiff_lzw"
+        compression = _PILLOW_COMPRESSION[chosen.color]
     elif pixels.dtype == np.uint8 and pixels.ndim == 3 and pixels.shape[2] == 3:
         image = Image.fromarray(np.ascontiguousarray(pixels[..., ::-1]), mode="RGB")
-        compression = "tiff_lzw"
+        compression = _PILLOW_COMPRESSION[chosen.color]
     else:
         raise ValueError(f"Unsupported array dtype={pixels.dtype} shape={pixels.shape}")
 

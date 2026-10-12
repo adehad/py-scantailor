@@ -11,12 +11,13 @@ from pathlib import Path
 from typing import ClassVar, Self
 
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Units(str, Enum):
     """Measurement units."""
 
+    PIXELS = "px"
     MILLIMETERS = "mm"
     INCHES = "in"
     CENTIMETERS = "cm"
@@ -33,6 +34,44 @@ class TiffCompression(int, Enum):
     JPEG = 7
     DEFLATE = 8
     CCITT_FAX4 = 4  # Group 4 fax compression (good for B&W)
+
+
+# What the Settings dialog offers: a black-and-white image cannot use JPEG and a
+# grey or colour image cannot use CCITT G4.
+BW_COMPRESSIONS = (
+    TiffCompression.NONE,
+    TiffCompression.LZW,
+    TiffCompression.DEFLATE,
+    TiffCompression.CCITT_FAX4,
+)
+COLOR_COMPRESSIONS = (
+    TiffCompression.NONE,
+    TiffCompression.LZW,
+    TiffCompression.DEFLATE,
+    TiffCompression.JPEG,
+)
+
+
+@dataclass(frozen=True)
+class TiffCompressions:
+    """TIFF compression per kind of image, as plain data for worker processes.
+
+    Args:
+        bw (TiffCompression): Used for bilevel images.
+        color (TiffCompression): Used for grey and colour images.
+    """
+
+    bw: TiffCompression = TiffCompression.CCITT_FAX4
+    color: TiffCompression = TiffCompression.LZW
+
+    def __post_init__(self) -> None:
+        """Reject a method that cannot compress the kind of image it is meant for."""
+        if self.bw not in BW_COMPRESSIONS:
+            raise ValueError(f"{self.bw.name} cannot compress a bilevel image")
+        if self.color not in COLOR_COMPRESSIONS:
+            raise ValueError(
+                f"{self.color.name} cannot compress a grey or colour image"
+            )
 
 
 @dataclass(frozen=True)
@@ -108,6 +147,24 @@ class ApplicationSettings(BaseModel):
 
     # Profile settings
     current_profile: str = Field(default="Default")
+
+    @field_validator("tiff_bw_compression")
+    @classmethod
+    def _bw_compression_applies_to_bilevel(
+        cls, value: TiffCompression
+    ) -> TiffCompression:
+        if value not in BW_COMPRESSIONS:
+            raise ValueError(f"{value.name} cannot compress a bilevel image")
+        return value
+
+    @field_validator("tiff_color_compression")
+    @classmethod
+    def _color_compression_applies_to_color(
+        cls, value: TiffCompression
+    ) -> TiffCompression:
+        if value not in COLOR_COMPRESSIONS:
+            raise ValueError(f"{value.name} cannot compress a grey or colour image")
+        return value
 
     # Class-level singleton storage
     _instance: ClassVar[Self | None] = None
@@ -194,6 +251,17 @@ class ApplicationSettings(BaseModel):
         except Exception as e:
             logger.error(f"Failed to save settings to {config_path}: {e}")
             raise
+
+    @property
+    def tiff_compressions(self) -> TiffCompressions:
+        """Get the TIFF compression choices as one picklable value.
+
+        Returns:
+            TiffCompressions: The black-and-white and the colour choice.
+        """
+        return TiffCompressions(
+            bw=self.tiff_bw_compression, color=self.tiff_color_compression
+        )
 
     @property
     def thumbnail_quality(self) -> ThumbnailSize:
