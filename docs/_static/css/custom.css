@@ -1,0 +1,6 @@
+img.screenshot {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--color-background-border);
+  border-radius: 4px;
+}
