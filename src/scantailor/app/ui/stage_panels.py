@@ -9,6 +9,7 @@ stage results no longer hold.
 """
 
 from dataclasses import dataclass
+from typing import cast
 
 import numpy as np
 from loguru import logger
@@ -132,9 +133,16 @@ class StagePanels(QtCore.QObject):
 
     Signals:
         settings_changed: The user edited the current page.
+        page_size_changed: The view shows another page or size. Args: size
+            (QSizeF | None) in pixels at the given resolution, None when no page
+            is shown; dpi (float).
+        cursor_moved: The cursor moved over the view. Args: position (QPointF | None)
+            in pixels from the page's top left corner, None when it left the view.
     """
 
     settings_changed = QtCore.Signal()
+    page_size_changed = QtCore.Signal(object, float)
+    cursor_moved = QtCore.Signal(object)
 
     def __init__(
         self,
@@ -173,6 +181,47 @@ class StagePanels(QtCore.QObject):
         self._dpi_overrides: DpiOverrides = {}
 
         self._connect_view(stage)
+        self._viewport = self.view.viewport()
+        self._viewport.installEventFilter(self)
+
+    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        """Report the cursor position over the view without consuming events.
+
+        Args:
+            watched (QtCore.QObject): The filtered object, the view's viewport.
+            event (QtCore.QEvent): The event.
+
+        Returns:
+            bool: Always False; the view handles the event as usual.
+        """
+        if watched is self._viewport:
+            if event.type() == QtCore.QEvent.Type.MouseMove:
+                moved = cast(QtGui.QMouseEvent, event)
+                self.cursor_moved.emit(self._page_position(moved.position()))
+            elif event.type() == QtCore.QEvent.Type.Leave:
+                self.cursor_moved.emit(None)
+        return False
+
+    def _page_scale(self) -> NDArray[np.float64]:
+        """Return view pixels per page pixel along x and y."""
+        if isinstance(self.view, OutputImageView):
+            return self._output_scale
+        return np.ones(2)
+
+    def _page_position(self, widget_position: QtCore.QPointF) -> QtCore.QPointF:
+        """Map a viewport position to pixels from the page's top left corner."""
+        view = self.view
+        origin = view._virtual_crop_area.boundingRect().topLeft()
+        offset = view._widget_to_virtual.map(widget_position) - origin
+        scale_x, scale_y = self._page_scale()
+        return QtCore.QPointF(offset.x() / scale_x, offset.y() / scale_y)
+
+    def _announce_page_size(self, dpi: float) -> None:
+        size = self.view._virtual_crop_area.boundingRect().size()
+        scale_x, scale_y = self._page_scale()
+        self.page_size_changed.emit(
+            QtCore.QSizeF(size.width() / scale_x, size.height() / scale_y), dpi
+        )
 
     def set_dpi_overrides(self, dpi_overrides: DpiOverrides) -> None:
         """Use the project's resolutions for sources decoded from now on.
@@ -247,6 +296,7 @@ class StagePanels(QtCore.QObject):
         self._clear_overlays()
         self.options.setEnabled(page_id is not None)
         if page_id is None:
+            self.page_size_changed.emit(None, 0.0)
             return
         if isinstance(self.options, fix_orientation.OptionsWidget):
             self.options.set_current_image(page_id.image_id)
@@ -339,6 +389,7 @@ class StagePanels(QtCore.QObject):
         page, source = current
         self._show_image_for(page, source)
         self._refresh_geometry()
+        self._announce_page_size(source.dpi)
 
     def _rotation(self, page: PageId) -> OrthogonalRotation:
         return self.sequence.fix_orientation_filter.get_rotation(page.image_id)

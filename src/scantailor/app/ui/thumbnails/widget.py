@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QListView,
+    QMenu,
     QStyle,
     QStyledItemDelegate,
     QStyleOptionViewItem,
@@ -26,6 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from scantailor.app.ui.icons import icon
 from scantailor.app.ui.thumbnails.cache import ThumbnailCache
 from scantailor.app.ui.thumbnails.model import (
     IsCurrentRole,
@@ -188,10 +190,19 @@ class ThumbnailListWidget(QWidget):
     Signals:
         page_selected (PageId): The current page changed.
         selection_changed (list): All selected pages, in display order.
+        insert_before_requested (PageId): "Insert before ..." was chosen for a page.
+        insert_after_requested (PageId): "Insert after ..." was chosen for a page.
+        remove_pages_requested (list): "Remove from project ..." was chosen; the
+            selected pages, in display order.
+        insert_here_requested (): "Insert here ..." was chosen in the empty area.
     """
 
     page_selected = Signal(object)
     selection_changed = Signal(object)
+    insert_before_requested = Signal(object)
+    insert_after_requested = Signal(object)
+    remove_pages_requested = Signal(object)
+    insert_here_requested = Signal()
 
     def __init__(
         self,
@@ -228,6 +239,8 @@ class ThumbnailListWidget(QWidget):
         ]
         self._restoring = False
         self._follow_current = True
+        self._has_project = project is not None
+        self._context_menu_enabled = True
 
         self._order_combo = QComboBox(self)
         for order in self._orders:
@@ -240,6 +253,8 @@ class ThumbnailListWidget(QWidget):
         self._view.setUniformItemSizes(True)
         self._view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self._view.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self._view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._view.customContextMenuRequested.connect(self._on_context_menu_requested)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -345,7 +360,70 @@ class ThumbnailListWidget(QWidget):
         Args:
             project (Project | None): The project, or None to clear the list.
         """
+        self._has_project = project is not None
         self._model.set_project(project)
+
+    def set_context_menu_enabled(self, enabled: bool) -> None:
+        """Allow or suppress the page menu, for example while a batch runs.
+
+        Args:
+            enabled (bool): Whether right-clicking shows a menu.
+        """
+        self._context_menu_enabled = enabled
+
+    def page_menu(self, page: PageId) -> QMenu:
+        """Build the menu for a page; its actions emit the request signals.
+
+        Args:
+            page (PageId): The page the menu is for.
+
+        Returns:
+            QMenu: Insert before/after and remove, parented to the list.
+        """
+        menu = QMenu(self)
+        insert_before = menu.addAction(icon("insert-before"), "Insert before ...")
+        insert_after = menu.addAction(icon("insert-after"), "Insert after ...")
+        menu.addSeparator()
+        remove = menu.addAction(
+            icon("trash-2", tint="danger"), "Remove from project ..."
+        )
+        insert_before.triggered.connect(lambda: self.insert_before_requested.emit(page))
+        insert_after.triggered.connect(lambda: self.insert_after_requested.emit(page))
+        remove.triggered.connect(self._request_removal)
+        return menu
+
+    def empty_area_menu(self) -> QMenu:
+        """Build the menu for the space past the last page.
+
+        Returns:
+            QMenu: A single "Insert here ..." action, parented to the list.
+        """
+        menu = QMenu(self)
+        insert_here = menu.addAction(icon("insert-here"), "Insert here ...")
+        insert_here.triggered.connect(self.insert_here_requested)
+        return menu
+
+    def _request_removal(self) -> None:
+        self.remove_pages_requested.emit(self.selected_pages())
+
+    def _on_context_menu_requested(self, position: QPoint) -> None:
+        if not self._context_menu_enabled:
+            return
+        index = self._view.indexAt(position)
+        if index.isValid():
+            page = index.data(PageRole)
+            if index not in self._view.selectionModel().selectedRows():
+                self._view.setCurrentIndex(index)
+            menu = self.page_menu(page)
+        elif self._has_project:
+            menu = self.empty_area_menu()
+        else:
+            return
+        self._show_menu(menu, self._view.viewport().mapToGlobal(position))
+        menu.deleteLater()
+
+    def _show_menu(self, menu: QMenu, global_position: QPoint) -> None:
+        menu.exec(global_position)
 
     def set_stage(self, stage: str) -> None:
         """Show previews for a different stage.

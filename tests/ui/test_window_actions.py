@@ -1,6 +1,7 @@
 """Batch processing, "Apply to...", propagation, reload and the thumbnail controls."""
 
 import pathlib
+import shutil
 import threading
 from collections.abc import Callable, Sequence
 
@@ -12,7 +13,7 @@ from scantailor.app.ui import batch_runner, page_renderer
 from scantailor.app.ui.dialogs.apply_to import ApplyToDialog
 from scantailor.app.ui.MainWindow import MainWindowManager
 from scantailor.core.batch import BatchResult, PageDone
-from scantailor.core.models import Dpi, Margins, PageId
+from scantailor.core.models import Dpi, ImageId, Margins, PageId, SubPage
 from scantailor.core.project import ImageMetadata
 from scantailor.core.propagation import ApplyScope
 from scantailor.core.settings import ApplicationSettings
@@ -1022,3 +1023,307 @@ class TestAutoSave:
         assert window._auto_save_timer.isActive()
         assert window._auto_save_timer.remainingTime() <= remaining
         window.renderer.wait_for_done()
+
+
+@pytest.fixture
+def new_images(page_images, dialog_factory) -> list[pathlib.Path]:
+    """Two scans that are not in the project, offered by the files dialog."""
+    created = []
+    for name in ("new_a.png", "new_b.png"):
+        path = page_images.directory / name
+        shutil.copy(page_images.paths[0], path)
+        created.append(path)
+    dialog_factory.names = [path.name for path in created]
+    return created
+
+
+def _image_names(window: MainWindowManager) -> list[str]:
+    assert window.project is not None
+    return [info.id.file_path.stem for info in window.project.images]
+
+
+def _listed_names(window: MainWindowManager) -> list[str]:
+    return [page.image_id.file_path.stem for page in window.thumbnails.pages()]
+
+
+class TestInsertImages:
+    """Insert before, after and at the end add pages where C++ does."""
+
+    def test_insert_before_puts_the_new_images_ahead_of_the_page_in_order(
+        self,
+        project_window: MainWindowManager,
+        new_images: list[pathlib.Path],
+        respond_to_modal,
+    ):
+        window = project_window
+        window.modified = False
+        respond_to_modal(accept=True)
+
+        window.insert_images_before(window.pages()[1])
+
+        expected = ["page_001", "new_a", "new_b", "page_002", "page_003"]
+        assert _image_names(window) == expected
+        assert _listed_names(window) == expected
+        assert window.modified
+        window.renderer.wait_for_done()
+
+    def test_insert_after_puts_the_new_images_behind_the_page_in_order(
+        self,
+        project_window: MainWindowManager,
+        new_images: list[pathlib.Path],
+        respond_to_modal,
+    ):
+        window = project_window
+        respond_to_modal(accept=True)
+
+        window.insert_images_after(window.pages()[0])
+
+        expected = ["page_001", "new_a", "new_b", "page_002", "page_003"]
+        assert _image_names(window) == expected
+        assert _listed_names(window) == expected
+        window.renderer.wait_for_done()
+
+    def test_insert_here_appends_after_the_last_page(
+        self,
+        project_window: MainWindowManager,
+        new_images: list[pathlib.Path],
+        respond_to_modal,
+    ):
+        respond_to_modal(accept=True)
+
+        project_window.insert_images_at_end()
+
+        assert _listed_names(project_window) == [
+            "page_001",
+            "page_002",
+            "page_003",
+            "new_a",
+            "new_b",
+        ]
+        project_window.renderer.wait_for_done()
+
+    def test_the_current_page_stays_current_and_the_status_bar_counts_the_new_pages(
+        self,
+        project_window: MainWindowManager,
+        new_images: list[pathlib.Path],
+        respond_to_modal,
+    ):
+        window = project_window
+        window.goLastPage()
+        current = window.current_page
+        respond_to_modal(accept=True)
+
+        window.insert_images_before(window.pages()[0])
+
+        assert window.current_page == current
+        assert window.status_panel.page_no_label.text() == "p. 5 / 5"
+        window.renderer.wait_for_done()
+
+    def test_cancelling_the_dialog_inserts_nothing(
+        self,
+        project_window: MainWindowManager,
+        new_images: list[pathlib.Path],
+        respond_to_modal,
+    ):
+        window = project_window
+        window.modified = False
+        respond_to_modal(accept=False)
+
+        window.insert_images_before(window.pages()[0])
+
+        assert len(window.pages()) == 3
+        assert not window.modified
+
+    def test_a_page_outside_the_project_inserts_nothing(
+        self,
+        project_window: MainWindowManager,
+        new_images: list[pathlib.Path],
+        respond_to_modal,
+    ):
+        window = project_window
+        window.modified = False
+        stranger = PageId(image_id=ImageId(file_path=pathlib.Path("elsewhere.png")))
+        respond_to_modal(accept=True)
+
+        window.insert_images_after(stranger)
+
+        assert len(window.pages()) == 3
+        assert not window.modified
+
+    def test_the_thumbnail_menu_requests_reach_the_insert_slots(
+        self,
+        project_window: MainWindowManager,
+        new_images: list[pathlib.Path],
+        respond_to_modal,
+    ):
+        window = project_window
+        respond_to_modal(accept=True)
+
+        window.thumbnails.insert_before_requested.emit(window.pages()[2])
+
+        assert _listed_names(window)[2:4] == ["new_a", "new_b"]
+        window.renderer.wait_for_done()
+
+
+class TestRemovePages:
+    """Removing pages updates the project and the list as in C++."""
+
+    @staticmethod
+    def _answer(window: MainWindowManager, answer: bool | None) -> list[int]:
+        asked: list[int] = []
+
+        def prompt(count: int, _parent: QtWidgets.QWidget) -> bool | None:
+            asked.append(count)
+            return answer
+
+        window.remove_pages_prompt = prompt
+        return asked
+
+    def test_removing_a_page_drops_its_image_and_asks_with_the_page_count(
+        self, project_window: MainWindowManager
+    ):
+        window = project_window
+        asked = self._answer(window, False)
+        window.modified = False
+
+        window.remove_pages([window.pages()[1], window.pages()[2]])
+
+        assert asked == [2]
+        assert _image_names(window) == ["page_001"]
+        assert _listed_names(window) == ["page_001"]
+        assert window.modified
+        window.renderer.wait_for_done()
+
+    def test_cancelling_removes_nothing(self, project_window: MainWindowManager):
+        window = project_window
+        self._answer(window, None)
+        window.modified = False
+
+        window.remove_pages([window.pages()[0]])
+
+        assert len(window.pages()) == 3
+        assert not window.modified
+
+    def test_removing_the_first_page_selects_the_first_page_that_stays(
+        self, project_window: MainWindowManager
+    ):
+        window = project_window
+        self._answer(window, False)
+        pages = window.pages()
+
+        window.remove_pages([pages[0], pages[1]])
+
+        assert window.current_page == pages[2]
+        window.renderer.wait_for_done()
+
+    def test_removing_a_later_page_selects_the_page_before_the_first_removed(
+        self, project_window: MainWindowManager
+    ):
+        window = project_window
+        self._answer(window, False)
+        pages = window.pages()
+        window.goLastPage()
+
+        window.remove_pages([pages[1], pages[2]])
+
+        assert window.current_page == pages[0]
+        window.renderer.wait_for_done()
+
+    def test_status_bar_counts_the_remaining_pages(
+        self, project_window: MainWindowManager
+    ):
+        window = project_window
+        self._answer(window, False)
+
+        window.remove_pages([window.pages()[0]])
+
+        assert window.status_panel.page_no_label.text() == "p. 1 / 2"
+        assert window.status_panel.page_info_label.text() == "page_002"
+        window.renderer.wait_for_done()
+
+    def test_removing_every_page_leaves_an_empty_project(
+        self, project_window: MainWindowManager
+    ):
+        window = project_window
+        self._answer(window, False)
+
+        window.remove_pages(window.pages())
+
+        assert window.pages() == []
+        assert window.current_page is None
+        assert window.status_panel.page_no_label.text() == ""
+
+    def test_output_files_are_erased_when_the_dialog_says_so(
+        self, project_window: MainWindowManager, page_images
+    ):
+        window = project_window
+        assert window.project is not None
+        out = window.project.output_directory
+        out.mkdir(parents=True, exist_ok=True)
+        for name in ("page_001.tif", "page_002.tif"):
+            (out / name).write_bytes(b"output")
+        self._answer(window, True)
+
+        window.remove_pages([window.pages()[0]])
+
+        assert not (out / "page_001.tif").exists()
+        assert (out / "page_002.tif").exists()
+        assert page_images.paths[0].exists()
+        window.renderer.wait_for_done()
+
+    def test_output_files_stay_when_the_dialog_says_so(
+        self, project_window: MainWindowManager
+    ):
+        window = project_window
+        assert window.project is not None
+        out = window.project.output_directory
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "page_001.tif").write_bytes(b"output")
+        self._answer(window, False)
+
+        window.remove_pages([window.pages()[0]])
+
+        assert (out / "page_001.tif").exists()
+        window.renderer.wait_for_done()
+
+    def test_removing_one_half_of_a_spread_keeps_the_other_half(
+        self, project_window: MainWindowManager
+    ):
+        window = project_window
+        assert window.project is not None
+        first = window.project.images[0].id
+        window._on_page_count_requested(first, 2)
+        left = PageId(image_id=first, sub_page=SubPage.LEFT_PAGE)
+        right = PageId(image_id=first, sub_page=SubPage.RIGHT_PAGE)
+        assert left in window.pages()
+        out = window.project.output_directory
+        out.mkdir(parents=True, exist_ok=True)
+        for name in ("page_001_1L.tif", "page_001_2R.tif"):
+            (out / name).write_bytes(b"output")
+        self._answer(window, True)
+
+        window.remove_pages([left])
+
+        assert right in window.pages()
+        assert left not in window.pages()
+        assert not (out / "page_001_1L.tif").exists()
+        assert (out / "page_001_2R.tif").exists()
+        window.renderer.wait_for_done()
+
+    def test_the_thumbnail_menu_request_reaches_the_remove_slot(
+        self, project_window: MainWindowManager
+    ):
+        window = project_window
+        self._answer(window, False)
+
+        window.thumbnails.remove_pages_requested.emit([window.pages()[0]])
+
+        assert _listed_names(window) == ["page_002", "page_003"]
+        window.renderer.wait_for_done()
+
+    def test_nothing_is_removed_without_a_project(self, main_window: MainWindowManager):
+        asked = self._answer(main_window, True)
+
+        main_window.remove_pages([])
+
+        assert asked == []

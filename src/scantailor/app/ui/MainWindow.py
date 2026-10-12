@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QGraphicsView,
+    QInputDialog,
     QMessageBox,
     QScrollArea,
     QStackedLayout,
@@ -32,6 +33,7 @@ from scantailor.app.ui.dialogs.pdf_import import DEFAULT_IMPORT_DPI, PdfImportDi
 from scantailor.app.ui.dialogs.pdf_progress import PdfProgressDialog
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
 from scantailor.app.ui.dialogs.relinking import RelinkingDialog
+from scantailor.app.ui.dialogs.remove_pages import RemovePagesDialog
 from scantailor.app.ui.dialogs.settings import SettingsDialog
 from scantailor.app.ui.dialogs.split_mode import SplitModeDialog
 from scantailor.app.ui.page_renderer import PageRenderer, render_thumbnail
@@ -49,15 +51,18 @@ from scantailor.app.ui.pdf_worker import (
 )
 from scantailor.app.ui.stage_panels import StagePanels
 from scantailor.app.ui.thumbnails import ThumbnailListWidget
+from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.app.ui.utils import get_cwidget
 from scantailor.app.ui.widgets.processing_indicator import ProcessingIndicator
 from scantailor.app.ui.widgets.stage_list_view import StageListView
+from scantailor.app.ui.widgets.status_bar_panel import StatusBarPanel
 from scantailor.core import propagation
 from scantailor.core.batch import (
     BatchResult,
     PageDetected,
     ProgressEvent,
     RenderInfo,
+    erase_output_files,
     output_file_names,
 )
 from scantailor.core.default_params import apply_default_params
@@ -69,7 +74,7 @@ from scantailor.core.page_source import DpiOverrides, dpi_overrides_of
 from scantailor.core.project import ImageInfo, ImageMetadata, LayoutDirection, Project
 from scantailor.core.recent_projects import RecentProjects
 from scantailor.core.relinker import Relinker, image_directories
-from scantailor.core.settings import ApplicationSettings
+from scantailor.core.settings import ApplicationSettings, Units
 from scantailor.core.stage_params import (
     apply_stage_defaults,
     apply_stage_params,
@@ -89,6 +94,16 @@ _LAST_PDF_DIR_KEY = "project/lastPdfDir"
 _LAST_PDF_DPI_KEY = "project/lastPdfDpi"
 THUMBNAIL_SIZE = QtCore.QSize(160, 160)
 _AUTO_SAVE_INTERVAL_MS = 60_000
+# Thumbnail zoom: one step and the limits of the largest thumbnail, in pixels.
+_THUMBNAIL_STEP = (25.0, 16.0)
+_MIN_THUMBNAIL_SIZE = (100.0, 64.0)
+_MAX_THUMBNAIL_SIZE = (1000.0, 640.0)
+# Repeated zoom steps rebuild the thumbnails once.
+_THUMBNAIL_RESIZE_DELAY_MS = 350
+# Alt+wheel zooms the thumbnails once it travels this far.
+_WHEEL_ZOOM_THRESHOLD = 30
+# A page that is half or more out of the thumbnail view stops being followed.
+_VISIBLE_FRACTION = 0.5
 # Written by SystemLoadWidget: how many pages a batch processes at once.
 _BATCH_THREADS_KEY = "settings/batch_processing_threads"
 _SELECT_CONTENT_OPTIONS = {
@@ -116,6 +131,9 @@ PdfImportDialogFactory = Callable[[pathlib.Path, QWidget], PdfImportDialog]
 PdfExportDialogFactory = Callable[[pathlib.Path, bool, QWidget], PdfExportDialog]
 # Arguments: pages without output, pages in the project.
 RunBatchPrompt = Callable[[int, int], bool]
+# Arguments: pages to remove, parent window. Returns None when the user cancels,
+# else whether the output files of the pages are to be erased too.
+RemovePagesPrompt = Callable[[int, QWidget], bool | None]
 PageMetadata = list[tuple[ImageId, ImageMetadata]]
 
 
@@ -164,6 +182,44 @@ class _CloseGuard(QtCore.QObject):
             event.ignore()
             return True
         return False
+
+
+class _AltWheelFilter(QtCore.QObject):
+    """Event filter that turns Alt+wheel into a zoom step instead of scrolling."""
+
+    def __init__(
+        self, zoom: Callable[[int], None], parent: QtCore.QObject | None = None
+    ) -> None:
+        """Create the filter.
+
+        Args:
+            zoom (Callable[[int], None]): Called with 1 to zoom in, -1 to zoom out.
+            parent (QtCore.QObject | None): Owner of the filter.
+        """
+        super().__init__(parent)
+        self._zoom = zoom
+
+    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        """Consume wheel events made with Alt held.
+
+        Args:
+            watched (QtCore.QObject): The filtered object.
+            event (QtCore.QEvent): The event.
+
+        Returns:
+            bool: True when the event was consumed.
+        """
+        if event.type() != QtCore.QEvent.Type.Wheel:
+            return False
+        wheel = cast(QtGui.QWheelEvent, event)
+        if wheel.modifiers() != QtCore.Qt.KeyboardModifier.AltModifier:
+            return False
+        # Qt reports an Alt wheel along either axis depending on the platform.
+        distance = wheel.angleDelta().x() + wheel.angleDelta().y()
+        if abs(distance) >= _WHEEL_ZOOM_THRESHOLD:
+            self._zoom(1 if distance > 0 else -1)
+        wheel.accept()
+        return True
 
 
 class MainWindowManager:
@@ -223,6 +279,7 @@ class MainWindowManager:
             self._default_pdf_export_dialog
         )
         self.run_batch_prompt: RunBatchPrompt = self._ask_run_batch
+        self.remove_pages_prompt: RemovePagesPrompt = RemovePagesDialog.ask_removal
 
         self.project: Project | None = None
         self.stages = StageSequence()
@@ -295,6 +352,18 @@ class MainWindowManager:
             self.ui, QtGui.QAction, "actionNextSelectedPageW"
         )
         self.actionGotoPage = get_cwidget(self.ui, QtGui.QAction, "actionGotoPage")
+        self.actionMagnifyThumbnails = get_cwidget(
+            self.ui, QtGui.QAction, "actionMagnifyThumbnails"
+        )
+        self.actionDiminishThumbnails = get_cwidget(
+            self.ui, QtGui.QAction, "actionDiminishThumbnails"
+        )
+        self.actionPixels = get_cwidget(self.ui, QtGui.QAction, "actionPixels")
+        self.actionMilimeters = get_cwidget(self.ui, QtGui.QAction, "actionMilimeters")
+        self.actionCentimetres = get_cwidget(
+            self.ui, QtGui.QAction, "actionCentimetres"
+        )
+        self.actionInches = get_cwidget(self.ui, QtGui.QAction, "actionInches")
         self.actionAbout = get_cwidget(self.ui, QtGui.QAction, "actionAbout")
         self.actionReloadPage = get_cwidget(self.ui, QtGui.QAction, "actionReloadPage")
         self.actionSwitchFilter1 = get_cwidget(
@@ -347,6 +416,19 @@ class MainWindowManager:
         self.magnifyThumbnailsBtn = get_cwidget(
             self.ui, QToolButton, "magnifyThumbnailsBtn"
         )
+        self.diminishThumbnailsBtn = get_cwidget(
+            self.ui, QToolButton, "diminishThumbnailsBtn"
+        )
+        self.prevPageBtn = get_cwidget(self.ui, QToolButton, "prevPageBtn")
+        self.nextPageBtn = get_cwidget(self.ui, QToolButton, "nextPageBtn")
+        self.filterSelectedBtn = get_cwidget(self.ui, QToolButton, "filterSelectedBtn")
+        self.gotoPageBtn = get_cwidget(self.ui, QToolButton, "gotoPageBtn")
+        self.thumbColumnViewBtn = get_cwidget(
+            self.ui, QToolButton, "thumbColumnViewBtn"
+        )
+        self.deviationHighlightingBtn = get_cwidget(
+            self.ui, QToolButton, "deviationHighlightingBtn"
+        )
         self.sortingOrderBtn = get_cwidget(self.ui, QToolButton, "sortingOrderBtn")
         self.filterList = get_cwidget(self.ui, StageListView, "filterList")
         self.actionAddFiles = QtGui.QAction(self.ui.tr("Add Files..."), self.ui)
@@ -368,9 +450,11 @@ class MainWindowManager:
         )
         self.imageFrameLayout.addWidget(self.not_ready_widget)
         self.processing_indicator = ProcessingIndicator(self.ui.tr("Processing..."))
-        get_cwidget(self.ui, QtWidgets.QStatusBar, "statusBar").addPermanentWidget(
-            self.processing_indicator
-        )
+        self.units_provider = UnitsProvider.get_instance()
+        self.status_panel = StatusBarPanel(self.units_provider)
+        status_bar = get_cwidget(self.ui, QtWidgets.QStatusBar, "statusBar")
+        status_bar.addPermanentWidget(self.status_panel)
+        status_bar.addPermanentWidget(self.processing_indicator)
         self.optionsFrameLayout = QVBoxLayout(self.filterOptions)
         self.optionsFrameLayout.setContentsMargins(0, 0, 0, 0)
 
@@ -408,10 +492,19 @@ class MainWindowManager:
         self.actionAddFiles.triggered.connect(self.addFiles)
         self.actionOpenPdf.triggered.connect(self.openPdf)
         self.actionExportPdf.triggered.connect(self.exportPdf)
+        self.actionMagnifyThumbnails.triggered.connect(lambda: self.scale_thumbnails(1))
+        self.actionDiminishThumbnails.triggered.connect(
+            lambda: self.scale_thumbnails(-1)
+        )
+        self.magnifyThumbnailsBtn.clicked.connect(lambda: self.scale_thumbnails(1))
+        self.diminishThumbnailsBtn.clicked.connect(lambda: self.scale_thumbnails(-1))
+        self.prevPageBtn.clicked.connect(self._on_prev_page_button)
+        self.nextPageBtn.clicked.connect(self._on_next_page_button)
+        self.gotoPageBtn.clicked.connect(self.execGotoPageDialog)
 
         # Shortcuts of actions that are not in any menu only fire when attached
         # to a widget.
-        self.ui.addActions(self._switch_filter_actions())
+        self.ui.addActions(self._shortcut_actions())
 
         self._close_guard = _CloseGuard(self._close_project_interactive, self.ui)
         self.ui.installEventFilter(self._close_guard)
@@ -432,8 +525,13 @@ class MainWindowManager:
         )
         self.thumbnails.apply_settings(ApplicationSettings.get_instance())
         self.thumbnails.page_selected.connect(self.page_selected)
+        self.thumbnails.insert_before_requested.connect(self.insert_images_before)
+        self.thumbnails.insert_after_requested.connect(self.insert_images_after)
+        self.thumbnails.insert_here_requested.connect(self.insert_images_at_end)
+        self.thumbnails.remove_pages_requested.connect(self.remove_pages)
         self.set_thumbnail_widget(self.thumbnails)
         self._wire_thumbnail_controls()
+        self._wire_units_menu()
         self.filterList.launch_batch_processing.connect(self.startBatchProcessing)
         self._update_welcome_panel()
         self._attach_stages()
@@ -487,12 +585,126 @@ class MainWindowManager:
         )
         self.sortOptions.setCurrentIndex(self.thumbnails.order_combo.currentIndex())
         self.sortOptions.currentIndexChanged.connect(self.thumbnails.set_order)
-        self.focusButton.toggled.connect(self.thumbnails.set_follow_current)
+        self.sortOptions.currentIndexChanged.connect(self._update_status_bar)
+        self.focusButton.toggled.connect(self._on_focus_toggled)
         self.selectionModeBtn.toggled.connect(
             self.thumbnails.set_multi_selection_enabled
         )
         self.thumbnails.set_follow_current(self.focusButton.isChecked())
         self.thumbnails.set_multi_selection_enabled(self.selectionModeBtn.isChecked())
+
+        settings = ApplicationSettings.get_instance()
+        self.thumbColumnViewBtn.setChecked(settings.single_column_thumbnail_display)
+        self.deviationHighlightingBtn.setChecked(settings.highlight_deviation)
+        self.thumbColumnViewBtn.clicked.connect(self._on_column_view_clicked)
+        self.deviationHighlightingBtn.clicked.connect(self._on_deviation_clicked)
+
+        self.thumbnails.view.verticalScrollBar().valueChanged.connect(
+            self._on_thumbnails_scrolled
+        )
+        self._thumbnail_resize_timer = QtCore.QTimer(self.ui)
+        self._thumbnail_resize_timer.setSingleShot(True)
+        self._thumbnail_resize_timer.setInterval(_THUMBNAIL_RESIZE_DELAY_MS)
+        self._thumbnail_resize_timer.timeout.connect(self._apply_thumbnail_size)
+        self._wheel_zoom = _AltWheelFilter(self.scale_thumbnails, self.ui)
+        view = self.thumbnails.view
+        for target in (view, view.viewport(), view.verticalScrollBar()):
+            target.installEventFilter(self._wheel_zoom)
+
+    def _on_focus_toggled(self, checked: bool) -> None:
+        """Follow the current page in the thumbnail list, scrolling to it now."""
+        self.thumbnails.set_follow_current(checked)
+        if checked:
+            self.thumbnails.scroll_to_current()
+
+    def _on_thumbnails_scrolled(self) -> None:
+        """Stop following the current page once the user scrolled it out of view."""
+        page = self._current_page
+        if page is None or self.thumbnails.model.row_of(page) < 0:
+            return
+        item = self.thumbnails.item_rect(page)
+        view = QtCore.QRectF(self.thumbnails.view.viewport().rect())
+        margin = item.height() * _VISIBLE_FRACTION
+        top_visible = item.top() >= view.top() and item.top() + margin <= view.bottom()
+        bottom_visible = (
+            item.bottom() <= view.bottom() and item.bottom() - margin >= view.top()
+        )
+        if not (top_visible or bottom_visible):
+            self.focusButton.setChecked(False)
+
+    def _on_column_view_clicked(self, single_column: bool) -> None:
+        settings = ApplicationSettings.get_instance()
+        settings.single_column_thumbnail_display = single_column
+        settings.save()
+        self.thumbnails.set_single_column(single_column)
+
+    def _on_deviation_clicked(self, highlighted: bool) -> None:
+        settings = ApplicationSettings.get_instance()
+        settings.highlight_deviation = highlighted
+        settings.save()
+        self._invalidate_thumbnails()
+
+    def scale_thumbnails(self, direction: int) -> None:
+        """Make the thumbnails larger or smaller by one step.
+
+        The size is stored at once; the thumbnails are rebuilt after a short
+        delay so that repeated steps rebuild them once.
+
+        Args:
+            direction (int): 1 to magnify, -1 to diminish.
+        """
+        settings = ApplicationSettings.get_instance()
+        step_x, step_y = _THUMBNAIL_STEP
+        (min_x, min_y), (max_x, max_y) = _MIN_THUMBNAIL_SIZE, _MAX_THUMBNAIL_SIZE
+        width = settings.max_thumbnail_width + step_x * direction
+        height = settings.max_thumbnail_height + step_y * direction
+        settings.max_thumbnail_width = min(max(width, min_x), max_x)
+        settings.max_thumbnail_height = min(max(height, min_y), max_y)
+        if not self._thumbnail_resize_timer.isActive():
+            self._thumbnail_resize_timer.start()
+
+    def _apply_thumbnail_size(self) -> None:
+        settings = ApplicationSettings.get_instance()
+        settings.save()
+        self.thumbnails.apply_settings(settings)
+
+    def _apply_thumbnail_settings(self, settings: ApplicationSettings) -> None:
+        """Take the thumbnail options of ``settings`` into the list and its buttons."""
+        self.thumbnails.apply_settings(settings)
+        self.thumbColumnViewBtn.setChecked(settings.single_column_thumbnail_display)
+
+    def _wire_units_menu(self) -> None:
+        """Bind the Units menu to the shared unit and the stored setting."""
+        group = QtGui.QActionGroup(self.ui)
+        group.setExclusive(True)
+        for action in self._units_actions().values():
+            group.addAction(action)
+        self._show_units_choice(self.units_provider.units)
+        for units, action in self._units_actions().items():
+            action.toggled.connect(
+                lambda checked, chosen=units: checked and self._choose_units(chosen)
+            )
+        self.units_provider.units_changed.connect(self._show_units_choice)
+
+    def _units_actions(self) -> dict[Units, QtGui.QAction]:
+        return {
+            Units.PIXELS: self.actionPixels,
+            Units.MILLIMETERS: self.actionMilimeters,
+            Units.CENTIMETERS: self.actionCentimetres,
+            Units.INCHES: self.actionInches,
+        }
+
+    def _show_units_choice(self, units: Units) -> None:
+        """Check the menu entry of ``units``, whoever chose the unit."""
+        self._units_actions()[units].setChecked(True)
+
+    def _choose_units(self, units: Units) -> None:
+        """Make ``units`` the unit of every length shown, and remember it."""
+        settings = ApplicationSettings.get_instance()
+        if settings.units is not units:
+            settings.units = units
+            settings.save()
+        self.units_provider.set_units(units)
 
     def _insert_add_files_action(self) -> None:
         """Place the add-files action in the File menu, above the save entries."""
@@ -585,6 +797,26 @@ class MainWindowManager:
         if not self.open_project_file(path) and self.project is None:
             self._update_welcome_panel()
 
+    def _shortcut_actions(self) -> list[QtGui.QAction]:
+        """Return the actions that have a shortcut but sit in no menu."""
+        return [
+            self.actionFirstPage,
+            self.actionLastPage,
+            self.actionNextPage,
+            self.actionPrevPage,
+            self.actionPrevPageQ,
+            self.actionNextPageW,
+            self.actionNextSelectedPage,
+            self.actionPrevSelectedPage,
+            self.actionNextSelectedPageW,
+            self.actionPrevSelectedPageQ,
+            self.actionGotoPage,
+            self.actionMagnifyThumbnails,
+            self.actionDiminishThumbnails,
+            self.actionReloadPage,
+            *self._switch_filter_actions(),
+        ]
+
     def _switch_filter_actions(self) -> list[QtGui.QAction]:
         """Return the stage switching actions in stage order."""
         return [
@@ -667,6 +899,8 @@ class MainWindowManager:
         panels = StagePanels(stage, self.stages, self.ui)
         panels.set_dpi_overrides(self._dpi_overrides)
         panels.settings_changed.connect(self._on_settings_edited)
+        panels.page_size_changed.connect(self.status_panel.set_page_size)
+        panels.cursor_moved.connect(self.status_panel.set_cursor_position)
         self._connect_apply_requests(panels)
         if panels.stage == FilterStage.PAGE_SPLIT:
             cast(Any, panels.options).page_count_requested.connect(
@@ -701,11 +935,17 @@ class MainWindowManager:
             propagation.propagate_content_boxes(project, self.stages)
             self._invalidate_thumbnails()
 
-    def _refresh_page_list(self) -> None:
-        """List the project's pages again after the page count of an image changed."""
+    def _refresh_page_list(self, preferred: PageId | None = None) -> None:
+        """List the project's pages again after the pages changed.
+
+        Args:
+            preferred (PageId | None): The page to make current if it still exists.
+        """
         pages = self.pages()
         previous = self._current_page
-        if previous in pages or previous is None:
+        if preferred in pages:
+            target = preferred
+        elif previous in pages or previous is None:
             target = previous
         else:
             same_image = [page for page in pages if page.image_id == previous.image_id]
@@ -717,6 +957,7 @@ class MainWindowManager:
         if target != previous:
             self._update_auto_save_timer()
             self._show_current_page()
+        self._update_status_bar()
 
     def _adopt_stored_page_counts(self, images: Iterable[ImageId]) -> bool:
         """Show the page count of the stored Page Split layouts in the page list.
@@ -770,6 +1011,8 @@ class MainWindowManager:
         if panels is None:
             return
         self._cancel_render()
+        self.status_panel.set_page_size(None, 0.0)
+        self.status_panel.set_cursor_position(None)
         for widget, layout in (
             (panels.options, self.optionsFrameLayout),
             (panels.view, self.imageFrameLayout),
@@ -782,11 +1025,21 @@ class MainWindowManager:
 
     def _show_current_page(self) -> None:
         """Point the stage panels at the current page and render it."""
+        self._update_status_bar()
         panels = self._panels
         if panels is None:
             return
         panels.set_page(self._current_page)
         self._request_render()
+
+    def _update_status_bar(self) -> None:
+        """Show the position and name of the current page in the status bar."""
+        page = self._current_page
+        displayed = self.thumbnails.pages()
+        if page is None or page not in displayed:
+            self.status_panel.clear()
+            return
+        self.status_panel.update_page(displayed.index(page) + 1, len(displayed), page)
 
     def _request_render(self) -> None:
         """Render the current page up to the current stage in the background."""
@@ -1175,6 +1428,7 @@ class MainWindowManager:
             in_progress (bool): True when a batch starts, False when it ends.
         """
         self.filterList.set_batch_processing_in_progress(in_progress)
+        self.thumbnails.set_context_menu_enabled(not in_progress)
         self.filterList.setEnabled(not in_progress)
         self.filterOptions.setEnabled(not in_progress)
         self.processing_indicator.set_active(in_progress)
@@ -1584,22 +1838,24 @@ class MainWindowManager:
             return None
         return dialog.relinker()
 
+    def _can_navigate(self) -> bool:
+        """Whether the page may change: a project is open and no batch runs."""
+        return self.project is not None and not self.batch_runner.is_running
+
+    def _go_to_page(self, page: PageId) -> None:
+        """Make ``page`` current and keep it in view in the thumbnail list."""
+        self.focusButton.setChecked(True)
+        self.current_page = page
+
     def _go_to_page_index(self, index: int) -> None:
-        """Make the page at ``index`` current, clamping to the valid range.
+        """Make the displayed page at ``index`` current, clamping to the valid range.
 
         Args:
-            index (int): Zero-based position in the page sequence.
+            index (int): Zero-based position in the thumbnail list.
         """
-        pages = self.pages()
-        if pages:
-            self.current_page = pages[max(0, min(index, len(pages) - 1))]
-
-    def _current_page_index(self) -> int:
-        """Return the position of the current page, or -1 when there is none."""
-        pages = self.pages()
-        if self.current_page is None or self.current_page not in pages:
-            return -1
-        return pages.index(self.current_page)
+        pages = self.thumbnails.pages()
+        if pages and self._can_navigate():
+            self._go_to_page(pages[max(0, min(index, len(pages) - 1))])
 
     def goFirstPage(self) -> None:
         """Go to first page."""
@@ -1607,15 +1863,27 @@ class MainWindowManager:
 
     def goLastPage(self) -> None:
         """Go to last page."""
-        self._go_to_page_index(len(self.pages()) - 1)
+        self._go_to_page_index(len(self.thumbnails.pages()) - 1)
 
     def goNextPage(self) -> None:
         """Go to next page."""
-        self._go_to_page_index(self._current_page_index() + 1)
+        self._go_to_page_index(self._display_position() + 1)
 
     def goPrevPage(self) -> None:
         """Go to previous page."""
-        self._go_to_page_index(max(self._current_page_index() - 1, 0))
+        self._go_to_page_index(max(self._display_position() - 1, 0))
+
+    def _on_prev_page_button(self) -> None:
+        if self.filterSelectedBtn.isChecked():
+            self.goPrevSelectedPage()
+        else:
+            self.goPrevPage()
+
+    def _on_next_page_button(self) -> None:
+        if self.filterSelectedBtn.isChecked():
+            self.goNextSelectedPage()
+        else:
+            self.goNextPage()
 
     def _display_position(self) -> int:
         """Return the row of the current page in the thumbnail list, or -1."""
@@ -1636,11 +1904,14 @@ class MainWindowManager:
             step (int): 1 for the next selected page in display order, -1 for the
                 previous one.
         """
+        if not self._can_navigate():
+            return
         displayed = self.thumbnails.pages()
         selected = set(self.thumbnails.selected_pages())
         index = self._display_position()
         while 0 <= (index := index + step) < len(displayed):
             if displayed[index] in selected:
+                self.focusButton.setChecked(True)
                 # NoUpdate keeps the multi-selection that the user is stepping through.
                 self.thumbnails.view.selectionModel().setCurrentIndex(
                     self.thumbnails.model.index(
@@ -1659,8 +1930,21 @@ class MainWindowManager:
         self._go_to_adjacent_selected_page(-1)
 
     def execGotoPageDialog(self) -> None:
-        """Execute go to page dialog."""
-        _LOG.info("Execute go to page dialog")
+        """Ask for a page number and go to that page."""
+        pages = self.thumbnails.pages()
+        if not pages or not self._can_navigate():
+            return
+        number, accepted = QInputDialog.getInt(
+            self.ui,
+            self.ui.tr("Go To Page"),
+            self.ui.tr("Enter the page number:"),
+            max(self._display_position(), 0) + 1,
+            1,
+            len(pages),
+            1,
+        )
+        if accepted and pages[number - 1] != self._current_page:
+            self._go_to_page(pages[number - 1])
 
     def showAboutDialog(self) -> None:
         """Show about dialog."""
@@ -1669,7 +1953,7 @@ class MainWindowManager:
 
     def reloadCurrentPage(self) -> None:
         """Render the current page again, e.g. after its source file changed."""
-        if self._current_page is None:
+        if self._current_page is None or not self._can_navigate():
             return
         self._invalidate_thumbnails(self._current_page)
         self._request_render()
@@ -1748,7 +2032,7 @@ class MainWindowManager:
         settings = ApplicationSettings.get_instance()
         dialog = SettingsDialog(settings, self.ui)
         dialog.settings_changed.connect(
-            lambda: self.thumbnails.apply_settings(settings)
+            lambda: self._apply_thumbnail_settings(settings)
         )
         self._run_dialog(dialog)
 
@@ -1801,12 +2085,42 @@ class MainWindowManager:
 
     def addFiles(self) -> None:
         """Append images chosen in the project files dialog to the open project."""
-        if self.project is None or self.batch_runner.is_running:
+        self._insert_chosen_images(None, before=True)
+
+    def insert_images_before(self, page: PageId) -> None:
+        """Insert images chosen in the files dialog before the image of ``page``.
+
+        Args:
+            page (PageId): A page of the open project.
+        """
+        self._insert_chosen_images(page.image_id, before=True)
+
+    def insert_images_after(self, page: PageId) -> None:
+        """Insert images chosen in the files dialog after the image of ``page``.
+
+        Args:
+            page (PageId): A page of the open project.
+        """
+        self._insert_chosen_images(page.image_id, before=False)
+
+    def insert_images_at_end(self) -> None:
+        """Append images chosen in the files dialog after the last page."""
+        self._insert_chosen_images(None, before=True)
+
+    def _insert_chosen_images(self, existing: ImageId | None, *, before: bool) -> None:
+        """Ask for image files and insert those not yet in the project.
+
+        Args:
+            existing (ImageId | None): The image to insert beside; None appends.
+            before (bool): Insert before ``existing`` rather than after it.
+        """
+        project = self.project
+        if project is None or self.batch_runner.is_running:
             return
         dialog = self.project_files_dialog_factory(self.ui)
         if not self._run_dialog(dialog):
             return
-        present = {info.id.file_path for info in self.project.images}
+        present = {info.id.file_path for info in project.images}
         paths = [
             path
             for path in sort_smart(dialog.get_project_paths())
@@ -1817,11 +2131,67 @@ class MainWindowManager:
             pages = self._fix_dpi_of_new_pages(pages)
         if not pages:
             return
-        for image_id, metadata in pages:
-            self.project.add_image(image_id, metadata)
-        if self.current_page is None:
-            self.current_page = self.pages()[0]
+        infos = [ImageInfo(id=image_id, metadata=meta) for image_id, meta in pages]
+        project.register_output_file_labels()
+        if not project.insert_images(infos, existing, before=before):
+            return
+        self._refresh_dpi_overrides()
         self.modified = True
+        current = self._current_page
+        self._refresh_page_list(current if current is not None else self.pages()[0])
+
+    def remove_pages(self, pages: Iterable[PageId]) -> None:
+        """Remove pages from the project after confirmation.
+
+        Args:
+            pages (Iterable[PageId]): The pages to remove.
+        """
+        project = self.project
+        doomed = set(pages)
+        if project is None or not doomed or self.batch_runner.is_running:
+            return
+        erase_output = self.remove_pages_prompt(len(doomed), self.ui)
+        if erase_output is None:
+            return
+        survivor = self._page_to_select_after_removal(doomed)
+        pages_before = self.pages()
+        sources = [info.id.file_path for info in project.images]
+        project.register_output_file_labels()
+        removed = project.remove_pages(doomed)
+        if not removed:
+            return
+        if erase_output:
+            erase_output_files(
+                removed,
+                project.output_directory,
+                pages_before,
+                project.layout_direction,
+                keep=sources,
+                file_labels=project.output_file_label_map(),
+            )
+        self._refresh_dpi_overrides()
+        self.modified = True
+        self._refresh_page_list(survivor)
+
+    def _page_to_select_after_removal(self, doomed: set[PageId]) -> PageId | None:
+        """Pick the page to show once ``doomed`` are gone.
+
+        Returns:
+            PageId | None: The first page that stays if the list starts with a
+                removed one, else the page before the first removed one.
+        """
+        displayed = self.thumbnails.pages()
+        survivors = [page for page in displayed if page not in doomed]
+        if not survivors:
+            return None
+        if displayed[0] in doomed:
+            return survivors[0]
+        before: PageId | None = None
+        for page in displayed:
+            if page in doomed:
+                return before
+            before = page
+        return None
 
     @staticmethod
     def _run_dialog(dialog: QtWidgets.QDialog) -> bool:

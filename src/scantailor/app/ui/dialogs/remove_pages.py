@@ -14,8 +14,8 @@ _UI_FOLDER = Path(__file__).parent
 class RemovePagesDialog(QtWidgets.QDialog):
     """Dialog to confirm removal of pages from a project.
 
-    Shows a warning message with the number of pages to be removed
-    and information about what will happen to the files.
+    Shows the number of pages to be removed and lets the user choose whether
+    the output files written for them are deleted too. Input files always remain.
     """
 
     def __init__(
@@ -44,6 +44,13 @@ class RemovePagesDialog(QtWidgets.QDialog):
         self._text_label = get_cwidget(self.ui, QtWidgets.QLabel, "text")
         self._warning_label = get_cwidget(self.ui, QtWidgets.QLabel, "multiPageWarning")
         self._button_box = get_cwidget(self.ui, QtWidgets.QDialogButtonBox, "buttonBox")
+        self._erase_check = get_cwidget(
+            self.ui, QtWidgets.QCheckBox, "eraseOutputFiles"
+        )
+        self._output_note = self._warning_label.text()
+        self._button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).setText(
+            "Remove"
+        )
 
         # Set the question icon
         icon = self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxQuestion)
@@ -59,6 +66,18 @@ class RemovePagesDialog(QtWidgets.QDialog):
         """Connect widget signals."""
         self._button_box.accepted.connect(self.accept)
         self._button_box.rejected.connect(self.reject)
+        self._erase_check.toggled.connect(self._show_output_note)
+        self._show_output_note(self._erase_check.isChecked())
+
+    def _show_output_note(self, erase: bool) -> None:
+        self._warning_label.setText(
+            self._output_note if erase else "Input and output files will remain."
+        )
+
+    @property
+    def erase_output_files(self) -> bool:
+        """Whether the output files of the removed pages are to be deleted."""
+        return self._erase_check.isChecked()
 
     @staticmethod
     def confirm_removal(
@@ -74,5 +93,24 @@ class RemovePagesDialog(QtWidgets.QDialog):
         Returns:
             True if user confirmed removal, False otherwise.
         """
+        return RemovePagesDialog.ask_removal(page_count, parent) is not None
+
+    @staticmethod
+    def ask_removal(
+        page_count: int,
+        parent: QtWidgets.QWidget | None = None,
+    ) -> bool | None:
+        """Show the dialog and report what the user chose.
+
+        Args:
+            page_count (int): Number of pages to be removed.
+            parent (QtWidgets.QWidget | None): Parent widget.
+
+        Returns:
+            bool | None: None if cancelled, otherwise whether output files are
+                to be deleted as well.
+        """
         dialog = RemovePagesDialog(page_count, parent)
-        return dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted
+        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            return None
+        return dialog.erase_output_files
