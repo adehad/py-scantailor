@@ -49,6 +49,7 @@ from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.params import DistortionModelSpec
 from scantailor.filters.output.split_output import (
     BACKGROUND_DIR,
     FOREGROUND_DIR,
@@ -83,11 +84,14 @@ class RenderInfo:
         output_dpi: Resolution of the written image.
         was_dewarped: True when the output was dewarped, which no affine
             transformation describes.
+        distortion_model: Page edges that automatic or marginal dewarping
+            found, to be stored in the page's parameters; None if none was built.
     """
 
     transformation: ImageTransformation
     output_dpi: Dpi
     was_dewarped: bool
+    distortion_model: DistortionModelSpec | None = None
 
 
 @dataclass(frozen=True)
@@ -446,6 +450,7 @@ def collect_stage_defaults(stages: StageSequence) -> StageDefaultsData:
         "output_despeckle_level": output.get_default_despeckle_level().value,
         "page_detection_box": list(select_content.get_page_detection_box()),
         "page_detection_tolerance": select_content.get_page_detection_tolerance(),
+        "deskew_auto_oblique": stages.deskew_filter.auto_oblique_default,
     }
 
 
@@ -463,6 +468,9 @@ def apply_stage_defaults(stages: StageSequence, defaults: StageDefaultsData) -> 
     select_content = stages.select_content_filter.settings
     select_content.set_page_detection_box(*defaults["page_detection_box"])
     select_content.set_page_detection_tolerance(defaults["page_detection_tolerance"])
+    stages.deskew_filter.auto_oblique_default = bool(
+        defaults.get("deskew_auto_oblique", False)
+    )
 
 
 def _dump_entries(entries: dict[str, list[StageParamsEntry]]) -> StageParamsData:
@@ -653,6 +661,7 @@ def _render_page(job: _PageJob) -> tuple[Path, RenderInfo]:
         rendered.transformation,
         dpi,
         bool(rendered.metadata.get("OUTPUT", {}).get("was_dewarped")),
+        rendered.distortion_model,
     )
     return job.output_path, info
 
@@ -716,6 +725,10 @@ def run_batch(
             result.written[event.page] = event.path
             if event.info is not None:
                 result.render_info[event.page] = event.info
+                if event.info.distortion_model is not None:
+                    stages.output_filter.store_distortion_model(
+                        event.page, event.info.distortion_model
+                    )
         elif isinstance(event, PageFailed):
             result.failed[event.page] = event.error
         if on_progress is not None:

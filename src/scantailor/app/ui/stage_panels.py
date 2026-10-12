@@ -66,6 +66,53 @@ _NEW_PICTURE_LAYER = PictureLayer.PAINTER2
 
 
 @dataclass
+class _ViewState:
+    """How much of a page a view shows and where, independent of its pixel size.
+
+    Attributes:
+        zoom: Widget pixels per virtual pixel.
+        page_width: Width of the displayed area in virtual pixels.
+        scroll: Horizontal and vertical scroll position as fractions of the
+            scroll range, None for an axis that cannot scroll.
+    """
+
+    zoom: float
+    page_width: float
+    scroll: tuple[float | None, float | None]
+
+    @classmethod
+    def of(cls, view: ImageViewBase) -> "_ViewState":
+        """Capture the zoom and scroll position of ``view``."""
+        return cls(
+            view.zoom_level,
+            view.virtual_display_area.width(),
+            (
+                _scroll_fraction(view.horizontalScrollBar()),
+                _scroll_fraction(view.verticalScrollBar()),
+            ),
+        )
+
+    def apply_to(self, view: ImageViewBase) -> None:
+        """Show as much of the page, at the same place, in a view of another size."""
+        width = view.virtual_display_area.width()
+        if width <= 0 or self.page_width <= 0:
+            return
+        view.set_zoom(self.zoom * self.page_width / width)
+        for bar, fraction in zip(
+            (view.horizontalScrollBar(), view.verticalScrollBar()), self.scroll
+        ):
+            if fraction is not None and bar.maximum() > bar.minimum():
+                bar.setValue(
+                    bar.minimum() + round(fraction * (bar.maximum() - bar.minimum()))
+                )
+
+
+def _scroll_fraction(bar: QtWidgets.QScrollBar) -> float | None:
+    extent = bar.maximum() - bar.minimum()
+    return (bar.value() - bar.minimum()) / extent if extent > 0 else None
+
+
+@dataclass
 class _Source:
     """Decoded source image of a page, BGR or gray as the loader returns it."""
 
@@ -249,6 +296,7 @@ class StagePanels(QtCore.QObject):
             case FilterStage.DESKEW:
                 widget = deskew.OptionsWidget(sequence.deskew_filter)
                 widget.angle_changed.connect(forward)
+                widget.oblique_changed.connect(forward)
             case FilterStage.SELECT_CONTENT:
                 widget = select_content.OptionsWidget(sequence.select_content_filter)
                 widget.page_mode_changed.connect(forward)
@@ -271,6 +319,7 @@ class StagePanels(QtCore.QObject):
             view.page_layout_set_locally.connect(self._on_page_layout_set)
         elif isinstance(view, DeskewImageView):
             view.manual_deskew_angle_set.connect(self._on_deskew_angle_set)
+            view.manual_oblique_angle_set.connect(self._on_oblique_angle_set)
         elif isinstance(view, SelectContentImageView):
             view.manual_content_rect_set.connect(self._on_content_rect_set)
             view.manual_page_rect_set.connect(self._on_page_rect_set)
@@ -394,6 +443,15 @@ class StagePanels(QtCore.QObject):
     def _rotation(self, page: PageId) -> OrthogonalRotation:
         return self.sequence.fix_orientation_filter.get_rotation(page.image_id)
 
+    def _view_state_of_same_page(
+        self, view: ImageViewBase, key: tuple[object, ...]
+    ) -> "_ViewState | None":
+        """Capture a zoomed view that is about to show the same page at another size."""
+        shown = self._view_key
+        if shown is None or shown[:2] != key[:2] or view._fit_mode:
+            return None
+        return _ViewState.of(view)
+
     def _already_shown(self, key: tuple[object, ...], *objects: object) -> bool:
         """Record what the view now shows; tell whether it was showing it already."""
         same = (
@@ -414,11 +472,14 @@ class StagePanels(QtCore.QObject):
         if isinstance(view, OutputImageView):
             image = self._stage_image
             assert image is not None
-            key = (self.stage, page, image.shape)
+            key = (self.stage, page, image.shape[:2])
             keep = key == self._view_key
+            carried = None if keep else self._view_state_of_same_page(view, key)
             if self._already_shown(key, image):
                 return
             view.set_image(image, keep_view=keep)
+            if carried is not None:
+                carried.apply_to(view)
             return
 
         if isinstance(view, FixOrientationImageView):
@@ -439,9 +500,9 @@ class StagePanels(QtCore.QObject):
         oriented_size = (oriented.shape[1], oriented.shape[0])
         if isinstance(view, DeskewImageView):
             through = FilterStage.PAGE_SPLIT
-            view.set_deskew_angle(
-                self.sequence.deskew_filter.get_params(page).deskew_angle_deg
-            )
+            params = self.sequence.deskew_filter.get_params(page)
+            view.set_deskew_angle(params.deskew_angle_deg)
+            view.set_oblique_angle(params.oblique_angle_deg)
         elif isinstance(view, PageSplitImageView):
             through = FilterStage.FIX_ORIENTATION
         else:
@@ -479,9 +540,9 @@ class StagePanels(QtCore.QObject):
                     sequence, page, oriented_size, source.dpi, FilterStage.PAGE_SPLIT
                 )
             )
-            view.set_deskew_angle(
-                sequence.deskew_filter.get_params(page).deskew_angle_deg
-            )
+            params = sequence.deskew_filter.get_params(page)
+            view.set_deskew_angle(params.deskew_angle_deg)
+            view.set_oblique_angle(params.oblique_angle_deg)
         elif isinstance(view, SelectContentImageView):
             self._refresh_select_content(view, page, oriented_size, source.dpi)
         elif isinstance(view, PageLayoutImageView):
@@ -622,6 +683,13 @@ class StagePanels(QtCore.QObject):
         if page is None:
             return
         self.sequence.deskew_filter.set_manual_angle(page, degrees)
+        self._after_edit()
+
+    def _on_oblique_angle_set(self, degrees: float) -> None:
+        page = self._page
+        if page is None:
+            return
+        self.sequence.deskew_filter.set_manual_oblique(page, degrees)
         self._after_edit()
 
     def _on_content_rect_set(self, rect: QtCore.QRectF) -> None:

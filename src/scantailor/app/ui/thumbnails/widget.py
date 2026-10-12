@@ -458,9 +458,10 @@ class ThumbnailListWidget(QWidget):
         return self._model.current_page
 
     def set_current_page(self, page: PageId) -> None:
-        """Make a page current, select only it and scroll it into view.
+        """Make a page current and select only it.
 
-        Emits ``page_selected`` if the current page changes.
+        Scrolls it into view only while following the current page. Emits
+        ``page_selected`` if the current page changes.
 
         Args:
             page (PageId): The page to make current.
@@ -468,8 +469,15 @@ class ThumbnailListWidget(QWidget):
         row = self._model.row_of(page)
         if row < 0:
             return
-        self._view.setCurrentIndex(self._model.index(row))
-        self.scroll_to_current()
+        # QAbstractItemView scrolls to a new current index on its own; only
+        # the follow setting may decide that for programmatic navigation.
+        self._view.setAutoScroll(False)
+        try:
+            self._view.setCurrentIndex(self._model.index(row))
+        finally:
+            self._view.setAutoScroll(True)
+        if self._follow_current:
+            self.scroll_to_current()
 
     def scroll_to_current(self) -> None:
         """Scroll so the current page is visible."""

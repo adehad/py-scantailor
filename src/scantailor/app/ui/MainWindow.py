@@ -23,7 +23,12 @@ from PySide6.QtWidgets import (
 from scantailor.app.ui import UI_FOLDER, load_ui_widget
 from scantailor.app.ui.batch_runner import BatchRunner
 from scantailor.app.ui.dialogs.about import AboutDialog
-from scantailor.app.ui.dialogs.apply_to import OUTPUT_GROUP_TITLES, ApplyToDialog
+from scantailor.app.ui.dialogs.apply_to import (
+    DESKEW_OPTIONS,
+    DESKEW_TITLE,
+    OUTPUT_GROUP_TITLES,
+    ApplyToDialog,
+)
 from scantailor.app.ui.dialogs.batch_progress import BatchProgressDialog
 from scantailor.app.ui.dialogs.default_params import DefaultParamsDialog
 from scantailor.app.ui.dialogs.fix_dpi import FixDpiDialog
@@ -83,7 +88,7 @@ from scantailor.core.stage_params import (
 )
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.xml_compat import import_xml_project_file
-from scantailor.filters.output.params import ApplyGroup
+from scantailor.filters.output.params import ApplyGroup, DistortionModelSpec
 from scantailor.filters.page_split.layout_type import LayoutType
 
 PROJECT_SUFFIX = ".ScanTailor"
@@ -109,6 +114,10 @@ _BATCH_THREADS_KEY = "settings/batch_processing_threads"
 _SELECT_CONTENT_OPTIONS = {
     "content_box": "Apply content box",
     "page_box": "Apply page box",
+}
+_APPLY_OPTIONS: dict[FilterStage, dict[str, str]] = {
+    FilterStage.SELECT_CONTENT: _SELECT_CONTENT_OPTIONS,
+    FilterStage.DESKEW: DESKEW_OPTIONS,
 }
 
 
@@ -289,6 +298,7 @@ class MainWindowManager:
         self._welcome_widget: QWidget | None = None
         self.renderer = PageRenderer(self.ui)
         self.renderer.render_done.connect(self._on_render_done)
+        self.renderer.distortion_model_found.connect(self._on_distortion_model_found)
         self.renderer.render_failed.connect(self._on_render_failed)
         self._render_pending = False
         self._thumbnail_epoch = 0
@@ -1104,6 +1114,12 @@ class MainWindowManager:
         if self._panels is not None and page_id == self._current_page:
             self._panels.show_image(image)  # type: ignore[arg-type]
 
+    def _on_distortion_model_found(
+        self, page_id: PageId, model: DistortionModelSpec
+    ) -> None:
+        if self.stages.output_filter.store_distortion_model(page_id, model):
+            self.modified = True
+
     def _on_render_failed(self, page_id: PageId, message: str) -> None:
         self._set_render_pending(False)
         _LOG.warning(f"Page {page_id} could not be shown: {message}")
@@ -1227,11 +1243,10 @@ class MainWindowManager:
             return False
         if stage == FilterStage.PAGE_SPLIT:
             return self._show_split_mode_dialog(page)
-        option_labels = (
-            {key: self.ui.tr(label) for key, label in _SELECT_CONTENT_OPTIONS.items()}
-            if stage == FilterStage.SELECT_CONTENT
-            else {}
-        )
+        option_labels = {
+            key: self.ui.tr(label)
+            for key, label in _APPLY_OPTIONS.get(stage, {}).items()
+        }
         dialog = ApplyToDialog(
             page,
             self.pages(),
@@ -1253,6 +1268,8 @@ class MainWindowManager:
             part=part,
             content_box=flags.get("content_box", True),
             page_box=flags.get("page_box", True),
+            deskew=flags.get("deskew", True),
+            oblique=flags.get("oblique", True),
         )
         return True
 
@@ -1302,6 +1319,8 @@ class MainWindowManager:
         """Return the title of the apply dialog for a stage and settings part."""
         if stage == FilterStage.OUTPUT and part:
             return self.ui.tr(OUTPUT_GROUP_TITLES[ApplyGroup(part)])
+        if stage == FilterStage.DESKEW:
+            return self.ui.tr(DESKEW_TITLE)
         titles = {
             "margins": self.ui.tr("Apply Margins"),
             "alignment": self.ui.tr("Apply Alignment"),
@@ -1316,6 +1335,8 @@ class MainWindowManager:
         part: str = "",
         content_box: bool = True,
         page_box: bool = True,
+        deskew: bool = True,
+        oblique: bool = True,
         layout_type: LayoutType = LayoutType.AUTO_LAYOUT_TYPE,
         apply_cut: bool = False,
     ) -> None:
@@ -1327,6 +1348,8 @@ class MainWindowManager:
             part (str): For Page Layout, ``"margins"`` or ``"alignment"``.
             content_box (bool): Select Content: copy a manual content box.
             page_box (bool): Select Content: copy a manual page box.
+            deskew (bool): Deskew: copy the rotation angle and mode.
+            oblique (bool): Deskew: copy the oblique angle and mode.
             layout_type (LayoutType): Page Split: the layout type to request.
             apply_cut (bool): Page Split: also copy the cutter lines, adapted to
                 each target.
@@ -1348,7 +1371,9 @@ class MainWindowManager:
                 ):
                     self._refresh_page_list()
             case FilterStage.DESKEW:
-                propagation.apply_deskew(stages, source, targets)
+                propagation.apply_deskew(
+                    stages, source, targets, apply_deskew=deskew, apply_oblique=oblique
+                )
             case FilterStage.SELECT_CONTENT:
                 propagation.apply_select_content(
                     stages,
@@ -1373,8 +1398,8 @@ class MainWindowManager:
             self._request_render()
 
     def _batch_pages(self) -> list[PageId]:
-        """Return the pages a batch processes: the current page and those after it."""
-        return self.thumbnails.pages()[max(self._display_position(), 0) :]
+        """Return every page in display order, whichever order is chosen."""
+        return self.thumbnails.pages()
 
     def _batch_worker_count(self) -> int | None:
         """Return the page parallelism chosen in the system load slider, if any."""
@@ -1382,10 +1407,11 @@ class MainWindowManager:
         return saved if isinstance(saved, int) and saved > 0 else None
 
     def startBatchProcessing(self) -> None:
-        """Process the current page and the following ones in the background."""
+        """Process every page in display order in the background."""
         project = self.project
         if project is None or self.batch_runner.is_running:
             return
+        self.focusButton.setChecked(True)
         self._start_batch(self._batch_pages())
 
     def _start_batch(self, pages: list[PageId]) -> None:
@@ -1843,8 +1869,7 @@ class MainWindowManager:
         return self.project is not None and not self.batch_runner.is_running
 
     def _go_to_page(self, page: PageId) -> None:
-        """Make ``page`` current and keep it in view in the thumbnail list."""
-        self.focusButton.setChecked(True)
+        """Make ``page`` current, scrolling the list to it only while Focus is on."""
         self.current_page = page
 
     def _go_to_page_index(self, index: int) -> None:
@@ -1911,7 +1936,6 @@ class MainWindowManager:
         index = self._display_position()
         while 0 <= (index := index + step) < len(displayed):
             if displayed[index] in selected:
-                self.focusButton.setChecked(True)
                 # NoUpdate keeps the multi-selection that the user is stepping through.
                 self.thumbnails.view.selectionModel().setCurrentIndex(
                     self.thumbnails.model.index(

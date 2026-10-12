@@ -237,6 +237,16 @@ def test_set_current_page_emits_page_selected(
 def test_scroll_to_current_brings_last_page_into_view(
     qtbot: QtBot, project: Project, renderer: CountingRenderer
 ) -> None:
+    thumbnails = _long_list(qtbot, project, renderer)
+    last = thumbnails.pages()[-1]
+    thumbnails.set_current_page(last)
+    viewport = thumbnails.view.viewport().rect()
+    assert viewport.contains(thumbnails.item_rect(last).center())
+
+
+def _long_list(
+    qtbot: QtBot, project: Project, renderer: CountingRenderer
+) -> ThumbnailListWidget:
     for number in range(5, 30):
         project.add_image(
             ImageId(file_path=Path(f"page_{number}.png")),
@@ -247,8 +257,30 @@ def test_scroll_to_current_brings_last_page_into_view(
     thumbnails.resize(240, 400)
     thumbnails.show()
     qtbot.wait_exposed(thumbnails)
+    return thumbnails
+
+
+def test_programmatic_navigation_does_not_scroll_when_following_is_off(
+    qtbot: QtBot, project: Project, renderer: CountingRenderer
+) -> None:
+    thumbnails = _long_list(qtbot, project, renderer)
+    thumbnails.set_follow_current(False)
+
+    thumbnails.set_current_page(thumbnails.pages()[-1])
+
+    assert thumbnails.current_page() == thumbnails.pages()[-1]
+    assert thumbnails.view.verticalScrollBar().value() == 0
+
+
+def test_programmatic_navigation_scrolls_when_following_is_on(
+    qtbot: QtBot, project: Project, renderer: CountingRenderer
+) -> None:
+    thumbnails = _long_list(qtbot, project, renderer)
+    thumbnails.set_follow_current(True)
     last = thumbnails.pages()[-1]
+
     thumbnails.set_current_page(last)
+
     viewport = thumbnails.view.viewport().rect()
     assert viewport.contains(thumbnails.item_rect(last).center())
 

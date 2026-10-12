@@ -399,6 +399,51 @@ class TestThumbnailButtons:
         assert scrolls == [1]
         project_window.renderer.wait_for_done()
 
+    def test_keyboard_navigation_leaves_the_focus_button_off(
+        self, project_window: MainWindow.MainWindowManager
+    ):
+        project_window.focusButton.setChecked(False)
+
+        project_window.goNextPage()
+        project_window.goLastPage()
+        project_window.goFirstPage()
+
+        assert not project_window.focusButton.isChecked()
+        project_window.renderer.wait_for_done()
+
+    def test_navigating_with_focus_off_does_not_scroll_the_thumbnail_list(
+        self,
+        project_window: MainWindow.MainWindowManager,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        project_window.focusButton.setChecked(False)
+        scrolls: list[int] = []
+        monkeypatch.setattr(
+            project_window.thumbnails, "scroll_to_current", lambda: scrolls.append(1)
+        )
+
+        project_window.goLastPage()
+
+        assert scrolls == []
+        project_window.renderer.wait_for_done()
+
+    def test_stepping_through_selected_pages_leaves_the_focus_button_off(
+        self, project_window: MainWindow.MainWindowManager
+    ):
+        project_window.selectionModeBtn.setChecked(True)
+        selection = project_window.thumbnails.view.selectionModel()
+        for row in (0, 2):
+            selection.select(
+                project_window.thumbnails.model.index(row),
+                QtCore.QItemSelectionModel.SelectionFlag.Select,
+            )
+        project_window.focusButton.setChecked(False)
+
+        project_window.goNextSelectedPage()
+
+        assert not project_window.focusButton.isChecked()
+        project_window.renderer.wait_for_done()
+
 
 def _stored_units() -> Units:
     return ApplicationSettings.load().units
