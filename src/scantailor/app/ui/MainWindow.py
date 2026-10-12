@@ -2,7 +2,7 @@
 
 import enum
 import pathlib
-from collections.abc import Callable, Hashable
+from collections.abc import Callable, Hashable, Iterable
 from typing import Any, cast
 
 from loguru import logger as _LOG
@@ -86,6 +86,7 @@ _LAST_INPUT_DIR_KEY = "project/lastInputDir"
 _LAST_PDF_DIR_KEY = "project/lastPdfDir"
 _LAST_PDF_DPI_KEY = "project/lastPdfDpi"
 THUMBNAIL_SIZE = QtCore.QSize(160, 160)
+_AUTO_SAVE_INTERVAL_MS = 60_000
 # Written by SystemLoadWidget: how many pages a batch processes at once.
 _BATCH_THREADS_KEY = "settings/batch_processing_threads"
 _SELECT_CONTENT_OPTIONS = {
@@ -252,6 +253,10 @@ class MainWindowManager:
         self.pdf_source: PdfSource | None = None
         self.last_pdf_export: PdfExportResult | None = None
         self._modified = False
+        self._auto_save_timer = QtCore.QTimer(self.ui)
+        self._auto_save_timer.setSingleShot(True)
+        self._auto_save_timer.setInterval(_AUTO_SAVE_INTERVAL_MS)
+        self._auto_save_timer.timeout.connect(self._auto_save_project)
         # Serialised project as last saved or opened; None while never saved.
         self._saved_state: str | None = None
         self.workerThreadPool = None  # std::make_unique<WorkerThreadPool>()
@@ -611,6 +616,7 @@ class MainWindowManager:
         self._current_page = page
         if page is not None and page != self.thumbnails.current_page():
             self.thumbnails.set_current_page(page)
+        self._update_auto_save_timer()
         self._show_current_page()
 
     @property
@@ -653,6 +659,8 @@ class MainWindowManager:
         self._discard_panels()
         if previous is not None:
             self._propagate_between_stages(previous, stage)
+        if stage > FilterStage.PAGE_SPLIT and self.project is not None:
+            self._adopt_stored_page_counts([info.id for info in self.project.images])
         self.thumbnails.set_stage(str(int(stage)))
         panels = StagePanels(stage, self.stages, self.ui)
         panels.set_dpi_overrides(self._dpi_overrides)
@@ -705,7 +713,42 @@ class MainWindowManager:
         if target is not None:
             self.thumbnails.set_current_page(target)
         if target != previous:
+            self._update_auto_save_timer()
             self._show_current_page()
+
+    def _adopt_stored_page_counts(self, images: Iterable[ImageId]) -> bool:
+        """Show the page count of the stored Page Split layouts in the page list.
+
+        Args:
+            images (Iterable[ImageId]): The images to check.
+
+        Returns:
+            bool: True if a page count changed and the page list was rebuilt.
+        """
+        project = self.project
+        if project is None:
+            return False
+        if not propagation.adopt_stored_page_counts(project, self.stages, images):
+            return False
+        self.modified = True
+        self._refresh_page_list()
+        return True
+
+    def _update_auto_save_timer(self) -> None:
+        """Start the auto-save countdown unless it is already running."""
+        if not self._auto_save_timer.isActive():
+            self._auto_save_timer.start()
+
+    def _auto_save_project(self) -> None:
+        """Save the project to its file when auto-save is on and it has one."""
+        if self.project is None or not self.projectFile:
+            return
+        if self.batch_runner.is_running:
+            # The worker owns the settings that would be written.
+            return
+        if not ApplicationSettings.get_instance().auto_save_project:
+            return
+        self._write_project(pathlib.Path(self.projectFile))
 
     def _on_page_count_requested(self, image_id: ImageId, count: int) -> None:
         """Give an image the page count its chosen layout type implies.
@@ -800,6 +843,9 @@ class MainWindowManager:
 
     def _on_render_done(self, page_id: PageId, image: object) -> None:
         self._set_render_pending(False)
+        if self._adopt_stored_page_counts([page_id.image_id]):
+            if page_id not in self.pages():
+                return
         if self._panels is not None and page_id == self._current_page:
             self._panels.show_image(image)  # type: ignore[arg-type]
 
@@ -974,7 +1020,7 @@ class MainWindowManager:
             self.ui,
             page,
             self.pages(),
-            set(self.selectedPages()),
+            self.selectedPages(),
             params.layout_type,
             params.page_layout.to_layout_type(),
         )
@@ -1149,6 +1195,9 @@ class MainWindowManager:
             return
         if result.written or result.failed:
             self.modified = True
+        self._adopt_stored_page_counts(
+            dict.fromkeys(page.image_id for page in (*result.written, *result.failed))
+        )
         self._invalidate_thumbnails()
         self._request_render()
 
