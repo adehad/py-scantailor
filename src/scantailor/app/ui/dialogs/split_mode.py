@@ -174,6 +174,10 @@ class SplitModeDialog(QtWidgets.QDialog):
     def _get_selected_scope(self) -> ApplyScope:
         """Get the selected apply scope.
 
+        "Every other selected page" starts from the current page when it is
+        selected, as the dialog's hint says. The C++ application starts from the
+        first selected page instead.
+
         Returns:
             The selected ApplyScope.
         """
@@ -196,6 +200,9 @@ class SplitModeDialog(QtWidgets.QDialog):
 
     def _get_affected_pages(self) -> set[PageId]:
         """Get the set of pages affected by the current scope selection.
+
+        Scope resolution is ``select_pages``, including its deliberate
+        deviation from C++ for "every other selected page".
 
         Returns:
             Set of PageId objects that will be affected.
