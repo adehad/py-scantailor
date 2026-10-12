@@ -175,7 +175,7 @@ class Filter:
                 mode=AutoManualMode.AUTO,
                 dependencies=dependencies or Dependencies(),
             )
-            self._settings.set_params(page_id, params)
+            self._settings.store_detected_params(page_id, params)
 
         return result
 
