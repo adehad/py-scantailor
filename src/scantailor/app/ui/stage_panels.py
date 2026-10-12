@@ -297,6 +297,8 @@ class StagePanels(QtCore.QObject):
         if generation != self._source_generation:
             return
         self._source = _Source(image_id, pixels, dpi)
+        if isinstance(self.options, page_layout.OptionsWidget):
+            self.options.set_page_dpi(dpi, dpi)
         self._present()
 
     @QtCore.Slot(int, object, str)

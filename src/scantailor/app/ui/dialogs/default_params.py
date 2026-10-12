@@ -134,7 +134,7 @@ class DefaultParamsDialog(QtWidgets.QDialog):
             parent (QtWidgets.QWidget | None): Parent widget.
         """
         super().__init__(parent)
-        self._units = units
+        self._units = Units.MILLIMETERS if units is Units.PIXELS else units
         self._settings = settings or ApplicationSettings.get_instance()
         self._store = store or ProfileStore()
         self._loaded = DefaultParams(units=units)
@@ -310,7 +310,11 @@ class DefaultParamsDialog(QtWidgets.QDialog):
     def _select_initial_profile(self) -> None:
         self._fill_profile_box()
         box = self._profile_box()
-        index = box.findData(self._settings.current_profile)
+        index = box.findData(
+            self._settings.current_profile,
+            QtCore.Qt.ItemDataRole.UserRole,
+            QtCore.Qt.MatchFlag.MatchFixedString,
+        )
         box.blockSignals(True)
         box.setCurrentIndex(index if index != -1 else 0)
         box.blockSignals(False)
@@ -393,7 +397,11 @@ class DefaultParamsDialog(QtWidgets.QDialog):
             box.blockSignals(True)
             box.setEditable(False)
             index = box.currentIndex()
-            existing = box.findData(name)
+            existing = box.findData(
+                name,
+                QtCore.Qt.ItemDataRole.UserRole,
+                QtCore.Qt.MatchFlag.MatchFixedString,
+            )
             if existing == -1:
                 box.setItemText(index, name)
                 box.setItemData(index, name)
@@ -426,7 +434,7 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         params = self._build_params()
         if name not in (DEFAULT_PROFILE, SOURCE_PROFILE):
             try:
-                self._store.set_active(params)
+                self._store.set_active(params, name)
             except ProfileError:
                 logger.exception("The default parameters could not be stored")
         self._settings.current_profile = name

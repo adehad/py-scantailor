@@ -18,6 +18,7 @@ from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
 from scantailor.app.ui.dialogs.settings import SettingsDialog
 from scantailor.app.ui.dialogs.split_mode import SplitModeDialog
 from scantailor.app.ui.icons import icon
+from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.core.default_params import DefaultParams, apply_default_params
 from scantailor.core.default_params_profiles import (
     ProfileStore,
@@ -45,8 +46,10 @@ MIN_ROWS = 12
 def config(tmp_path: pathlib.Path) -> Iterator[pathlib.Path]:
     """Settings and profiles in a temporary folder, never the user's."""
     ApplicationSettings.set_config_path(tmp_path / "settings.json")
+    UnitsProvider.reset_instance()
     yield tmp_path
     ApplicationSettings.reset_instance()
+    UnitsProvider.reset_instance()
 
 
 def find[T: QtWidgets.QWidget](
@@ -105,6 +108,41 @@ def accept(dialog: QtWidgets.QDialog) -> None:
     ).click()
 
 
+def cancel(dialog: QtWidgets.QDialog) -> None:
+    find(dialog, QtWidgets.QDialogButtonBox, "buttonBox").button(
+        QtWidgets.QDialogButtonBox.StandardButton.Cancel
+    ).click()
+
+
+def window_lightness(app: QtWidgets.QApplication) -> int:
+    return app.palette().window().color().lightness()
+
+
+UNWIRED = (
+    ("languageBox", QtWidgets.QComboBox),
+    ("blackOnWhiteDetectionCB", QtWidgets.QCheckBox),
+    ("blackOnWhiteDetectionAtOutputCB", QtWidgets.QCheckBox),
+    ("highlightDeviationCB", QtWidgets.QCheckBox),
+    ("deskewDeviationCoefSB", QtWidgets.QDoubleSpinBox),
+    ("deskewDeviationThresholdSB", QtWidgets.QDoubleSpinBox),
+    ("selectContentDeviationCoefSB", QtWidgets.QDoubleSpinBox),
+    ("selectContentDeviationThresholdSB", QtWidgets.QDoubleSpinBox),
+    ("marginsDeviationCoefSB", QtWidgets.QDoubleSpinBox),
+    ("marginsDeviationThresholdSB", QtWidgets.QDoubleSpinBox),
+)
+WIRED = (
+    ("colorSchemeBox", QtWidgets.QComboBox),
+    ("unitsBox", QtWidgets.QComboBox),
+    ("autoSaveProjectCB", QtWidgets.QCheckBox),
+    ("thumbnailQualitySB", QtWidgets.QSpinBox),
+    ("thumbnailSizeSB", QtWidgets.QSpinBox),
+    ("singleColumnThumbnailsCB", QtWidgets.QCheckBox),
+    ("cancelingSelectionQuestionCB", QtWidgets.QCheckBox),
+    ("tiffCompressionBWBox", QtWidgets.QComboBox),
+    ("tiffCompressionColorBox", QtWidgets.QComboBox),
+)
+
+
 class TestSettingsDialog:
     def test_shows_its_controls_and_saves_what_was_edited(
         self, qtbot: QtBot, config: pathlib.Path
@@ -151,8 +189,145 @@ class TestSettingsDialog:
         def drive(dlg: QtWidgets.QDialog) -> None:
             assert_shown(dlg, "enableOpenglCb")
             assert not find(dlg, QtWidgets.QCheckBox, "enableOpenglCb").isEnabled()
+            for name, kind in UNWIRED:
+                assert not find(dlg, kind, name).isEnabled(), name
+            for name, kind in WIRED:
+                assert find(dlg, kind, name).isEnabled(), name
 
         exec_while(dialog, drive)
+
+    def test_disabled_options_keep_their_stored_values(
+        self, qtbot: QtBot, config: pathlib.Path
+    ) -> None:
+        settings = ApplicationSettings(
+            language="de", black_on_white_detection=False, highlight_deviation=False
+        )
+        dialog = SettingsDialog(settings)
+        qtbot.addWidget(dialog)
+
+        exec_while(dialog, accept)
+
+        assert settings.language == "de"
+        assert settings.black_on_white_detection is False
+        assert settings.highlight_deviation is False
+
+    def test_units_offer_pixels_and_reach_the_provider_on_accept(
+        self, qtbot: QtBot, config: pathlib.Path
+    ) -> None:
+        provider = UnitsProvider(Units.MILLIMETERS)
+        dialog = SettingsDialog(ApplicationSettings(), units_provider=provider)
+        qtbot.addWidget(dialog)
+        announced: list[Units] = []
+        provider.units_changed.connect(announced.append)
+
+        def drive(dlg: QtWidgets.QDialog) -> None:
+            units = find(dlg, QtWidgets.QComboBox, "unitsBox")
+            assert units.findData(Units.PIXELS) != -1
+            units.setCurrentIndex(units.findData(Units.PIXELS))
+            assert provider.units is Units.MILLIMETERS
+            accept(dlg)
+
+        exec_while(dialog, drive)
+
+        assert provider.units is Units.PIXELS
+        assert announced == [Units.PIXELS]
+
+    def test_cancel_does_not_change_the_unit(
+        self, qtbot: QtBot, config: pathlib.Path
+    ) -> None:
+        provider = UnitsProvider(Units.MILLIMETERS)
+        dialog = SettingsDialog(ApplicationSettings(), units_provider=provider)
+        qtbot.addWidget(dialog)
+
+        def drive(dlg: QtWidgets.QDialog) -> None:
+            units = find(dlg, QtWidgets.QComboBox, "unitsBox")
+            units.setCurrentIndex(units.findData(Units.INCHES))
+            cancel(dlg)
+
+        exec_while(dialog, drive)
+
+        assert provider.units is Units.MILLIMETERS
+
+    def test_choosing_a_scheme_previews_it_without_storing_it(
+        self,
+        qtbot: QtBot,
+        qapp: QtWidgets.QApplication,
+        config: pathlib.Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
+        theme.apply_theme(qapp, "light")
+        QtCore.QSettings().setValue(theme.SETTINGS_KEY, "light")
+        dialog = SettingsDialog(ApplicationSettings())
+        qtbot.addWidget(dialog)
+        light = window_lightness(qapp)
+
+        def drive(dlg: QtWidgets.QDialog) -> None:
+            box = find(dlg, QtWidgets.QComboBox, "colorSchemeBox")
+            box.setCurrentIndex(box.findData("dark"))
+            assert window_lightness(qapp) < light
+            assert QtCore.QSettings().value(theme.SETTINGS_KEY) == "light"
+            cancel(dlg)
+
+        exec_while(dialog, drive)
+        theme.apply_theme(qapp, theme.AUTO)
+
+    @pytest.mark.parametrize("close", ["cancel button", "escape", "window close"])
+    def test_closing_without_accepting_brings_back_the_earlier_scheme(
+        self,
+        qtbot: QtBot,
+        qapp: QtWidgets.QApplication,
+        config: pathlib.Path,
+        monkeypatch: pytest.MonkeyPatch,
+        close: str,
+    ) -> None:
+        monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
+        theme.apply_theme(qapp, "light")
+        QtCore.QSettings().setValue(theme.SETTINGS_KEY, "light")
+        dialog = SettingsDialog(ApplicationSettings())
+        qtbot.addWidget(dialog)
+        light = window_lightness(qapp)
+
+        def drive(dlg: QtWidgets.QDialog) -> None:
+            box = find(dlg, QtWidgets.QComboBox, "colorSchemeBox")
+            box.setCurrentIndex(box.findData("dark"))
+            assert window_lightness(qapp) < light
+            if close == "cancel button":
+                cancel(dlg)
+            elif close == "escape":
+                qtbot.keyClick(dlg, QtCore.Qt.Key.Key_Escape)
+            else:
+                dlg.close()
+
+        assert exec_while(dialog, drive) == QtWidgets.QDialog.DialogCode.Rejected
+        assert window_lightness(qapp) == light
+        assert QtCore.QSettings().value(theme.SETTINGS_KEY) == "light"
+        theme.apply_theme(qapp, theme.AUTO)
+
+    def test_accepting_keeps_the_previewed_scheme(
+        self,
+        qtbot: QtBot,
+        qapp: QtWidgets.QApplication,
+        config: pathlib.Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
+        theme.apply_theme(qapp, "light")
+        QtCore.QSettings().setValue(theme.SETTINGS_KEY, "light")
+        dialog = SettingsDialog(ApplicationSettings())
+        qtbot.addWidget(dialog)
+        light = window_lightness(qapp)
+
+        def drive(dlg: QtWidgets.QDialog) -> None:
+            box = find(dlg, QtWidgets.QComboBox, "colorSchemeBox")
+            box.setCurrentIndex(box.findData("dark"))
+            accept(dlg)
+
+        exec_while(dialog, drive)
+
+        assert window_lightness(qapp) < light
+        assert QtCore.QSettings().value(theme.SETTINGS_KEY) == "dark"
+        theme.apply_theme(qapp, theme.AUTO)
 
     def test_cancel_leaves_settings_untouched(
         self, qtbot: QtBot, config: pathlib.Path
@@ -304,7 +479,7 @@ class TestDefaultParamsDialog:
     def test_untouched_form_builds_the_loaded_profile(
         self, qtbot: QtBot, config: pathlib.Path
     ) -> None:
-        for units in Units:
+        for units in (Units.MILLIMETERS, Units.CENTIMETERS, Units.INCHES):
             dialog = DefaultParamsDialog(
                 units=units,
                 settings=ApplicationSettings(),
