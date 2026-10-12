@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from scantailor.app.ui.icons import icon
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 from scantailor.core.models import Margins, PageId
 from scantailor.filters.page_layout.alignment import (
@@ -115,7 +116,7 @@ class OptionsWidget(QWidget):
 
         self._top_bottom_link = QToolButton()
         self._top_bottom_link.setObjectName("topBottomLink")
-        self._top_bottom_link.setText("⇅")
+        self._top_bottom_link.setIcon(icon("link-2-off", "link-2"))
         self._top_bottom_link.setCheckable(True)
         self._top_bottom_link.setToolTip("Link top and bottom margins")
         self._top_bottom_link.setMinimumSize(20, 36)
@@ -139,7 +140,7 @@ class OptionsWidget(QWidget):
 
         self._left_right_link = QToolButton()
         self._left_right_link.setObjectName("leftRightLink")
-        self._left_right_link.setText("⇄")
+        self._left_right_link.setIcon(icon("link-2-off", "link-2"))
         self._left_right_link.setCheckable(True)
         self._left_right_link.setToolTip("Link left and right margins")
         self._left_right_link.setMinimumSize(20, 36)
@@ -233,22 +234,22 @@ class OptionsWidget(QWidget):
 
         # Create 3x3 alignment button grid
         align_buttons = [
-            ("↖", 0, 0, "alignTopLeftBtn"),
-            ("↑", 0, 1, "alignTopBtn"),
-            ("↗", 0, 2, "alignTopRightBtn"),
-            ("←", 1, 0, "alignLeftBtn"),
-            ("●", 1, 1, "alignCenterBtn"),
-            ("→", 1, 2, "alignRightBtn"),
-            ("↙", 2, 0, "alignBottomLeftBtn"),
-            ("↓", 2, 1, "alignBottomBtn"),
-            ("↘", 2, 2, "alignBottomRightBtn"),
+            ("align_top_left", 0, 0, "alignTopLeftBtn"),
+            ("align_top", 0, 1, "alignTopBtn"),
+            ("align_top_right", 0, 2, "alignTopRightBtn"),
+            ("align_left", 1, 0, "alignLeftBtn"),
+            ("align_center", 1, 1, "alignCenterBtn"),
+            ("align_right", 1, 2, "alignRightBtn"),
+            ("align_bottom_left", 2, 0, "alignBottomLeftBtn"),
+            ("align_bottom", 2, 1, "alignBottomBtn"),
+            ("align_bottom_right", 2, 2, "alignBottomRightBtn"),
         ]
 
         self._align_buttons: dict[str, QToolButton] = {}
-        for text, row, col, name in align_buttons:
+        for glyph, row, col, name in align_buttons:
             btn = QToolButton()
             btn.setObjectName(name)
-            btn.setText(text)
+            btn.setIcon(icon(glyph))
             btn.setCheckable(True)
             btn.setAutoExclusive(True)
             btn.setMinimumSize(32, 32)

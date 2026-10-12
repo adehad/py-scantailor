@@ -9,11 +9,12 @@ from PySide6.QtCore import (
     QPersistentModelIndex,
     QPoint,
     QRect,
+    QRectF,
     QSize,
     Qt,
     Signal,
 )
-from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtGui import QPainter, QPalette, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -41,7 +42,10 @@ from scantailor.core.project import Project
 
 _PADDING = 6
 _CAPTION_HEIGHT = 18
-_CURRENT_BORDER = 3
+_CURRENT_BORDER = 2
+_FRAME_MARGIN = 3
+_FRAME_RADIUS = 4
+_CAPTION_PX = 11
 
 
 class ThumbnailDelegate(QStyledItemDelegate):
@@ -74,18 +78,21 @@ class ThumbnailDelegate(QStyledItemDelegate):
         option = cast(Any, item_option)
         palette = option.palette
         painter.save()
-        if option.state & QStyle.StateFlag.State_Selected:
-            painter.fillRect(option.rect, palette.highlight())
-            text_color = palette.highlightedText().color()
-        else:
-            text_color = palette.text().color()
-
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         picture_area = QRect(
             option.rect.left() + _PADDING,
             option.rect.top() + _PADDING,
             self._thumbnail_size.width(),
             self._thumbnail_size.height(),
         )
+        frame_area = picture_area.adjusted(
+            -_FRAME_MARGIN, -_FRAME_MARGIN, _FRAME_MARGIN, _FRAME_MARGIN
+        )
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(palette.highlight())
+            painter.drawRoundedRect(frame_area, _FRAME_RADIUS, _FRAME_RADIUS)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
         image = index.data(Qt.ItemDataRole.DecorationRole)
         if image is None:
             painter.setPen(palette.mid().color())
@@ -98,10 +105,14 @@ class ThumbnailDelegate(QStyledItemDelegate):
             target.moveCenter(picture_area.center())
             painter.drawImage(target, image)
 
-        painter.setPen(text_color)
+        # The caption lies below the inset selection fill, on the plain background.
+        painter.setPen(palette.text().color())
+        caption_font = painter.font()
+        caption_font.setPixelSize(_CAPTION_PX)
+        painter.setFont(caption_font)
         caption_area = QRect(
             option.rect.left() + _PADDING,
-            picture_area.bottom() + 1,
+            picture_area.bottom() + 1 + _FRAME_MARGIN,
             self._thumbnail_size.width(),
             _CAPTION_HEIGHT,
         )
@@ -116,9 +127,14 @@ class ThumbnailDelegate(QStyledItemDelegate):
         )
 
         if index.data(IsCurrentRole):
-            painter.setPen(QPen(QColor("#e8a200"), _CURRENT_BORDER))
-            inset = _CURRENT_BORDER // 2
-            painter.drawRect(option.rect.adjusted(inset, inset, -inset - 1, -inset - 1))
+            accent = palette.color(QPalette.ColorRole.Accent)
+            painter.setPen(QPen(accent, _CURRENT_BORDER))
+            inset = _CURRENT_BORDER / 2
+            painter.drawRoundedRect(
+                QRectF(frame_area).adjusted(-inset, -inset, inset, inset),
+                _FRAME_RADIUS,
+                _FRAME_RADIUS,
+            )
         painter.restore()
 
 
