@@ -243,3 +243,61 @@ def test_semantic_roles_are_green_and_red_for_each_scheme():
         positive, danger = QtGui.QColor(tokens.positive), QtGui.QColor(tokens.danger)
         assert positive.green() > positive.red() and positive.green() > positive.blue()
         assert danger.red() > danger.green() and danger.red() > danger.blue()
+
+
+def test_dark_tab_bar_draws_no_base_line_outside_the_pane_border(app):
+    theme.apply_theme(app, "dark")
+    sheet = app.styleSheet()
+
+    assert "qproperty-drawBase: 0" in sheet
+    assert f"border: 1px solid {DARK.panel_border}; border-radius" in sheet
+
+
+def test_dark_dialog_tab_bar_shows_no_white_line_beside_the_tabs(app, qtbot):
+    from scantailor.app.ui.dialogs.settings import SettingsDialog
+    from scantailor.core.settings import ApplicationSettings
+
+    theme.apply_theme(app, "dark")
+    dialog = SettingsDialog(ApplicationSettings())
+    qtbot.addWidget(dialog)
+    dialog.show()
+    qtbot.wait_exposed(dialog)
+    tabs = dialog.findChild(QtWidgets.QTabWidget)
+    assert tabs is not None
+
+    image = dialog.grab().toImage()
+    bar = tabs.tabBar()
+    top_left = bar.mapTo(dialog, QtCore.QPoint(0, 0))
+    last_tab = bar.tabRect(tabs.count() - 1)
+    for y in range(top_left.y() - 2, top_left.y() + 2):
+        for x in range(top_left.x() + last_tab.right() + 10, image.width() - 20):
+            assert image.pixelColor(x, y).lightness() < 150, (x, y)
+
+
+@pytest.mark.parametrize("scheme", theme.SCHEMES)
+def test_deskew_arc_and_handles_are_drawn_in_the_theme_accent(app, qtbot, scheme):
+    from scantailor.app.ui.image_views.deskew import DeskewImageView
+
+    theme.apply_theme(app, scheme)
+    view = DeskewImageView()
+    qtbot.addWidget(view)
+    view.resize(500, 400)
+    view.show()
+    qtbot.wait_exposed(view)
+    accent = QtGui.QColor((DARK if scheme == "dark" else LIGHT).accent)
+    size = view.viewport().size()
+    image = QtGui.QImage(size, QtGui.QImage.Format.Format_ARGB32)
+    image.fill(QtCore.Qt.GlobalColor.transparent)
+
+    painter = QtGui.QPainter(image)
+    view._paint_rotation_arcs(painter)
+    painter.end()
+
+    opaque = {
+        QtGui.QColor(image.pixel(x, y)).rgb()
+        for y in range(image.height())
+        for x in range(image.width())
+        if QtGui.qAlpha(image.pixel(x, y)) == 255
+    }
+    assert view.palette().color(QtGui.QPalette.ColorRole.Accent) == accent
+    assert accent.rgb() in opaque
