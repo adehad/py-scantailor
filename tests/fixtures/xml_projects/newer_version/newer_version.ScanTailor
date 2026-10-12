@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<project outputDirectory="out" layoutDirection="LTR" version="4">
+<directories><directory id="1" path="scans"/></directories>
+<files><file id="2" dirId="1" name="page_001.tif"/></files>
+<images><image id="3" subPages="1" fileId="2" fileImage="0"><size width="60" height="80"/><dpi horizontal="300" vertical="300"/></image></images>
+<pages><page id="4" imageId="3" subPage="single"/></pages>
+<file-name-disambiguation/>
+<filters><fancy-new-stage enabled="1"/></filters>
+</project>

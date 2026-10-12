@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<project outputDirectory="out" layoutDirection="LTR" version="3">
+<directories><directory id="1" path="scans"/></directories>
+<files><file id="2" dirId="1" name="book.tif"/></files>
+<images>
+<image id="3" subPages="1" fileId="2" fileImage="1"><size width="60" height="80"/><dpi horizontal="300" vertical="300"/></image>
+<image id="5" subPages="1" fileId="2" fileImage="2"><size width="60" height="80"/><dpi horizontal="300" vertical="300"/></image>
+</images>
+<pages><page id="4" imageId="3" subPage="single"/><page id="6" imageId="5" subPage="single" selected="selected"/></pages>
+<file-name-disambiguation><mapping file="2" label="0"/></file-name-disambiguation>
+<filters>
+<fix-orientation><image id="5"><rotation degrees="270"/></image><image-settings/></fix-orientation>
+<page-split defaultLayoutType="single-uncut"><image id="3"><params mode="auto"><pages type="single-uncut"><outline><point x="0" y="0"/><point x="60" y="0"/><point x="60" y="80"/><point x="0" y="80"/></outline></pages><dependencies><rotation degrees="0"/><size width="60" height="80"/><layoutType>auto-detect</layoutType></dependencies></params></image><image id="5"><params mode="auto"><pages type="single-uncut"><outline><point x="0" y="0"/><point x="60" y="0"/><point x="60" y="80"/><point x="0" y="80"/></outline></pages><dependencies><rotation degrees="0"/><size width="60" height="80"/><layoutType>auto-detect</layoutType></dependencies></params></image></page-split><deskew><page id="4"><params mode="auto" angle="0"><dependencies><rotation degrees="0"/><page-outline><point x="0" y="0"/><point x="60" y="0"/><point x="60" y="80"/><point x="0" y="80"/></page-outline></dependencies></params></page><page id="6"><params mode="manual" angle="2.25"><dependencies><rotation degrees="0"/><page-outline><point x="0" y="0"/><point x="60" y="0"/><point x="60" y="80"/><point x="0" y="80"/></page-outline></dependencies></params></page><image-settings/></deskew>
+<select-content pageDetectionTolerance="0.1"><page-detection-box width="0" height="0"/><page id="4"><params contentDetectionMode="auto" pageDetectionMode="disabled" fineTuneCorners="0"><content-rect x="6" y="8" width="48" height="60"/><page-rect x="0" y="0" width="60" height="80"/><content-size-mm width="5.08" height="6.77"/><dependencies><rotated-page-outline><point x="0" y="0"/><point x="60" y="0"/><point x="60" y="80"/><point x="0" y="80"/></rotated-page-outline><params contentDetectionMode="auto" pageDetectionMode="disabled" fineTuneCorners="0"/></dependencies></params></page><page id="6"><params contentDetectionMode="auto" pageDetectionMode="disabled" fineTuneCorners="0"><content-rect x="6" y="8" width="48" height="60"/><page-rect x="0" y="0" width="60" height="80"/><content-size-mm width="5.08" height="6.77"/><dependencies><rotated-page-outline><point x="0" y="0"/><point x="60" y="0"/><point x="60" y="80"/><point x="0" y="80"/></rotated-page-outline><params contentDetectionMode="auto" pageDetectionMode="disabled" fineTuneCorners="0"/></dependencies></params></page></select-content>
+<page-layout showMiddleRect="0"/>
+<output/>
+</filters>
+</project>
