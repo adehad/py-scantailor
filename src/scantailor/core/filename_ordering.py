@@ -9,7 +9,13 @@ from pathlib import Path
 _DIGIT_RUN = 0
 _OTHER_CHAR = 1
 
-type _Token = tuple[int, int] | tuple[int, str]
+# C++ SmartFilenameOrdering never compares two non-digit characters: its check for
+# them sits inside a loop that has already ruled them out, so it steps over them in
+# lockstep. Matching that keeps page order identical for projects made in C++, so
+# every non-digit character is the same token.
+_ANY_OTHER_CHAR = (_OTHER_CHAR, 0)
+
+type _Token = tuple[int, int]
 type SmartFilenameKey = tuple[str, tuple[_Token, ...], str]
 
 
@@ -18,9 +24,9 @@ def smart_filename_key(path: Path | str) -> SmartFilenameKey:
 
     Files are grouped by folder first. Within a folder, runs of digits compare by
     value (``p2`` before ``p10``) and a digit sorts before any other character.
-    Names that only differ in leading zeros or are otherwise equal under that
-    comparison fall back to a plain comparison of the whole name, so the order is
-    always total.
+    Non-digit characters only count as "some character", so ``b1`` sorts before
+    ``a2``, as in C++. Names that are equal under that comparison fall back to a
+    plain comparison of the whole name, so the order is always total.
 
     Args:
         path (Path | str): Image file path; relative paths are made absolute.
@@ -46,7 +52,7 @@ def sort_smart(paths: Iterable[Path]) -> list[Path]:
 
 
 def _tokens(name: str) -> list[_Token]:
-    """Split a file name into digit runs (as numbers) and single other characters."""
+    """Split a file name into digit runs (as numbers) and one token per other char."""
     tokens: list[_Token] = []
     number: int | None = None
     for char in name:
@@ -57,7 +63,7 @@ def _tokens(name: str) -> list[_Token]:
         if number is not None:
             tokens.append((_DIGIT_RUN, number))
             number = None
-        tokens.append((_OTHER_CHAR, char))
+        tokens.append(_ANY_OTHER_CHAR)
     if number is not None:
         tokens.append((_DIGIT_RUN, number))
     return tokens
