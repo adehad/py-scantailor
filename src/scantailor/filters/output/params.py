@@ -22,7 +22,7 @@ from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode
 from .color_options import ColorCommonOptions
 from .despeckle import DespeckleLevel
-from .dewarping_options import DewarpingOptions
+from .dewarping_options import DewarpingMode, DewarpingOptions
 from .picture_shape import PictureShapeOptions
 from .splitting_options import SplittingOptions
 
@@ -168,8 +168,22 @@ class Params(BaseModel):
     splitting: SplittingOptions = Field(default_factory=SplittingOptions)
 
     def with_output_dpi(self, dpi: Dpi) -> Self:
-        """Create a copy with different output DPI."""
-        return self.model_copy(update={"output_dpi": dpi})
+        """Create a copy with different output DPI.
+
+        Automatic dewarping becomes manual when a model is stored, so the page
+        keeps its shape at the new resolution instead of being measured again.
+        """
+        return self.model_copy(update=self._dpi_update(dpi))
+
+    def _dpi_update(self, dpi: Dpi) -> dict[str, object]:
+        update: dict[str, object] = {"output_dpi": dpi}
+        if (
+            dpi != self.output_dpi
+            and self.dewarping.is_auto()
+            and self.distortion_model.is_defined()
+        ):
+            update["dewarping"] = self.dewarping.with_mode(DewarpingMode.MANUAL)
+        return update
 
     def with_color_mode(self, mode: ColorMode) -> Self:
         """Create a copy with different color mode."""
@@ -235,9 +249,10 @@ class Params(BaseModel):
         Returns:
             Self: The merged parameters.
         """
-        return self.model_copy(
-            update={name: getattr(source, name) for name in _GROUP_FIELDS[group]}
-        )
+        update = {name: getattr(source, name) for name in _GROUP_FIELDS[group]}
+        if group is ApplyGroup.DPI:
+            update = self._dpi_update(source.output_dpi)
+        return self.model_copy(update=update)
 
     def needs_binarization(self) -> bool:
         """Return True if the color mode requires binarization."""
