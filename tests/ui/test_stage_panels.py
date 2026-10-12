@@ -1,6 +1,7 @@
 """The options widget and image view that MainWindow shows for the current stage."""
 
 import threading
+from collections.abc import Callable
 
 import pytest
 from PySide6 import QtCore, QtWidgets
@@ -132,9 +133,11 @@ def test_editing_an_option_rerenders_the_current_page(
     qtbot: QtBot,
     project_window: MainWindowManager,
     monkeypatch: pytest.MonkeyPatch,
+    wait_for_thumbnails: Callable[[MainWindowManager], None],
 ):
     _switch_stage(project_window, FilterStage.DESKEW)
     _render_current_page(qtbot, project_window)
+    wait_for_thumbnails(project_window)
     stages_run: list[FilterStage] = []
     real_render = page_renderer.render_page
 
@@ -153,7 +156,7 @@ def test_editing_an_option_rerenders_the_current_page(
     # The edited page's thumbnail is rendered again as well, to the same stage.
     assert stages_run
     assert set(stages_run) == {FilterStage.DESKEW}
-    project_window.thumbnails.model.wait_for_idle()
+    wait_for_thumbnails(project_window)
 
 
 def test_options_widget_follows_the_current_page(

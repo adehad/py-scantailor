@@ -634,3 +634,61 @@ def test_each_option_group_requests_its_own_apply_to_dialog(
 def test_every_apply_group_has_a_dialog_title():
     assert set(OUTPUT_GROUP_TITLES) == set(ApplyGroup)
     assert all(title.strip() for title in OUTPUT_GROUP_TITLES.values())
+
+
+class TestBinarizationGroupSize:
+    @staticmethod
+    def _group_height(qtbot: QtBot, method: BinarizationMethod) -> int:
+        params = Params(
+            color_mode=ColorMode.BLACK_AND_WHITE,
+            binarization=Params().binarization.with_method(method),
+        )
+        widget = _Widget(qtbot, params)
+        widget.widget.show()
+        qtbot.wait_exposed(widget.widget)
+        return widget.find(QtWidgets.QWidget, "binarizationGroup").height()
+
+    def test_group_is_shorter_with_otsu_than_with_sauvola(self, qtbot: QtBot):
+        otsu = self._group_height(qtbot, BinarizationMethod.OTSU)
+        sauvola = self._group_height(qtbot, BinarizationMethod.SAUVOLA)
+
+        assert otsu < sauvola
+
+    def test_group_is_shorter_with_sauvola_than_with_wolf(self, qtbot: QtBot):
+        sauvola = self._group_height(qtbot, BinarizationMethod.SAUVOLA)
+        wolf = self._group_height(qtbot, BinarizationMethod.WOLF)
+
+        assert sauvola < wolf
+
+    def test_group_shrinks_when_the_method_changes_to_otsu(self, qtbot: QtBot):
+        params = Params(
+            color_mode=ColorMode.BLACK_AND_WHITE,
+            binarization=Params().binarization.with_method(BinarizationMethod.WOLF),
+        )
+        widget = _Widget(qtbot, params)
+        widget.widget.show()
+        qtbot.wait_exposed(widget.widget)
+        group = widget.find(QtWidgets.QWidget, "binarizationGroup")
+        before = group.sizeHint().height()
+
+        combo = widget.find(QtWidgets.QComboBox, "methodCombo")
+        combo.setCurrentIndex(combo.findData(BinarizationMethod.OTSU))
+
+        assert group.sizeHint().height() < before
+
+
+def test_despeckle_slider_paints_its_tick_marks(qtbot: QtBot, bw: _Widget):
+    slider = bw.find(QtWidgets.QSlider, "despeckleSlider")
+    assert slider.tickPosition() != QtWidgets.QSlider.TickPosition.NoTicks
+    bw.widget.show()
+    qtbot.wait_exposed(bw.widget)
+
+    image = slider.grab().toImage()
+    background = image.pixelColor(0, image.height() - 1)
+    below_groove = [
+        image.pixelColor(x, y)
+        for y in range(image.height() // 2, image.height())
+        for x in range(image.width())
+    ]
+
+    assert any(color != background for color in below_groove)
