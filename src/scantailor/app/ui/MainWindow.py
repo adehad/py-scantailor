@@ -72,6 +72,10 @@ from scantailor.core.relinker import Relinker, image_directories
 from scantailor.core.settings import ApplicationSettings
 from scantailor.core.stage_params import apply_stage_params, collect_stage_params
 from scantailor.core.stage_sequence import FilterStage, StageSequence
+from scantailor.core.xml_compat import (
+    apply_xml_stage_defaults,
+    import_xml_project_file,
+)
 from scantailor.filters.output.params import ApplyGroup
 from scantailor.filters.page_split.layout_type import LayoutType
 
@@ -1399,7 +1403,8 @@ class MainWindowManager:
         """
         _LOG.info(f"Opening project: {path}")
         try:
-            project = Project.load(path)
+            xml_import = import_xml_project_file(path)
+            project = xml_import.project if xml_import else Project.load(path)
         except (OSError, ValueError, SyntaxError) as error:
             self._warn_cannot_open(path, error)
             return False
@@ -1410,6 +1415,8 @@ class MainWindowManager:
             self._apply_relinker(project, relinker)
             stages = StageSequence()
             apply_stage_params(stages, project.stage_params)
+            if xml_import:
+                apply_xml_stage_defaults(stages, xml_import.stage_defaults)
         except ValueError as error:
             self._warn_cannot_open(path, error)
             return False
