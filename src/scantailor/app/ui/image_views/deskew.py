@@ -3,7 +3,8 @@
 Shows the page rotated by the current deskew angle under an alignment grid.
 Two handles on arcs at the left and right of the window set the angle; the
 page follows them while they are dragged. Ctrl+Wheel and the arrow keys
-rotate in small steps.
+rotate in small steps. Two more handles on arcs at the top and bottom of a
+circle at the right edge set the oblique (shear) correction.
 """
 
 import copy
@@ -18,6 +19,7 @@ from PySide6.QtGui import QColor, QImage, QPainter, QPalette, QPen
 from scantailor.app.ui.image_views.base import ImageViewBase
 from scantailor.app.ui.theme.tokens import view_color
 from scantailor.core.transformation import ImageTransformation
+from scantailor.filters.deskew.params import MAX_OBLIQUE_DEG
 
 
 def format_angle(degrees: float) -> str:
@@ -47,14 +49,21 @@ class DeskewImageView(ImageViewBase):
     Signals:
         manual_deskew_angle_set: The user set an angle. Args: degrees (float),
             clockwise positive.
+        manual_oblique_angle_set: The user set an oblique angle. Args: degrees
+            (float).
     """
 
     manual_deskew_angle_set = Signal(float)
+    manual_oblique_angle_set = Signal(float)
 
     wheel_zoom_at_center = True
 
     MAX_ROTATION_DEG = 45.0
     MAX_ROTATION_SIN = math.sin(math.radians(MAX_ROTATION_DEG))
+    MAX_OBLIQUE_DEG = MAX_OBLIQUE_DEG
+    MAX_OBLIQUE_SIN = math.sin(math.radians(MAX_OBLIQUE_DEG))
+    ROTATION_HANDLES = 2
+    HANDLE_COUNT = 4
     CELL_SIZE = 20  # Grid cell size in widget pixels
     HANDLE_RADIUS = 8
     HANDLE_HIT_RADIUS = 15
@@ -73,9 +82,10 @@ class DeskewImageView(ImageViewBase):
         """
         super().__init__(parent=parent)
         self._deskew_angle = 0.0
+        self._oblique_angle = 0.0
         self._base_transformation: ImageTransformation | None = None
         self._dragging_handle = -1
-        self._drag_offset_y = 0.0
+        self._drag_offset = QPointF()
         self._show_grid = True
 
         for key, step in (
@@ -127,6 +137,7 @@ class DeskewImageView(ImageViewBase):
     def _rotated(self, transformation: ImageTransformation) -> ImageTransformation:
         rotated = copy.deepcopy(transformation)
         rotated.set_post_rotation(self._deskew_angle)
+        rotated.set_post_oblique(self._oblique_angle)
         return rotated
 
     @property
@@ -144,6 +155,27 @@ class DeskewImageView(ImageViewBase):
         if abs(degrees - self._deskew_angle) < 1e-6:
             return
         self._deskew_angle = degrees
+        if self._base_transformation is not None:
+            ImageViewBase.set_transformation(
+                self, self._rotated(self._base_transformation), keep_view=True
+            )
+        self.update()
+
+    @property
+    def oblique_angle(self) -> float:
+        """The oblique (shear) angle in degrees."""
+        return self._oblique_angle
+
+    def set_oblique_angle(self, degrees: float) -> None:
+        """Shear the page to an angle without reporting it as a user edit.
+
+        Args:
+            degrees (float): The oblique angle in degrees.
+        """
+        degrees = max(-self.MAX_OBLIQUE_DEG, min(self.MAX_OBLIQUE_DEG, degrees))
+        if abs(degrees - self._oblique_angle) < 1e-6:
+            return
+        self._oblique_angle = degrees
         if self._base_transformation is not None:
             ImageViewBase.set_transformation(
                 self, self._rotated(self._base_transformation), keep_view=True
@@ -174,13 +206,8 @@ class DeskewImageView(ImageViewBase):
             math.floor(0.5 * viewport.height()) + 0.5,
         )
 
-    def rotation_arc_square(self) -> QRectF:
-        """Return the square whose left and right arcs carry the handles.
-
-        Returns:
-            QRectF: Square in widget coordinates; empty when the window is too
-            small.
-        """
+    def _lever_area(self) -> QRectF:
+        """Return the part of the viewport the lever arcs and handles stay in."""
         viewport = self.viewport()
         assert viewport is not None
         margin = self.HANDLE_RADIUS + 20
@@ -191,6 +218,60 @@ class DeskewImageView(ImageViewBase):
             viewport.height() - 2 * margin,
         )
         if reduced.width() <= 0 or reduced.height() <= 0:
+            return QRectF()
+        return reduced
+
+    def oblique_arc_square(self) -> QRectF:
+        """Return the square whose top and bottom arcs carry the oblique handles.
+
+        The circle spans the height of the lever area and sits against its
+        right edge, so it follows the window whatever its size.
+
+        Returns:
+            QRectF: Square in widget coordinates; empty when the window is too
+            small.
+        """
+        reduced = self._lever_area()
+        if reduced.isEmpty():
+            return QRectF()
+
+        # The handles swing sideways by up to radius * sin(max oblique) and must
+        # stay inside the area.
+        size = min(reduced.height(), 2 * reduced.width() / (1 + self.MAX_OBLIQUE_SIN))
+        square = QRectF(0, 0, size, size)
+        square.moveRight(reduced.right())
+        square.moveTop(reduced.center().y() - size / 2)
+        return square
+
+    def oblique_handles(self) -> tuple[QPointF, QPointF]:
+        """Return the positions of the two oblique handles.
+
+        Returns:
+            tuple[QPointF, QPointF]: Top and bottom handle in widget
+            coordinates; null points when the window is too small.
+        """
+        square = self.oblique_arc_square()
+        if square.isEmpty():
+            return QPointF(), QPointF()
+
+        radians = math.radians(self._oblique_angle)
+        radius = 0.5 * square.height()
+        center = square.center()
+        sin, cos = math.sin(radians), math.cos(radians)
+        return (
+            QPointF(center.x() + sin * radius, center.y() - cos * radius),
+            QPointF(center.x() - sin * radius, center.y() + cos * radius),
+        )
+
+    def rotation_arc_square(self) -> QRectF:
+        """Return the square whose left and right arcs carry the handles.
+
+        Returns:
+            QRectF: Square in widget coordinates; empty when the window is too
+            small.
+        """
+        reduced = self._lever_area()
+        if reduced.isEmpty():
             return QRectF()
 
         size = min(reduced.width(), reduced.height() / self.MAX_ROTATION_SIN)
@@ -226,6 +307,7 @@ class DeskewImageView(ImageViewBase):
                 painter, viewport.width(), viewport.height(), self._rotation_origin()
             )
         self._paint_rotation_arcs(painter)
+        self._paint_oblique_arcs(painter)
 
     def _paint_grid(
         self, painter: QPainter, width: float, height: float, center: QPointF
@@ -279,10 +361,7 @@ class DeskewImageView(ImageViewBase):
         handle_pen.setWidth(2)
         painter.setPen(handle_pen)
         for index, handle in enumerate(self.rotation_handles()):
-            fill = QColor(accent)
-            fill.setAlpha(200 if self._dragging_handle == index else 150)
-            painter.setBrush(fill)
-            painter.drawEllipse(handle, self.HANDLE_RADIUS, self.HANDLE_RADIUS)
+            self._paint_handle(painter, handle, index, accent)
 
         painter.setPen(self.palette().color(QPalette.ColorRole.Text))
         font = painter.font()
@@ -295,9 +374,48 @@ class DeskewImageView(ImageViewBase):
         )
         painter.restore()
 
+    def _paint_handle(
+        self, painter: QPainter, handle: QPointF, index: int, accent: QColor
+    ) -> None:
+        fill = QColor(accent)
+        fill.setAlpha(200 if self._dragging_handle == index else 150)
+        painter.setBrush(fill)
+        painter.drawEllipse(handle, self.HANDLE_RADIUS, self.HANDLE_RADIUS)
+
+    def _paint_oblique_arcs(self, painter: QPainter) -> None:
+        square = self.oblique_arc_square()
+        if square.isEmpty():
+            return
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        accent = self.palette().color(QPalette.ColorRole.Accent)
+        arc_pen = QPen(accent)
+        arc_pen.setWidthF(1.5)
+        painter.setPen(arc_pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        span = int(16 * 2 * self.MAX_OBLIQUE_DEG)
+        painter.drawArc(square, int(16 * (90 - self.MAX_OBLIQUE_DEG)), span)
+        painter.drawArc(square, int(16 * (270 - self.MAX_OBLIQUE_DEG)), span)
+
+        handle_pen = QPen(accent)
+        handle_pen.setWidth(2)
+        painter.setPen(handle_pen)
+        for offset, handle in enumerate(self.oblique_handles()):
+            self._paint_handle(painter, handle, self.ROTATION_HANDLES + offset, accent)
+        painter.restore()
+
+    def _all_handles(self) -> list[QPointF]:
+        return [*self.rotation_handles(), *self.oblique_handles()]
+
     def _handle_at(self, pos: QPointF) -> int:
-        """Return 0 for the left handle, 1 for the right one, -1 for neither."""
-        for index, handle in enumerate(self.rotation_handles()):
+        """Return the index of the handle under a point, or -1 for none.
+
+        Indices 0 and 1 are the left and right rotation handles, 2 and 3 the top
+        and bottom oblique handles.
+        """
+        for index, handle in enumerate(self._all_handles()):
             if math.hypot(pos.x() - handle.x(), pos.y() - handle.y()) <= (
                 self.HANDLE_HIT_RADIUS
             ):
@@ -313,6 +431,15 @@ class DeskewImageView(ImageViewBase):
         angle = math.degrees(math.asin(rel_y / radius))
         return -angle if handle == 0 else angle
 
+    def _oblique_for_handle_position(self, handle: int, pos: QPointF) -> float:
+        square = self.oblique_arc_square()
+        radius = 0.5 * square.height()
+        if radius <= 0:
+            return self._oblique_angle
+        rel_x = max(-radius, min(radius, pos.x() - square.center().x()))
+        angle = math.degrees(math.asin(rel_x / radius))
+        return angle if handle == self.ROTATION_HANDLES else -angle
+
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
         """Pick up a handle.
 
@@ -323,9 +450,7 @@ class DeskewImageView(ImageViewBase):
             handle = self._handle_at(event.position())
             if handle >= 0:
                 self._dragging_handle = handle
-                self._drag_offset_y = (
-                    event.position().y() - self.rotation_handles()[handle].y()
-                )
+                self._drag_offset = event.position() - self._all_handles()[handle]
                 self.setCursor(Qt.CursorShape.ClosedHandCursor)
                 event.accept()
                 self.update()
@@ -339,12 +464,15 @@ class DeskewImageView(ImageViewBase):
             event (QtGui.QMouseEvent): The mouse event.
         """
         if self._dragging_handle >= 0:
-            self.set_deskew_angle(
-                self._angle_for_handle_position(
-                    self._dragging_handle,
-                    event.position() - QPointF(0, self._drag_offset_y),
+            target = event.position() - self._drag_offset
+            if self._dragging_handle < self.ROTATION_HANDLES:
+                self.set_deskew_angle(
+                    self._angle_for_handle_position(self._dragging_handle, target)
                 )
-            )
+            else:
+                self.set_oblique_angle(
+                    self._oblique_for_handle_position(self._dragging_handle, target)
+                )
             event.accept()
             return
         if not self._panning:
@@ -363,9 +491,13 @@ class DeskewImageView(ImageViewBase):
             event (QtGui.QMouseEvent): The mouse event.
         """
         if event.button() == Qt.MouseButton.LeftButton and self._dragging_handle >= 0:
+            dragged = self._dragging_handle
             self._dragging_handle = -1
             self.setCursor(Qt.CursorShape.ArrowCursor)
-            self.manual_deskew_angle_set.emit(self._deskew_angle)
+            if dragged < self.ROTATION_HANDLES:
+                self.manual_deskew_angle_set.emit(self._deskew_angle)
+            else:
+                self.manual_oblique_angle_set.emit(self._oblique_angle)
             event.accept()
             self.update()
             return

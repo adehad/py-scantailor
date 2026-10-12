@@ -73,7 +73,8 @@ def build_transformation(
     if through < FilterStage.DESKEW:
         return xform
 
-    xform.set_post_rotation(sequence.deskew_filter.get_params(page_id).deskew_angle_deg)
+    deskew = sequence.deskew_filter
+    deskew.apply_geometry(xform, deskew.get_params(page_id))
     if through >= FilterStage.PAGE_LAYOUT:
         xform.set_post_crop_area(_page_polygon(sequence, page_id, xform))
     return xform

@@ -58,16 +58,21 @@ class DeskewDefaults(BaseModel):
     Attributes:
         deskew_angle_deg: Default deskew angle in degrees.
         mode: Default mode (AUTO or MANUAL).
+        auto_oblique: Whether pages detect their oblique (shear) correction.
+            Off leaves new pages unsheared.
     """
 
     deskew_angle_deg: float = Field(default=0.0, ge=-45.0, le=45.0)
     mode: DeskewMode = DeskewMode.AUTO
+    auto_oblique: bool = False
 
     def to_params(self) -> DeskewParams:
         """Convert to filter Params instance."""
         return DeskewParams(
             deskew_angle_deg=self.deskew_angle_deg,
             mode=self.mode,
+            oblique_mode=DeskewMode.AUTO if self.auto_oblique else DeskewMode.MANUAL,
+            redetect_oblique=self.auto_oblique,
         )
 
 
@@ -292,6 +297,7 @@ def apply_default_params(
             defaults.page_split.layout_type
         )
 
+    stages.deskew_filter.auto_oblique_default = defaults.deskew.auto_oblique
     if defaults.deskew.mode is DeskewMode.MANUAL:
         deskew_params = defaults.get_deskew_params()
         for page in pages:
