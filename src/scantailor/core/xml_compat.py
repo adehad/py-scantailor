@@ -36,8 +36,15 @@ from scantailor.core.xml_reader import (
     sub_page_from_string,
 )
 from scantailor.filters.deskew.xml_import import read_deskew
-from scantailor.filters.fix_orientation.xml_import import read_rotations
-from scantailor.filters.output.xml_import import read_output
+from scantailor.filters.fix_orientation.xml_import import (
+    ImageTrim,
+    read_rotations,
+    read_trims,
+)
+from scantailor.filters.output.xml_import import (
+    read_fill_outside_page_box,
+    read_output,
+)
 from scantailor.filters.page_layout.xml_import import read_page_layout
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.page_split.xml_import import read_page_split
@@ -47,7 +54,7 @@ if TYPE_CHECKING:
     from scantailor.core.stage_sequence import StageSequence
 
 # The newest project format the C++ application reads and writes.
-NEWEST_PROJECT_VERSION = 3
+NEWEST_PROJECT_VERSION = 4
 
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:[\\/]")
 
@@ -79,6 +86,27 @@ class XmlStageDefaults:
 
 
 @dataclass(frozen=True)
+class XmlUnappliedSettings:
+    """Version 4 settings the port has no model for yet.
+
+    Kept so a later stage can apply them; each non-default value is logged as
+    dropped when the project is read.
+
+    Attributes:
+        fix_orientation_trims (dict[ImageId, ImageTrim]): Enabled per-image
+            trims of Fix Orientation.
+        fill_outside_page_box_pages (frozenset[PageId]): Pages whose Output
+            colour options fill outside the page box.
+        deskew_content_based (bool): False when the Deskew stage was set to
+            find the skew from the whole page rather than from its content.
+    """
+
+    fix_orientation_trims: dict[ImageId, ImageTrim] = field(default_factory=dict)
+    fill_outside_page_box_pages: frozenset[PageId] = frozenset()
+    deskew_content_based: bool = True
+
+
+@dataclass(frozen=True)
 class XmlProjectImport:
     """Everything read from a C++ project file.
 
@@ -90,11 +118,14 @@ class XmlProjectImport:
             file whose name another source file shares; it appears in the
             output file name as ``name(label).tif``. Files absent from the
             mapping have label 0.
+        unapplied (XmlUnappliedSettings): Values read from the file that no
+            stage applies yet.
     """
 
     project: Project
     stage_defaults: XmlStageDefaults = field(default_factory=XmlStageDefaults)
     output_file_labels: dict[Path, int] = field(default_factory=dict)
+    unapplied: XmlUnappliedSettings = field(default_factory=XmlUnappliedSettings)
 
 
 def parse_xml_project(path: Path, content: str) -> Project:
@@ -160,7 +191,10 @@ def import_xml_project(path: Path, content: str) -> XmlProjectImport:
         image_ids={key: info.id for key, info in image_map.items()},
         page_ids=page_map,
     )
-    stage_params, stage_defaults = _read_filters(child(root, "filters"), context)
+    stage_params, stage_defaults, unapplied = _read_filters(
+        child(root, "filters"), context
+    )
+    _warn_about_unapplied(unapplied)
     labels = _read_output_file_labels(child(root, "file-name-disambiguation"), file_map)
 
     logger.info(
@@ -181,7 +215,7 @@ def import_xml_project(path: Path, content: str) -> XmlProjectImport:
             for file_path, label in labels.items()
         ],
     )
-    return XmlProjectImport(project, stage_defaults, labels)
+    return XmlProjectImport(project, stage_defaults, labels, unapplied)
 
 
 def import_xml_project_file(path: Path) -> XmlProjectImport | None:
@@ -384,8 +418,8 @@ def _read_pages(
 
 def _read_filters(
     element: ET.Element | None, context: XmlProjectContext
-) -> tuple[dict[str, list[StageParamsEntry]], XmlStageDefaults]:
-    """Read the ``<filters>`` element into stage parameters and stage defaults."""
+) -> tuple[dict[str, list[StageParamsEntry]], XmlStageDefaults, XmlUnappliedSettings]:
+    """Read the ``<filters>`` element: parameters, defaults, unapplied settings."""
     page_split = read_page_split(child(element, "page-split"), context)
     select_content = read_select_content(child(element, "select-content"), context)
     per_stage: dict[FilterStage, list[StageParamsEntry]] = {
@@ -408,7 +442,35 @@ def _read_filters(
         page_detection_box=select_content.page_detection_box,
         page_detection_tolerance=select_content.page_detection_tolerance,
     )
-    return stage_params, defaults
+    deskew_element = child(element, "deskew")
+    unapplied = XmlUnappliedSettings(
+        fix_orientation_trims=read_trims(child(element, "fix-orientation"), context),
+        fill_outside_page_box_pages=read_fill_outside_page_box(
+            child(element, "output"), context
+        ),
+        # Absent means on; the C++ reader only checks for an explicit "0".
+        deskew_content_based=attr_text(deskew_element, "algoContentBased") != "0",
+    )
+    return stage_params, defaults, unapplied
+
+
+def _warn_about_unapplied(unapplied: XmlUnappliedSettings) -> None:
+    """Log each version 4 setting that is set but cannot be applied yet."""
+    if unapplied.fix_orientation_trims:
+        logger.warning(
+            "Dropping the Fix Orientation trim of {} image(s): not supported yet.",
+            len(unapplied.fix_orientation_trims),
+        )
+    if unapplied.fill_outside_page_box_pages:
+        logger.warning(
+            "Dropping 'fill outside page box' on {} page(s): not supported yet.",
+            len(unapplied.fill_outside_page_box_pages),
+        )
+    if not unapplied.deskew_content_based:
+        logger.warning(
+            "Dropping the Deskew setting that finds the skew from the whole page: "
+            "it is not supported yet."
+        )
 
 
 def _read_output_file_labels(
