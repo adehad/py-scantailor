@@ -165,19 +165,17 @@ class OptionsWidget(QWidget):
             self._updating = False
 
     def _on_auto_clicked(self) -> None:
-        """Handle auto mode button click."""
+        """Forget the stored angle so the next run detects it again."""
         if self._current_page_id is None or self._updating:
             return
 
-        # Re-detect the skew angle
-        # This would typically trigger a re-detection
-        params = self._filter.get_params(self._current_page_id)
-        new_params = params.with_auto_angle(params.deskew_angle_deg)
-        self._filter.settings.set_params(self._current_page_id, new_params)
+        self._filter.clear_detection(self._current_page_id)
 
         self._update_ui()
         self.angle_changed.emit(
-            self._current_page_id, new_params.deskew_angle_deg, False
+            self._current_page_id,
+            self._filter.get_deskew_angle(self._current_page_id),
+            False,
         )
 
     def _on_manual_clicked(self) -> None:

@@ -12,8 +12,9 @@ from numpy.typing import NDArray
 
 from scantailor.core.models import PageId
 
+from .dependencies import Dependencies
 from .layout_type import LayoutType
-from .page_layout import PageLayout
+from .page_layout import PageLayout, PageLayoutType
 from .params import Params
 from .settings import Settings
 from .split_finder import SplitResult, detect_split
@@ -126,6 +127,7 @@ class Filter:
         page_id: "PageId",
         dpi: float = 300.0,
         store_result: bool = True,
+        rotation_degrees: int = 0,
     ) -> SplitResult:
         """Detect how to split an image.
 
@@ -134,6 +136,8 @@ class Filter:
             page_id: The page ID to associate with the result.
             dpi: Image resolution in dots per inch.
             store_result: If True, store the result in settings.
+            rotation_degrees: Orthogonal rotation already applied to ``image``;
+                recorded so a later rotation change invalidates the result.
 
         Returns:
             SplitResult with detected layout and confidence.
@@ -144,7 +148,12 @@ class Filter:
         result = detect_split(image, layout_type, dpi)
 
         if store_result:
-            new_params = params.with_auto_layout(result.layout)
+            dependencies = self._dependencies_of(
+                params.layout_type, image.shape, rotation_degrees
+            )
+            new_params = params.with_auto_layout(result.layout).model_copy(
+                update={"dependencies": dependencies}
+            )
             self._settings.set_params(page_id, new_params)
 
         return result
@@ -168,8 +177,7 @@ class Filter:
             The updated Params.
         """
         layout = PageLayout.two_pages(width, height, split_x)
-        params = self.get_params(page_id).with_manual_layout(layout)
-        params = params.with_layout_type(LayoutType.TWO_PAGES)
+        params = self._with_manual_layout_of_type(page_id, layout, LayoutType.TWO_PAGES)
         self._settings.set_params(page_id, params)
         return params
 
@@ -194,10 +202,25 @@ class Filter:
             The updated Params.
         """
         layout = PageLayout.single_page_cut(width, height, left_x, right_x)
-        params = self.get_params(page_id).with_manual_layout(layout)
-        params = params.with_layout_type(LayoutType.PAGE_PLUS_OFFCUT)
+        params = self._with_manual_layout_of_type(
+            page_id, layout, LayoutType.PAGE_PLUS_OFFCUT
+        )
         self._settings.set_params(page_id, params)
         return params
+
+    def _with_manual_layout_of_type(
+        self, page_id: "PageId", layout: PageLayout, layout_type: LayoutType
+    ) -> Params:
+        """Params holding a hand-placed layout, recorded as made for its own type."""
+        params = self.get_params(page_id)
+        dependencies = params.dependencies
+        if not dependencies.is_null():
+            dependencies = dependencies.model_copy(update={"layout_type": layout_type})
+        return (
+            params.with_manual_layout(layout)
+            .with_layout_type(layout_type)
+            .model_copy(update={"dependencies": dependencies})
+        )
 
     def reset_to_auto(self, page_id: "PageId") -> None:
         """Reset a page to auto mode.
@@ -213,40 +236,119 @@ class Filter:
     def apply_to_pages(self, page_ids: list["PageId"], params: Params) -> None:
         """Apply parameters to multiple pages.
 
+        An automatic split line is not copied: each target keeps the layout
+        type and detects its own layout.
+
         Args:
             page_ids: List of pages to set parameters for.
             params: The parameters to apply.
         """
+        if params.is_auto():
+            params = Params(layout_type=params.layout_type)
         self._settings.apply_params_to_pages(page_ids, params)
+
+    @staticmethod
+    def _dependencies_of(
+        layout_type: LayoutType, image_shape: tuple[int, ...], rotation_degrees: int
+    ) -> Dependencies:
+        height, width = image_shape[:2]
+        return Dependencies(
+            image_size=(width, height),
+            rotation_degrees=rotation_degrees,
+            layout_type=layout_type,
+        )
+
+    def needs_detection(
+        self,
+        page_id: "PageId",
+        image_shape: tuple[int, ...],
+        rotation_degrees: int = 0,
+    ) -> bool:
+        """Tell whether the stored layout is missing or stale.
+
+        Args:
+            page_id: The page to check.
+            image_shape: Shape of the oriented image.
+            rotation_degrees: Orthogonal rotation applied to that image.
+
+        Returns:
+            True if the layout must be detected again.
+        """
+        params = self.get_params(page_id)
+        if params.page_layout is None:
+            return True
+        current = self._dependencies_of(
+            params.layout_type, image_shape, rotation_degrees
+        )
+        if not params.dependencies.is_compatible_with(
+            current, manual_split_line=params.is_manual()
+        ):
+            return True
+        required = {
+            LayoutType.TWO_PAGES: PageLayoutType.TWO_PAGES,
+            LayoutType.PAGE_PLUS_OFFCUT: PageLayoutType.SINGLE_PAGE_CUT,
+        }.get(params.layout_type)
+        return required is not None and params.page_layout.layout_type != required
+
+    def clear_detection(self, page_id: "PageId") -> None:
+        """Forget the layout and split line mode but keep the requested type.
+
+        The next run detects the layout again.
+
+        Args:
+            page_id: The page to reset.
+        """
+        layout_type = self.get_params(page_id).layout_type
+        self._settings.set_params(page_id, Params(layout_type=layout_type))
 
     def process(
         self,
         image: NDArray[np.uint8],
         page_id: "PageId",
         dpi: float = 300.0,
+        rotation_degrees: int = 0,
     ) -> Params:
-        """Process an image to detect or apply page split.
+        """Detect the page layout unless a valid one is stored.
 
-        In AUTO mode, this will detect the split. In MANUAL mode,
-        it preserves the existing layout.
+        A stored layout is kept while its dependencies still hold. When the
+        requested type became a single uncut page the layout is reduced to it
+        without detection.
 
         Args:
-            image: The image to process.
+            image: The oriented image to process.
             page_id: The page ID.
             dpi: Image resolution.
+            rotation_degrees: Orthogonal rotation applied to ``image``.
 
         Returns:
             The updated parameters.
         """
+        if self.needs_detection(page_id, image.shape, rotation_degrees):
+            self.detect_split(
+                image, page_id, dpi=dpi, rotation_degrees=rotation_degrees
+            )
+            return self.get_params(page_id)
+
         params = self.get_params(page_id)
-
-        # If manual mode and layout already exists, don't re-detect
-        if params.is_manual() and params.page_layout is not None:
-            return params
-
-        # Detect split
-        self.detect_split(image, page_id, dpi=dpi)
-        return self.get_params(page_id)
+        layout = params.page_layout
+        if (
+            params.layout_type == LayoutType.SINGLE_PAGE_UNCUT
+            and layout is not None
+            and layout.layout_type != PageLayoutType.SINGLE_PAGE_UNCUT
+        ):
+            x, y, width, height = layout.outline
+            params = params.with_page_layout(
+                PageLayout.single_page_uncut(width, height, x, y),
+                params.split_line_mode,
+            ).model_copy(
+                update={
+                    "dependencies": params.dependencies.model_copy(
+                        update={"layout_type": LayoutType.SINGLE_PAGE_UNCUT}
+                    )
+                }
+            )
+            self._settings.set_params(page_id, params)
+        return params
 
     def get_sub_page_count(self, page_id: "PageId") -> int:
         """Get the number of sub-pages for an image.

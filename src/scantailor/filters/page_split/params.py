@@ -8,6 +8,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
 
+from .dependencies import Dependencies
 from .layout_type import LayoutType
 from .page_layout import PageLayout
 
@@ -26,6 +27,7 @@ class Params(BaseModel):
         layout_type: The requested layout type for splitting.
         page_layout: The detected or manually set page layout.
         split_line_mode: Whether the split line was auto-detected or manually set.
+        dependencies: What the page layout was computed from; null if unknown.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -33,6 +35,7 @@ class Params(BaseModel):
     layout_type: LayoutType = LayoutType.AUTO_LAYOUT_TYPE
     page_layout: PageLayout | None = None
     split_line_mode: AutoManualMode = AutoManualMode.AUTO
+    dependencies: Dependencies = Dependencies()
 
     def with_layout_type(self, layout_type: LayoutType) -> "Params":
         """Create a copy with a different layout type."""

@@ -10,6 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from scantailor.core.models import PageId
+from scantailor.filters.deskew.dependencies import Dependencies
 from scantailor.filters.deskew.params import AutoManualMode, Params
 from scantailor.filters.deskew.settings import Settings
 from scantailor.imageproc.analysis import SkewResult, find_skew
@@ -121,6 +122,7 @@ class Filter:
         max_angle: float | None = None,
         accuracy: float | None = None,
         store_result: bool = True,
+        dependencies: Dependencies | None = None,
     ) -> SkewResult:
         """Detect the skew angle for an image.
 
@@ -133,6 +135,8 @@ class Filter:
             max_angle: Maximum angle to search (default 7.0 degrees).
             accuracy: Target accuracy (default 0.1 degrees).
             store_result: If True, store the detected angle in settings.
+            dependencies: Upstream geometry to record with the angle, so a
+                change of it invalidates the angle.
 
         Returns:
             SkewResult with detected angle and confidence.
@@ -166,10 +170,39 @@ class Filter:
             angle = result.angle if result.is_confident() else 0.0
             # Negate the skew angle to get the correction angle
             deskew_angle = -angle
-            params = Params(deskew_angle_deg=deskew_angle, mode=AutoManualMode.AUTO)
+            params = Params(
+                deskew_angle_deg=deskew_angle,
+                mode=AutoManualMode.AUTO,
+                dependencies=dependencies or Dependencies(),
+            )
             self._settings.set_params(page_id, params)
 
         return result
+
+    def needs_detection(self, page_id: PageId, dependencies: Dependencies) -> bool:
+        """Tell whether the angle is missing or detected under other geometry.
+
+        Args:
+            page_id: The page to check.
+            dependencies: The upstream geometry as it stands now.
+
+        Returns:
+            True if the angle must be detected again. A manual angle never is.
+        """
+        if not self._settings.is_params_set(page_id):
+            return True
+        params = self._settings.get_params(page_id)
+        if params.is_manual() or params.dependencies.is_null():
+            return False
+        return not params.dependencies.matches(dependencies)
+
+    def clear_detection(self, page_id: PageId) -> None:
+        """Forget the stored angle so the next run detects it.
+
+        Args:
+            page_id: The page to reset.
+        """
+        self._settings.clear_page(page_id)
 
     def reset_to_auto(self, page_id: PageId) -> None:
         """Reset a page to auto mode with 0 degree angle.

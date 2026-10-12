@@ -16,8 +16,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from scantailor.app.ui.icons import icon
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
-from scantailor.core.models import PageId
+from scantailor.core.models import ImageId, PageId
 from scantailor.filters.page_split.filter import Filter
 from scantailor.filters.page_split.layout_type import LayoutType
 
@@ -33,11 +34,15 @@ class OptionsWidget(QWidget):
             Args: page_id (PageId), layout_type (LayoutType)
         split_mode_changed: Emitted when split mode (auto/manual) changes.
             Args: page_id (PageId), is_manual (bool)
+        page_count_requested: Emitted when the chosen layout type fixes how many
+            logical pages the image has.
+            Args: image_id (ImageId), count (int)
         change_requested: Emitted when user clicks "Change..."
     """
 
     layout_type_changed = Signal(PageId, LayoutType)
     split_mode_changed = Signal(PageId, bool)
+    page_count_requested = Signal(ImageId, int)
     change_requested = Signal()
 
     def __init__(
@@ -82,7 +87,7 @@ class OptionsWidget(QWidget):
         self._single_page_btn.setObjectName("singlePageUncutBtn")
         self._single_page_btn.setCheckable(True)
         self._single_page_btn.setAutoExclusive(True)
-        self._single_page_btn.setText("☐")  # Single page icon placeholder
+        self._single_page_btn.setIcon(icon("single_page"))
         self._single_page_btn.setToolTip("Single page (no cutting)")
         self._single_page_btn.setMinimumSize(40, 40)
         self._layout_button_group.addButton(self._single_page_btn, 0)
@@ -92,7 +97,7 @@ class OptionsWidget(QWidget):
         self._page_offcut_btn.setObjectName("pagePlusOffcutBtn")
         self._page_offcut_btn.setCheckable(True)
         self._page_offcut_btn.setAutoExclusive(True)
-        self._page_offcut_btn.setText("☐|")  # Page + offcut icon placeholder
+        self._page_offcut_btn.setIcon(icon("page_offcut_right"))
         self._page_offcut_btn.setToolTip("Page with offcut to remove")
         self._page_offcut_btn.setMinimumSize(40, 40)
         self._layout_button_group.addButton(self._page_offcut_btn, 1)
@@ -102,7 +107,7 @@ class OptionsWidget(QWidget):
         self._two_pages_btn.setObjectName("twoPagesBtn")
         self._two_pages_btn.setCheckable(True)
         self._two_pages_btn.setAutoExclusive(True)
-        self._two_pages_btn.setText("☐|☐")  # Two pages icon placeholder
+        self._two_pages_btn.setIcon(icon("two_pages"))
         self._two_pages_btn.setToolTip("Two pages (split in middle)")
         self._two_pages_btn.setMinimumSize(40, 40)
         self._layout_button_group.addButton(self._two_pages_btn, 2)
@@ -240,6 +245,9 @@ class OptionsWidget(QWidget):
             new_params = params.with_layout_type(layout_type)
             self._filter.set_params(self._current_page_id, new_params)
             self._update_ui()
+            count = layout_type.sub_page_count()
+            if count is not None:
+                self.page_count_requested.emit(self._current_page_id.image_id, count)
             self.layout_type_changed.emit(self._current_page_id, layout_type)
 
     def _on_split_mode_changed(self, is_manual: bool) -> None:
@@ -252,7 +260,12 @@ class OptionsWidget(QWidget):
             return
 
         params = self._filter.get_params(self._current_page_id)
-        if params.is_manual() != is_manual:
-            new_params = params.with_manual_mode(is_manual)
-            self._filter.set_params(self._current_page_id, new_params)
-            self.split_mode_changed.emit(self._current_page_id, is_manual)
+        if params.is_manual() == is_manual:
+            return
+        if is_manual:
+            self._filter.set_params(
+                self._current_page_id, params.with_manual_mode(True)
+            )
+        else:
+            self._filter.clear_detection(self._current_page_id)
+        self.split_mode_changed.emit(self._current_page_id, is_manual)
