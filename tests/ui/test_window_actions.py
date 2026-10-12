@@ -16,6 +16,7 @@ from scantailor.core.models import Dpi, Margins, PageId
 from scantailor.core.project import ImageMetadata
 from scantailor.core.propagation import ApplyScope
 from scantailor.core.stage_sequence import FilterStage
+from scantailor.filters.output.params import ApplyGroup
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
 from scantailor.filters.select_content.content_box import ContentBox, PageBox
 from scantailor.filters.select_content.params import Params as SelectContentParams
@@ -455,11 +456,33 @@ class TestApplyTo:
         window.stages.output_filter.set_params(current, dpi_params)
 
         _answer_apply_dialog(ApplyScope.ALL_PAGES)
-        window.show_apply_dialog(FilterStage.OUTPUT)
+        window.show_apply_dialog(FilterStage.OUTPUT, part=ApplyGroup.DPI.value)
 
         assert window.stages.output_filter.get_params(
             pages[2]
         ).output_dpi == Dpi.uniform(400)
+
+    def test_output_group_button_keeps_target_zones_and_dewarp_model(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.OUTPUT)
+        pages = window.pages()
+        current = window.current_page
+        assert current is not None
+        target = pages[2] if pages[2] != current else pages[3]
+        output = window.stages.output_filter
+        target_before = output.get_params(target)
+        output.set_params(
+            current, output.get_params(current).with_output_dpi(Dpi.uniform(400))
+        )
+
+        _answer_apply_dialog(ApplyScope.ALL_PAGES)
+        window.show_apply_dialog(FilterStage.OUTPUT, part=ApplyGroup.DPI.value)
+
+        after = output.get_params(target)
+        assert after.output_dpi == Dpi.uniform(400)
+        assert after.with_output_dpi(target_before.output_dpi) == target_before
 
     def test_applying_refreshes_the_thumbnails_of_all_pages(
         self, settled_window: MainWindowManager

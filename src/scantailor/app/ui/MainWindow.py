@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 from scantailor.app.ui import UI_FOLDER, load_ui_widget
 from scantailor.app.ui.batch_runner import BatchRunner
 from scantailor.app.ui.dialogs.about import AboutDialog
-from scantailor.app.ui.dialogs.apply_to import ApplyToDialog
+from scantailor.app.ui.dialogs.apply_to import OUTPUT_GROUP_TITLES, ApplyToDialog
 from scantailor.app.ui.dialogs.batch_progress import BatchProgressDialog
 from scantailor.app.ui.dialogs.fix_dpi import FixDpiDialog
 from scantailor.app.ui.dialogs.load_files_status import LoadFilesStatusDialog
@@ -66,6 +66,7 @@ from scantailor.core.recent_projects import RecentProjects
 from scantailor.core.relinker import Relinker, image_directories
 from scantailor.core.stage_params import apply_stage_params, collect_stage_params
 from scantailor.core.stage_sequence import FilterStage, StageSequence
+from scantailor.filters.output.params import ApplyGroup
 
 PROJECT_SUFFIX = ".ScanTailor"
 APP_TITLE = "ScanTailor Advanced"
@@ -867,8 +868,13 @@ class MainWindowManager:
                 ("apply_margins_requested", "margins"),
                 ("apply_alignment_requested", "alignment"),
             ],
-            FilterStage.OUTPUT: [("apply_to_requested", "")],
         }
+        if panels.stage == FilterStage.OUTPUT:
+            options.apply_group_requested.connect(
+                lambda group: self.show_apply_dialog(
+                    FilterStage.OUTPUT, part=group.value
+                )
+            )
         for signal_name, part in requests.get(panels.stage, []):
             getattr(options, signal_name).connect(
                 lambda *_args, stage=panels.stage, part=part: self.show_apply_dialog(
@@ -889,10 +895,6 @@ class MainWindowManager:
         page = self._current_page
         if page is None or self.batch_runner.is_running:
             return False
-        titles = {
-            "margins": self.ui.tr("Apply Margins"),
-            "alignment": self.ui.tr("Apply Alignment"),
-        }
         option_labels = (
             {key: self.ui.tr(label) for key, label in _SELECT_CONTENT_OPTIONS.items()}
             if stage == FilterStage.SELECT_CONTENT
@@ -903,7 +905,7 @@ class MainWindowManager:
             self.pages(),
             self.selectedPages(),
             self.ui,
-            title=titles.get(part, self.ui.tr("Apply to")),
+            title=self._apply_dialog_title(stage, part),
             options=option_labels,
         )
         accepted = dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted
@@ -921,6 +923,16 @@ class MainWindowManager:
             page_box=flags.get("page_box", True),
         )
         return True
+
+    def _apply_dialog_title(self, stage: FilterStage, part: str) -> str:
+        """Return the title of the apply dialog for a stage and settings part."""
+        if stage == FilterStage.OUTPUT and part:
+            return self.ui.tr(OUTPUT_GROUP_TITLES[ApplyGroup(part)])
+        titles = {
+            "margins": self.ui.tr("Apply Margins"),
+            "alignment": self.ui.tr("Apply Alignment"),
+        }
+        return titles.get(part, self.ui.tr("Apply to"))
 
     def apply_to_pages(
         self,
@@ -962,7 +974,7 @@ class MainWindowManager:
             case FilterStage.PAGE_LAYOUT:
                 propagation.apply_margins(stages, source, targets)
             case FilterStage.OUTPUT:
-                propagation.apply_output(stages, source, targets)
+                propagation.apply_output(stages, source, targets, ApplyGroup(part))
             case _:
                 return
         self.modified = True

@@ -16,6 +16,7 @@ from scantailor.core.models import ImageId, OrthogonalRotation, PageId, SubPage
 from scantailor.core.pipeline import PipelineOptions, fix_aggregate_page_size
 from scantailor.core.project import ImageInfo, ImageMetadata, Project
 from scantailor.core.stage_sequence import FilterStage, StageSequence
+from scantailor.filters.output.params import ApplyGroup
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.select_content.dependencies import Dependencies
 
@@ -286,14 +287,26 @@ def apply_alignment(
 
 
 def apply_output(
-    stages: StageSequence, source: PageId, targets: Iterable[PageId]
+    stages: StageSequence,
+    source: PageId,
+    targets: Iterable[PageId],
+    group: ApplyGroup,
 ) -> None:
-    """Copy the source page's output parameters.
+    """Copy one group of the source page's output parameters.
+
+    Zones and the manual distortion model belong to no group and stay as they are.
 
     Args:
         stages (StageSequence): The stages whose settings are updated.
         source (PageId): The page whose parameters are copied.
         targets (Iterable[PageId]): Pages that receive them.
+        group (ApplyGroup): The parameter group to copy.
     """
     filter_ = stages.output_filter
-    filter_.apply_to_pages(list(targets), filter_.get_params(source))
+    source_params = filter_.get_params(source)
+    for target in targets:
+        if target == source:
+            continue
+        filter_.set_params(
+            target, filter_.get_params(target).with_group_from(source_params, group)
+        )

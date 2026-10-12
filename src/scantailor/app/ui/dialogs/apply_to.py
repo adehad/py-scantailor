@@ -6,6 +6,7 @@ from PySide6 import QtWidgets
 
 from scantailor.core.models import PageId
 from scantailor.core.propagation import ApplyScope, select_pages
+from scantailor.filters.output.params import ApplyGroup
 
 _SCOPE_BUTTONS: tuple[tuple[ApplyScope, str, str], ...] = (
     (ApplyScope.THIS_PAGE, "thisPageRB", "This page only (already applied)"),
@@ -28,6 +29,15 @@ _SCOPE_BUTTONS: tuple[tuple[ApplyScope, str, str], ...] = (
         "Every other selected page",
     ),
 )
+OUTPUT_GROUP_TITLES: dict[ApplyGroup, str] = {
+    ApplyGroup.DPI: "Apply Output Resolution",
+    ApplyGroup.COLOR_MODE: "Apply Color Settings",
+    ApplyGroup.SPLITTING: "Apply Splitting Settings",
+    ApplyGroup.BINARIZATION: "Apply Binarization Settings",
+    ApplyGroup.DESPECKLE: "Apply Despeckling Level",
+    ApplyGroup.DEWARPING: "Apply Dewarping Mode",
+    ApplyGroup.DEPTH_PERCEPTION: "Apply Depth Perception",
+}
 _SELECTION_SCOPES = (ApplyScope.SELECTED_PAGES, ApplyScope.EVERY_OTHER_SELECTED)
 
 

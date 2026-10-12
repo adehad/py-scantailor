@@ -6,6 +6,7 @@ import pytest
 from PySide6 import QtWidgets
 from pytestqt.qtbot import QtBot
 
+from scantailor.app.ui.dialogs.apply_to import OUTPUT_GROUP_TITLES
 from scantailor.app.ui.options_widgets.output import OptionsWidget
 from scantailor.core.models import ImageId, PageId, SubPage
 from scantailor.filters.output.binarization import BinarizationMethod
@@ -14,7 +15,7 @@ from scantailor.filters.output.color_options import FillingColor
 from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.output.dewarping_options import DewarpingMode
 from scantailor.filters.output.filter import Filter
-from scantailor.filters.output.params import DistortionModelSpec, Params
+from scantailor.filters.output.params import ApplyGroup, DistortionModelSpec, Params
 
 PAGE = PageId(
     image_id=ImageId(file_path=Path("page.tif")), sub_page=SubPage.SINGLE_PAGE
@@ -549,11 +550,21 @@ class TestPageState:
         assert seen == []
 
 
-def test_apply_to_button_requests_the_apply_to_dialog(qtbot: QtBot):
+@pytest.mark.parametrize("group", list(ApplyGroup))
+def test_each_option_group_requests_its_own_apply_to_dialog(
+    qtbot: QtBot, group: ApplyGroup
+):
     widget = OptionsWidget(Filter())
     qtbot.addWidget(widget)
-    button = widget.findChild(QtWidgets.QPushButton, "applyToBtn")
+    button = widget.findChild(QtWidgets.QPushButton, f"apply_{group.value}_btn")
     assert button is not None
 
-    with qtbot.waitSignal(widget.apply_to_requested):
+    with qtbot.waitSignal(widget.apply_group_requested) as blocker:
         button.click()
+
+    assert blocker.args == [group]
+
+
+def test_every_apply_group_has_a_dialog_title():
+    assert set(OUTPUT_GROUP_TITLES) == set(ApplyGroup)
+    assert all(title.strip() for title in OUTPUT_GROUP_TITLES.values())
