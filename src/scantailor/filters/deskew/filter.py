@@ -1,8 +1,9 @@
 """Deskew filter implementation.
 
 This filter detects and corrects page skew by rotating the image to align
-horizontal text lines. It can operate in automatic mode (detecting skew)
-or manual mode (using user-specified angles).
+horizontal text lines, and optionally an oblique (shear) distortion. Each can
+operate in automatic mode (detecting it) or manual mode (using user-specified
+angles).
 """
 
 import cv2
@@ -10,9 +11,11 @@ import numpy as np
 from numpy.typing import NDArray
 
 from scantailor.core.models import PageId
+from scantailor.core.transformation import ImageTransformation
 from scantailor.filters.deskew.dependencies import Dependencies
-from scantailor.filters.deskew.params import AutoManualMode, Params
-from scantailor.filters.deskew.settings import Settings
+from scantailor.filters.deskew.oblique import find_oblique_degrees, rotate_mask
+from scantailor.filters.deskew.params import MAX_OBLIQUE_DEG, Params
+from scantailor.filters.deskew.settings import Detection, Settings
 from scantailor.imageproc.analysis import SkewResult, find_skew
 from scantailor.imageproc.binarize import binarize_otsu
 
@@ -24,11 +27,11 @@ class Filter:
     and Page Split). It detects and corrects page skew to align horizontal
     text lines.
 
-    The filter can operate in two modes:
-    - AUTO: Automatically detect skew using image analysis
+    The rotation and the oblique correction each run in one of two modes:
+    - AUTO: Automatically detect it using image analysis
     - MANUAL: Use a user-specified angle
 
-    The deskew angle is stored as metadata and can be applied to images
+    The angles are stored as metadata and can be applied to images
     during final output generation.
 
     Example:
@@ -102,7 +105,7 @@ class Filter:
         self._settings.set_params(page_id, params)
 
     def set_manual_angle(self, page_id: PageId, angle: float) -> Params:
-        """Set a manual deskew angle for a page.
+        """Set a manual deskew angle for a page, keeping its oblique correction.
 
         Args:
             page_id: The page to set angle for.
@@ -111,9 +114,33 @@ class Filter:
         Returns:
             The new Params instance.
         """
-        params = Params(deskew_angle_deg=angle, mode=AutoManualMode.MANUAL)
+        params = self.get_params(page_id).with_manual_angle(angle)
         self._settings.set_params(page_id, params)
         return params
+
+    def set_manual_oblique(self, page_id: PageId, angle: float) -> Params:
+        """Set a manual oblique angle for a page, keeping its rotation.
+
+        Args:
+            page_id: The page to set the angle for.
+            angle: The oblique angle in degrees, clamped to the oblique limit.
+
+        Returns:
+            The new Params instance.
+        """
+        clamped = max(-MAX_OBLIQUE_DEG, min(MAX_OBLIQUE_DEG, angle))
+        params = self.get_params(page_id).with_manual_oblique(clamped)
+        self._settings.set_params(page_id, params)
+        return params
+
+    @property
+    def auto_oblique_default(self) -> bool:
+        """Whether pages without parameters detect their oblique angle."""
+        return self._settings.get_auto_oblique_default()
+
+    @auto_oblique_default.setter
+    def auto_oblique_default(self, enabled: bool) -> None:
+        self._settings.set_auto_oblique_default(enabled)
 
     def detect_skew(
         self,
@@ -164,55 +191,107 @@ class Filter:
             min_angle=self.DEFAULT_MIN_ANGLE,
         )
 
-        # Store result if confident and requested
         if store_result:
-            # Use detected angle if confident, otherwise 0
-            angle = result.angle if result.is_confident() else 0.0
-            # Negate the skew angle to get the correction angle
-            deskew_angle = -angle
-            params = Params(
-                deskew_angle_deg=deskew_angle,
-                mode=AutoManualMode.AUTO,
-                dependencies=dependencies or Dependencies(),
-            )
-            self._settings.store_detected_params(page_id, params)
+            self._store_detection(binary, result, page_id, dependencies)
 
         return result
 
+    def _automatic_parts(self, page_id: PageId) -> tuple[bool, bool]:
+        """Tell which of rotation and oblique are automatic for a page.
+
+        Returns:
+            Whether the rotation and whether the oblique angle are automatic;
+            a manual part is never replaced by detection.
+        """
+        if not self._settings.is_params_set(page_id):
+            return True, self._settings.get_auto_oblique_default()
+        params = self._settings.get_params(page_id)
+        return params.is_auto(), params.is_oblique_auto()
+
+    def _store_detection(
+        self,
+        binary: NDArray[np.uint8],
+        skew: SkewResult,
+        page_id: PageId,
+        dependencies: Dependencies | None,
+    ) -> None:
+        """Store the parts of a detection that the page's modes allow."""
+        detect_rotation, detect_oblique = self._automatic_parts(page_id)
+        # The correction is the negated skew; a weak skew counts as none.
+        rotation = (0.0 - skew.angle) if skew.is_confident() else 0.0
+        oblique: float | None = None
+        if detect_oblique:
+            kept = self._settings.get_params(page_id).deskew_angle_deg
+            level = rotate_mask(binary, rotation if detect_rotation else kept)
+            found = find_oblique_degrees(level)
+            oblique = 0.0 if found is None else 0.0 - found
+        self._settings.store_detection(
+            page_id,
+            dependencies or Dependencies(),
+            rotation=rotation if detect_rotation else None,
+            oblique=oblique,
+        )
+
     def needs_detection(self, page_id: PageId, dependencies: Dependencies) -> bool:
-        """Tell whether the angle is missing or detected under other geometry.
+        """Tell whether an angle is missing or detected under other geometry.
 
         Args:
             page_id: The page to check.
             dependencies: The upstream geometry as it stands now.
 
         Returns:
-            True if the angle must be detected again. A manual angle never is.
+            True if the rotation or the oblique angle must be detected. Manual
+            angles never are.
         """
         if not self._settings.is_params_set(page_id):
             return True
         params = self._settings.get_params(page_id)
-        if params.is_manual() or params.dependencies.is_null():
+        if params.needs_redetection():
+            return True
+        if not (params.is_auto() or params.is_oblique_auto()):
             return False
-        return not params.dependencies.matches(dependencies)
+        return not (
+            params.dependencies.is_null() or params.dependencies.matches(dependencies)
+        )
 
-    def clear_detection(self, page_id: PageId) -> None:
-        """Forget the stored angle so the next run detects it.
+    def redetect_rotation(self, page_id: PageId) -> None:
+        """Make the rotation automatic again; the oblique correction is kept.
+
+        Args:
+            page_id: The page to reset.
+        """
+        self._settings.request_detection(page_id, Detection.ROTATION)
+
+    def redetect_oblique(self, page_id: PageId) -> None:
+        """Make the oblique correction automatic again; the rotation is kept.
+
+        Args:
+            page_id: The page to reset.
+        """
+        self._settings.request_detection(page_id, Detection.OBLIQUE)
+
+    def reset_to_auto(self, page_id: PageId) -> None:
+        """Reset a page to its fresh state, forgetting manual angles.
+
+        Rotation is automatic with 0 degrees, and the oblique correction starts
+        as the default says.
 
         Args:
             page_id: The page to reset.
         """
         self._settings.clear_page(page_id)
 
-    def reset_to_auto(self, page_id: PageId) -> None:
-        """Reset a page to auto mode with 0 degree angle.
-
-        This clears any manual angle and resets to default auto detection.
+    def apply_geometry(
+        self, transformation: ImageTransformation, params: Params
+    ) -> None:
+        """Set the rotation and the shear of a transformation from parameters.
 
         Args:
-            page_id: The page to reset.
+            transformation: The transformation to update; later steps reset.
+            params: The page's parameters.
         """
-        self._settings.set_params(page_id, Params())
+        transformation.set_post_rotation(params.deskew_angle_deg)
+        transformation.set_post_oblique(params.oblique_angle_deg)
 
     def apply_to_pages(self, page_ids: list[PageId], params: Params) -> None:
         """Apply parameters to multiple pages.

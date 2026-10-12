@@ -32,6 +32,7 @@ SHOT_NAMES = (
     "welcome",
     "new_project",
     *STAGE_SHOTS,
+    "stage3_deskew_oblique",
     "settings",
     "default_parameters",
     "batch_progress",
@@ -230,14 +231,14 @@ def _capture(scheme: str, out_dir: Path) -> None:
     manager.actionNewProject.trigger()
     pump_until(lambda: len(manager.pages()) == _PAGE_COUNT, 30.0, "the project")
 
-    def show_stage(index: int) -> None:
+    def show_stage(index: int, name: str | None = None, settle_s: float = 1.5) -> None:
         getattr(manager, f"switchFilter{index}")()
         pump(0.5)
         pump_until(
             lambda: not manager._render_pending, _RENDER_TIMEOUT_S, "the page render"
         )
-        pump(1.5)
-        save(manager.ui, STAGE_SHOTS[index - 1])
+        pump(settle_s)
+        save(manager.ui, name or STAGE_SHOTS[index - 1])
 
     manager.current_page = manager.pages()[0]
     for index in range(1, 6):
@@ -252,6 +253,10 @@ def _capture(scheme: str, out_dir: Path) -> None:
         save(manager.batch_dialog, "batch_progress")
         manager.batch_dialog.close()
     show_stage(6)
+
+    manager.stages.deskew_filter.set_manual_oblique(manager.current_page, 2.0)
+    show_stage(3, "stage3_deskew_oblique", settle_s=6.0)
+    manager.stages.deskew_filter.set_manual_oblique(manager.current_page, 0.0)
 
     in_modal("settings", manager.actionSettings.trigger)
     in_modal("default_parameters", manager.actionDefaults.trigger)

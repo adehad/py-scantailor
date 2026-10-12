@@ -547,6 +547,7 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         angle = self._spin("angleSpinBox")
         angle.setEnabled(not auto)
         angle.setValue(defaults.deskew_angle_deg)
+        self._check("deskewAutoObliqueCB", defaults.auto_oblique)
 
     def _load_select_content(self, defaults: SelectContentDefaults) -> None:
         page_buttons = {
@@ -721,6 +722,7 @@ class DefaultParamsDialog(QtWidgets.QDialog):
                 mode=AutoManualMode.AUTO
                 if self._checked("deskewAutoBtn")
                 else AutoManualMode.MANUAL,
+                auto_oblique=self._checked("deskewAutoObliqueCB"),
             ),
             page_split=PageSplitDefaults(layout_type=self._build_layout_type()),
             select_content=self._build_select_content(base.select_content),

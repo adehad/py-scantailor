@@ -155,6 +155,7 @@ def collect_stage_defaults(stages: StageSequence) -> dict[str, Any]:
         "output_despeckle_level": output.get_default_despeckle_level().value,
         "page_detection_box": list(select_content.get_page_detection_box()),
         "page_detection_tolerance": select_content.get_page_detection_tolerance(),
+        "deskew_auto_oblique": stages.deskew_filter.auto_oblique_default,
     }
 
 
@@ -187,3 +188,5 @@ def apply_stage_defaults(stages: StageSequence, defaults: dict[str, Any]) -> Non
         select_content.set_page_detection_box(width, height)
     if (tolerance := defaults.get("page_detection_tolerance")) is not None:
         select_content.set_page_detection_tolerance(tolerance)
+    if (auto_oblique := defaults.get("deskew_auto_oblique")) is not None:
+        stages.deskew_filter.auto_oblique_default = bool(auto_oblique)

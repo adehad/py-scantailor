@@ -28,6 +28,7 @@ from scantailor.core.propagation import (
     select_pages,
 )
 from scantailor.core.stage_sequence import StageSequence
+from scantailor.filters.deskew.dependencies import Dependencies as DeskewDependencies
 from scantailor.filters.deskew.params import Params as DeskewParams
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.params import ApplyGroup
@@ -386,7 +387,10 @@ class TestApplyFunctions:
 
         apply_deskew(stages, source, [target])
 
-        assert not stages.deskew_filter.settings.is_params_set(target)
+        params = stages.deskew_filter.get_params(target)
+        assert params.is_auto()
+        assert params.redetect_rotation
+        assert stages.deskew_filter.needs_detection(target, DeskewDependencies())
 
     def test_select_content_copies_boxes_and_modes(self):
         stages = StageSequence()
