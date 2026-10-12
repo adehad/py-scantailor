@@ -6,7 +6,7 @@ pipeline, matching the C++ ImageTransformation class:
 1. Pre-scale: Equalize DPI (make pixels square)
 2. Pre-rotate: Orthogonal rotation (0, 90, 180, 270 degrees)
 3. Pre-crop: Crop to page boundaries (after split)
-4. Post-rotate: Deskew rotation (arbitrary angle)
+4. Post-rotate: Deskew rotation (arbitrary angle), then oblique (shear)
 5. Post-crop: Adjust margins
 6. Post-scale: Scale to output DPI
 """
@@ -159,6 +159,13 @@ def _rotation_matrix(degrees: float) -> NDArray[np.float64]:
     return m
 
 
+def _shear_matrix(oblique_degrees: float) -> NDArray[np.float64]:
+    """Create the horizontal shear x' = x - tan(oblique / 2) * y about the origin."""
+    m = np.eye(3, dtype=np.float64)
+    m[0, 1] = -math.tan(math.radians(oblique_degrees) * 0.5)
+    return m
+
+
 def _then(*matrices: NDArray[np.float64]) -> NDArray[np.float64]:
     """Compose column-vector transforms so the first argument is applied first.
 
@@ -203,7 +210,7 @@ class ImageTransformation:
     1. Pre-scale: Scale to equalize DPI (make pixels square)
     2. Pre-rotate: Orthogonal rotation (0, 90, 180, 270 degrees)
     3. Pre-crop: Crop to page boundaries
-    4. Post-rotate: Deskew rotation (arbitrary angle)
+    4. Post-rotate: Deskew rotation (arbitrary angle), then oblique (shear)
     5. Post-crop: Margin adjustment
     6. Post-scale: Scale to output DPI
 
@@ -240,6 +247,7 @@ class ImageTransformation:
 
     # Step 4: Post-rotate
     _post_rotation: float = 0.0
+    _post_oblique: float = 0.0
     _post_rotate_xform: NDArray[np.float64] = field(
         default_factory=_identity_matrix, repr=False
     )
@@ -314,6 +322,11 @@ class ImageTransformation:
         return self._post_rotation
 
     @property
+    def post_oblique(self) -> float:
+        """Get the oblique (shear) correction in degrees."""
+        return self._post_oblique
+
+    @property
     def transform(self) -> NDArray[np.float64]:
         """Get full transformation matrix (original to resulting)."""
         return self._transform.copy()
@@ -379,7 +392,9 @@ class ImageTransformation:
             self._pre_crop_xform = self._calc_crop_xform(self._pre_crop_area)
 
         # Recalculate post-rotate
-        self._post_rotate_xform = self._calc_post_rotate_xform(self._post_rotation)
+        self._post_rotate_xform = self._calc_post_rotate_xform(
+            self._post_rotation, self._post_oblique
+        )
 
         # Recalculate post-crop area
         if len(self._post_crop_area) > 0:
@@ -447,7 +462,26 @@ class ImageTransformation:
     def set_post_rotation(self, degrees: float) -> None:
         """Set deskew rotation in degrees, resetting subsequent steps."""
         self._post_rotation = degrees
-        self._post_rotate_xform = self._calc_post_rotate_xform(degrees)
+        self._post_rotate_xform = self._calc_post_rotate_xform(
+            degrees, self._post_oblique
+        )
+        self._reset_post_crop()
+        self._reset_post_scale()
+        self._update()
+
+    def set_post_oblique(self, degrees: float) -> None:
+        """Set the oblique (shear) correction, resetting subsequent steps.
+
+        The shear is applied after the deskew rotation: x' = x - tan(degrees / 2) * y.
+        Half the angle keeps the page's proportions.
+
+        Args:
+            degrees (float): Oblique angle in degrees; zero means no shear.
+        """
+        self._post_oblique = degrees
+        self._post_rotate_xform = self._calc_post_rotate_xform(
+            self._post_rotation, degrees
+        )
         self._reset_post_crop()
         self._reset_post_scale()
         self._update()
@@ -502,9 +536,15 @@ class ImageTransformation:
         bounds = _polygon_bounding_rect(area)
         return _translation_matrix(-bounds.x, -bounds.y)
 
-    def _calc_post_rotate_xform(self, degrees: float) -> NDArray[np.float64]:
-        """Calculate post-rotation transformation around pre-crop area center."""
-        if abs(degrees) < 1e-10:
+    def _calc_post_rotate_xform(
+        self, degrees: float, oblique_degrees: float = 0.0
+    ) -> NDArray[np.float64]:
+        """Calculate the rotation, then shear, around the pre-crop area center.
+
+        The result is shifted so the top-left corner of the pre-crop area's
+        bounds stays where it was.
+        """
+        if abs(degrees) < 1e-10 and abs(oblique_degrees) < 1e-10:
             return _identity_matrix()
 
         # Get center of pre-crop area
@@ -523,6 +563,7 @@ class ImageTransformation:
         xform = _then(
             _translation_matrix(-cx, -cy),
             _rotation_matrix(degrees),
+            _shear_matrix(oblique_degrees),
             _translation_matrix(cx, cy),
         )
 
@@ -581,8 +622,9 @@ class ImageTransformation:
         self._pre_crop_xform = _identity_matrix()
 
     def _reset_post_rotation(self) -> None:
-        """Reset post-rotation."""
+        """Reset post-rotation and oblique."""
         self._post_rotation = 0.0
+        self._post_oblique = 0.0
         self._post_rotate_xform = _identity_matrix()
 
     def _reset_post_crop(self) -> None:
