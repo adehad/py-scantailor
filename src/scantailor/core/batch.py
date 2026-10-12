@@ -26,7 +26,7 @@ import numpy as np
 from loguru import logger
 from numpy.typing import NDArray
 
-from scantailor.core.image_io import write_image
+from scantailor.core.image_io import tiff_compressions_in_use, write_image
 from scantailor.core.models import Dpi, PageId, SubPage
 from scantailor.core.page_source import DpiOverrides, load_page
 from scantailor.core.pipeline import (
@@ -35,6 +35,7 @@ from scantailor.core.pipeline import (
     process_page,
 )
 from scantailor.core.project import LayoutDirection, StageParamsEntry
+from scantailor.core.settings import ApplicationSettings, TiffCompressions
 from scantailor.core.stage_params import (
     STAGE_KEYS,
     apply_stage_params,
@@ -439,6 +440,7 @@ class _PhaseConfig:
     stage_params: StageParamsData
     defaults: StageDefaultsData
     default_dpi: float
+    tiff_compressions: TiffCompressions = field(default_factory=TiffCompressions)
 
 
 @dataclass(frozen=True)
@@ -555,11 +557,15 @@ def _render_page(job: _PageJob) -> tuple[Path, RenderInfo]:
     is_binary = bool(rendered.metadata.get("OUTPUT", {}).get("is_binary"))
     dpi = rendered.dpi or (None if loaded.dpi.is_null() else loaded.dpi)
     job.output_path.parent.mkdir(parents=True, exist_ok=True)
-    write_image(job.output_path, _as_writable(rendered.image, is_binary), dpi)
+    compressions = job.config.tiff_compressions
+    write_image(
+        job.output_path, _as_writable(rendered.image, is_binary), dpi, compressions
+    )
     if rendered.split is not None:
-        write_split_images(
-            job.output_path.parent, job.output_path.name, rendered.split, dpi
-        )
+        with tiff_compressions_in_use(compressions):
+            write_split_images(
+                job.output_path.parent, job.output_path.name, rendered.split, dpi
+            )
     if rendered.transformation is None or dpi is None:
         raise RuntimeError("The pipeline returned no output geometry")
     info = RenderInfo(
@@ -582,6 +588,7 @@ def run_batch(
     cancel: Event | None = None,
     dpi_overrides: DpiOverrides | None = None,
     executor: ProcessPoolExecutor | None = None,
+    tiff_compressions: TiffCompressions | None = None,
 ) -> BatchResult:
     """Process pages through the full pipeline and write them as TIFFs.
 
@@ -608,11 +615,17 @@ def run_batch(
         executor (ProcessPoolExecutor | None): A pool from ``spawn_pool`` to
             reuse across phases; ``max_workers`` must then be its size. It is
             left running. A private pool is used and closed when None.
+        tiff_compressions (TiffCompressions | None): Methods for the written
+            files, handed to the workers as plain data; the application settings
+            as they are when the batch starts when None.
 
     Returns:
         BatchResult: Written, failed and never-started pages.
     """
     result = BatchResult()
+    compressions = (
+        tiff_compressions or ApplicationSettings.get_instance().tiff_compressions
+    )
 
     def report(event: BatchEvent) -> None:
         if isinstance(event, PageDone):
@@ -645,6 +658,7 @@ def run_batch(
             stage_params=collect_effective_stage_params(stages, ready),
             defaults=collect_stage_defaults(stages),
             default_dpi=default_dpi,
+            tiff_compressions=compressions,
         )
         jobs = [
             _PageJob(
