@@ -64,6 +64,27 @@ class Settings(BaseModel):
         with self._lock:
             self.params[page_id] = params
 
+    def store_detected_params(self, page_id: PageId, params: Params) -> bool:
+        """Store an auto-detected result unless the page has a manual angle.
+
+        Detection runs on worker threads, so the user can set a manual angle
+        between the start of a detection and its result; checking and storing
+        under one lock keeps that manual angle.
+
+        Args:
+            page_id: The page the detection ran for.
+            params: The detected parameters.
+
+        Returns:
+            True if the params were stored, False if a manual angle was kept.
+        """
+        with self._lock:
+            current = self.params.get(page_id)
+            if current is not None and current.is_manual():
+                return False
+            self.params[page_id] = params
+            return True
+
     def set_angle(self, page_id: PageId, angle: float, mode: str | None = None) -> None:
         """Set just the deskew angle for a page.
 

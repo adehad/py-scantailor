@@ -131,6 +131,34 @@ class TestFilterDetectSkew:
 
         assert filter.settings.is_params_set(page_id) is False
 
+    def test_detection_finishing_after_a_manual_angle_keeps_the_manual_angle(self):
+        """A detection result must not overwrite an angle the user set meanwhile."""
+        filter = Filter()
+        page_id = make_page_id("test")
+        image = np.zeros((100, 200), dtype=np.uint8)
+        image[30, 20:180] = 255
+        filter.set_manual_angle(page_id, 2.5)
+
+        filter.detect_skew(image, page_id)
+
+        params = filter.get_params(page_id)
+        assert params.is_manual()
+        assert params.deskew_angle_deg == 2.5
+
+    def test_detection_replaces_an_earlier_auto_angle(self):
+        """Re-detection still updates a page whose angle was auto-detected."""
+        filter = Filter()
+        page_id = make_page_id("test")
+        filter.settings.set_params(
+            page_id, Params(deskew_angle_deg=4.0, mode=AutoManualMode.AUTO)
+        )
+        image = np.zeros((100, 200), dtype=np.uint8)
+        image[30, 20:180] = 255
+
+        filter.detect_skew(image, page_id)
+
+        assert filter.get_params(page_id).deskew_angle_deg != 4.0
+
     def test_detect_skew_sets_auto_mode(self):
         """detect_skew should set AUTO mode."""
         filter = Filter()
