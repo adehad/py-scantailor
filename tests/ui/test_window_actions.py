@@ -2,7 +2,7 @@
 
 import pathlib
 import threading
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import pytest
 from PySide6 import QtCore, QtWidgets
@@ -15,9 +15,15 @@ from scantailor.core.batch import BatchResult, PageDone
 from scantailor.core.models import Dpi, Margins, PageId
 from scantailor.core.project import ImageMetadata
 from scantailor.core.propagation import ApplyScope
+from scantailor.core.settings import ApplicationSettings
 from scantailor.core.stage_sequence import FilterStage
 from scantailor.filters.output.params import ApplyGroup
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
+from scantailor.filters.page_split.dependencies import (
+    Dependencies as SplitDependencies,
+)
+from scantailor.filters.page_split.page_layout import PageLayout
+from scantailor.filters.page_split.params import Params as SplitParams
 from scantailor.filters.select_content.content_box import ContentBox, PageBox
 from scantailor.filters.select_content.params import Params as SelectContentParams
 
@@ -693,8 +699,10 @@ class TestReloadAndIndicator:
         qtbot: QtBot,
         settled_window: MainWindowManager,
         monkeypatch: pytest.MonkeyPatch,
+        wait_for_thumbnails: Callable[[MainWindowManager], None],
     ):
         window = settled_window
+        wait_for_thumbnails(window)
         delivered: list[PageId] = []
         window.renderer.render_done.connect(lambda page, _image: delivered.append(page))
         rendered = _count_renders(window, monkeypatch)
@@ -704,7 +712,7 @@ class TestReloadAndIndicator:
 
         assert delivered == [window.current_page]
         assert window.current_page in rendered
-        window.thumbnails.model.wait_for_idle()
+        wait_for_thumbnails(window)
 
     def test_reload_refreshes_the_thumbnail_of_the_page(
         self, settled_window: MainWindowManager
@@ -852,4 +860,165 @@ class TestThumbnailControls:
         )
 
         assert window.pages()[1] in window.selectedPages()
+        window.renderer.wait_for_done()
+
+
+def _store_detected_spreads(window: MainWindowManager, image_ids) -> None:
+    """Store a two-page layout for each image the way Page Split detection does."""
+    for image_id in image_ids:
+        window.stages.page_split_filter.set_params(
+            PageId(image_id=image_id),
+            SplitParams(
+                page_layout=PageLayout.two_pages(600, 800, 300),
+                dependencies=SplitDependencies(image_size=(600, 800)),
+            ),
+        )
+
+
+class TestDetectedPageCounts:
+    """A detected two-page spread adds a page to the list, as in C++."""
+
+    def test_an_interactive_render_that_detects_a_spread_adds_its_pages(
+        self, qtbot: QtBot, settled_window: MainWindowManager, monkeypatch
+    ):
+        window = settled_window
+        real_render = page_renderer.render_page
+
+        def detecting_render(page_id, sequence, end_stage, dpi_overrides=None):
+            _store_detected_spreads(window, [page_id.image_id])
+            return real_render(page_id, sequence, end_stage)
+
+        monkeypatch.setattr(page_renderer, "render_page", detecting_render)
+        first = window.pages()[0]
+        assert len(window.pages()) == 3
+
+        window._request_render()
+        qtbot.waitUntil(lambda: len(window.pages()) == 4, timeout=RENDER_TIMEOUT_MS)
+
+        assert [page.image_id for page in window.pages()].count(first.image_id) == 2
+        current = window.current_page
+        assert current is not None
+        assert current.image_id == first.image_id
+        assert current in window.pages()
+        assert window.modified
+        window.renderer.wait_for_done()
+
+    def test_a_batch_that_detects_spreads_adds_their_pages(
+        self, qtbot: QtBot, project_window: MainWindowManager, monkeypatch
+    ):
+        window = project_window
+        image_count = len(window.pages())
+
+        def detecting_batch(stages, pages, output_dir, **_kwargs):
+            _store_detected_spreads(window, [page.image_id for page in pages])
+            result = BatchResult()
+            for page in pages:
+                result.written[page] = output_dir / "x.tif"
+            return result
+
+        monkeypatch.setattr(batch_runner, "run_batch", detecting_batch)
+
+        with qtbot.waitSignal(window.batch_runner.finished, timeout=10_000):
+            window.startBatchProcessing()
+
+        assert len(window.pages()) == 2 * image_count
+        assert window.current_page in window.pages()
+
+    def test_entering_a_later_stage_adopts_layouts_stored_by_an_earlier_run(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        assert window.project is not None
+        _store_detected_spreads(window, [info.id for info in window.project.images])
+
+        _switch_stage(window, FilterStage.DESKEW)
+
+        assert len(window.pages()) == 6
+        window.renderer.wait_for_done()
+
+
+@pytest.fixture
+def auto_save_enabled() -> object:
+    settings = ApplicationSettings.get_instance()
+    previous = settings.auto_save_project
+    settings.auto_save_project = True
+    yield settings
+    settings.auto_save_project = previous
+
+
+class TestAutoSave:
+    """The project is written a while after the current page changes."""
+
+    @staticmethod
+    def _arm(window: MainWindowManager, project_file: pathlib.Path) -> None:
+        window.projectFile = str(project_file)
+        window._auto_save_timer.stop()
+        window._auto_save_timer.setInterval(10)
+
+    def test_changing_page_saves_the_project_when_auto_save_is_on(
+        self,
+        qtbot: QtBot,
+        settled_window: MainWindowManager,
+        tmp_path: pathlib.Path,
+        auto_save_enabled: object,
+    ):
+        target = tmp_path / "auto.ScanTailor"
+        self._arm(settled_window, target)
+
+        settled_window.goNextPage()
+
+        qtbot.waitUntil(target.is_file, timeout=10_000)
+        assert not settled_window.modified
+        settled_window.renderer.wait_for_done()
+
+    def test_nothing_is_written_when_auto_save_is_off(
+        self,
+        qtbot: QtBot,
+        settled_window: MainWindowManager,
+        tmp_path: pathlib.Path,
+    ):
+        settings = ApplicationSettings.get_instance()
+        previous = settings.auto_save_project
+        settings.auto_save_project = False
+        try:
+            target = tmp_path / "auto.ScanTailor"
+            self._arm(settled_window, target)
+
+            settled_window.goNextPage()
+            qtbot.waitUntil(lambda: not settled_window._auto_save_timer.isActive())
+        finally:
+            settings.auto_save_project = previous
+
+        assert not target.exists()
+        settled_window.renderer.wait_for_done()
+
+    def test_a_project_without_a_file_is_not_saved_automatically(
+        self,
+        qtbot: QtBot,
+        settled_window: MainWindowManager,
+        tmp_path: pathlib.Path,
+        auto_save_enabled: object,
+    ):
+        self._arm(settled_window, tmp_path / "unused.ScanTailor")
+        settled_window.projectFile = ""
+
+        settled_window.goNextPage()
+        qtbot.waitUntil(lambda: not settled_window._auto_save_timer.isActive())
+
+        assert not list(tmp_path.glob("*.ScanTailor"))
+        settled_window.renderer.wait_for_done()
+
+    def test_the_countdown_is_not_restarted_by_further_page_changes(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        window._auto_save_timer.stop()
+        window._auto_save_timer.setInterval(60_000)
+
+        window.goNextPage()
+        remaining = window._auto_save_timer.remainingTime()
+        window.goNextPage()
+
+        assert window._auto_save_timer.isActive()
+        assert window._auto_save_timer.remainingTime() <= remaining
         window.renderer.wait_for_done()

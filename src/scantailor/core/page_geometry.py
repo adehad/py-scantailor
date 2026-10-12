@@ -17,6 +17,9 @@ from scantailor.filters.page_layout.page_rect import (
     adapt_content_rect,
     calc_page_polygon,
 )
+from scantailor.filters.page_split.page_layout_adapter import (
+    correct_page_layout_type,
+)
 
 # Smallest crop edge, in pixels, that is still worth applying.
 _MIN_CROP_EDGE_PX = 1.0
@@ -82,6 +85,7 @@ def _page_crop_area(
     layout = sequence.page_split_filter.get_params(page_id).page_layout
     if layout is None:
         return None
+    layout = correct_page_layout_type(layout)
     outline = layout.get_page_outline(page_id.sub_page)
     if outline is None:
         return None

@@ -4,7 +4,7 @@ Allows users to select the split mode (auto/manual) and apply scope
 (this page, all pages, selected pages, etc.) for page splitting.
 """
 
-from enum import Enum, auto
+from collections.abc import Collection
 from pathlib import Path
 
 from PySide6 import QtCore, QtWidgets
@@ -14,6 +14,7 @@ from scantailor.app.ui import embed_ui, load_ui_widget
 from scantailor.app.ui.icons import icon
 from scantailor.app.ui.utils import get_cwidget
 from scantailor.core.models import PageId
+from scantailor.core.propagation import ApplyScope, select_pages
 from scantailor.filters.page_split.layout_type import LayoutType
 
 _UI_FOLDER = Path(__file__).parent
@@ -22,18 +23,6 @@ _LAYOUT_GLYPHS = {
     LayoutType.PAGE_PLUS_OFFCUT: "split-right-page-plus-offcut",
     LayoutType.TWO_PAGES: "book-open",
 }
-
-
-class ApplyScope(Enum):
-    """Scope for applying the split mode change."""
-
-    THIS_PAGE = auto()
-    ALL_PAGES = auto()
-    THIS_PAGE_AND_FOLLOWING = auto()
-    THIS_PAGE_EVERY_OTHER = auto()
-    EVERY_OTHER = auto()
-    SELECTED_PAGES = auto()
-    EVERY_OTHER_SELECTED = auto()
 
 
 class SplitModeDialog(QtWidgets.QDialog):
@@ -54,7 +43,7 @@ class SplitModeDialog(QtWidgets.QDialog):
         parent: QtWidgets.QWidget | None = None,
         current_page: PageId | None = None,
         all_pages: list[PageId] | None = None,
-        selected_pages: set[PageId] | None = None,
+        selected_pages: Collection[PageId] | None = None,
         layout_type: LayoutType | None = None,
         auto_detected_layout_type: LayoutType | None = None,
     ) -> None:
@@ -64,7 +53,8 @@ class SplitModeDialog(QtWidgets.QDialog):
             parent: Parent widget.
             current_page: The current page being edited.
             all_pages: List of all pages in the project.
-            selected_pages: Currently selected pages in the thumbnail list.
+            selected_pages: Currently selected pages in the thumbnail list;
+                kept in the order of ``all_pages``.
             layout_type: Current layout type setting.
             auto_detected_layout_type: Auto-detected layout type for current page.
         """
@@ -72,7 +62,8 @@ class SplitModeDialog(QtWidgets.QDialog):
 
         self._current_page = current_page
         self._all_pages = all_pages or []
-        self._selected_pages = selected_pages or set()
+        selected = set(selected_pages or ())
+        self._selected_pages = [page for page in self._all_pages if page in selected]
         self._layout_type = layout_type
         self._auto_detected_layout_type = auto_detected_layout_type
 
@@ -146,8 +137,7 @@ class SplitModeDialog(QtWidgets.QDialog):
 
     def _update_ui_state(self) -> None:
         """Update UI based on current state."""
-        # Disable selected pages options if no pages are selected
-        has_selection = len(self._selected_pages) > 0
+        has_selection = len(self._selected_pages) > 1
         self._selected_pages_rb.setEnabled(has_selection)
         self._every_other_selected_rb.setEnabled(has_selection)
         self._selected_pages_hint.setEnabled(has_selection)
@@ -192,7 +182,7 @@ class SplitModeDialog(QtWidgets.QDialog):
         elif self._all_pages_rb.isChecked():
             return ApplyScope.ALL_PAGES
         elif self._this_page_and_followers_rb.isChecked():
-            return ApplyScope.THIS_PAGE_AND_FOLLOWING
+            return ApplyScope.THIS_PAGE_AND_FOLLOWERS
         elif self._this_every_other_rb.isChecked():
             return ApplyScope.THIS_PAGE_EVERY_OTHER
         elif self._every_other_rb.isChecked():
@@ -212,52 +202,14 @@ class SplitModeDialog(QtWidgets.QDialog):
         """
         if not self._current_page or not self._all_pages:
             return set()
-
-        scope = self._get_selected_scope()
-
-        if scope == ApplyScope.THIS_PAGE:
-            return {self._current_page}
-
-        elif scope == ApplyScope.ALL_PAGES:
-            return set(self._all_pages)
-
-        elif scope == ApplyScope.THIS_PAGE_AND_FOLLOWING:
-            try:
-                idx = self._all_pages.index(self._current_page)
-                return set(self._all_pages[idx:])
-            except ValueError:
-                return {self._current_page}
-
-        elif scope == ApplyScope.THIS_PAGE_EVERY_OTHER:
-            try:
-                idx = self._all_pages.index(self._current_page)
-                return {self._all_pages[i] for i in range(idx, len(self._all_pages), 2)}
-            except ValueError:
-                return {self._current_page}
-
-        elif scope == ApplyScope.EVERY_OTHER:
-            return {self._all_pages[i] for i in range(0, len(self._all_pages), 2)}
-
-        elif scope == ApplyScope.SELECTED_PAGES:
-            return self._selected_pages.copy()
-
-        elif scope == ApplyScope.EVERY_OTHER_SELECTED:
-            # Get selected pages in order, take every other one
-            selected_in_order = [
-                p for p in self._all_pages if p in self._selected_pages
-            ]
-            # Include current page and every other from there
-            result = set()
-            include_next = True
-            for page in selected_in_order:
-                if page == self._current_page:
-                    include_next = True
-                if include_next:
-                    result.add(page)
-                include_next = not include_next
-            return result
-
-        return {self._current_page}
+        return set(
+            select_pages(
+                self._get_selected_scope(),
+                self._current_page,
+                self._all_pages,
+                self._selected_pages,
+            )
+        )
 
     def _get_combined_layout_type(self) -> LayoutType:
         """Get the combined layout type based on mode selection.

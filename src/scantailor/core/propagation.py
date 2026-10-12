@@ -17,7 +17,13 @@ from scantailor.core.pipeline import PipelineOptions, fix_aggregate_page_size
 from scantailor.core.project import ImageInfo, ImageMetadata, Project
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.output.params import ApplyGroup
+from scantailor.filters.page_split.dependencies import (
+    Dependencies as SplitDependencies,
+)
 from scantailor.filters.page_split.layout_type import LayoutType
+from scantailor.filters.page_split.page_layout_adapter import (
+    correct_page_layout_type,
+)
 from scantailor.filters.select_content.dependencies import Dependencies
 
 
@@ -182,6 +188,50 @@ def adopt_requested_page_counts(
     for image_id in images:
         count = split.get_layout_type(PageId(image_id=image_id)).sub_page_count()
         if count is not None and set_page_count(project, image_id, count):
+            changed.append(image_id)
+    return changed
+
+
+def adopt_stored_page_counts(
+    project: Project, stages: StageSequence, images: Iterable[ImageId]
+) -> list[ImageId]:
+    """Give images the page count of the Page Split layout stored for them.
+
+    Used after detection ran, and when entering a later stage, so the page list
+    shows two pages for a detected spread. Layouts that no longer match the
+    image's size or orientation, and images without a layout, are left alone.
+    A layout whose cutters cut nothing counts as a single page.
+
+    Args:
+        project (Project): The open project; page counts are updated in place.
+        stages (StageSequence): Source of the stored layouts and orientations.
+        images (Iterable[ImageId]): The images to look at.
+
+    Returns:
+        list[ImageId]: Images whose page count changed.
+    """
+    split = stages.page_split_filter
+    rotations = stages.fix_orientation_filter.settings
+    metadata_of = {info.id: info.metadata for info in project.images}
+    changed: list[ImageId] = []
+    for image_id in images:
+        metadata = metadata_of.get(image_id)
+        params = split.get_params(PageId(image_id=image_id))
+        if metadata is None or params.page_layout is None:
+            continue
+        rotation = rotations.get_rotation_for(image_id)
+        width, height = rotation.rotate_dimensions(metadata.width, metadata.height)
+        current = SplitDependencies(
+            image_size=(round(width), round(height)),
+            rotation_degrees=rotation.degrees,
+            layout_type=params.layout_type,
+        )
+        if not params.dependencies.is_compatible_with(
+            current, manual_split_line=params.is_manual()
+        ):
+            continue
+        layout = correct_page_layout_type(params.page_layout)
+        if set_page_count(project, image_id, layout.num_sub_pages):
             changed.append(image_id)
     return changed
 

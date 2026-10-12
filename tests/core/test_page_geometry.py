@@ -14,6 +14,8 @@ from scantailor.core.page_geometry import (
 from scantailor.core.pipeline import PipelineOptions, process_page
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.page_split.layout_type import LayoutType
+from scantailor.filters.page_split.page_layout import PageLayout, PageLayoutType
+from scantailor.filters.page_split.params import Params as SplitParams
 from scantailor.filters.select_content.content_box import ContentBox
 
 WIDTH = 600
@@ -156,3 +158,22 @@ def test_content_rect_of_returns_the_stored_box():
     rect = content_rect_of(sequence, page)
 
     assert (rect.x, rect.y, rect.width, rect.height) == (60, 80, 400, 600)
+
+
+def test_cutters_that_cross_inside_the_page_leave_the_whole_image_uncropped():
+    page = _page()
+    crossing = PageLayout(
+        outline=(0, 0, WIDTH, HEIGHT),
+        layout_type=PageLayoutType.SINGLE_PAGE_CUT,
+        cutter1=((100, 0), (300, HEIGHT)),
+        cutter2=((300, 0), (100, HEIGHT)),
+    )
+    sequence = StageSequence()
+    sequence.page_split_filter.set_params(page, SplitParams(page_layout=crossing))
+
+    xform = build_transformation(
+        sequence, page, (WIDTH, HEIGHT), DPI, FilterStage.PAGE_SPLIT
+    )
+
+    assert xform.resulting_rect.width == pytest.approx(WIDTH)
+    assert xform.resulting_rect.height == pytest.approx(HEIGHT)

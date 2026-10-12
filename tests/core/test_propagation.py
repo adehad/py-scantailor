@@ -15,6 +15,7 @@ from scantailor.core.models import (
 from scantailor.core.project import ImageMetadata, Project
 from scantailor.core.propagation import (
     ApplyScope,
+    adopt_stored_page_counts,
     advise_logical_page_count,
     apply_alignment,
     apply_deskew,
@@ -39,7 +40,11 @@ from scantailor.filters.page_layout.alignment import (
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
 from scantailor.filters.page_layout.params import Params as LayoutParams
 from scantailor.filters.page_layout.settings import Settings as LayoutSettings
+from scantailor.filters.page_split.dependencies import (
+    Dependencies as SplitDependencies,
+)
 from scantailor.filters.page_split.layout_type import LayoutType
+from scantailor.filters.page_split.page_layout import PageLayout
 from scantailor.filters.page_split.params import Params as SplitParams
 from scantailor.filters.select_content.content_box import ContentBox, PageBox
 from scantailor.filters.select_content.params import Params as SelectContentParams
@@ -510,3 +515,82 @@ class TestApplyFunctions:
         assert stages.output_filter.get_params(target).color_mode == (
             ColorMode.COLOR_GRAYSCALE
         )
+
+
+class TestAdoptStoredPageCounts:
+    """The page list follows the layouts Page Split stored."""
+
+    @staticmethod
+    def _store(
+        stages: StageSequence,
+        project: Project,
+        layout: PageLayout,
+        dependencies: SplitDependencies | None = None,
+    ) -> ImageId:
+        image_id = project.images[0].id
+        stages.page_split_filter.set_params(
+            PageId(image_id=image_id),
+            SplitParams(
+                page_layout=layout,
+                dependencies=dependencies or SplitDependencies(image_size=(1200, 800)),
+            ),
+        )
+        return image_id
+
+    def test_a_detected_two_page_layout_grows_the_image_to_two_pages(self):
+        project = _project((1200, 800))
+        stages = StageSequence()
+        image_id = self._store(stages, project, PageLayout.two_pages(1200, 800, 600))
+
+        changed = adopt_stored_page_counts(project, stages, [image_id])
+
+        assert changed == [image_id]
+        assert len(project.get_pages()) == 2
+
+    def test_a_single_page_layout_shrinks_a_two_page_image(self):
+        project = _project((1200, 800))
+        project.images[0].num_sub_pages = 2
+        stages = StageSequence()
+        image_id = self._store(stages, project, PageLayout.single_page_uncut(1200, 800))
+
+        assert adopt_stored_page_counts(project, stages, [image_id]) == [image_id]
+        assert len(project.get_pages()) == 1
+
+    def test_a_layout_computed_for_another_image_size_is_ignored(self):
+        project = _project((1200, 800))
+        stages = StageSequence()
+        image_id = self._store(
+            stages,
+            project,
+            PageLayout.two_pages(1200, 800, 600),
+            SplitDependencies(image_size=(800, 1200)),
+        )
+
+        assert adopt_stored_page_counts(project, stages, [image_id]) == []
+        assert len(project.get_pages()) == 1
+
+    def test_cutters_that_cut_nothing_count_as_one_page(self):
+        project = _project((1200, 800))
+        stages = StageSequence()
+        image_id = self._store(stages, project, PageLayout.two_pages(1200, 800, 0))
+
+        assert adopt_stored_page_counts(project, stages, [image_id]) == []
+        assert len(project.get_pages()) == 1
+
+    def test_an_image_without_a_stored_layout_keeps_its_page_count(self):
+        project = _project((1200, 800))
+
+        changed = adopt_stored_page_counts(
+            project, StageSequence(), [project.images[0].id]
+        )
+
+        assert changed == []
+
+    def test_an_image_with_one_half_removed_stays_a_single_page(self):
+        project = _project((1200, 800))
+        project.images[0].left_half_removed = True
+        stages = StageSequence()
+        image_id = self._store(stages, project, PageLayout.two_pages(1200, 800, 600))
+
+        assert adopt_stored_page_counts(project, stages, [image_id]) == []
+        assert project.images[0].num_sub_pages == 1
