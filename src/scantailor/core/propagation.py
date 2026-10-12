@@ -47,6 +47,11 @@ def select_pages(
 ) -> list[PageId]:
     """Resolve an apply scope to concrete pages.
 
+    ``EVERY_OTHER_SELECTED`` deliberately differs from the C++ application:
+    it starts from the current page when that page is selected, as the Split
+    mode dialog hint promises, whereas C++ always starts from the first
+    selected page.
+
     Args:
         scope (ApplyScope): The requested scope.
         current (PageId): The page whose settings are being copied.

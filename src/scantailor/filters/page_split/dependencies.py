@@ -31,6 +31,12 @@ class Dependencies(BaseModel):
     ) -> bool:
         """Tell whether a result computed under ``self`` is still valid.
 
+        Null dependencies are never compatible: projects saved before
+        dependencies were recorded carry no image size to compare, so the
+        layout is detected again (auto) or adapted to the current outline
+        (explicit layout type), as the C++ application does. A layout that is
+        set by hand must therefore be stored with its dependencies.
+
         A two-page request with a hand-placed split line has all the data it
         needs, and a single uncut page has no split line to depend on. A
         page-plus-offcut request cannot be reused for another type because
@@ -45,7 +51,7 @@ class Dependencies(BaseModel):
             bool: True if the stored layout can be kept.
         """
         if self.is_null():
-            return True
+            return False
         if self.image_size != current.image_size:
             return False
         if self.rotation_degrees != current.rotation_degrees:

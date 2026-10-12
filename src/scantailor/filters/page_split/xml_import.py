@@ -150,8 +150,14 @@ def _read_dependencies(element: ET.Element | None) -> Dependencies:
     """Read a ``<dependencies>`` element; an absent one is unknown (null)."""
     if element is None:
         return Dependencies()
+    width, height = read_size(child(element, "size"))
+    rotation_degrees = attr_int(child(element, "rotation"), "degrees")
+    if rotation_degrees % 180 == 90:
+        # C++ records the size of the unrotated source; the port records the
+        # oriented image the layout outline is measured on.
+        width, height = height, width
     return Dependencies(
-        image_size=read_size(child(element, "size")),
-        rotation_degrees=attr_int(child(element, "rotation"), "degrees"),
+        image_size=(width, height),
+        rotation_degrees=rotation_degrees,
         layout_type=layout_type_from_string(read_text(child(element, "layoutType"))),
     )
