@@ -4,7 +4,7 @@ from xml.etree import ElementTree as ET
 
 from loguru import logger
 
-from scantailor.core.models import Dpi
+from scantailor.core.models import Dpi, PageId
 from scantailor.core.project import StageParamsEntry
 from scantailor.core.xml_reader import (
     Point,
@@ -123,6 +123,30 @@ def read_output(
                 StageParamsEntry(page=page_id, params=params.model_dump(mode="json"))
             )
     return entries
+
+
+def read_fill_outside_page_box(
+    filter_element: ET.Element | None, context: XmlProjectContext
+) -> frozenset[PageId]:
+    """Find the pages whose Output settings fill outside the page box.
+
+    Version 4 projects store this flag in the colour options; the port has no
+    such option yet, so it is read apart from the parameters.
+
+    Args:
+        filter_element (ET.Element | None): The ``<output>`` element.
+        context (XmlProjectContext): Id lookup of the project.
+
+    Returns:
+        frozenset[PageId]: The pages with the flag set.
+    """
+    pages: set[PageId] = set()
+    for page_id, element in page_elements(filter_element, context):
+        color_params = child(child(element, "params"), "color-params")
+        options = child(color_params, "color-or-grayscale")
+        if attr_flag(options, "fillOutsidePageBox"):
+            pages.add(page_id)
+    return frozenset(pages)
 
 
 def despeckle_level_from_factor(factor: float) -> DespeckleLevel:
