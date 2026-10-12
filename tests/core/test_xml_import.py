@@ -20,6 +20,7 @@ from scantailor.core.stage_sequence import StageSequence
 from scantailor.core.xml_compat import (
     NEWEST_PROJECT_VERSION,
     XmlProjectImport,
+    XmlUnappliedSettings,
     apply_xml_stage_defaults,
     import_xml_project,
     import_xml_project_file,
@@ -27,6 +28,7 @@ from scantailor.core.xml_compat import (
 from scantailor.core.zones import PictureLayer, ZoneCategory
 from scantailor.filters.deskew.params import AutoManualMode as DeskewMode
 from scantailor.filters.deskew.params import Params as DeskewParams
+from scantailor.filters.fix_orientation.xml_import import ImageTrim
 from scantailor.filters.output.binarization import BinarizationMethod
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.color_options import FillingColor
@@ -88,7 +90,7 @@ class TestFixturesLoad:
 
         assert len(imported.project.images) == images
         assert len(imported.project.get_pages()) == pages
-        assert imported.project.version == NEWEST_PROJECT_VERSION
+        assert imported.project.version == 3
 
     def test_image_files_resolve_next_to_the_project_file_and_exist(
         self, tmp_path: Path
@@ -202,14 +204,97 @@ class TestMultiPageTiff:
         assert [info.id.page for info in project.images] == [1, 2]
 
 
+class TestVersion4:
+    def test_the_newest_version_is_4(self):
+        assert NEWEST_PROJECT_VERSION == 4
+
+    def test_version_4_fixture_loads_its_images_pages_and_filters(self, tmp_path: Path):
+        imported = _load(tmp_path, "version4")
+
+        assert imported.project.version == 4
+        assert len(imported.project.images) == 2
+        assert len(imported.project.get_pages()) == 2
+        assert set(imported.project.stage_params) >= {"fix_orientation", "deskew"}
+
+    def test_version_4_deskew_pages_keep_the_angle_and_mode(self, tmp_path: Path):
+        project = _load(tmp_path, "version4").project
+
+        by_page = {entry.page: entry.params for entry in project.stage_params["deskew"]}
+        manual = by_page[_page(project, 0)]
+        assert manual["deskew_angle_deg"] == pytest.approx(0.5)
+        assert manual["mode"] == "manual"
+
+    def test_trim_only_image_gets_no_rotation_entry_and_keeps_its_trim(
+        self, tmp_path: Path
+    ):
+        imported = _load(tmp_path, "version4")
+        first_image = imported.project.images[0].id
+        second_image = imported.project.images[1].id
+
+        rotated = {
+            entry.page.image_id
+            for entry in imported.project.stage_params["fix_orientation"]
+        }
+        assert rotated == {second_image}
+        assert imported.unapplied.fix_orientation_trims == {
+            first_image: ImageTrim(left=4, right=5, top=6, bottom=7)
+        }
+
+    def test_disabled_trim_is_not_kept(self, tmp_path: Path):
+        imported = _load(tmp_path, "version4")
+
+        assert imported.project.images[1].id not in (
+            imported.unapplied.fix_orientation_trims
+        )
+
+    def test_fill_outside_page_box_pages_are_kept(self, tmp_path: Path):
+        imported = _load(tmp_path, "version4")
+
+        assert imported.unapplied.fill_outside_page_box_pages == set(
+            imported.project.get_pages()
+        )
+
+    def test_content_based_deskew_flag_is_kept_and_defaults_to_on(self, tmp_path: Path):
+        assert _load(tmp_path, "version4").unapplied.deskew_content_based is False
+        assert _load(tmp_path, "simple").unapplied.deskew_content_based is True
+
+    def test_version_3_projects_have_nothing_unapplied(self, tmp_path: Path):
+        unapplied = _load(tmp_path, "simple").unapplied
+
+        assert unapplied == XmlUnappliedSettings()
+
+    def test_dropping_version_4_settings_is_logged_as_a_warning(self, tmp_path: Path):
+        messages: list[str] = []
+        sink = logger.add(messages.append, level="WARNING", format="{message}")
+        try:
+            _load(tmp_path, "version4")
+        finally:
+            logger.remove(sink)
+
+        text = "".join(messages)
+        assert "trim" in text
+        assert "fill outside page box" in text
+        assert "whole page" in text
+
+    def test_version_3_projects_log_no_dropped_settings(self, tmp_path: Path):
+        messages: list[str] = []
+        sink = logger.add(messages.append, level="WARNING", format="{message}")
+        try:
+            _load(tmp_path, "simple")
+        finally:
+            logger.remove(sink)
+
+        assert not any("Dropping" in message for message in messages)
+
+
 class TestVersion:
     def test_newer_version_is_refused_with_a_clear_message(self, tmp_path: Path):
         project_file = _fixture(tmp_path, "newer_version")
 
-        with pytest.raises(ValueError, match=r"version 4.*newer application"):
+        with pytest.raises(ValueError, match=r"version 5.*newer application"):
             Project.load(project_file)
 
-    @pytest.mark.parametrize("version", ["1", "2", "3"])
+    @pytest.mark.parametrize("version", ["1", "2", "3", "4"])
     def test_versions_up_to_the_newest_are_accepted(self, tmp_path: Path, version: str):
         xml = f'<project version="{version}" outputDirectory="out"/>'
 
@@ -805,7 +890,7 @@ class TestMalformedInput:
     def test_unrecognised_filter_elements_are_ignored(self, tmp_path: Path):
         project_file = _fixture(tmp_path, "newer_version")
         text = project_file.read_text(encoding="utf-8").replace(
-            'version="4"', 'version="3"'
+            'version="5"', 'version="3"'
         )
 
         project = import_xml_project(project_file, text).project
