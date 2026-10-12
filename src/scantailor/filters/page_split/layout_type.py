@@ -29,6 +29,12 @@ class LayoutType(Enum):
                 return layout_type
         return cls.AUTO_LAYOUT_TYPE
 
+    def sub_page_count(self) -> int | None:
+        """Return how many logical pages the type yields, None when undecided."""
+        if self == LayoutType.AUTO_LAYOUT_TYPE:
+            return None
+        return 2 if self == LayoutType.TWO_PAGES else 1
+
     def __str__(self) -> str:
         """Return the string value."""
         return self.value
