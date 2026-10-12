@@ -39,6 +39,7 @@ from scantailor.app.ui.thumbnails.model import (
 )
 from scantailor.core.models import PageId
 from scantailor.core.project import Project
+from scantailor.core.settings import ApplicationSettings
 
 _PADDING = 6
 _CAPTION_HEIGHT = 18
@@ -56,16 +57,33 @@ class ThumbnailDelegate(QStyledItemDelegate):
         super().__init__(parent)
         self._thumbnail_size = thumbnail_size
 
+    def set_thumbnail_size(self, size: QSize) -> None:
+        """Change the bounding size a thumbnail is drawn at.
+
+        Args:
+            size (QSize): The new bounding size; callers must lay the view out again.
+        """
+        self._thumbnail_size = QSize(size)
+
+    @property
+    def thumbnail_size(self) -> QSize:
+        """Bounding size a thumbnail is drawn at."""
+        return self._thumbnail_size
+
+    def cell_size(self) -> QSize:
+        """Return the size of one cell: the thumbnail, its caption and padding."""
+        return QSize(
+            self._thumbnail_size.width() + 2 * _PADDING,
+            self._thumbnail_size.height() + _CAPTION_HEIGHT + 2 * _PADDING,
+        )
+
     def sizeHint(
         self,
         option: QStyleOptionViewItem,
         index: QModelIndex | QPersistentModelIndex,
     ) -> QSize:
         """Return the fixed cell size."""
-        return QSize(
-            self._thumbnail_size.width() + 2 * _PADDING,
-            self._thumbnail_size.height() + _CAPTION_HEIGHT + 2 * _PADDING,
-        )
+        return self.cell_size()
 
     def paint(
         self,
@@ -79,6 +97,8 @@ class ThumbnailDelegate(QStyledItemDelegate):
         palette = option.palette
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # Thumbnails are kept at the render resolution and drawn at the cell size.
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         picture_area = QRect(
             option.rect.left() + _PADDING,
             option.rect.top() + _PADDING,
@@ -154,8 +174,12 @@ class ThumbnailListWidget(QWidget):
         cache_directory (Path | None): Directory for on-disk thumbnails, or
             None for memory only.
         cache_capacity (int): Thumbnails kept in memory.
-        thumbnail_size (QSize | None): Bounding size of a thumbnail; defaults
-            to 160x160.
+        thumbnail_size (QSize | None): Bounding size of a thumbnail as drawn,
+            the cell size; defaults to 160x160.
+        render_size (QSize | None): Resolution thumbnails are rendered and cached
+            at; defaults to ``thumbnail_size``.
+        single_column (bool): Show one thumbnail per row instead of filling the
+            width with as many as fit.
         extra_orders (Sequence[PageOrderOption]): Further sort options, for
             orders that need stage data, shown after the built-in ones.
         thread_count (int): Worker threads.
@@ -178,6 +202,8 @@ class ThumbnailListWidget(QWidget):
         cache_directory: Path | None = None,
         cache_capacity: int = 256,
         thumbnail_size: QSize | None = None,
+        render_size: QSize | None = None,
+        single_column: bool = False,
         extra_orders: Sequence[PageOrderOption] = (),
         thread_count: int = 2,
         parent: QWidget | None = None,
@@ -189,7 +215,7 @@ class ThumbnailListWidget(QWidget):
             renderer,
             cache=ThumbnailCache(cache_capacity, cache_directory),
             params_hash=params_hash,
-            max_thumbnail_size=size,
+            render_size=render_size or size,
             thread_count=thread_count,
             parent=self,
         )
@@ -209,7 +235,8 @@ class ThumbnailListWidget(QWidget):
 
         self._view = QListView(self)
         self._view.setModel(self._model)
-        self._view.setItemDelegate(ThumbnailDelegate(size, self._view))
+        self._delegate = ThumbnailDelegate(size, self._view)
+        self._view.setItemDelegate(self._delegate)
         self._view.setUniformItemSizes(True)
         self._view.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self._view.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
@@ -224,6 +251,7 @@ class ThumbnailListWidget(QWidget):
         selection.currentChanged.connect(self._on_current_changed)
         selection.selectionChanged.connect(self._on_selection_changed)
 
+        self.set_single_column(single_column)
         self._model.set_project(project)
 
     @property
@@ -240,6 +268,76 @@ class ThumbnailListWidget(QWidget):
     def order_combo(self) -> QComboBox:
         """The sort order combo box."""
         return self._order_combo
+
+    @property
+    def render_size(self) -> QSize:
+        """Resolution thumbnails are rendered at; safe to read from workers."""
+        return self._model.render_size
+
+    @property
+    def cell_size(self) -> QSize:
+        """Bounding size a thumbnail is drawn at."""
+        return self._delegate.thumbnail_size
+
+    def set_cell_size(self, size: QSize) -> None:
+        """Draw thumbnails at another size, laying the list out again.
+
+        Args:
+            size (QSize): The new bounding size of a thumbnail as drawn.
+        """
+        self._delegate.set_thumbnail_size(size)
+        self._view.setMinimumWidth(self._minimum_view_width())
+        self._view.doItemsLayout()
+        self._view.viewport().update()
+
+    def set_render_size(self, size: QSize) -> None:
+        """Render thumbnails at another resolution, rendering them again.
+
+        Args:
+            size (QSize): The new bounding size of rendered thumbnails.
+        """
+        self._model.set_render_size(size)
+
+    def set_single_column(self, single_column: bool) -> None:
+        """Show one thumbnail per row, or as many per row as the width allows.
+
+        Args:
+            single_column (bool): True for one column.
+        """
+        view = self._view
+        if single_column:
+            view.setViewMode(QListView.ViewMode.ListMode)
+            view.setFlow(QListView.Flow.TopToBottom)
+            view.setWrapping(False)
+        else:
+            view.setViewMode(QListView.ViewMode.IconMode)
+            view.setFlow(QListView.Flow.LeftToRight)
+            view.setWrapping(True)
+        view.setResizeMode(QListView.ResizeMode.Adjust)
+        view.setMovement(QListView.Movement.Static)
+        view.setSpacing(0)
+        view.setUniformItemSizes(True)
+        view.setMinimumWidth(self._minimum_view_width())
+
+    def apply_settings(self, settings: ApplicationSettings) -> None:
+        """Take the thumbnail options of the application settings.
+
+        Args:
+            settings (ApplicationSettings): Source of the render resolution, the
+                cell size and the column mode.
+        """
+        quality = settings.thumbnail_quality
+        max_width, max_height = settings.max_thumbnail_size
+        self.set_single_column(settings.single_column_thumbnail_display)
+        self.set_cell_size(QSize(round(max_width), round(max_height)))
+        self.set_render_size(QSize(quality.width, quality.height))
+
+    def _minimum_view_width(self) -> int:
+        """Width that shows one whole cell next to a scroll bar."""
+        style = self._view.style()
+        scroll_bar = style.pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent)
+        frame = 2 * self._view.frameWidth()
+        return self._delegate.cell_size().width() + scroll_bar + frame
 
     def set_project(self, project: Project | None) -> None:
         """Show the pages of a project, keeping the chosen sort order.

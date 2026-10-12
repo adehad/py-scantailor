@@ -21,8 +21,11 @@ from PySide6.QtWidgets import (
 )
 
 from scantailor.app.ui.icons import icon
+from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 from scantailor.core.models import Margins, PageId
+from scantailor.core.settings import Units
+from scantailor.core.units import convert_length, spin_box_precision
 from scantailor.filters.page_layout.alignment import (
     Alignment,
     HorizontalAlignment,
@@ -30,18 +33,23 @@ from scantailor.filters.page_layout.alignment import (
 )
 from scantailor.filters.page_layout.filter import Filter
 
+# Margins are stored in millimetres; this bounds what the spin boxes accept.
+_MAX_MARGIN_MM = 9999.0
+_OPPOSITE_SIDE = {"top": "bottom", "bottom": "top", "left": "right", "right": "left"}
+
 
 class OptionsWidget(QWidget):
     """Options widget for the Page Layout filter.
 
     Provides controls for:
-    - Margins (top, bottom, left, right) with optional auto-margins
+    - Margins (top, bottom, left, right) with optional auto-margins, shown and
+      edited in the application's current unit
     - Alignment (9-point grid for manual, dropdown for mode selection)
     - Match size with other pages option
 
     Signals:
         margins_changed: Emitted when margin values change.
-            Args: page_id (PageId), margins (Margins)
+            Args: page_id (PageId), margins (Margins) in millimetres
         alignment_changed: Emitted when alignment changes.
             Args: page_id (PageId), alignment (Alignment)
         apply_margins_requested: Emitted when user clicks "Apply To..." for margins
@@ -57,16 +65,22 @@ class OptionsWidget(QWidget):
         self,
         filter_: Filter,
         parent: QWidget | None = None,
+        units_provider: UnitsProvider | None = None,
     ) -> None:
         """Initialize the options widget.
 
         Args:
             filter_: The Page Layout filter instance.
             parent: The parent widget.
+            units_provider: Source of the unit margins are shown in; the
+                application-wide one when None.
         """
         super().__init__(parent)
 
         self._filter = filter_
+        self._units_provider = units_provider or UnitsProvider.get_instance()
+        self._margins_mm = Margins()
+        self._dpi = (0.0, 0.0)
         self._current_page_id: PageId | None = None
         self._updating = False  # Prevent signal loops
         self._link_top_bottom = False
@@ -74,6 +88,7 @@ class OptionsWidget(QWidget):
 
         self._setup_ui()
         self._connect_signals()
+        self._apply_units()
 
     def _setup_ui(self) -> None:
         """Set up the user interface."""
@@ -289,13 +304,14 @@ class OptionsWidget(QWidget):
         """Connect widget signals to slots."""
         # Margins
         self._auto_margins_check.toggled.connect(self._on_auto_margins_changed)
-        self._top_spinbox.valueChanged.connect(self._on_top_margin_changed)
-        self._bottom_spinbox.valueChanged.connect(self._on_bottom_margin_changed)
-        self._left_spinbox.valueChanged.connect(self._on_left_margin_changed)
-        self._right_spinbox.valueChanged.connect(self._on_right_margin_changed)
+        for side, spin in self._spin_boxes().items():
+            spin.valueChanged.connect(
+                lambda _value, side=side: self._on_margin_edited(side)
+            )
         self._top_bottom_link.toggled.connect(self._on_top_bottom_link_changed)
         self._left_right_link.toggled.connect(self._on_left_right_link_changed)
         self._apply_margins_btn.clicked.connect(self.apply_margins_requested.emit)
+        self._units_provider.units_changed.connect(self._apply_units)
 
         # Alignment
         self._match_size_check.toggled.connect(self._on_match_size_changed)
@@ -315,6 +331,49 @@ class OptionsWidget(QWidget):
         self._current_page_id = page_id
         self._update_ui()
 
+    def set_page_dpi(self, horizontal: float, vertical: float) -> None:
+        """Tell the widget the resolution of the current page.
+
+        Only pixel units need it; margins are shown unchanged while it is unknown.
+
+        Args:
+            horizontal: Dots per inch along x, or 0 when unknown.
+            vertical: Dots per inch along y, or 0 when unknown.
+        """
+        self._dpi = (horizontal, vertical)
+        self._apply_units()
+
+    def _spin_boxes(self) -> dict[str, QDoubleSpinBox]:
+        return {
+            "top": self._top_spinbox,
+            "bottom": self._bottom_spinbox,
+            "left": self._left_spinbox,
+            "right": self._right_spinbox,
+        }
+
+    def _dpi_for(self, side: str) -> float:
+        return self._dpi[0] if side in ("left", "right") else self._dpi[1]
+
+    def _apply_units(self) -> None:
+        """Re-show the stored margins in the current unit."""
+        units = self._units_provider.units
+        decimals, step = spin_box_precision(units)
+        was_updating, self._updating = self._updating, True
+        try:
+            for side, spin in self._spin_boxes().items():
+                dpi = self._dpi_for(side)
+                limit = convert_length(_MAX_MARGIN_MM, Units.MILLIMETERS, units, dpi)
+                spin.setDecimals(decimals)
+                spin.setSingleStep(step)
+                spin.setRange(-limit, limit)
+                spin.setValue(
+                    convert_length(
+                        getattr(self._margins_mm, side), Units.MILLIMETERS, units, dpi
+                    )
+                )
+        finally:
+            self._updating = was_updating
+
     def _update_ui(self) -> None:
         """Update the UI to reflect current page settings."""
         if self._current_page_id is None:
@@ -326,11 +385,8 @@ class OptionsWidget(QWidget):
 
             # Update margins
             self._auto_margins_check.setChecked(params.auto_margins)
-            margins = params.hard_margins_mm
-            self._top_spinbox.setValue(margins.top)
-            self._bottom_spinbox.setValue(margins.bottom)
-            self._left_spinbox.setValue(margins.left)
-            self._right_spinbox.setValue(margins.right)
+            self._margins_mm = params.hard_margins_mm
+            self._apply_units()
 
             # Enable/disable spinboxes based on auto margins
             spinboxes_enabled = not params.auto_margins
@@ -417,63 +473,41 @@ class OptionsWidget(QWidget):
         if self._current_page_id is None:
             return
 
-        margins = Margins(
-            top=self._top_spinbox.value(),
-            bottom=self._bottom_spinbox.value(),
-            left=self._left_spinbox.value(),
-            right=self._right_spinbox.value(),
-        )
+        margins = self._margins_mm
         params = self._filter.get_params(self._current_page_id)
         new_params = params.with_margins(margins)
         self._filter.set_params(self._current_page_id, new_params)
         self.margins_changed.emit(self._current_page_id, margins)
 
-    def _on_top_margin_changed(self, value: float) -> None:
-        """Handle top margin spinbox change."""
+    def _on_margin_edited(self, side: str) -> None:
+        """Store an edited margin, and its opposite one when the two are linked.
+
+        Margins the user did not touch keep their stored millimetre values, so
+        the rounding of the displayed unit does not creep into them.
+        """
         if self._current_page_id is None or self._updating:
             return
 
-        if self._link_top_bottom:
-            self._updating = True
-            self._bottom_spinbox.setValue(value)
+        vertical = side in ("top", "bottom")
+        linked = self._link_top_bottom if vertical else self._link_left_right
+        spin_boxes = self._spin_boxes()
+        sides = [side, _OPPOSITE_SIDE[side]] if linked else [side]
+        value = spin_boxes[side].value()
+        units = self._units_provider.units
+        updates: dict[str, float] = {}
+        self._updating = True
+        try:
+            for edited in sides:
+                spin_boxes[edited].setValue(value)
+                updates[edited] = convert_length(
+                    spin_boxes[edited].value(),
+                    units,
+                    Units.MILLIMETERS,
+                    self._dpi_for(edited),
+                )
+        finally:
             self._updating = False
-
-        self._emit_margins_changed()
-
-    def _on_bottom_margin_changed(self, value: float) -> None:
-        """Handle bottom margin spinbox change."""
-        if self._current_page_id is None or self._updating:
-            return
-
-        if self._link_top_bottom:
-            self._updating = True
-            self._top_spinbox.setValue(value)
-            self._updating = False
-
-        self._emit_margins_changed()
-
-    def _on_left_margin_changed(self, value: float) -> None:
-        """Handle left margin spinbox change."""
-        if self._current_page_id is None or self._updating:
-            return
-
-        if self._link_left_right:
-            self._updating = True
-            self._right_spinbox.setValue(value)
-            self._updating = False
-
-        self._emit_margins_changed()
-
-    def _on_right_margin_changed(self, value: float) -> None:
-        """Handle right margin spinbox change."""
-        if self._current_page_id is None or self._updating:
-            return
-
-        if self._link_left_right:
-            self._updating = True
-            self._left_spinbox.setValue(value)
-            self._updating = False
-
+        self._margins_mm = self._margins_mm.model_copy(update=updates)
         self._emit_margins_changed()
 
     def _on_top_bottom_link_changed(self, checked: bool) -> None:

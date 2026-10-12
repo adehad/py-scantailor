@@ -22,18 +22,21 @@ class ThumbnailKey:
         stage (str): Filter stage the preview belongs to.
         params_hash (Hashable): Digest of the stage parameters that affect the
             preview; a change produces a new key and therefore a re-render.
+        render_size (tuple[int, int]): Width and height of the box the image
+            was scaled to; a different size is a different thumbnail.
     """
 
     page: PageId
     stage: str
     params_hash: Hashable = 0
+    render_size: tuple[int, int] = (0, 0)
 
     def file_stem(self) -> str:
         """Return a filesystem-safe name that is unique to this key."""
         image_id = self.page.image_id
         text = (
             f"{image_id.file_path}|{image_id.page}|{int(self.page.sub_page)}"
-            f"|{self.stage}|{self.params_hash!r}"
+            f"|{self.stage}|{self.params_hash!r}|{self.render_size}"
         )
         return hashlib.sha1(text.encode("utf-8")).hexdigest()
 

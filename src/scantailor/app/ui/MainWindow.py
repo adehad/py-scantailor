@@ -413,13 +413,13 @@ class MainWindowManager:
         # self.setupThumbView()
         # self.updateThumbViewMinWidth()
         # self.updateSortOptions()
-        # self.updateAutoSaveTimer()
         # self.setupIcons()
         self.thumbnails = ThumbnailListWidget(
             self._render_page_thumbnail,
             params_hash=self._thumbnail_digest,
             thumbnail_size=THUMBNAIL_SIZE,
         )
+        self.thumbnails.apply_settings(ApplicationSettings.get_instance())
         self.thumbnails.page_selected.connect(self.page_selected)
         self.set_thumbnail_widget(self.thumbnails)
         self._wire_thumbnail_controls()
@@ -436,7 +436,7 @@ class MainWindowManager:
             page,
             self.stages,
             FilterStage(int(stage)),
-            THUMBNAIL_SIZE,
+            self.thumbnails.render_size,
             self._dpi_overrides,
         )
 
@@ -1683,7 +1683,12 @@ class MainWindowManager:
 
     def openSettingsDialog(self) -> None:
         """Open settings dialog."""
-        self._run_dialog(SettingsDialog(ApplicationSettings.get_instance(), self.ui))
+        settings = ApplicationSettings.get_instance()
+        dialog = SettingsDialog(settings, self.ui)
+        dialog.settings_changed.connect(
+            lambda: self.thumbnails.apply_settings(settings)
+        )
+        self._run_dialog(dialog)
 
     def openDefaultParamsDialog(self) -> None:
         """Open default params dialog."""

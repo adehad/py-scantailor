@@ -140,8 +140,8 @@ class ThumbnailModel(QAbstractListModel):
         params_hash (Callable[[PageId, str], Hashable] | None): Digest of the
             parameters that affect a page's preview at a stage. Evaluated on
             the GUI thread whenever a thumbnail is requested.
-        max_thumbnail_size (QSize | None): Rendered images are scaled to fit
-            this; defaults to 160x160.
+        render_size (QSize | None): Rendered images are scaled to fit this, the
+            resolution thumbnails are kept at; defaults to 160x160.
         thread_count (int): Worker threads.
         parent (QObject | None): Parent object.
     """
@@ -151,7 +151,7 @@ class ThumbnailModel(QAbstractListModel):
         renderer: ThumbnailRenderer,
         cache: ThumbnailCache | None = None,
         params_hash: Callable[[PageId, str], Hashable] | None = None,
-        max_thumbnail_size: QSize | None = None,
+        render_size: QSize | None = None,
         thread_count: int = 2,
         parent: QObject | None = None,
     ) -> None:
@@ -160,7 +160,7 @@ class ThumbnailModel(QAbstractListModel):
         self._renderer = renderer
         self._cache = cache if cache is not None else ThumbnailCache()
         self._params_hash = params_hash
-        self._max_size = max_thumbnail_size or QSize(160, 160)
+        self._render_size = render_size or QSize(160, 160)
         self._entries: list[PageEntry] = []
         self._rows: dict[PageId, int] = {}
         self._order = natural_order()
@@ -189,9 +189,20 @@ class ThumbnailModel(QAbstractListModel):
         return self._current
 
     @property
-    def max_thumbnail_size(self) -> QSize:
+    def render_size(self) -> QSize:
         """Bounding size of rendered thumbnails."""
-        return self._max_size
+        return self._render_size
+
+    def set_render_size(self, size: QSize) -> None:
+        """Keep thumbnails at another resolution and render them again.
+
+        Args:
+            size (QSize): The new bounding size of rendered thumbnails.
+        """
+        if size == self._render_size:
+            return
+        self._render_size = QSize(size)
+        self.invalidate()
 
     def pages(self) -> list[PageId]:
         """Return the pages in display order."""
@@ -311,14 +322,15 @@ class ThumbnailModel(QAbstractListModel):
             self._in_flight.add(key)
             self._pool.start(
                 _RenderTask(
-                    key, self._renderer, self._cache, self._max_size, self._signals
+                    key, self._renderer, self._cache, self._render_size, self._signals
                 )
             )
         return image
 
     def _key_for(self, page: PageId) -> ThumbnailKey:
         digest = self._params_hash(page, self._stage) if self._params_hash else 0
-        return ThumbnailKey(page, self._stage, digest)
+        size = self._render_size
+        return ThumbnailKey(page, self._stage, digest, (size.width(), size.height()))
 
     def _on_render_finished(self, key: ThumbnailKey, image: QImage | None) -> None:
         self._in_flight.discard(key)
