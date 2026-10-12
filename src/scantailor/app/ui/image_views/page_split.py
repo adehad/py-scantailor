@@ -11,9 +11,10 @@ from itertools import pairwise
 
 from PySide6 import QtGui, QtWidgets
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QPainter, QPen, QPolygonF
+from PySide6.QtGui import QPainter, QPen, QPolygonF
 
 from scantailor.app.ui.image_views.base import ImageViewBase, point_to_segment_distance
+from scantailor.app.ui.theme.tokens import view_color
 from scantailor.filters.page_split.page_layout import PageLayout, PageLayoutType
 
 # Smallest distance, in image pixels, kept between cutting lines and the outline.
@@ -34,12 +35,6 @@ class PageSplitImageView(ImageViewBase):
     HANDLE_RADIUS = 8
     HANDLE_HIT_RADIUS = 15
     LINE_HIT_DISTANCE = 10
-
-    LINE_COLOR = QColor(0, 0, 255, 200)
-    LINE_HIGHLIGHT = QColor(0, 128, 255, 255)
-    HANDLE_COLOR = QColor(0, 0, 255, 180)
-    PAGE_COLORS = (QColor(0, 200, 0, 50), QColor(0, 0, 200, 50))
-    OFFCUT_COLOR = QColor(200, 0, 0, 80)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         """Initialize the view.
@@ -156,9 +151,9 @@ class PageSplitImageView(ImageViewBase):
         cut = self._layout.layout_type == PageLayoutType.SINGLE_PAGE_CUT
         for index, (left, right) in enumerate(pairwise(bounds)):
             if cut:
-                color = self.PAGE_COLORS[0] if index == 1 else self.OFFCUT_COLOR
+                color = view_color("split_page_left" if index == 1 else "split_offcut")
             elif self._line_xs:
-                color = self.PAGE_COLORS[index]
+                color = view_color(("split_page_left", "split_page_right")[index])
             else:
                 continue
             painter.setPen(Qt.PenStyle.NoPen)
@@ -172,13 +167,15 @@ class PageSplitImageView(ImageViewBase):
             active = index in (self._dragged_line, self._hovered_line)
             painter.setPen(
                 QPen(
-                    self.LINE_HIGHLIGHT if active else self.LINE_COLOR,
+                    view_color("split_line_active" if active else "split_line"),
                     3 if active else 2,
                 )
             )
             painter.drawLine(handle_top, handle_bottom)
-            painter.setPen(QPen(Qt.GlobalColor.white, 2))
-            painter.setBrush(self.LINE_HIGHLIGHT if active else self.HANDLE_COLOR)
+            painter.setPen(QPen(view_color("handle_ring"), 2))
+            painter.setBrush(
+                view_color("split_line_active" if active else "split_handle")
+            )
             for handle in (handle_top, handle_bottom):
                 painter.drawEllipse(handle, self.HANDLE_RADIUS, self.HANDLE_RADIUS)
         painter.restore()

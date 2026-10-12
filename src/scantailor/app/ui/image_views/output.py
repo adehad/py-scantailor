@@ -9,7 +9,6 @@ import math
 from dataclasses import dataclass
 from enum import Enum, auto
 from itertools import pairwise
-from typing import ClassVar
 
 import numpy as np
 from numpy.typing import NDArray
@@ -26,6 +25,7 @@ from PySide6.QtWidgets import QTabWidget
 
 from scantailor.app.ui.icons import icon
 from scantailor.app.ui.image_views.base import ImageViewBase
+from scantailor.app.ui.theme.tokens import view_color
 from scantailor.dewarping.page_dewarper import dewarper_from_polylines
 from scantailor.filters.output.params import DistortionModelSpec
 from scantailor.math.spline import XSpline
@@ -219,13 +219,7 @@ class OutputImageView(ImageViewBase):
 
     VERTEX_HIT_RADIUS = 8
     MIN_ZONE_VERTICES = 3
-    ZONE_COLORS: ClassVar[dict[ZoneKind, tuple[QColor, QColor]]] = {
-        ZoneKind.PICTURE: (QColor(0, 100, 255, 200), QColor(0, 100, 255, 50)),
-        ZoneKind.FILL: (QColor(0, 160, 60, 200), QColor(0, 160, 60, 50)),
-    }
-    SELECTED_BORDER = QColor(255, 165, 0, 255)
     SELECTED_FILL_ALPHA = 80
-    VERTEX_COLOR = QColor(0, 100, 255, 255)
     FILL_PREVIEW_ALPHA = 128
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
@@ -330,12 +324,17 @@ class OutputImageView(ImageViewBase):
         if self._creating is not None and self._new_points:
             self._paint_new_zone(painter)
 
+    @staticmethod
+    def _zone_colors(kind: ZoneKind) -> tuple[QColor, QColor]:
+        role = "zone_picture" if kind == ZoneKind.PICTURE else "zone_fill"
+        return view_color(f"{role}_border"), view_color(f"{role}_fill")
+
     def _paint_zone(self, painter: QPainter, zone: ViewZone, selected: bool) -> None:
-        border, fill = self.ZONE_COLORS[zone.kind]
+        border, fill = self._zone_colors(zone.kind)
         if zone.kind == ZoneKind.FILL:
             fill = QColor(*zone.fill_color, self.FILL_PREVIEW_ALPHA)
         if selected:
-            border = self.SELECTED_BORDER
+            border = view_color("zone_selected")
             fill = QColor(fill)
             fill.setAlpha(self.SELECTED_FILL_ALPHA)
         polygon = self._virtual_to_widget.map(zone.polygon)
@@ -346,7 +345,7 @@ class OutputImageView(ImageViewBase):
         painter.setPen(QPen(border, 2 if selected else 1))
         painter.drawPolygon(polygon)
         if selected:
-            painter.setBrush(self.VERTEX_COLOR)
+            painter.setBrush(view_color("zone_vertex"))
             painter.setPen(Qt.PenStyle.NoPen)
             for point in polygon.toList():
                 painter.drawEllipse(point, 5, 5)
@@ -354,7 +353,7 @@ class OutputImageView(ImageViewBase):
 
     def _paint_new_zone(self, painter: QPainter) -> None:
         assert self._creating is not None
-        border = self.ZONE_COLORS[self._creating][0]
+        border = self._zone_colors(self._creating)[0]
         points = [self.virtual_to_widget_point(p) for p in self._new_points]
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -364,7 +363,7 @@ class OutputImageView(ImageViewBase):
         if len(points) >= 2:
             painter.setPen(QPen(border.lighter(), 1, Qt.PenStyle.DotLine))
             painter.drawLine(points[-1], points[0])
-        painter.setBrush(self.VERTEX_COLOR)
+        painter.setBrush(view_color("zone_vertex"))
         painter.setPen(Qt.PenStyle.NoPen)
         for point in points:
             painter.drawEllipse(point, 5, 5)
@@ -532,8 +531,6 @@ class DewarpingImageView(ImageViewBase):
     HIT_RADIUS = 8
     MAX_CONTROL_POINTS = 5
     GRID_LINES = 30
-    GRID_COLOR = QColor(0, 0, 255)
-    HANDLE_COLOR = QColor(255, 0, 0)
     _DEWARPER_ERRORS = (ValueError, ArithmeticError, np.linalg.LinAlgError, IndexError)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
@@ -667,7 +664,7 @@ class DewarpingImageView(ImageViewBase):
     def _paint_overlay(self, painter: QPainter) -> None:
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        grid_pen = QPen(self.GRID_COLOR, 1.2)
+        grid_pen = QPen(view_color("dewarp_grid"), 1.2)
         grid_pen.setCosmetic(True)
         painter.setPen(grid_pen)
         painter.setTransform(self.image_to_widget(), True)
@@ -679,7 +676,7 @@ class DewarpingImageView(ImageViewBase):
         painter.restore()
 
         painter.save()
-        painter.setPen(QPen(self.HANDLE_COLOR, 4))
+        painter.setPen(QPen(view_color("dewarp_handle"), 4))
         to_widget = self.image_to_widget()
         for points in self._controls:
             for point in points:

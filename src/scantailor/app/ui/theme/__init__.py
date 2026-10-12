@@ -17,7 +17,7 @@ from .docks import DockSizer
 from .fonts import TabularFigures, apply_fonts
 from .palette import build_palette
 from .stylesheet import build_stylesheet
-from .tokens import DARK, LIGHT
+from .tokens import DARK, LIGHT, set_active_tokens
 
 __all__ = [
     "AUTO",
@@ -109,6 +109,7 @@ class _ThemeController(QtCore.QObject):
         scheme = resolve_scheme(self._app, mode)
         tokens = _TOKENS[scheme]
         self.scheme = scheme
+        set_active_tokens(tokens)
         set_semantic_colors(QtGui.QColor(tokens.positive), QtGui.QColor(tokens.danger))
         self._app.setPalette(build_palette(tokens))
         self._app.setStyleSheet(build_stylesheet(tokens, write_assets(tokens, scheme)))

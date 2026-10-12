@@ -16,6 +16,7 @@ from PySide6.QtCore import QLineF, QLocale, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPalette, QPen
 
 from scantailor.app.ui.image_views.base import ImageViewBase
+from scantailor.app.ui.theme.tokens import view_color
 from scantailor.core.transformation import ImageTransformation
 
 
@@ -232,7 +233,7 @@ class DeskewImageView(ImageViewBase):
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
 
-        pen = QPen(QColor(0, 0, 0xD1, 90))
+        pen = QPen(view_color("deskew_grid"))
         pen.setCosmetic(True)
         painter.setPen(pen)
 
@@ -250,7 +251,7 @@ class DeskewImageView(ImageViewBase):
         for x in xs:
             painter.drawLine(QLineF(x, 0.5, x, height - 0.5))
 
-        axis_pen = QPen(QColor(0, 0, 0xD1))
+        axis_pen = QPen(view_color("deskew_axis"))
         axis_pen.setCosmetic(True)
         painter.setPen(axis_pen)
         painter.drawLine(QPointF(0.5, center.y()), QPointF(width - 0.5, center.y()))

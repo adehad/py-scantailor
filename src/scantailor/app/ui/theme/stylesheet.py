@@ -108,7 +108,8 @@ QPushButton:default {{
 }}
 QPushButton:default:hover {{ background: {t.accent_hover}; }}
 QPushButton:disabled, QToolButton:disabled {{
-    color: {t.text_dim}; background: transparent;
+    color: {t.text_disabled}; background: {t.field_disabled};
+    border-color: transparent;
 }}
 
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QPlainTextEdit, QTextEdit {{
@@ -124,6 +125,11 @@ QLineEdit:hover, QSpinBox:hover, QDoubleSpinBox:hover, QComboBox:hover {{
 QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus,
 QPushButton:focus, QPlainTextEdit:focus, QTextEdit:focus {{
     border: 2px solid {t.accent};
+}}
+QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled,
+QComboBox:disabled, QPlainTextEdit:disabled, QTextEdit:disabled {{
+    color: {t.text_disabled}; background: {t.field_disabled};
+    border-color: transparent;
 }}
 QComboBox {{ padding-right: 28px; }}
 QComboBox::drop-down {{
@@ -159,6 +165,17 @@ QCheckBox::indicator, QRadioButton::indicator {{
 }}
 QCheckBox::indicator {{ border-radius: 4px; }}
 QRadioButton::indicator {{ border-radius: 10px; }}
+QCheckBox:disabled, QRadioButton:disabled, QLabel:disabled,
+QGroupBox:disabled {{ color: {t.text_disabled}; }}
+QCheckBox::indicator:disabled, QRadioButton::indicator:disabled {{
+    background: {t.field_disabled}; border-color: {t.field_border};
+}}
+QCheckBox::indicator:checked:disabled {{
+    background: {t.text_disabled}; border-color: {t.text_disabled};
+}}
+QRadioButton::indicator:checked:disabled {{
+    background: {t.text_disabled}; border-color: {t.field_disabled};
+}}
 QCheckBox::indicator:checked {{
     background: {t.accent}; border-color: {t.accent}; image: url({glyphs["check"]});
 }}
@@ -174,6 +191,12 @@ QSlider::sub-page:horizontal {{ background: {t.accent}; border-radius: 2px; }}
 QSlider::handle:horizontal {{
     width: 16px; height: 16px; margin: -7px 0; border-radius: 9px;
     background: {handle_fill}; border: 2px solid {t.accent};
+}}
+
+QSlider::groove:horizontal:disabled {{ background: {t.field_disabled}; }}
+QSlider::sub-page:horizontal:disabled {{ background: {t.text_disabled}; }}
+QSlider::handle:horizontal:disabled {{
+    background: {t.field_disabled}; border-color: {t.text_disabled};
 }}
 
 QListView, QListWidget, QTreeView, QTableView {{
