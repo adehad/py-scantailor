@@ -1,6 +1,7 @@
 # https://github.com/github/gitignore/blob/main/Python.gitignore
 
 # Project Specific
+docs/_generated/
 CMakeLists.txt.user
 build/
 **/scantailor_*.qm

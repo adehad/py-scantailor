@@ -1,6 +1,11 @@
 """Sphinx configuration."""
 
+import sys
+from pathlib import Path
+
 import scantailor as app
+
+sys.path.insert(0, str(Path(__file__).parent / "_ext"))
 
 # -- General configuration -----------------------------------------------------
 
@@ -16,6 +21,8 @@ extensions = [
     "sphinx.ext.viewcode",
     # External
     "sphinx_copybutton",
+    # Local
+    "screenshot",
 ]
 
 intersphinx_mapping = {
@@ -69,7 +76,7 @@ today = "1"
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ["_build"]
+exclude_patterns = ["_build", "_ext"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
@@ -107,7 +114,7 @@ html_logo = "_static/images/logo.svg"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-# html_static_path = []
+html_static_path = ["_static"]
 html_css_files = [
     "css/custom.css",
 ]
