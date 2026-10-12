@@ -308,7 +308,7 @@ def test_positive_accent_is_green_in_normal_and_disabled_ink_when_disabled(
     normal = dominant_colors(glyph.pixmap(SIZE, Mode.Normal))
     disabled = dominant_colors(glyph.pixmap(SIZE, Mode.Disabled))
     ink = LIGHT.text
-    dim = LIGHT.text_dim
+    dim = LIGHT.text_disabled
     assert LIGHT.positive in normal
     assert ink in normal
     assert disabled == {dim}
@@ -327,7 +327,7 @@ def test_danger_tint_colours_the_whole_glyph_except_when_disabled(scheme_app, na
     glyph = icons.icon(name, tint="danger")
     assert dominant_colors(glyph.pixmap(SIZE, Mode.Normal)) == {LIGHT.danger}
     assert dominant_colors(glyph.pixmap(SIZE, Mode.Active)) == {LIGHT.danger}
-    assert dominant_colors(glyph.pixmap(SIZE, Mode.Disabled)) == {LIGHT.text_dim}
+    assert dominant_colors(glyph.pixmap(SIZE, Mode.Disabled)) == {LIGHT.text_disabled}
 
 
 def test_accent_tint_follows_the_palette_accent(scheme_app):
