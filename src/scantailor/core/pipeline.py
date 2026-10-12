@@ -36,6 +36,7 @@ from scantailor.dewarping.page_dewarper import (
     dewarper_from_polylines,
     marginal_dewarper,
 )
+from scantailor.filters.deskew.dependencies import Dependencies as DeskewDependencies
 from scantailor.filters.output.dewarping_options import DewarpingMode
 from scantailor.filters.output.generator import DewarperSource, OutputResult
 from scantailor.filters.output.params import FillZoneSpec, Params, PictureZoneSpec
@@ -333,8 +334,15 @@ def _process_page_split(
     """Process the Page Split stage, cropping to this page's region."""
     filter_ = sequence.page_split_filter
 
-    if detect and not filter_.is_params_set(page_id):
-        filter_.process(state.source, page_id, dpi=options.dpi)
+    if detect:
+        filter_.process(
+            state.source,
+            page_id,
+            dpi=options.dpi,
+            rotation_degrees=sequence.fix_orientation_filter.get_rotation(
+                page_id.image_id
+            ).degrees,
+        )
 
     params = filter_.get_params(page_id)
     metadata: dict[str, object] = {
@@ -387,11 +395,18 @@ def _process_deskew(
 ) -> dict:
     """Process the Deskew stage, rotating by the correction angle."""
     filter_ = sequence.deskew_filter
+    dependencies = DeskewDependencies.of(
+        state.xform.pre_crop_area,
+        sequence.fix_orientation_filter.get_rotation(page_id.image_id).degrees,
+    )
 
-    if detect and not filter_.settings.is_params_set(page_id):
-        filter_.detect_skew(state.view(), page_id)
+    if detect and filter_.needs_detection(page_id, dependencies):
+        filter_.detect_skew(state.view(), page_id, dependencies=dependencies)
 
     params = filter_.get_params(page_id)
+    if detect and params.is_manual() and params.dependencies != dependencies:
+        params = params.model_copy(update={"dependencies": dependencies})
+        filter_.set_params(page_id, params)
     state.rotate(params.deskew_angle_deg)
     return {
         "skew_angle": params.deskew_angle_deg,

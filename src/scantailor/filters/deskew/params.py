@@ -9,6 +9,8 @@ from typing import Self
 
 from pydantic import BaseModel, Field
 
+from .dependencies import Dependencies
+
 
 class AutoManualMode(str, Enum):
     """Mode for deskew angle determination.
@@ -29,10 +31,13 @@ class Params(BaseModel):
             clockwise, negative values rotate counter-clockwise. This is the
             correction angle (opposite of detected skew).
         mode: Whether the angle was auto-detected or manually specified.
+        dependencies: Upstream geometry the angle was detected under; null if
+            unknown, in which case the angle is trusted.
     """
 
     deskew_angle_deg: float = Field(default=0.0, ge=-45.0, le=45.0)
     mode: AutoManualMode = AutoManualMode.AUTO
+    dependencies: Dependencies = Field(default_factory=Dependencies)
 
     def is_manual(self) -> bool:
         """Return True if the angle was manually specified."""
@@ -55,6 +60,7 @@ class Params(BaseModel):
         return Params(
             deskew_angle_deg=angle,
             mode=mode if mode is not None else self.mode,
+            dependencies=self.dependencies,
         )
 
     def with_auto_angle(self, angle: float) -> Self:
@@ -66,7 +72,11 @@ class Params(BaseModel):
         Returns:
             New Params instance with AUTO mode.
         """
-        return Params(deskew_angle_deg=angle, mode=AutoManualMode.AUTO)
+        return Params(
+            deskew_angle_deg=angle,
+            mode=AutoManualMode.AUTO,
+            dependencies=self.dependencies,
+        )
 
     def with_manual_angle(self, angle: float) -> Self:
         """Return a new Params with a manually specified angle.
@@ -77,4 +87,8 @@ class Params(BaseModel):
         Returns:
             New Params instance with MANUAL mode.
         """
-        return Params(deskew_angle_deg=angle, mode=AutoManualMode.MANUAL)
+        return Params(
+            deskew_angle_deg=angle,
+            mode=AutoManualMode.MANUAL,
+            dependencies=self.dependencies,
+        )
