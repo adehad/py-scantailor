@@ -54,7 +54,9 @@ def write_processed_outputs(window: MainWindowManager) -> None:
     project = window.project
     assert project is not None
     pages = project.get_pages()
-    names = output_file_names(pages, project.layout_direction)
+    names = output_file_names(
+        pages, project.layout_direction, project.output_file_label_map()
+    )
     width, height = RENDERED_SIZE
     black = np.zeros((height, width), dtype=bool)
     black[100:140, 100:900] = True

@@ -70,12 +70,14 @@ from scantailor.core.project import ImageInfo, ImageMetadata, LayoutDirection, P
 from scantailor.core.recent_projects import RecentProjects
 from scantailor.core.relinker import Relinker, image_directories
 from scantailor.core.settings import ApplicationSettings
-from scantailor.core.stage_params import apply_stage_params, collect_stage_params
-from scantailor.core.stage_sequence import FilterStage, StageSequence
-from scantailor.core.xml_compat import (
-    apply_xml_stage_defaults,
-    import_xml_project_file,
+from scantailor.core.stage_params import (
+    apply_stage_defaults,
+    apply_stage_params,
+    collect_stage_defaults,
+    collect_stage_params,
 )
+from scantailor.core.stage_sequence import FilterStage, StageSequence
+from scantailor.core.xml_compat import import_xml_project_file
 from scantailor.filters.output.params import ApplyGroup
 from scantailor.filters.page_split.layout_type import LayoutType
 
@@ -1153,6 +1155,7 @@ class MainWindowManager:
             layout_direction=project.layout_direction,
             max_workers=self._batch_worker_count(),
             dpi_overrides=self._dpi_overrides,
+            file_labels=project.output_file_label_map(),
         )
 
     def stopBatchProcessing(self) -> None:
@@ -1296,7 +1299,9 @@ class MainWindowManager:
         pages = project.get_pages()
         if not pages:
             return
-        names = output_file_names(pages, project.layout_direction)
+        names = output_file_names(
+            pages, project.layout_direction, project.output_file_label_map()
+        )
         files = {page: project.output_directory / names[page] for page in pages}
         unprocessed = [page for page in pages if not files[page].is_file()]
         if unprocessed:
@@ -1464,8 +1469,7 @@ class MainWindowManager:
             self._apply_relinker(project, relinker)
             stages = StageSequence()
             apply_stage_params(stages, project.stage_params)
-            if xml_import:
-                apply_xml_stage_defaults(stages, xml_import.stage_defaults)
+            apply_stage_defaults(stages, project.stage_defaults)
         except ValueError as error:
             self._warn_cannot_open(path, error)
             return False
@@ -1726,10 +1730,12 @@ class MainWindowManager:
         if relinker is None or relinker.is_empty():
             return
         project.stage_params = collect_stage_params(self.stages, project.get_pages())
+        project.stage_defaults = collect_stage_defaults(self.stages)
         project.selected_page = self.current_page
         self._apply_relinker(project, relinker)
         stages = StageSequence()
         apply_stage_params(stages, project.stage_params)
+        apply_stage_defaults(stages, project.stage_defaults)
         project_file = pathlib.Path(self.projectFile) if self.projectFile else None
         self._install_project(project, stages, project_file=project_file, modified=True)
 
@@ -2003,6 +2009,7 @@ class MainWindowManager:
         if project is None:
             return False
         project.stage_params = collect_stage_params(self.stages, project.get_pages())
+        project.stage_defaults = collect_stage_defaults(self.stages)
         project.selected_page = self.current_page
         try:
             project.save(path)
@@ -2029,7 +2036,11 @@ class MainWindowManager:
             return ""
         stage_params = collect_stage_params(self.stages, project.get_pages())
         return project.model_copy(
-            update={"stage_params": stage_params, "selected_page": None}
+            update={
+                "stage_params": stage_params,
+                "stage_defaults": collect_stage_defaults(self.stages),
+                "selected_page": None,
+            }
         ).model_dump_json()
 
     def has_unsaved_changes(self) -> bool:

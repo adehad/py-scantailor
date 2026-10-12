@@ -12,7 +12,7 @@ import os
 import sys
 import uuid
 from collections import deque
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
 from concurrent.futures.process import BrokenProcessPool
 from contextlib import ExitStack
@@ -34,7 +34,11 @@ from scantailor.core.pipeline import (
     fix_aggregate_page_size,
     process_page,
 )
-from scantailor.core.project import LayoutDirection, StageParamsEntry
+from scantailor.core.project import (
+    LayoutDirection,
+    StageParamsEntry,
+    assign_output_file_labels,
+)
 from scantailor.core.settings import ApplicationSettings, TiffCompressions
 from scantailor.core.stage_params import (
     STAGE_KEYS,
@@ -45,7 +49,12 @@ from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
-from scantailor.filters.output.split_output import write_split_images
+from scantailor.filters.output.split_output import (
+    BACKGROUND_DIR,
+    FOREGROUND_DIR,
+    ORIGINAL_BACKGROUND_DIR,
+    write_split_images,
+)
 from scantailor.filters.page_split.layout_type import LayoutType
 
 DEFAULT_DPI = 300.0
@@ -131,7 +140,9 @@ class BatchResult:
 
 
 def output_file_names(
-    pages: Iterable[PageId], layout_direction: LayoutDirection = "LTR"
+    pages: Iterable[PageId],
+    layout_direction: LayoutDirection = "LTR",
+    file_labels: Mapping[Path, int] | None = None,
 ) -> dict[PageId, str]:
     """Name the output file of each page the way the C++ generator does.
 
@@ -144,18 +155,19 @@ def output_file_names(
         pages (Iterable[PageId]): Pages in project order; the order decides
             which colliding source file gets which label.
         layout_direction (LayoutDirection): Reading direction of the project.
+        file_labels (Mapping[Path, int] | None): Labels already given to source
+            files, as stored in ``Project.output_file_labels``. They win over the
+            order of ``pages``; a file without one is labelled after the others
+            of its name, as the C++ FileNameDisambiguator does when it registers
+            a file.
 
     Returns:
         dict[PageId, str]: File name (with ``.tif`` suffix) per page.
     """
     pages = list(pages)
-    labels: dict[Path, int] = {}
-    files_per_name: dict[str, int] = {}
-    for page in pages:
-        path = page.image_id.file_path
-        if path not in labels:
-            labels[path] = files_per_name.get(path.name, 0)
-            files_per_name[path.name] = labels[path] + 1
+    labels = assign_output_file_labels(
+        (page.image_id.file_path for page in pages), file_labels
+    )
 
     left_to_right = layout_direction == "LTR"
     names: dict[PageId, str] = {}
@@ -171,6 +183,75 @@ def output_file_names(
             name += f"_{1 if left_to_right == is_left else 2}{'L' if is_left else 'R'}"
         names[page] = name + ".tif"
     return names
+
+
+_ERASE_VARIANTS = {
+    SubPage.SINGLE_PAGE: (SubPage.SINGLE_PAGE, SubPage.LEFT_PAGE, SubPage.RIGHT_PAGE),
+    SubPage.LEFT_PAGE: (SubPage.SINGLE_PAGE, SubPage.LEFT_PAGE),
+    SubPage.RIGHT_PAGE: (SubPage.SINGLE_PAGE, SubPage.RIGHT_PAGE),
+}
+_SPLIT_LAYER_DIRS = (FOREGROUND_DIR, BACKGROUND_DIR, ORIGINAL_BACKGROUND_DIR)
+
+
+def erase_output_files(
+    removed: Iterable[PageId],
+    output_dir: Path,
+    project_pages: Sequence[PageId],
+    layout_direction: LayoutDirection = "LTR",
+    keep: Iterable[Path] = (),
+    file_labels: Mapping[Path, int] | None = None,
+) -> list[Path]:
+    """Delete the files the batch wrote for pages that leave the project.
+
+    A removed page may have been written as a single page or as either half of
+    a split, so each name it could have had is tried, as in C++. Split layer
+    copies in the sub-folders are deleted with them. Only files named by
+    ``output_file_names`` directly in ``output_dir`` (or in the layer
+    sub-folders) are touched, never folders, and never a source image.
+
+    Args:
+        removed (Iterable[PageId]): Pages being removed.
+        output_dir (Path): The project's output folder.
+        project_pages (Sequence[PageId]): The project's pages as they were
+            before the removal; labels that tell same-named source files apart
+            depend on them.
+        layout_direction (LayoutDirection): Reading direction, for file names.
+        keep (Iterable[Path]): Files that must survive, such as the source
+            images when the output folder is also the input folder.
+        file_labels (Mapping[Path, int] | None): Stored labels of source files,
+            as passed to ``output_file_names``.
+
+    Returns:
+        list[Path]: The files that were deleted.
+    """
+    removed = list(removed)
+    variants = [
+        PageId(image_id=page.image_id, sub_page=sub_page)
+        for page in removed
+        for sub_page in _ERASE_VARIANTS[page.sub_page]
+    ]
+    names = output_file_names(
+        [*project_pages, *variants], layout_direction, file_labels
+    )
+    root = Path(os.path.abspath(output_dir))
+    protected = {os.path.normcase(os.path.abspath(path)) for path in keep}
+    candidates = {names[variant] for variant in variants}
+
+    deleted: list[Path] = []
+    for name in sorted(candidates):
+        for folder in (root, *(root / layer for layer in _SPLIT_LAYER_DIRS)):
+            path = folder / name
+            if os.path.normcase(os.path.abspath(path)) in protected:
+                continue
+            if path.is_symlink() or not path.is_file():
+                continue
+            try:
+                path.unlink()
+            except OSError as error:
+                logger.warning("Could not delete output file {}: {}", path, error)
+                continue
+            deleted.append(path)
+    return deleted
 
 
 # ProcessPoolExecutor refuses more workers than WaitForMultipleObjects can wait on.
@@ -589,6 +670,7 @@ def run_batch(
     dpi_overrides: DpiOverrides | None = None,
     executor: ProcessPoolExecutor | None = None,
     tiff_compressions: TiffCompressions | None = None,
+    file_labels: Mapping[Path, int] | None = None,
 ) -> BatchResult:
     """Process pages through the full pipeline and write them as TIFFs.
 
@@ -618,6 +700,8 @@ def run_batch(
         tiff_compressions (TiffCompressions | None): Methods for the written
             files, handed to the workers as plain data; the application settings
             as they are when the batch starts when None.
+        file_labels (Mapping[Path, int] | None): Stored output file labels of the
+            sources, as in ``output_file_names``.
 
     Returns:
         BatchResult: Written, failed and never-started pages.
@@ -651,7 +735,7 @@ def run_batch(
             report,
             result,
         )
-        names = output_file_names(pages, layout_direction)
+        names = output_file_names(pages, layout_direction, file_labels)
         overrides = dpi_overrides or {}
         config = _PhaseConfig(
             token=uuid.uuid4().hex,

@@ -5,10 +5,17 @@ import shutil
 from pathlib import Path
 
 import pytest
+from loguru import logger
 
+from scantailor.core import xml_reader
 from scantailor.core.models import Dpi, ImageId, OrthogonalRotation, PageId, SubPage
 from scantailor.core.project import Project
-from scantailor.core.stage_params import apply_stage_params, collect_stage_params
+from scantailor.core.stage_params import (
+    apply_stage_defaults,
+    apply_stage_params,
+    collect_stage_defaults,
+    collect_stage_params,
+)
 from scantailor.core.stage_sequence import StageSequence
 from scantailor.core.xml_compat import (
     NEWEST_PROJECT_VERSION,
@@ -937,3 +944,156 @@ class TestJsonRoundTrip:
             for entry in entries:
                 assert entry.page.image_id in known
         assert isinstance(next(iter(known)), ImageId)
+
+
+_PROJECT_XML = """{declaration}<project version="3" outputDirectory="out">
+<directories><directory id="1" path="{directory}"/></directories>
+<files><file id="2" dirId="1" name="{name}"/></files>
+<images><image id="3" subPages="1" fileId="2" fileImage="0"/></images>
+<pages><page id="4" imageId="3" subPage="single"/></pages>
+</project>
+"""
+
+
+def _write_project(
+    tmp_path: Path, encoding: str, declaration: str = "", directory: str = "Café"
+) -> Path:
+    text = _PROJECT_XML.format(
+        declaration=declaration, directory=directory, name="scan.tif"
+    )
+    project_file = tmp_path / "p.ScanTailor"
+    project_file.write_bytes(text.encode(encoding))
+    return project_file
+
+
+class TestProjectFileEncoding:
+    def test_utf8_file_with_accented_path_is_read_unchanged(self, tmp_path: Path):
+        project_file = _write_project(tmp_path, "utf-8")
+
+        imported = import_xml_project_file(project_file)
+
+        assert imported is not None
+        assert imported.project.images[0].id.file_path.parent.name == "Café"
+
+    def test_cp1252_file_without_declaration_falls_back_to_the_codepage(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(xml_reader, "_ansi_codepage", lambda: "cp1252")
+        project_file = _write_project(tmp_path, "cp1252")
+
+        imported = import_xml_project_file(project_file)
+
+        assert imported is not None
+        assert imported.project.images[0].id.file_path.parent.name == "Café"
+
+    def test_cp1252_fallback_logs_a_warning(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(xml_reader, "_ansi_codepage", lambda: "cp1252")
+        messages: list[str] = []
+        sink = logger.add(messages.append, level="WARNING", format="{message}")
+        try:
+            import_xml_project_file(_write_project(tmp_path, "cp1252"))
+        finally:
+            logger.remove(sink)
+
+        assert any("cp1252" in message for message in messages)
+
+    def test_declared_codepage_is_used_directly(self, tmp_path: Path):
+        project_file = _write_project(
+            tmp_path,
+            "cp1252",
+            declaration='<?xml version="1.0" encoding="windows-1252"?>\n',
+        )
+
+        imported = import_xml_project_file(project_file)
+
+        assert imported is not None
+        assert imported.project.images[0].id.file_path.parent.name == "Café"
+
+    def test_declared_non_latin_codepage_is_honoured(self, tmp_path: Path):
+        project_file = _write_project(
+            tmp_path,
+            "cp1251",
+            declaration='<?xml version="1.0" encoding="windows-1251"?>\n',
+            directory="Книга",
+        )
+
+        imported = import_xml_project_file(project_file)
+
+        assert imported is not None
+        assert imported.project.images[0].id.file_path.parent.name == ("Книга")
+
+    def test_unknown_declared_encoding_does_not_crash(self, tmp_path: Path):
+        project_file = _write_project(
+            tmp_path,
+            "utf-8",
+            declaration='<?xml version="1.0" encoding="no-such-codec"?>\n',
+        )
+
+        imported = import_xml_project_file(project_file)
+
+        assert imported is not None
+        assert imported.project.images[0].id.file_path.parent.name == "Café"
+
+    def test_codepage_that_cannot_decode_falls_back_to_cp1252(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(xml_reader, "_ansi_codepage", lambda: "ascii")
+        project_file = _write_project(tmp_path, "cp1252")
+
+        imported = import_xml_project_file(project_file)
+
+        assert imported is not None
+        assert len(imported.project.images) == 1
+
+    def test_project_load_reads_a_cp1252_xml_project(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        monkeypatch.setattr(xml_reader, "_ansi_codepage", lambda: "cp1252")
+        project_file = _write_project(tmp_path, "cp1252")
+
+        project = Project.load(project_file)
+
+        assert project.images[0].id.file_path.parent.name == "Café"
+
+
+class TestProjectFieldsFromXml:
+    def test_output_labels_are_stored_in_the_project(self, tmp_path: Path):
+        imported = _load(tmp_path, "simple")
+
+        assert imported.project.output_file_label_map() == imported.output_file_labels
+        assert sorted(imported.project.output_file_label_map().values()) == [0, 0, 1]
+
+    def test_stage_defaults_are_stored_in_the_project(self, tmp_path: Path):
+        project = _load(tmp_path, "split_and_mixed").project
+
+        assert project.stage_defaults["page_detection_box"] == [210.0, 297.0]
+        assert project.stage_defaults["page_detection_tolerance"] == pytest.approx(0.15)
+
+    def test_stored_defaults_restore_the_same_stages_as_the_xml_import(
+        self, tmp_path: Path
+    ):
+        imported = _load(tmp_path, "split_and_mixed")
+        from_xml = StageSequence()
+        apply_xml_stage_defaults(from_xml, imported.stage_defaults)
+        from_project = StageSequence()
+
+        apply_stage_defaults(from_project, imported.project.stage_defaults)
+
+        assert collect_stage_defaults(from_project) == collect_stage_defaults(from_xml)
+
+    def test_imported_labels_and_defaults_survive_a_json_round_trip(
+        self, tmp_path: Path
+    ):
+        imported = _load(tmp_path, "split_and_mixed")
+        saved = tmp_path / "converted.json"
+
+        imported.project.save(saved)
+        loaded = Project.load(saved)
+
+        assert (
+            imported.output_file_labels.items()
+            <= loaded.output_file_label_map().items()
+        )
+        assert loaded.stage_defaults == imported.project.stage_defaults

@@ -18,6 +18,7 @@ from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 from scantailor.core.project import (
     ImageInfo,
     ImageMetadata,
+    OutputFileLabel,
     Project,
     StageParamsEntry,
 )
@@ -30,6 +31,7 @@ from scantailor.core.xml_reader import (
     attr_text,
     child,
     children,
+    decode_project_bytes,
     skip_malformed,
     sub_page_from_string,
 )
@@ -66,6 +68,14 @@ class XmlStageDefaults:
     page_split_layout_type: LayoutType = LayoutType.AUTO_LAYOUT_TYPE
     page_detection_box: tuple[float, float] = (0.0, 0.0)
     page_detection_tolerance: float = 0.1
+
+    def as_project_defaults(self) -> dict[str, object]:
+        """Return the values in the form ``Project.stage_defaults`` stores."""
+        return {
+            "page_split_layout_type": self.page_split_layout_type.value,
+            "page_detection_box": list(self.page_detection_box),
+            "page_detection_tolerance": self.page_detection_tolerance,
+        }
 
 
 @dataclass(frozen=True)
@@ -165,6 +175,11 @@ def import_xml_project(path: Path, content: str) -> XmlProjectImport:
         images=images,
         selected_page=selected_page,
         stage_params=stage_params,
+        stage_defaults=stage_defaults.as_project_defaults(),
+        output_file_labels=[
+            OutputFileLabel(file_path=file_path, label=max(label, 0))
+            for file_path, label in labels.items()
+        ],
     )
     return XmlProjectImport(project, stage_defaults, labels)
 
@@ -183,7 +198,7 @@ def import_xml_project_file(path: Path) -> XmlProjectImport | None:
         OSError: If the file cannot be read.
         ValueError: As :func:`import_xml_project`.
     """
-    content = path.read_text(encoding="utf-8-sig")
+    content = decode_project_bytes(path.read_bytes())
     if not content.lstrip().startswith(("<?xml", "<project")):
         return None
     return import_xml_project(path, content)
