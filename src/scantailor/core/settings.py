@@ -14,13 +14,6 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 
-class ColorScheme(str, Enum):
-    """Available color schemes."""
-
-    DARK = "dark"
-    LIGHT = "light"
-
-
 class Units(str, Enum):
     """Measurement units."""
 
@@ -68,17 +61,17 @@ class ApplicationSettings(BaseModel):
 
     Example:
         >>> settings = ApplicationSettings.get_instance()
-        >>> settings.color_scheme
-        <ColorScheme.DARK: 'dark'>
-        >>> settings.color_scheme = ColorScheme.LIGHT
+        >>> settings.units
+        <Units.MILLIMETERS: 'mm'>
+        >>> settings.units = Units.INCHES
         >>> settings.save()
     """
 
     model_config = {"validate_assignment": True}
 
-    # Display settings
+    # Display settings; the colour scheme lives in QSettings under the key the
+    # theme reads, so a change applies at once and at the next start.
     opengl_enabled: bool = Field(default=False)
-    color_scheme: ColorScheme = Field(default=ColorScheme.DARK)
     language: str = Field(default="en")
     units: Units = Field(default=Units.MILLIMETERS)
 

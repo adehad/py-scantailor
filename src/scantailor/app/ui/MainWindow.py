@@ -24,6 +24,7 @@ from scantailor.app.ui.batch_runner import BatchRunner
 from scantailor.app.ui.dialogs.about import AboutDialog
 from scantailor.app.ui.dialogs.apply_to import OUTPUT_GROUP_TITLES, ApplyToDialog
 from scantailor.app.ui.dialogs.batch_progress import BatchProgressDialog
+from scantailor.app.ui.dialogs.default_params import DefaultParamsDialog
 from scantailor.app.ui.dialogs.fix_dpi import FixDpiDialog
 from scantailor.app.ui.dialogs.load_files_status import LoadFilesStatusDialog
 from scantailor.app.ui.dialogs.pdf_export import PdfExportDialog, PdfExportOptions
@@ -31,6 +32,7 @@ from scantailor.app.ui.dialogs.pdf_import import DEFAULT_IMPORT_DPI, PdfImportDi
 from scantailor.app.ui.dialogs.pdf_progress import PdfProgressDialog
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
 from scantailor.app.ui.dialogs.relinking import RelinkingDialog
+from scantailor.app.ui.dialogs.settings import SettingsDialog
 from scantailor.app.ui.dialogs.split_mode import SplitModeDialog
 from scantailor.app.ui.page_renderer import PageRenderer, render_thumbnail
 from scantailor.app.ui.panels.new_open_project import NewOpenProjectPanel
@@ -58,6 +60,8 @@ from scantailor.core.batch import (
     RenderInfo,
     output_file_names,
 )
+from scantailor.core.default_params import apply_default_params
+from scantailor.core.default_params_profiles import active_default_params
 from scantailor.core.filename_ordering import sort_smart
 from scantailor.core.image_io import ImageLoadError, list_image_pages
 from scantailor.core.models import Dpi, ImageId, PageId
@@ -65,6 +69,7 @@ from scantailor.core.page_source import DpiOverrides, dpi_overrides_of
 from scantailor.core.project import ImageInfo, ImageMetadata, LayoutDirection, Project
 from scantailor.core.recent_projects import RecentProjects
 from scantailor.core.relinker import Relinker, image_directories
+from scantailor.core.settings import ApplicationSettings
 from scantailor.core.stage_params import apply_stage_params, collect_stage_params
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.output.params import ApplyGroup
@@ -1677,11 +1682,15 @@ class MainWindowManager:
 
     def openSettingsDialog(self) -> None:
         """Open settings dialog."""
-        _LOG.info("Open settings dialog")
+        self._run_dialog(SettingsDialog(ApplicationSettings.get_instance(), self.ui))
 
     def openDefaultParamsDialog(self) -> None:
         """Open default params dialog."""
-        _LOG.info("Open default params dialog")
+        self._run_dialog(
+            DefaultParamsDialog(
+                units=ApplicationSettings.get_instance().units, parent=self.ui
+            )
+        )
 
     def newProject(self) -> None:
         """Create a project from files chosen in the project files dialog."""
@@ -1715,9 +1724,11 @@ class MainWindowManager:
         for image_id, metadata in pages:
             project.add_image(image_id, metadata)
         _create_directory(project.output_directory)
-        self._install_project(
-            project, StageSequence(), project_file=None, modified=True
+        stages = StageSequence()
+        apply_default_params(
+            stages, [image_id for image_id, _ in pages], active_default_params()
         )
+        self._install_project(project, stages, project_file=None, modified=True)
         self.settings.setValue(_LAST_INPUT_DIR_KEY, str(input_dir))
 
     def addFiles(self) -> None:

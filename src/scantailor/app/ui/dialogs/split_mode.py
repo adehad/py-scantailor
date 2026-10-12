@@ -7,15 +7,21 @@ Allows users to select the split mode (auto/manual) and apply scope
 from enum import Enum, auto
 from pathlib import Path
 
-from PySide6 import QtWidgets
+from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Signal
 
 from scantailor.app.ui import embed_ui, load_ui_widget
+from scantailor.app.ui.icons import icon
 from scantailor.app.ui.utils import get_cwidget
 from scantailor.core.models import PageId
 from scantailor.filters.page_split.layout_type import LayoutType
 
 _UI_FOLDER = Path(__file__).parent
+_LAYOUT_GLYPHS = {
+    LayoutType.SINGLE_PAGE_UNCUT: "split-single-uncut",
+    LayoutType.PAGE_PLUS_OFFCUT: "split-right-page-plus-offcut",
+    LayoutType.TWO_PAGES: "book-open",
+}
 
 
 class ApplyScope(Enum):
@@ -157,17 +163,23 @@ class SplitModeDialog(QtWidgets.QDialog):
             else:
                 self._mode_manual.setChecked(True)
 
-        self._update_layout_icon()
+        self._on_mode_changed()
 
     def _on_mode_changed(self) -> None:
         """Handle mode selection change."""
+        manual = self._mode_manual.isChecked()
+        self._apply_cut_option.setEnabled(manual)
+        if not manual:
+            self._apply_cut_option.setChecked(False)
         self._update_layout_icon()
 
     def _update_layout_icon(self) -> None:
         """Update the layout type icon based on selection."""
-        # In a full implementation, this would update the icon based on
-        # the selected mode and auto-detected layout type
-        pass
+        glyph = _LAYOUT_GLYPHS.get(self._get_combined_layout_type(), "wand-sparkles")
+        size = QtCore.QSize(48, 48)
+        self._layout_type_label.setPixmap(
+            icon(glyph).pixmap(size, self._layout_type_label.devicePixelRatioF())
+        )
 
     def _get_selected_scope(self) -> ApplyScope:
         """Get the selected apply scope.
