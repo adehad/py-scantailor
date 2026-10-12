@@ -2,22 +2,54 @@
 
 from pathlib import Path
 
-from PySide6 import QtWidgets
+from loguru import logger
+from PySide6 import QtCore, QtWidgets
 
-from scantailor.app.ui import load_ui_widget
+from scantailor.app.ui import embed_ui, load_ui_widget
+from scantailor.app.ui.theme import AUTO, SETTINGS_KEY, apply_theme
 from scantailor.app.ui.utils import get_cwidget
-from scantailor.core.settings import ApplicationSettings
+from scantailor.core.settings import (
+    ApplicationSettings,
+    DeviationSettings,
+    TiffCompression,
+    Units,
+)
 
 _UI_FOLDER = Path(__file__).parent
+_TRANSLATIONS_FOLDER = _UI_FOLDER.parents[2] / "translations"
+_SOURCE_LANGUAGE = "en"
+_OPENGL_UNAVAILABLE = "Your hardware / driver don't provide the necessary features"
+# C++ derives the thumbnail height from the width with this aspect ratio.
+_THUMBNAIL_ASPECT = 16.0 / 25.0
+
+
+def available_languages() -> list[str]:
+    """List the locale codes the application can be shown in.
+
+    Returns:
+        list[str]: The source language first, then one code per bundled translation.
+    """
+    codes = {
+        path.stem.removeprefix("scantailor_")
+        for pattern in ("scantailor_*.ts", "scantailor_*.qm")
+        for path in _TRANSLATIONS_FOLDER.glob(pattern)
+    }
+    codes.discard("untranslated")
+    return [_SOURCE_LANGUAGE, *sorted(codes - {_SOURCE_LANGUAGE})]
 
 
 class SettingsDialog(QtWidgets.QDialog):
     """Settings dialog for configuring application preferences.
 
-    Provides tabs for:
-    - General settings (UI, thumbnails, saving)
-    - Processing settings (detection, deviation thresholds)
+    Accepting the dialog writes the values to ``settings``, saves them, stores the
+    appearance under the key the theme reads and applies it to the running
+    application.
+
+    Signals:
+        settings_changed: Emitted after the changes were committed.
     """
+
+    settings_changed = QtCore.Signal()
 
     def __init__(
         self,
@@ -27,257 +59,243 @@ class SettingsDialog(QtWidgets.QDialog):
         """Initialize the settings dialog.
 
         Args:
-            settings: Application settings to edit.
-            parent: Parent widget.
+            settings (ApplicationSettings): Application settings to edit.
+            parent (QtWidgets.QWidget | None): Parent widget.
         """
         super().__init__(parent)
         self._settings = settings
-        self._original_settings = settings.model_copy()
 
-        # Load UI
         self.ui = load_ui_widget(_UI_FOLDER / "SettingsDialog.ui", self)
+        embed_ui(self, self.ui)
         self._setup_widgets()
+        self._populate_combo_boxes()
         self._load_settings()
         self._connect_signals()
 
     def _setup_widgets(self) -> None:
-        """Set up widget references."""
-        # General tab - User Interface
-        self._enable_opengl_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "enableOpenglCb"
+        """Look up the widgets of the form."""
+        ui = self.ui
+        check, combo, spin = (
+            QtWidgets.QCheckBox,
+            QtWidgets.QComboBox,
+            QtWidgets.QSpinBox,
         )
+        double = QtWidgets.QDoubleSpinBox
+
+        self._enable_opengl_cb = get_cwidget(ui, check, "enableOpenglCb")
         self._opengl_device_label = get_cwidget(
-            self.ui, QtWidgets.QLabel, "openglDeviceLabel"
+            ui, QtWidgets.QLabel, "openglDeviceLabel"
         )
-        self._auto_save_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "autoSaveProjectCB"
-        )
-        self._color_scheme_box = get_cwidget(
-            self.ui, QtWidgets.QComboBox, "colorSchemeBox"
-        )
-        self._language_box = get_cwidget(self.ui, QtWidgets.QComboBox, "languageBox")
+        self._auto_save_cb = get_cwidget(ui, check, "autoSaveProjectCB")
+        self._color_scheme_box = get_cwidget(ui, combo, "colorSchemeBox")
+        self._language_box = get_cwidget(ui, combo, "languageBox")
+        self._units_box = get_cwidget(ui, combo, "unitsBox")
 
-        # General tab - Thumbnails
-        self._thumbnail_quality_sb = get_cwidget(
-            self.ui, QtWidgets.QSpinBox, "thumbnailQualitySB"
-        )
-        self._thumbnail_size_sb = get_cwidget(
-            self.ui, QtWidgets.QSpinBox, "thumbnailSizeSB"
-        )
-        self._single_column_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "singleColumnThumbnailsCB"
-        )
+        self._thumbnail_quality_sb = get_cwidget(ui, spin, "thumbnailQualitySB")
+        self._thumbnail_size_sb = get_cwidget(ui, spin, "thumbnailSizeSB")
+        self._single_column_cb = get_cwidget(ui, check, "singleColumnThumbnailsCB")
         self._cancel_selection_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "cancelingSelectionQuestionCB"
+            ui, check, "cancelingSelectionQuestionCB"
         )
 
-        # General tab - Saving
-        self._tiff_bw_box = get_cwidget(
-            self.ui, QtWidgets.QComboBox, "tiffCompressionBWBox"
-        )
-        self._tiff_color_box = get_cwidget(
-            self.ui, QtWidgets.QComboBox, "tiffCompressionColorBox"
-        )
+        self._tiff_bw_box = get_cwidget(ui, combo, "tiffCompressionBWBox")
+        self._tiff_color_box = get_cwidget(ui, combo, "tiffCompressionColorBox")
 
-        # Processing tab - White on Black detection
-        self._black_on_white_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "blackOnWhiteDetectionCB"
-        )
+        self._black_on_white_cb = get_cwidget(ui, check, "blackOnWhiteDetectionCB")
         self._black_on_white_output_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "blackOnWhiteDetectionAtOutputCB"
+            ui, check, "blackOnWhiteDetectionAtOutputCB"
         )
 
-        # Processing tab - Deviation
-        self._highlight_deviation_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "highlightDeviationCB"
-        )
-        self._deskew_deviation_coef = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "deskewDeviationCoefSB"
-        )
+        self._highlight_deviation_cb = get_cwidget(ui, check, "highlightDeviationCB")
+        self._deskew_deviation_coef = get_cwidget(ui, double, "deskewDeviationCoefSB")
         self._deskew_deviation_thresh = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "deskewDeviationThresholdSB"
+            ui, double, "deskewDeviationThresholdSB"
         )
         self._select_content_deviation_coef = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "selectContentDeviationCoefSB"
+            ui, double, "selectContentDeviationCoefSB"
         )
         self._select_content_deviation_thresh = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "selectContentDeviationThresholdSB"
+            ui, double, "selectContentDeviationThresholdSB"
         )
-        self._margins_deviation_coef = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "marginsDeviationCoefSB"
-        )
+        self._margins_deviation_coef = get_cwidget(ui, double, "marginsDeviationCoefSB")
         self._margins_deviation_thresh = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "marginsDeviationThresholdSB"
+            ui, double, "marginsDeviationThresholdSB"
         )
 
-        # Button box
-        self._button_box = get_cwidget(self.ui, QtWidgets.QDialogButtonBox, "buttonBox")
-
-        # Populate combo boxes
-        self._populate_combo_boxes()
+        self._button_box = get_cwidget(ui, QtWidgets.QDialogButtonBox, "buttonBox")
 
     def _populate_combo_boxes(self) -> None:
-        """Populate combo box options."""
-        # Color schemes
-        self._color_scheme_box.addItems(["Light", "Dark", "System"])
+        """Fill the combo boxes; the item data carries the stored value."""
+        for text, mode in (("Auto", AUTO), ("Light", "light"), ("Dark", "dark")):
+            self._color_scheme_box.addItem(text, mode)
 
-        # Languages (placeholder - would be populated from available translations)
-        self._language_box.addItems(["English", "System"])
+        for text, units in (
+            ("Millimetres", Units.MILLIMETERS),
+            ("Centimetres", Units.CENTIMETERS),
+            ("Inches", Units.INCHES),
+        ):
+            self._units_box.addItem(text, units)
 
-        # TIFF compression options
-        compression_options = ["None", "LZW", "Deflate", "JPEG"]
-        self._tiff_bw_box.addItems(["None", "LZW", "Deflate", "CCITT G4"])
-        self._tiff_color_box.addItems(compression_options)
+        for code in available_languages():
+            name = QtCore.QLocale.languageToString(QtCore.QLocale(code).language())
+            self._language_box.addItem(name, code)
+        self._language_box.setEnabled(self._language_box.count() > 1)
+
+        for box, last in (
+            (self._tiff_bw_box, ("CCITT G4", TiffCompression.CCITT_FAX4)),
+            (self._tiff_color_box, ("JPEG", TiffCompression.JPEG)),
+        ):
+            for text, method in (
+                ("None", TiffCompression.NONE),
+                ("LZW", TiffCompression.LZW),
+                ("Deflate", TiffCompression.DEFLATE),
+                last,
+            ):
+                box.addItem(text, method)
 
     def _load_settings(self) -> None:
-        """Load current settings into the UI."""
-        # User Interface
-        self._enable_opengl_cb.setChecked(self._settings.opengl_enabled)
-        self._auto_save_cb.setChecked(self._settings.auto_save_project)
+        """Show the stored values."""
+        settings = self._settings
 
-        # Set color scheme
-        scheme_index = {"light": 0, "dark": 1, "system": 2}.get(
-            self._settings.color_scheme.value, 2
+        # The Python port has no OpenGL rendering path to switch on.
+        self._enable_opengl_cb.setChecked(False)
+        self._enable_opengl_cb.setEnabled(False)
+        self._opengl_device_label.setEnabled(False)
+        self._opengl_device_label.setText(_OPENGL_UNAVAILABLE)
+
+        self._auto_save_cb.setChecked(settings.auto_save_project)
+        self._select_data(self._color_scheme_box, AUTO)
+        self._select_data(
+            self._color_scheme_box,
+            str(QtCore.QSettings().value(SETTINGS_KEY, AUTO)).strip().lower(),
         )
-        self._color_scheme_box.setCurrentIndex(scheme_index)
+        self._select_data(self._units_box, settings.units)
+        self._select_data(self._language_box, settings.language)
 
-        # Thumbnails
-        self._thumbnail_quality_sb.setValue(self._settings.thumbnail_quality_width)
-        self._thumbnail_size_sb.setValue(int(self._settings.max_thumbnail_width))
-        self._single_column_cb.setChecked(
-            self._settings.single_column_thumbnail_display
-        )
-        self._cancel_selection_cb.setChecked(
-            self._settings.show_canceling_selection_question
-        )
+        self._thumbnail_quality_sb.setValue(settings.thumbnail_quality_width)
+        self._thumbnail_size_sb.setValue(int(settings.max_thumbnail_width))
+        self._single_column_cb.setChecked(settings.single_column_thumbnail_display)
+        self._cancel_selection_cb.setChecked(settings.show_canceling_selection_question)
 
-        # TIFF compression
-        bw_map = {1: 0, 5: 1, 8: 2, 4: 3}  # TiffCompression enum to index
-        bw_index = bw_map.get(self._settings.tiff_bw_compression.value, 3)
-        self._tiff_bw_box.setCurrentIndex(bw_index)
+        self._select_data(self._tiff_bw_box, settings.tiff_bw_compression)
+        self._select_data(self._tiff_color_box, settings.tiff_color_compression)
 
-        color_map = {1: 0, 5: 1, 8: 2, 7: 3}  # TiffCompression enum to index
-        color_index = color_map.get(self._settings.tiff_color_compression.value, 1)
-        self._tiff_color_box.setCurrentIndex(color_index)
-
-        # White on black detection
-        self._black_on_white_cb.setChecked(self._settings.black_on_white_detection)
+        self._black_on_white_cb.setChecked(settings.black_on_white_detection)
         self._black_on_white_output_cb.setChecked(
-            self._settings.black_on_white_detection_output
+            settings.black_on_white_detection_output
         )
+        self._black_on_white_output_cb.setEnabled(self._black_on_white_cb.isChecked())
 
-        # Deviation settings
-        self._highlight_deviation_cb.setChecked(self._settings.highlight_deviation)
-        self._deskew_deviation_coef.setValue(
-            self._settings.deskew_deviation.coefficient
-        )
-        self._deskew_deviation_thresh.setValue(
-            self._settings.deskew_deviation.threshold
-        )
-        self._select_content_deviation_coef.setValue(
-            self._settings.select_content_deviation.coefficient
-        )
-        self._select_content_deviation_thresh.setValue(
-            self._settings.select_content_deviation.threshold
-        )
-        self._margins_deviation_coef.setValue(
-            self._settings.margins_deviation.coefficient
-        )
-        self._margins_deviation_thresh.setValue(
-            self._settings.margins_deviation.threshold
-        )
+        self._highlight_deviation_cb.setChecked(settings.highlight_deviation)
+        for coef, thresh, deviation in self._deviation_rows(settings):
+            coef.setValue(deviation.coefficient)
+            thresh.setValue(deviation.threshold)
+
+    def _deviation_rows(
+        self, settings: ApplicationSettings
+    ) -> list[
+        tuple[QtWidgets.QDoubleSpinBox, QtWidgets.QDoubleSpinBox, DeviationSettings]
+    ]:
+        return [
+            (
+                self._deskew_deviation_coef,
+                self._deskew_deviation_thresh,
+                settings.deskew_deviation,
+            ),
+            (
+                self._select_content_deviation_coef,
+                self._select_content_deviation_thresh,
+                settings.select_content_deviation,
+            ),
+            (
+                self._margins_deviation_coef,
+                self._margins_deviation_thresh,
+                settings.margins_deviation,
+            ),
+        ]
+
+    @staticmethod
+    def _select_data(box: QtWidgets.QComboBox, data: object) -> None:
+        """Select the item that carries ``data``, leaving the box as is if none does."""
+        index = box.findData(data)
+        if index != -1:
+            box.setCurrentIndex(index)
 
     def _connect_signals(self) -> None:
         """Connect widget signals."""
         self._button_box.accepted.connect(self._save_and_accept)
         self._button_box.rejected.connect(self.reject)
+        self._black_on_white_cb.clicked.connect(
+            self._black_on_white_output_cb.setEnabled
+        )
 
     def _save_and_accept(self) -> None:
-        """Save settings and close dialog."""
+        """Commit the values and close the dialog."""
         self._save_settings()
+        self._store_appearance()
+        self.settings_changed.emit()
         self.accept()
 
     def _save_settings(self) -> None:
-        """Save UI values to settings."""
-        from scantailor.core.settings import (
-            ColorScheme,
-            DeviationSettings,
-            TiffCompression,
-        )
+        """Write the form to the settings object and to disk."""
+        settings = self._settings
+        settings.auto_save_project = self._auto_save_cb.isChecked()
+        settings.units = Units(self._units_box.currentData())
+        settings.language = self._language_box.currentData()
 
-        # User Interface
-        self._settings.opengl_enabled = self._enable_opengl_cb.isChecked()
-        self._settings.auto_save_project = self._auto_save_cb.isChecked()
-
-        schemes = [
-            ColorScheme.LIGHT,
-            ColorScheme.DARK,
-            ColorScheme.DARK,
-        ]  # "system" -> dark
-        self._settings.color_scheme = schemes[self._color_scheme_box.currentIndex()]
-
-        # Thumbnails
-        self._settings.thumbnail_quality_width = self._thumbnail_quality_sb.value()
-        self._settings.thumbnail_quality_height = self._thumbnail_quality_sb.value()
-        self._settings.max_thumbnail_width = float(self._thumbnail_size_sb.value())
-        self._settings.max_thumbnail_height = float(self._thumbnail_size_sb.value())
-        self._settings.single_column_thumbnail_display = (
-            self._single_column_cb.isChecked()
-        )
-        self._settings.show_canceling_selection_question = (
+        quality = self._thumbnail_quality_sb.value()
+        settings.thumbnail_quality_width = quality
+        settings.thumbnail_quality_height = quality
+        width = float(self._thumbnail_size_sb.value())
+        settings.max_thumbnail_width = width
+        settings.max_thumbnail_height = round(width * _THUMBNAIL_ASPECT, 2)
+        settings.single_column_thumbnail_display = self._single_column_cb.isChecked()
+        settings.show_canceling_selection_question = (
             self._cancel_selection_cb.isChecked()
         )
 
-        # TIFF compression
-        bw_options = [
-            TiffCompression.NONE,
-            TiffCompression.LZW,
-            TiffCompression.DEFLATE,
-            TiffCompression.CCITT_FAX4,
-        ]
-        self._settings.tiff_bw_compression = bw_options[
-            self._tiff_bw_box.currentIndex()
-        ]
+        settings.tiff_bw_compression = self._tiff_bw_box.currentData()
+        settings.tiff_color_compression = self._tiff_color_box.currentData()
 
-        color_options = [
-            TiffCompression.NONE,
-            TiffCompression.LZW,
-            TiffCompression.DEFLATE,
-            TiffCompression.JPEG,
-        ]
-        self._settings.tiff_color_compression = color_options[
-            self._tiff_color_box.currentIndex()
-        ]
-
-        # White on black detection
-        self._settings.black_on_white_detection = self._black_on_white_cb.isChecked()
-        self._settings.black_on_white_detection_output = (
+        settings.black_on_white_detection = self._black_on_white_cb.isChecked()
+        settings.black_on_white_detection_output = (
             self._black_on_white_output_cb.isChecked()
         )
 
-        # Deviation settings
-        self._settings.highlight_deviation = self._highlight_deviation_cb.isChecked()
-        self._settings.deskew_deviation = DeviationSettings(
-            coefficient=self._deskew_deviation_coef.value(),
-            threshold=self._deskew_deviation_thresh.value(),
+        settings.highlight_deviation = self._highlight_deviation_cb.isChecked()
+        settings.deskew_deviation = self._deviation(
+            self._deskew_deviation_coef, self._deskew_deviation_thresh
         )
-        self._settings.select_content_deviation = DeviationSettings(
-            coefficient=self._select_content_deviation_coef.value(),
-            threshold=self._select_content_deviation_thresh.value(),
+        settings.select_content_deviation = self._deviation(
+            self._select_content_deviation_coef,
+            self._select_content_deviation_thresh,
         )
-        self._settings.margins_deviation = DeviationSettings(
-            coefficient=self._margins_deviation_coef.value(),
-            threshold=self._margins_deviation_thresh.value(),
+        settings.margins_deviation = self._deviation(
+            self._margins_deviation_coef, self._margins_deviation_thresh
         )
+
+        try:
+            settings.save()
+        except OSError:
+            logger.exception("The settings could not be saved")
+
+    @staticmethod
+    def _deviation(
+        coef: QtWidgets.QDoubleSpinBox, thresh: QtWidgets.QDoubleSpinBox
+    ) -> DeviationSettings:
+        return DeviationSettings(coefficient=coef.value(), threshold=thresh.value())
+
+    def _store_appearance(self) -> None:
+        """Remember the chosen appearance and show it right away."""
+        QtCore.QSettings().setValue(SETTINGS_KEY, self._color_scheme_box.currentData())
+        app = QtWidgets.QApplication.instance()
+        if isinstance(app, QtWidgets.QApplication):
+            apply_theme(app)
 
     def get_settings(self) -> ApplicationSettings:
         """Get the (possibly modified) settings.
 
         Returns:
-            The application settings.
+            ApplicationSettings: The application settings.
         """
         return self._settings
-
-    def show(self) -> None:
-        """Show the dialog."""
-        self.ui.show()
