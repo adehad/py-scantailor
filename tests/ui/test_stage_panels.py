@@ -95,6 +95,12 @@ def test_image_view_receives_the_rendered_first_page_at_each_stage(
             )
 
     _render_current_page(qtbot, project_window)
+    # The stage switch queues its own render, so the signal above can belong to a
+    # superseded request that the window ignored.
+    qtbot.waitUntil(
+        lambda: project_window._panels.view.image is not None,
+        timeout=RENDER_TIMEOUT_MS,
+    )
 
     image = project_window._panels.view.image
     assert image is not None
