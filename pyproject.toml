@@ -65,6 +65,7 @@ distribution = true
 [tool.pdm.scripts]
 # post_install = "python -m scantailor._ui._autogen"
 cov = "pytest -vv --cov-report=term-missing --cov-config=pyproject.toml --cov=src/scantailor --cov=tests {args} --cov-report=xml:dist/cov/coverage.xml --cov-report=html:dist/cov/coverage.html"
+docs-screenshots = "python tools/docs_screenshots.py {args}"
 docs = "sphinx-build -a -n -v -W --keep-going  -b html --color -d dist/docs_doctree docs/ {args:dist/docs}"
 exe = "pyinstaller app.spec"
 
