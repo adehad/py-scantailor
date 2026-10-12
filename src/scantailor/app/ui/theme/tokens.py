@@ -25,6 +25,8 @@ class Tokens:
         accent_hover (str): Accent under the cursor.
         accent_tint (str): Translucent accent for list selection.
         accent_text (str): Text drawn on the accent colour.
+        positive (str): Semantic green for additive glyph accents.
+        danger (str): Semantic red for destructive glyphs.
         viewport (str): Neutral colour behind page images.
         scroll_handle (str): Scroll bar handle.
     """
@@ -46,6 +48,8 @@ class Tokens:
     accent_hover: str
     accent_tint: str
     accent_text: str
+    positive: str
+    danger: str
     viewport: str
     scroll_handle: str
 
@@ -68,6 +72,8 @@ LIGHT = Tokens(
     accent_hover="#4a82f2",
     accent_tint="rgba(47, 111, 237, 40)",
     accent_text="#ffffff",
+    positive="#008a1a",
+    danger="#d92d20",
     viewport="#c9ccd1",
     scroll_handle="rgba(28, 35, 48, 90)",
 )
@@ -90,6 +96,8 @@ DARK = Tokens(
     accent_hover="#78adff",
     accent_tint="rgba(91, 155, 255, 56)",
     accent_text="#0b1220",
+    positive="#5ccf72",
+    danger="#ff7b72",
     viewport="#2b2d31",
     scroll_handle="rgba(232, 236, 244, 90)",
 )

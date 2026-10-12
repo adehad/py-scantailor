@@ -193,10 +193,76 @@ class TestControlsWriteParams:
         color_box = mixed.find(QtWidgets.QCheckBox, "equalizeIlluminationColorCB")
         assert color_box.isChecked() is False
 
-    def test_despeckle_buttons_set_level(self, bw: _Widget):
-        bw.click(QtWidgets.QPushButton, "despeckleAggressiveBtn")
+    @pytest.mark.parametrize(
+        ("step", "level"),
+        [
+            (0, DespeckleLevel.OFF),
+            (1, DespeckleLevel.CAUTIOUS),
+            (2, DespeckleLevel.NORMAL),
+            (3, DespeckleLevel.AGGRESSIVE),
+        ],
+    )
+    def test_despeckle_slider_step_sets_level(
+        self, bw: _Widget, step: int, level: DespeckleLevel
+    ):
+        slider = bw.find(QtWidgets.QSlider, "despeckleSlider")
+        slider.setValue(0 if step != 0 else 3)
+        bw.changed.clear()
+
+        slider.setValue(step)
+
+        assert bw.params.despeckle_level == level
+        assert bw.changed == [PAGE]
+
+    def test_despeckle_slider_drag_renders_once_on_release(self, bw: _Widget):
+        slider = bw.find(QtWidgets.QSlider, "despeckleSlider")
+        slider.setValue(0)
+        bw.changed.clear()
+
+        slider.setSliderDown(True)
+        slider.setValue(1)
+        slider.setValue(3)
+        assert bw.changed == []
+
+        slider.setSliderDown(False)
 
         assert bw.params.despeckle_level == DespeckleLevel.AGGRESSIVE
+        assert bw.changed == [PAGE]
+
+    def test_despeckle_middle_labels_sit_under_their_slider_stops(self, bw: _Widget):
+        bw.widget.resize(400, 900)
+        bw.widget.show()
+        slider = bw.find(QtWidgets.QSlider, "despeckleSlider")
+        style = slider.style()
+        handle = style.pixelMetric(QtWidgets.QStyle.PixelMetric.PM_SliderLength)
+
+        for step, name in ((1, "Cautious"), (2, "Normal")):
+            label = bw.find(QtWidgets.QLabel, f"despeckle{name}Label")
+            centre = label.mapTo(bw.widget, label.rect().center()).x()
+            stop = (
+                style.sliderPositionFromValue(0, 3, step, slider.width() - handle)
+                + handle // 2
+                + slider.mapTo(bw.widget, slider.rect().topLeft()).x()
+            )
+            assert abs(centre - stop) <= 3, name
+
+    def test_despeckle_slider_labels_use_the_cpp_strings(self, bw: _Widget):
+        labels = [
+            bw.find(QtWidgets.QLabel, f"despeckle{name}Label").text()
+            for name in ("Off", "Cautious", "Normal", "Aggressive")
+        ]
+
+        assert labels == ["Off", "Cautious", "Normal", "Aggressive"]
+        slider = bw.find(QtWidgets.QSlider, "despeckleSlider")
+        assert (slider.minimum(), slider.maximum()) == (0, 3)
+
+    def test_despeckle_apply_button_emits_the_despeckle_group(
+        self, bw: _Widget, qtbot: QtBot
+    ):
+        with qtbot.waitSignal(bw.widget.apply_group_requested) as blocker:
+            bw.click(QtWidgets.QPushButton, "apply_despeckle_btn")
+
+        assert blocker.args == [ApplyGroup.DESPECKLE]
 
     def test_post_deskew_checkbox_needs_dewarping_to_be_enabled(self, bw: _Widget):
         assert not bw.enabled("postDeskewCB")
@@ -530,7 +596,7 @@ class TestPageState:
 
         assert widget.find(QtWidgets.QPushButton, "mixedBtn").isChecked()
         assert widget.find(QtWidgets.QCheckBox, "splittingCB").isChecked()
-        assert widget.find(QtWidgets.QPushButton, "despeckleNormalBtn").isChecked()
+        assert widget.find(QtWidgets.QSlider, "despeckleSlider").value() == 2
 
     def test_loading_a_page_does_not_report_a_change(self, qtbot: QtBot):
         widget = _Widget(qtbot, _with_mode(ColorMode.MIXED))

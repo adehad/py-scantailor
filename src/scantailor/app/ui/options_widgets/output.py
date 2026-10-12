@@ -8,6 +8,7 @@ filling, despeckling and dewarping.
 from collections.abc import Callable
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
     QBoxLayout,
     QButtonGroup,
@@ -24,11 +25,13 @@ from PySide6.QtWidgets import (
     QSpacerItem,
     QSpinBox,
     QStackedWidget,
+    QStyle,
     QVBoxLayout,
     QWidget,
 )
 
 from scantailor.app.ui.icons import icon
+from scantailor.app.ui.theme.fonts import CAPTION_PX
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 from scantailor.core.models import Dpi, PageId
 from scantailor.filters.output.binarization import BinarizationMethod
@@ -105,12 +108,8 @@ def _apply_button(layout: QVBoxLayout | QHBoxLayout, group: ApplyGroup) -> QPush
     return button
 
 
-_DESPECKLE_ICONS = {
-    DespeckleLevel.OFF: "despeckle_off",
-    DespeckleLevel.CAUTIOUS: "despeckle_cautious",
-    DespeckleLevel.NORMAL: "despeckle_normal",
-    DespeckleLevel.AGGRESSIVE: "despeckle_aggressive",
-}
+def _despeckle_step(level: DespeckleLevel) -> int:
+    return next(i for i, (lvl, _label) in enumerate(_DESPECKLE_LEVELS) if lvl is level)
 
 
 def _exclusive_button(
@@ -123,6 +122,59 @@ def _exclusive_button(
     group.addButton(button, index)
     layout.addWidget(button)
     return button
+
+
+class _StopLabels(QWidget):
+    """A row of labels, each centred under its stop of a slider.
+
+    The outer labels are kept inside the row so they are not clipped.
+    """
+
+    def __init__(
+        self,
+        slider: QSlider,
+        labels: list[tuple[str, str]],
+        parent: QWidget | None = None,
+    ) -> None:
+        """Create the row.
+
+        Args:
+            slider (QSlider): Slider with one stop per label, from its minimum up.
+            labels (list[tuple[str, str]]): Text and object name of each label.
+            parent (QWidget | None): Parent widget.
+        """
+        super().__init__(parent)
+        self._slider = slider
+        self._labels = []
+        for text, name in labels:
+            label = QLabel(text, self)
+            label.setObjectName(name)
+            font = label.font()
+            font.setPixelSize(CAPTION_PX)
+            label.setFont(font)
+            label.adjustSize()
+            self._labels.append(label)
+        self.setFixedHeight(max(label.height() for label in self._labels))
+        self.setMinimumWidth(sum(label.width() for label in self._labels))
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        """Place the labels under the slider stops.
+
+        Args:
+            event (QResizeEvent): The event.
+        """
+        super().resizeEvent(event)
+        handle = self._slider.style().pixelMetric(
+            QStyle.PixelMetric.PM_SliderLength, None, self._slider
+        )
+        span = max(self.width() - handle, 0)
+        stops = len(self._labels) - 1
+        for step, label in enumerate(self._labels):
+            centre = handle // 2 + round(step * span / stops)
+            left = min(
+                max(centre - label.width() // 2, 0), self.width() - label.width()
+            )
+            label.move(left, 0)
 
 
 class OptionsWidget(QWidget):
@@ -219,7 +271,7 @@ class OptionsWidget(QWidget):
         self._mixed_btn.setToolTip("Black and white with colorful pictures")
         self._bw_btn.setIcon(icon("contrast"))
         self._gray_btn.setIcon(icon("palette"))
-        self._mixed_btn.setIcon(icon("mixed"))
+        self._mixed_btn.setIcon(icon("colour-mode-mixed"))
         self._bw_btn.setChecked(True)
         mode_layout.addLayout(mode_btn_layout)
 
@@ -470,28 +522,24 @@ class OptionsWidget(QWidget):
         self._despeckle_group.setObjectName("despeckleGroup")
         despeckle_layout = QVBoxLayout(self._despeckle_group)
 
-        btn_layout = QHBoxLayout()
-        self._despeckle_button_group = QButtonGroup(self)
-        self._despeckle_buttons = {
-            level: _exclusive_button(
-                self._despeckle_button_group,
-                btn_layout,
-                f"despeckle{label}Btn",
-                label,
-                index,
+        self._despeckle_slider = QSlider(Qt.Orientation.Horizontal)
+        self._despeckle_slider.setObjectName("despeckleSlider")
+        self._despeckle_slider.setRange(0, len(_DESPECKLE_LEVELS) - 1)
+        self._despeckle_slider.setPageStep(1)
+        self._despeckle_slider.setTickInterval(1)
+        self._despeckle_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self._despeckle_slider.setValue(_despeckle_step(DespeckleLevel.CAUTIOUS))
+        despeckle_layout.addWidget(self._despeckle_slider)
+
+        despeckle_layout.addWidget(
+            _StopLabels(
+                self._despeckle_slider,
+                [
+                    (label, f"despeckle{label}Label")
+                    for _lvl, label in _DESPECKLE_LEVELS
+                ],
             )
-            for index, (level, label) in enumerate(_DESPECKLE_LEVELS)
-        }
-        self._despeckle_off_btn = self._despeckle_buttons[DespeckleLevel.OFF]
-        self._despeckle_cautious_btn = self._despeckle_buttons[DespeckleLevel.CAUTIOUS]
-        self._despeckle_normal_btn = self._despeckle_buttons[DespeckleLevel.NORMAL]
-        self._despeckle_aggressive_btn = self._despeckle_buttons[
-            DespeckleLevel.AGGRESSIVE
-        ]
-        self._despeckle_cautious_btn.setChecked(True)
-        for level, glyph in _DESPECKLE_ICONS.items():
-            self._despeckle_buttons[level].setIcon(icon(glyph))
-        despeckle_layout.addLayout(btn_layout)
+        )
 
         self._apply_buttons[ApplyGroup.DESPECKLE] = _apply_button(
             despeckle_layout, ApplyGroup.DESPECKLE
@@ -644,7 +692,8 @@ class OptionsWidget(QWidget):
             lambda on: self._edit_posterization(force_black_and_white=on)
         )
 
-        self._despeckle_button_group.buttonClicked.connect(self._on_despeckle_changed)
+        self._despeckle_slider.valueChanged.connect(self._on_despeckle_changed)
+        self._despeckle_slider.sliderReleased.connect(self._commit_despeckle)
 
         self._dewarp_button_group.buttonClicked.connect(self._on_dewarping_changed)
         self._post_deskew_check.toggled.connect(self._on_post_deskew_changed)
@@ -880,7 +929,7 @@ class OptionsWidget(QWidget):
     def _show_despeckle_and_dewarping(self, params: Params) -> None:
         threshold = params.needs_binarization()
         self._despeckle_group.setVisible(threshold and not self._dewarping_tab_active)
-        self._despeckle_buttons[params.despeckle_level].setChecked(True)
+        self._despeckle_slider.setValue(_despeckle_step(params.despeckle_level))
 
         dewarping = params.dewarping
         self._dewarp_buttons[dewarping.mode].setChecked(True)
@@ -944,11 +993,12 @@ class OptionsWidget(QWidget):
         value = self._threshold_slider.value()
         self._edit_binarization(threshold_adjustment=value)
 
-    def _on_despeckle_changed(self, button: QPushButton) -> None:
-        level = next(
-            (lvl for lvl, btn in self._despeckle_buttons.items() if btn is button),
-            DespeckleLevel.OFF,
-        )
+    def _on_despeckle_changed(self, _step: int) -> None:
+        if not self._despeckle_slider.isSliderDown():
+            self._commit_despeckle()
+
+    def _commit_despeckle(self) -> None:
+        level = _DESPECKLE_LEVELS[self._despeckle_slider.value()][0]
         self._edit(lambda p: p.with_despeckle_level(level))
 
     def _on_dewarping_changed(self, button: QPushButton) -> None:

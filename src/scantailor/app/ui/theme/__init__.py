@@ -8,14 +8,13 @@ scheme, and the ``SCANTAILOR_THEME`` environment variable overrides both.
 import os
 
 from loguru import logger
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
-from scantailor.app.ui.icons import IconBinder
+from scantailor.app.ui.icons import IconBinder, set_semantic_colors
 
 from .assets import write_assets
 from .docks import DockSizer
 from .fonts import TabularFigures, apply_fonts
-from .legacy_icons import IconTinter
 from .palette import build_palette
 from .stylesheet import build_stylesheet
 from .tokens import DARK, LIGHT
@@ -96,7 +95,6 @@ class _ThemeController(QtCore.QObject):
         app.setStyle("Fusion")  # native styles ignore palette and several QSS rules
         apply_fonts(app)
         app.installEventFilter(IconBinder(self))
-        app.installEventFilter(IconTinter(self))
         app.installEventFilter(TabularFigures(self))
         app.installEventFilter(DockSizer(self))
         app.styleHints().colorSchemeChanged.connect(self._on_scheme_changed)
@@ -111,9 +109,9 @@ class _ThemeController(QtCore.QObject):
         scheme = resolve_scheme(self._app, mode)
         tokens = _TOKENS[scheme]
         self.scheme = scheme
+        set_semantic_colors(QtGui.QColor(tokens.positive), QtGui.QColor(tokens.danger))
         self._app.setPalette(build_palette(tokens))
         self._app.setStyleSheet(build_stylesheet(tokens, write_assets(tokens, scheme)))
-        IconTinter.retint_all(self._app)
         return scheme
 
     def _on_scheme_changed(self, _scheme: QtCore.Qt.ColorScheme) -> None:

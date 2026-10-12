@@ -1,112 +1,52 @@
 <RCC>
   <qresource prefix="/">
-    <file>icons/file.svg</file>
-    <file>icons/folder.svg</file>
-    <file>icons/undo.svg</file>
     <file>appicon.svg</file>
-    <file>icons/plus.svg</file>
-    <file>icons/trashed.svg</file>
-    <file>icons/untrash.svg</file>
-    <file>icons/minus.svg</file>
-    <file>icons/insert-here.svg</file>
-    <file>icons/user-trash.svg</file>
-    <file>icons/insert-after.svg</file>
-    <file>icons/insert-before.svg</file>
-    <file>icons/play-hovered.svg</file>
-    <file>icons/play.svg</file>
-    <file>icons/play-pressed.svg</file>
-    <file>icons/stop.svg</file>
-    <file>icons/stop-hovered.svg</file>
-    <file>icons/stop-pressed.svg</file>
-    <file>icons/stock-center.svg</file>
-    <file>icons/stock-gravity-east.svg</file>
-    <file>icons/stock-gravity-north.svg</file>
-    <file>icons/stock-gravity-north-east.svg</file>
-    <file>icons/stock-gravity-north-west.svg</file>
-    <file>icons/stock-gravity-south.svg</file>
-    <file>icons/stock-gravity-south-east.svg</file>
-    <file>icons/stock-gravity-south-west.svg</file>
-    <file>icons/stock-gravity-west.svg</file>
-    <file>icons/stock-vchain.svg</file>
-    <file>icons/stock-vchain-broken.svg</file>
-    <file>icons/right_page_thumb.svg</file>
-    <file>icons/left_page_thumb.svg</file>
-    <file>icons/aqua-sphere.svg</file>
-    <file>icons/big-down-arrow.svg</file>
-    <file>icons/big-left-arrow.svg</file>
-    <file>icons/big-right-arrow.svg</file>
-    <file>icons/big-up-arrow.svg</file>
-    <file>icons/layout_type_auto.svg</file>
-    <file>icons/object-rotate-left.svg</file>
-    <file>icons/object-rotate-right.svg</file>
-    <file>icons/two_pages.svg</file>
-    <file>icons/single_page_uncut.svg</file>
-    <file>icons/left_page_plus_offcut.svg</file>
-    <file>icons/right_page_plus_offcut.svg</file>
-    <file>icons/check-mark.svg</file>
-    <file>icons/check-mark-disabled.svg</file>
-    <file>icons/eye.svg</file>
-    <file>icons/eye-disabled.svg</file>
-    <file>icons/left-arrow-inscribed.svg</file>
-    <file>icons/right-arrow-inscribed.svg</file>
-    <file>icons/triangle-down-arrow.svg</file>
-    <file>icons/triangle-up-arrow.svg</file>
-    <file>icons/collapse.svg</file>
-    <file>icons/expand.svg</file>
-    <file>icons/checkbox-styled.svg</file>
-    <file>icons/right-pointing.svg</file>
-    <file>icons/multi-column-view.svg</file>
-    <file>icons/single-column-view.svg</file>
-    <file>icons/ascending_sorting_order.svg</file>
-    <file>icons/descending_sorting_order.svg</file>
-    <file>icons/lasso-zone-mode.svg</file>
-    <file>icons/polygonal-zone-mode.svg</file>
-    <file>icons/rectangular-zone-mode.svg</file>
-    <file>icons/six-spoked-asterisk.svg</file>
-    <file>icons/six-spoked-asterisk-disabled.svg</file>
-    <file>icons/diminishing-glass.svg</file>
-    <file>icons/magnifying-glass.svg</file>
-    <file>icons.xml</file>
     <file>font-icons.xml</file>
     <file>GPLv3.html</file>
-    <file>icons/lucide/LICENSE</file>
+    <file>icons/custom/align-keep-original.svg</file>
+    <file>icons/custom/align-north-east.svg</file>
+    <file>icons/custom/align-north-west.svg</file>
+    <file>icons/custom/align-south-east.svg</file>
+    <file>icons/custom/align-south-west.svg</file>
+    <file>icons/custom/colour-mode-mixed.svg</file>
+    <file>icons/custom/content-box.svg</file>
+    <file>icons/custom/dewarp-grid.svg</file>
+    <file>icons/custom/drag-handle.svg</file>
+    <file>icons/custom/insert-after.svg</file>
+    <file>icons/custom/insert-before.svg</file>
+    <file>icons/custom/insert-here.svg</file>
+    <file>icons/custom/page-box.svg</file>
+    <file>icons/custom/split-left-page-plus-offcut.svg</file>
+    <file>icons/custom/split-right-page-plus-offcut.svg</file>
+    <file>icons/custom/split-single-uncut.svg</file>
+    <file>icons/custom/spread-half-left.svg</file>
+    <file>icons/custom/spread-half-right.svg</file>
+    <file>icons/custom/zone-polygon.svg</file>
     <file>icons/lucide/archive-restore.svg</file>
+    <file>icons/lucide/archive.svg</file>
     <file>icons/lucide/arrow-down-0-1.svg</file>
     <file>icons/lucide/arrow-down-1-0.svg</file>
-    <file>icons/lucide/arrow-down-left.svg</file>
-    <file>icons/lucide/arrow-down-right.svg</file>
     <file>icons/lucide/arrow-down-to-line.svg</file>
     <file>icons/lucide/arrow-down.svg</file>
     <file>icons/lucide/arrow-left-to-line.svg</file>
     <file>icons/lucide/arrow-left.svg</file>
     <file>icons/lucide/arrow-right-to-line.svg</file>
     <file>icons/lucide/arrow-right.svg</file>
-    <file>icons/lucide/arrow-up-left.svg</file>
-    <file>icons/lucide/arrow-up-right.svg</file>
     <file>icons/lucide/arrow-up-to-line.svg</file>
     <file>icons/lucide/arrow-up.svg</file>
     <file>icons/lucide/asterisk.svg</file>
-    <file>icons/lucide/between-horizontal-end.svg</file>
-    <file>icons/lucide/between-horizontal-start.svg</file>
     <file>icons/lucide/book-open.svg</file>
-    <file>icons/lucide/check.svg</file>
     <file>icons/lucide/chevron-down.svg</file>
     <file>icons/lucide/chevron-right.svg</file>
     <file>icons/lucide/chevron-up.svg</file>
     <file>icons/lucide/circle-arrow-left.svg</file>
     <file>icons/lucide/circle-arrow-right.svg</file>
-    <file>icons/lucide/circle-dot.svg</file>
     <file>icons/lucide/circle-stop.svg</file>
-    <file>icons/lucide/columns-2.svg</file>
     <file>icons/lucide/contrast.svg</file>
-    <file>icons/lucide/dot.svg</file>
     <file>icons/lucide/eye-off.svg</file>
     <file>icons/lucide/eye.svg</file>
-    <file>icons/lucide/file-image.svg</file>
-    <file>icons/lucide/file-plus.svg</file>
     <file>icons/lucide/file.svg</file>
     <file>icons/lucide/folder.svg</file>
-    <file>icons/lucide/grid-3x3.svg</file>
     <file>icons/lucide/image.svg</file>
     <file>icons/lucide/lasso.svg</file>
     <file>icons/lucide/layout-grid.svg</file>
@@ -114,58 +54,23 @@
     <file>icons/lucide/link-2.svg</file>
     <file>icons/lucide/list-checks.svg</file>
     <file>icons/lucide/minus.svg</file>
-    <file>icons/lucide/move.svg</file>
     <file>icons/lucide/paint-bucket.svg</file>
     <file>icons/lucide/palette.svg</file>
-    <file>icons/lucide/panel-left.svg</file>
-    <file>icons/lucide/panel-right.svg</file>
-    <file>icons/lucide/pentagon.svg</file>
     <file>icons/lucide/play.svg</file>
     <file>icons/lucide/plus.svg</file>
-    <file>icons/lucide/rectangle-vertical.svg</file>
     <file>icons/lucide/rotate-ccw-square.svg</file>
     <file>icons/lucide/rotate-cw-square.svg</file>
     <file>icons/lucide/rows-3.svg</file>
-    <file>icons/lucide/scan.svg</file>
     <file>icons/lucide/shrink.svg</file>
     <file>icons/lucide/square-arrow-right.svg</file>
     <file>icons/lucide/square-check-big.svg</file>
     <file>icons/lucide/square-dashed.svg</file>
-    <file>icons/lucide/square-split-horizontal.svg</file>
-    <file>icons/lucide/square.svg</file>
-    <file>icons/lucide/text-cursor-input.svg</file>
     <file>icons/lucide/trash-2.svg</file>
     <file>icons/lucide/undo-2.svg</file>
     <file>icons/lucide/wand-sparkles.svg</file>
-    <file>icons/lucide/x.svg</file>
     <file>icons/lucide/zoom-in.svg</file>
     <file>icons/lucide/zoom-out.svg</file>
-    <file>icons/custom/align_bottom.svg</file>
-    <file>icons/custom/align_bottom_left.svg</file>
-    <file>icons/custom/align_bottom_right.svg</file>
-    <file>icons/custom/align_center.svg</file>
-    <file>icons/custom/align_left.svg</file>
-    <file>icons/custom/align_original.svg</file>
-    <file>icons/custom/align_right.svg</file>
-    <file>icons/custom/align_top.svg</file>
-    <file>icons/custom/align_top_left.svg</file>
-    <file>icons/custom/align_top_right.svg</file>
-    <file>icons/custom/content_box.svg</file>
-    <file>icons/custom/despeckle_aggressive.svg</file>
-    <file>icons/custom/despeckle_cautious.svg</file>
-    <file>icons/custom/despeckle_normal.svg</file>
-    <file>icons/custom/despeckle_off.svg</file>
-    <file>icons/custom/dewarp.svg</file>
-    <file>icons/custom/handle.svg</file>
-    <file>icons/custom/layout_auto.svg</file>
-    <file>icons/custom/left_thumb.svg</file>
-    <file>icons/custom/mixed.svg</file>
-    <file>icons/custom/page_box.svg</file>
-    <file>icons/custom/page_offcut_left.svg</file>
-    <file>icons/custom/page_offcut_right.svg</file>
-    <file>icons/custom/right_thumb.svg</file>
-    <file>icons/custom/single_page.svg</file>
-    <file>icons/custom/two_pages.svg</file>
+    <file>icons/lucide/LICENSE</file>
     <file>fonts/inter/Inter-Medium.ttf</file>
     <file>fonts/inter/Inter-Regular.ttf</file>
     <file>fonts/inter/Inter-SemiBold.ttf</file>
