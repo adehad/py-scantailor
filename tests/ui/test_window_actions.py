@@ -328,7 +328,7 @@ class TestApplyTo:
         assert not window.show_apply_dialog(FilterStage.DESKEW)
 
         other = window.pages()[1]
-        assert not window.stages.deskew_filter.settings.is_params_set(other)
+        assert not window.stages.deskew_filter.get_params(other).is_manual()
         assert not window.modified
 
     def test_this_page_only_changes_nothing(self, settled_window: MainWindowManager):
@@ -352,9 +352,9 @@ class TestApplyTo:
         _answer_apply_dialog(ApplyScope.EVERY_OTHER)
         window.show_apply_dialog(FilterStage.DESKEW)
 
-        settings = window.stages.deskew_filter.settings
-        assert settings.is_params_set(pages[2])
-        assert not settings.is_params_set(pages[1])
+        deskew = window.stages.deskew_filter
+        assert deskew.get_params(pages[2]).is_manual()
+        assert not deskew.get_params(pages[1]).is_manual()
 
     def test_selected_pages_scope_uses_the_thumbnail_selection(
         self, settled_window: MainWindowManager
