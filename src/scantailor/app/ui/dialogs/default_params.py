@@ -1,627 +1,1112 @@
-"""Default parameters dialog for setting filter defaults."""
+"""Default parameters dialog: the values new projects start from, with profiles."""
 
 from pathlib import Path
 
-from PySide6 import QtWidgets
+from loguru import logger
+from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Signal
-from PySide6.QtGui import QPixmap
 
-from scantailor.app.ui import load_ui_widget
+from scantailor.app.ui import embed_ui, load_ui_widget
+from scantailor.app.ui.icons import icon
 from scantailor.app.ui.utils import get_cwidget
-from scantailor.core.default_params import DefaultParams
+from scantailor.core.default_params import (
+    DefaultParams,
+    DeskewDefaults,
+    FixOrientationDefaults,
+    OutputDefaults,
+    PageLayoutDefaults,
+    PageSplitDefaults,
+    SelectContentDefaults,
+)
+from scantailor.core.default_params_profiles import (
+    CUSTOM_PROFILE,
+    DEFAULT_PROFILE,
+    SOURCE_PROFILE,
+    ProfileError,
+    ProfileStore,
+    is_reserved_profile_name,
+    validate_profile_name,
+)
+from scantailor.core.models import Dpi, Margins, OrthogonalRotation
+from scantailor.core.settings import ApplicationSettings, Units
+from scantailor.filters.deskew.params import AutoManualMode
+from scantailor.filters.output.binarization import (
+    BinarizationMethod,
+    ColorSegmenterOptions,
+)
+from scantailor.filters.output.color_mode import ColorMode
+from scantailor.filters.output.color_options import (
+    FillingColor,
+    PosterizationOptions,
+)
+from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.dewarping_options import DewarpingMode
+from scantailor.filters.output.picture_shape import PictureShape, PictureShapeOptions
+from scantailor.filters.output.splitting_options import SplittingOptions
+from scantailor.filters.page_layout.alignment import (
+    Alignment,
+    HorizontalAlignment,
+    VerticalAlignment,
+)
+from scantailor.filters.page_split.layout_type import LayoutType
+from scantailor.filters.select_content.content_box import PhysicalSize
+from scantailor.filters.select_content.detection import (
+    ContentDetectionMode,
+    PageDetectionMode,
+)
 
 _UI_FOLDER = Path(__file__).parent
+_MM_PER_UNIT = {Units.MILLIMETERS: 1.0, Units.CENTIMETERS: 10.0, Units.INCHES: 25.4}
+_UNIT_LABEL = {Units.MILLIMETERS: "mm", Units.CENTIMETERS: "cm", Units.INCHES: "in"}
+_ROTATION_INDICATOR_SIZE = 32
+_CUSTOM_DPI = 200
+# Binarization methods the Python output filter has no implementation of.
+_UNSUPPORTED_METHODS = ("EdgePlus", "BlurDiv")
+_DEPTH_STEPS_PER_UNIT = 10
+_DESPECKLE_LEVELS = (
+    DespeckleLevel.CAUTIOUS,
+    DespeckleLevel.NORMAL,
+    DespeckleLevel.AGGRESSIVE,
+)
+V, H = VerticalAlignment, HorizontalAlignment
+_ALIGNMENT_BUTTONS = {
+    "alignTopLeftBtn": (V.TOP, H.LEFT),
+    "alignTopBtn": (V.TOP, H.HCENTER),
+    "alignTopRightBtn": (V.TOP, H.RIGHT),
+    "alignLeftBtn": (V.VCENTER, H.LEFT),
+    "alignCenterBtn": (V.VCENTER, H.HCENTER),
+    "alignRightBtn": (V.VCENTER, H.RIGHT),
+    "alignBottomLeftBtn": (V.BOTTOM, H.LEFT),
+    "alignBottomBtn": (V.BOTTOM, H.HCENTER),
+    "alignBottomRightBtn": (V.BOTTOM, H.RIGHT),
+}
+# Index of the stacked page each binarization method shows: the threshold slider,
+# the window size with a coefficient, and the Wolf bounds.
+_METHOD_PAGES = {
+    "Otsu": 0,
+    "Sauvola": 1,
+    "Wolf": 2,
+    "Bradley": 1,
+    "EdgePlus": 1,
+    "BlurDiv": 1,
+    "EdgeDiv": 1,
+}
+_METHODS = {
+    "Otsu": BinarizationMethod.OTSU,
+    "Sauvola": BinarizationMethod.SAUVOLA,
+    "Wolf": BinarizationMethod.WOLF,
+    "Bradley": BinarizationMethod.BRADLEY,
+    "EdgePlus": None,
+    "BlurDiv": None,
+    "EdgeDiv": BinarizationMethod.EDGEDIV,
+}
 
 
 class DefaultParamsDialog(QtWidgets.QDialog):
-    """Dialog for configuring default parameters for all filter stages.
+    """Dialog for the default parameters of every filter stage.
 
-    Provides tabs for each filter stage:
-    - Fix Orientation: Default rotation
-    - Split Pages: Page layout type and split line mode
-    - Deskew: Auto/manual mode and angle
-    - Select Content: Content detection settings
-    - Margins: Default margins and alignment
-    - Output: Color mode, binarization, dewarping, etc.
-
-    Also supports saving/loading parameter profiles.
+    A profile is Default, Source, a saved profile or Custom (the unsaved working
+    values). Default and Source are shown read-only. Accepting stores the selected
+    profile name in the application settings and the shown values in the profile
+    store, which is what new projects start from.
 
     Signals:
-        params_changed: Emitted when parameters are changed.
+        params_changed: Emitted after the selection was committed.
     """
 
     params_changed = Signal()
 
     def __init__(
         self,
-        default_params: DefaultParams | None = None,
+        units: Units = Units.MILLIMETERS,
+        settings: ApplicationSettings | None = None,
+        store: ProfileStore | None = None,
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
-        """Initialize the default parameters dialog.
+        """Initialize the dialog.
 
         Args:
-            default_params: Current default parameters to edit.
-            parent: Parent widget.
+            units (Units): Units that margins and page size are shown in.
+            settings (ApplicationSettings | None): Settings that remember the
+                selected profile; defaults to the application instance.
+            store (ProfileStore | None): Where profiles are kept; defaults to the
+                application's profile folder.
+            parent (QtWidgets.QWidget | None): Parent widget.
         """
         super().__init__(parent)
-        self._params = default_params
-        self._current_rotation = 0  # 0, 90, 180, 270
+        self._units = units
+        self._settings = settings or ApplicationSettings.get_instance()
+        self._store = store or ProfileStore()
+        self._loaded = DefaultParams(units=units)
+        self._rotation = OrthogonalRotation()
+        self._loading = False
+        self._custom_dpi = _CUSTOM_DPI
+        self._custom_dpi_index = -1
+        self._custom_profile_index = -1
 
-        # Load UI
         self.ui = load_ui_widget(_UI_FOLDER / "DefaultParamsDialog.ui", self)
-        self._setup_widgets()
-        self._load_params()
-        self._connect_signals()
-
-    def _setup_widgets(self) -> None:
-        """Set up widget references."""
-        # Profile management
-        self._profile_cb = get_cwidget(self.ui, QtWidgets.QComboBox, "profileCB")
-        self._profile_save_btn = get_cwidget(
-            self.ui, QtWidgets.QPushButton, "profileSaveButton"
-        )
-        self._profile_delete_btn = get_cwidget(
-            self.ui, QtWidgets.QPushButton, "profileDeleteButton"
-        )
-        self._units_label = get_cwidget(self.ui, QtWidgets.QLabel, "unitsLabel")
-
-        # Tab widget
-        self._tab_widget = get_cwidget(self.ui, QtWidgets.QTabWidget, "tabWidget")
-
-        # === Fix Orientation tab ===
-        self._rotate_left_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "rotateLeftBtn"
-        )
-        self._rotate_right_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "rotateRightBtn"
-        )
-        self._rotation_indicator = get_cwidget(
-            self.ui, QtWidgets.QLabel, "rotationIndicator"
-        )
-        self._reset_btn = get_cwidget(self.ui, QtWidgets.QPushButton, "resetBtn")
-
-        # === Split Pages tab ===
-        self._layout_mode_cb = get_cwidget(self.ui, QtWidgets.QComboBox, "layoutModeCB")
-        self._single_page_uncut_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "singlePageUncutBtn"
-        )
-        self._page_plus_offcut_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "pagePlusOffcutBtn"
-        )
-        self._two_pages_btn = get_cwidget(self.ui, QtWidgets.QToolButton, "twoPagesBtn")
-
-        # === Deskew tab ===
-        self._deskew_auto_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "deskewAutoBtn"
-        )
-        self._deskew_manual_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "deskewManualBtn"
-        )
-        self._angle_spin_box = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "angleSpinBox"
-        )
-
-        # === Select Content tab ===
-        self._content_detect_auto_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "contentDetectAutoBtn"
-        )
-        self._content_detect_disable_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "contentDetectDisableBtn"
-        )
-        self._page_detect_auto_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "pageDetectAutoBtn"
-        )
-        self._page_detect_manual_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "pageDetectManualBtn"
-        )
-        self._page_detect_disable_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "pageDetectDisableBtn"
-        )
-        self._fine_tune_btn = get_cwidget(self.ui, QtWidgets.QCheckBox, "fineTuneBtn")
-
-        # === Margins tab ===
-        self._top_margin_sb = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "topMarginSpinBox"
-        )
-        self._bottom_margin_sb = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "bottomMarginSpinBox"
-        )
-        self._left_margin_sb = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "leftMarginSpinBox"
-        )
-        self._right_margin_sb = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "rightMarginSpinBox"
-        )
-        self._top_bottom_link = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "topBottomLink"
-        )
-        self._left_right_link = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "leftRightLink"
-        )
-        self._auto_margins_cb = get_cwidget(self.ui, QtWidgets.QCheckBox, "autoMargins")
-
-        # Alignment buttons
-        self._align_top_left_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "alignTopLeftBtn"
-        )
-        self._align_top_btn = get_cwidget(self.ui, QtWidgets.QToolButton, "alignTopBtn")
-        self._align_top_right_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "alignTopRightBtn"
-        )
-        self._align_left_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "alignLeftBtn"
-        )
-        self._align_center_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "alignCenterBtn"
-        )
-        self._align_right_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "alignRightBtn"
-        )
-        self._align_bottom_left_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "alignBottomLeftBtn"
-        )
-        self._align_bottom_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "alignBottomBtn"
-        )
-        self._align_bottom_right_btn = get_cwidget(
-            self.ui, QtWidgets.QToolButton, "alignBottomRightBtn"
-        )
-        self._align_with_others_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "alignWithOthersCB"
-        )
-        self._h_alignment_mode_cb = get_cwidget(
-            self.ui, QtWidgets.QComboBox, "hAlignmentModeCB"
-        )
-        self._v_alignment_mode_cb = get_cwidget(
-            self.ui, QtWidgets.QComboBox, "vAlignmentModeCB"
-        )
-
-        # === Output tab ===
-        # Color mode
-        self._color_mode_selector = get_cwidget(
-            self.ui, QtWidgets.QComboBox, "colorModeSelector"
-        )
-        self._bw_foreground_rb = get_cwidget(
-            self.ui, QtWidgets.QRadioButton, "bwForegroundRB"
-        )
-        self._color_foreground_rb = get_cwidget(
-            self.ui, QtWidgets.QRadioButton, "colorForegroundRB"
-        )
-
-        # DPI
-        self._dpi_selector = get_cwidget(self.ui, QtWidgets.QComboBox, "dpiSelector")
-
-        # Binarization
-        self._threshold_method_box = get_cwidget(
-            self.ui, QtWidgets.QComboBox, "thresholdMethodBox"
-        )
-        self._threshold_slider = get_cwidget(
-            self.ui, QtWidgets.QSlider, "thresholdSlider"
-        )
-        self._neutral_threshold_btn = get_cwidget(
-            self.ui, QtWidgets.QPushButton, "neutralThresholdBtn"
-        )
-        self._sauvola_window_size = get_cwidget(
-            self.ui, QtWidgets.QSpinBox, "sauvolaWindowSize"
-        )
-        self._sauvola_coef = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "sauvolaCoef"
-        )
-        self._wolf_window_size = get_cwidget(
-            self.ui, QtWidgets.QSpinBox, "wolfWindowSize"
-        )
-        self._wolf_coef = get_cwidget(self.ui, QtWidgets.QDoubleSpinBox, "wolfCoef")
-        self._lower_bound = get_cwidget(self.ui, QtWidgets.QSpinBox, "lowerBound")
-        self._upper_bound = get_cwidget(self.ui, QtWidgets.QSpinBox, "upperBound")
-
-        # Picture shape
-        self._picture_shape_selector = get_cwidget(
-            self.ui, QtWidgets.QComboBox, "pictureShapeSelector"
-        )
-        self._picture_shape_sensitivity_sb = get_cwidget(
-            self.ui, QtWidgets.QSpinBox, "pictureShapeSensitivitySB"
-        )
-        self._higher_search_sensitivity_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "higherSearchSensitivityCB"
-        )
-
-        # Despeckle
-        self._despeckle_cb = get_cwidget(self.ui, QtWidgets.QCheckBox, "despeckleCB")
-        self._despeckle_slider = get_cwidget(
-            self.ui, QtWidgets.QSlider, "despeckleSlider"
-        )
-
-        # Smoothing
-        self._morphological_smoothing_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "morphologicalSmoothingCB"
-        )
-        self._savitzky_golay_smoothing_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "savitzkyGolaySmoothingCB"
-        )
-
-        # Illumination
-        self._equalize_illumination_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "equalizeIlluminationCB"
-        )
-        self._equalize_illumination_color_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "equalizeIlluminationColorCB"
-        )
-
-        # Filling
-        self._fill_margins_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "fillMarginsCB"
-        )
-        self._fill_offcut_cb = get_cwidget(self.ui, QtWidgets.QCheckBox, "fillOffcutCB")
-        self._filling_color_box = get_cwidget(
-            self.ui, QtWidgets.QComboBox, "fillingColorBox"
-        )
-
-        # Splitting
-        self._splitting_cb = get_cwidget(self.ui, QtWidgets.QCheckBox, "splittingCB")
-        self._original_background_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "originalBackgroundCB"
-        )
-        self._color_segmentation_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "colorSegmentationCB"
-        )
-        self._reduce_noise_sb = get_cwidget(
-            self.ui, QtWidgets.QSpinBox, "reduceNoiseSB"
-        )
-        self._red_adjustment_sb = get_cwidget(
-            self.ui, QtWidgets.QSpinBox, "redAdjustmentSB"
-        )
-        self._green_adjustment_sb = get_cwidget(
-            self.ui, QtWidgets.QSpinBox, "greenAdjustmentSB"
-        )
-        self._blue_adjustment_sb = get_cwidget(
-            self.ui, QtWidgets.QSpinBox, "blueAdjustmentSB"
-        )
-
-        # Posterize
-        self._posterize_cb = get_cwidget(self.ui, QtWidgets.QCheckBox, "posterizeCB")
-        self._posterize_level_sb = get_cwidget(
-            self.ui, QtWidgets.QSpinBox, "posterizeLevelSB"
-        )
-        self._posterize_normalization_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "posterizeNormalizationCB"
-        )
-        self._posterize_force_bw_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "posterizeForceBwCB"
-        )
-
-        # Dewarping
-        self._dewarping_mode_cb = get_cwidget(
-            self.ui, QtWidgets.QComboBox, "dewarpingModeCB"
-        )
-        self._dewarping_post_deskew_cb = get_cwidget(
-            self.ui, QtWidgets.QCheckBox, "dewarpingPostDeskewCB"
-        )
-        self._depth_perception_slider = get_cwidget(
-            self.ui, QtWidgets.QSlider, "depthPerceptionSlider"
-        )
-
-        # Output dimensions
-        self._width_spin_box = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "widthSpinBox"
-        )
-        self._height_spin_box = get_cwidget(
-            self.ui, QtWidgets.QDoubleSpinBox, "heightSpinBox"
-        )
-
-        # Button box
-        self._button_box = get_cwidget(self.ui, QtWidgets.QDialogButtonBox, "buttonBox")
-
-        # Set default units
-        self._units_label.setText("mm")
-
-        # Populate combo boxes
+        embed_ui(self, self.ui)
         self._populate_combo_boxes()
+        self._update_rotation_indicator()
+        self._connect_signals()
+        self._select_initial_profile()
+
+    # ------------------------------------------------------------------ setup
+
+    def _w[T: QtWidgets.QWidget](self, kind: type[T], name: str) -> T:
+        return get_cwidget(self.ui, kind, name)
 
     def _populate_combo_boxes(self) -> None:
-        """Populate combo box options."""
-        # Profile combo - start with default
-        self._profile_cb.clear()
-        self._profile_cb.addItem("Default")
+        self._w(QtWidgets.QComboBox, "layoutModeCB").addItem("Auto", "auto")
+        self._w(QtWidgets.QComboBox, "layoutModeCB").addItem("Manual", "manual")
+        color_modes = self._w(QtWidgets.QComboBox, "colorModeSelector")
+        color_modes.addItem("Black and White", ColorMode.BLACK_AND_WHITE)
+        color_modes.addItem("Color / Grayscale", ColorMode.COLOR_GRAYSCALE)
+        color_modes.addItem("Mixed", ColorMode.MIXED)
+        filling = self._w(QtWidgets.QComboBox, "fillingColorBox")
+        filling.addItem("Background", FillingColor.BACKGROUND)
+        filling.addItem("White", FillingColor.WHITE)
+        filling.addItem("Black", FillingColor.BLACK)
 
-        # Layout mode for page split
-        self._layout_mode_cb.clear()
-        self._layout_mode_cb.addItems(
-            [
-                "Auto",
-                "Manual",
-            ]
+        methods = self._w(QtWidgets.QComboBox, "thresholdMethodBox")
+        for name in _METHODS:
+            methods.addItem(name, name)
+            if name in _UNSUPPORTED_METHODS:
+                item = methods.model().item(methods.count() - 1)  # type: ignore[attr-defined]
+                item.setEnabled(False)
+
+        shapes = self._w(QtWidgets.QComboBox, "pictureShapeSelector")
+        shapes.addItem("Off", PictureShape.OFF)
+        shapes.addItem("Free", PictureShape.FREE)
+        shapes.addItem("Rectangular", PictureShape.RECTANGULAR)
+
+        dpi = self._w(QtWidgets.QComboBox, "dpiSelector")
+        for value in (300, 400, 600, 1200):
+            dpi.addItem(str(value), value)
+        self._custom_dpi_index = dpi.count()
+        dpi.addItem("Custom", self._custom_dpi)
+
+        dewarping = self._w(QtWidgets.QComboBox, "dewarpingModeCB")
+        dewarping.addItem("Off", DewarpingMode.OFF)
+        dewarping.addItem("Auto", DewarpingMode.AUTO)
+        dewarping.addItem("Manual", DewarpingMode.MANUAL)
+        dewarping.addItem("Marginal", DewarpingMode.MARGINAL)
+
+        self._w(QtWidgets.QSlider, "thresholdSlider").setRange(-100, 100)
+        self._w(QtWidgets.QSlider, "despeckleSlider").setRange(
+            1, len(_DESPECKLE_LEVELS)
         )
-
-        # Alignment mode options
-        alignment_modes = ["Auto", "Manual", "Original"]
-        self._h_alignment_mode_cb.clear()
-        self._h_alignment_mode_cb.addItems(alignment_modes)
-        self._v_alignment_mode_cb.clear()
-        self._v_alignment_mode_cb.addItems(alignment_modes)
-
-        # Color mode
-        self._color_mode_selector.clear()
-        self._color_mode_selector.addItems(
-            [
-                "Black and White",
-                "Color / Grayscale",
-                "Mixed",
-            ]
+        self._w(QtWidgets.QSlider, "depthPerceptionSlider").setRange(
+            _DEPTH_STEPS_PER_UNIT, 3 * _DEPTH_STEPS_PER_UNIT
         )
+        for name in ("darkerThresholdLink", "lighterThresholdLink"):
+            label = self._w(QtWidgets.QLabel, name)
+            label.setText(f'<a href="#">{label.text()}</a>')
 
-        # DPI options
-        self._dpi_selector.clear()
-        self._dpi_selector.addItems(
-            [
-                "300",
-                "400",
-                "600",
-                "1200",
-            ]
-        )
-
-        # Binarization method
-        self._threshold_method_box.clear()
-        self._threshold_method_box.addItems(
-            [
-                "Otsu",
-                "Sauvola",
-                "Wolf",
-            ]
-        )
-
-        # Picture shape
-        self._picture_shape_selector.clear()
-        self._picture_shape_selector.addItems(
-            [
-                "Off",
-                "Free",
-                "Rectangular",
-            ]
-        )
-
-        # Filling color
-        self._filling_color_box.clear()
-        self._filling_color_box.addItems(
-            [
-                "White",
-                "Black",
-            ]
-        )
-
-        # Dewarping mode
-        self._dewarping_mode_cb.clear()
-        self._dewarping_mode_cb.addItems(
-            [
-                "Off",
-                "Auto",
-                "Manual",
-                "Marginal",
-            ]
-        )
-
-    def _load_params(self) -> None:
-        """Load current parameters into the UI."""
-        if not self._params:
-            return
-
-        # TODO: Load values from params object based on actual DefaultParams structure
+        self._alignment_group = QtWidgets.QButtonGroup(self)
+        for name in _ALIGNMENT_BUTTONS:
+            self._alignment_group.addButton(self._w(QtWidgets.QToolButton, name))
 
     def _connect_signals(self) -> None:
-        """Connect widget signals."""
-        self._button_box.accepted.connect(self._save_and_accept)
-        self._button_box.rejected.connect(self.reject)
+        w = self._w
+        button_box = w(QtWidgets.QDialogButtonBox, "buttonBox")
+        button_box.accepted.connect(self._commit)
+        button_box.rejected.connect(self.reject)
 
-        # Profile management
-        self._profile_save_btn.clicked.connect(self._save_profile)
-        self._profile_delete_btn.clicked.connect(self._delete_profile)
-        self._profile_cb.currentIndexChanged.connect(self._on_profile_changed)
-
-        # Fix Orientation
-        self._rotate_left_btn.clicked.connect(self._rotate_left)
-        self._rotate_right_btn.clicked.connect(self._rotate_right)
-        self._reset_btn.clicked.connect(self._reset_rotation)
-
-        # Deskew mode
-        self._deskew_auto_btn.clicked.connect(
-            lambda: self._angle_spin_box.setEnabled(False)
+        profile = w(QtWidgets.QComboBox, "profileCB")
+        profile.currentIndexChanged.connect(self._on_profile_changed)
+        w(QtWidgets.QPushButton, "profileSaveButton").clicked.connect(
+            self._save_profile
         )
-        self._deskew_manual_btn.clicked.connect(
-            lambda: self._angle_spin_box.setEnabled(True)
+        w(QtWidgets.QPushButton, "profileDeleteButton").clicked.connect(
+            self._delete_profile
         )
 
-        # Auto margins toggle
-        self._auto_margins_cb.toggled.connect(self._on_auto_margins_toggled)
-
-        # Margin linking
-        self._top_bottom_link.toggled.connect(self._on_top_bottom_link_toggled)
-        self._left_right_link.toggled.connect(self._on_left_right_link_toggled)
-        self._top_margin_sb.valueChanged.connect(self._on_top_margin_changed)
-        self._left_margin_sb.valueChanged.connect(self._on_left_margin_changed)
-
-        # Threshold method
-        self._threshold_method_box.currentIndexChanged.connect(
-            self._on_threshold_method_changed
+        w(QtWidgets.QToolButton, "rotateLeftBtn").clicked.connect(
+            lambda: self._set_rotation(self._rotation.rotate_counter_clockwise())
         )
-        self._neutral_threshold_btn.clicked.connect(self._reset_threshold)
-
-        # Despeckle
-        self._despeckle_cb.toggled.connect(
-            lambda checked: self._despeckle_slider.setEnabled(checked)
+        w(QtWidgets.QToolButton, "rotateRightBtn").clicked.connect(
+            lambda: self._set_rotation(self._rotation.rotate_clockwise())
+        )
+        w(QtWidgets.QPushButton, "resetBtn").clicked.connect(
+            lambda: self._set_rotation(OrthogonalRotation())
         )
 
-        # Posterize
-        self._posterize_cb.toggled.connect(self._on_posterize_toggled)
+        w(QtWidgets.QComboBox, "layoutModeCB").currentIndexChanged.connect(
+            self._on_layout_mode_changed
+        )
+        w(QtWidgets.QPushButton, "deskewAutoBtn").toggled.connect(
+            lambda auto: w(QtWidgets.QDoubleSpinBox, "angleSpinBox").setEnabled(
+                not auto
+            )
+        )
 
-        # Splitting
-        self._splitting_cb.toggled.connect(self._on_splitting_toggled)
+        for name in (
+            "pageDetectAutoBtn",
+            "pageDetectManualBtn",
+            "pageDetectDisableBtn",
+        ):
+            w(QtWidgets.QPushButton, name).toggled.connect(self._update_page_detect)
 
-        # Color segmentation
-        self._color_segmentation_cb.toggled.connect(self._on_color_segmentation_toggled)
+        w(QtWidgets.QCheckBox, "autoMargins").toggled.connect(
+            lambda auto: w(QtWidgets.QWidget, "marginsWidget").setEnabled(not auto)
+        )
+        for name in ("topBottomLink", "leftRightLink"):
+            w(QtWidgets.QToolButton, name).clicked.connect(self._on_link_clicked)
+        for name in ("topMarginSpinBox", "bottomMarginSpinBox"):
+            w(QtWidgets.QDoubleSpinBox, name).valueChanged.connect(
+                self._on_vertical_margin_changed
+            )
+        for name in ("leftMarginSpinBox", "rightMarginSpinBox"):
+            w(QtWidgets.QDoubleSpinBox, name).valueChanged.connect(
+                self._on_horizontal_margin_changed
+            )
+        w(QtWidgets.QCheckBox, "alignWithOthersCB").toggled.connect(
+            self._update_alignment_enabled
+        )
+        for name in ("hAlignmentModeCB", "vAlignmentModeCB"):
+            w(QtWidgets.QComboBox, name).currentIndexChanged.connect(
+                self._on_alignment_mode_changed
+            )
 
-    def _save_and_accept(self) -> None:
-        """Save parameters and close dialog."""
-        self._save_params()
+        for name, slot in (
+            ("colorModeSelector", self._update_output_enabled),
+            ("pictureShapeSelector", self._update_output_enabled),
+            ("thresholdMethodBox", self._on_method_changed),
+        ):
+            w(QtWidgets.QComboBox, name).currentIndexChanged.connect(slot)
+        for name in (
+            "equalizeIlluminationCB",
+            "splittingCB",
+            "bwForegroundRB",
+            "colorSegmentationCB",
+            "posterizeCB",
+            "despeckleCB",
+        ):
+            w(QtWidgets.QAbstractButton, name).toggled.connect(
+                self._update_output_enabled
+            )
+        w(QtWidgets.QComboBox, "dpiSelector").activated.connect(self._on_dpi_selected)
+        w(QtWidgets.QComboBox, "dpiSelector").editTextChanged.connect(
+            self._on_dpi_text_changed
+        )
+        threshold = w(QtWidgets.QSlider, "thresholdSlider")
+        threshold.valueChanged.connect(self._on_threshold_changed)
+        w(QtWidgets.QToolButton, "neutralThresholdBtn").clicked.connect(
+            lambda: threshold.setValue(0)
+        )
+        w(QtWidgets.QLabel, "lighterThresholdLink").linkActivated.connect(
+            lambda _: threshold.setValue(threshold.value() - 1)
+        )
+        w(QtWidgets.QLabel, "darkerThresholdLink").linkActivated.connect(
+            lambda _: threshold.setValue(threshold.value() + 1)
+        )
+
+    # --------------------------------------------------------------- profiles
+
+    def _profile_box(self) -> QtWidgets.QComboBox:
+        return self._w(QtWidgets.QComboBox, "profileCB")
+
+    def _select_initial_profile(self) -> None:
+        self._fill_profile_box()
+        box = self._profile_box()
+        index = box.findData(self._settings.current_profile)
+        box.blockSignals(True)
+        box.setCurrentIndex(index if index != -1 else 0)
+        box.blockSignals(False)
+        self._on_profile_changed(box.currentIndex())
+
+    def _fill_profile_box(self) -> None:
+        box = self._profile_box()
+        box.blockSignals(True)
+        box.clear()
+        box.addItem("Default", DEFAULT_PROFILE)
+        box.addItem("Source", SOURCE_PROFILE)
+        for name in self._store.names():
+            box.addItem(name, name)
+        self._custom_profile_index = box.count()
+        box.addItem("Custom", CUSTOM_PROFILE)
+        box.blockSignals(False)
+
+    def _set_profile_controls(
+        self, *, save: bool, delete: bool, editable: bool
+    ) -> None:
+        self._w(QtWidgets.QPushButton, "profileSaveButton").setEnabled(save)
+        self._w(QtWidgets.QPushButton, "profileDeleteButton").setEnabled(delete)
+        tabs = self._w(QtWidgets.QTabWidget, "tabWidget")
+        for index in range(tabs.count()):
+            tabs.widget(index).setEnabled(editable)
+
+    def _on_profile_changed(self, index: int) -> None:
+        box = self._profile_box()
+        name = box.itemData(index)
+        is_custom = index == self._custom_profile_index
+        box.setEditable(is_custom)
+        if is_custom:
+            box.setEditText(box.currentText())
+            line_edit = box.lineEdit()
+            if line_edit is not None:
+                line_edit.selectAll()
+            self._set_profile_controls(save=True, delete=False, editable=True)
+            if self._settings.current_profile == CUSTOM_PROFILE:
+                self._load_params(self._store.active_params(CUSTOM_PROFILE))
+        elif name == DEFAULT_PROFILE:
+            self._set_profile_controls(save=False, delete=False, editable=False)
+            self._load_params(DefaultParams())
+        elif name == SOURCE_PROFILE:
+            self._set_profile_controls(save=False, delete=False, editable=False)
+            self._load_params(DefaultParams.source())
+        else:
+            try:
+                params = self._store.read(name)
+            except ProfileError:
+                logger.exception("Profile {} could not be loaded", name)
+                QtWidgets.QMessageBox.critical(
+                    self, "Error", "Error loading the profile."
+                )
+                box.removeItem(index)
+                self._custom_profile_index -= 1
+                box.setCurrentIndex(0)
+                return
+            self._set_profile_controls(save=True, delete=True, editable=True)
+            self._load_params(params)
+
+    def _save_profile(self) -> None:
+        box = self._profile_box()
+        name = box.currentText()
+        if is_reserved_profile_name(name):
+            QtWidgets.QMessageBox.information(
+                self,
+                "Error",
+                "The name conflicts with a default profile name. "
+                "Please enter a different name.",
+            )
+            return
+        try:
+            name = validate_profile_name(name)
+            self._store.write(name, self._build_params())
+        except ProfileError as error:
+            logger.warning("{}", error)
+            QtWidgets.QMessageBox.critical(self, "Error", "Error saving the profile.")
+            return
+        if box.currentIndex() == self._custom_profile_index:
+            box.blockSignals(True)
+            box.setEditable(False)
+            index = box.currentIndex()
+            existing = box.findData(name)
+            if existing == -1:
+                box.setItemText(index, name)
+                box.setItemData(index, name)
+                self._custom_profile_index = box.count()
+                box.addItem("Custom", CUSTOM_PROFILE)
+                box.setCurrentIndex(index)
+            else:
+                box.setCurrentIndex(existing)
+            box.blockSignals(False)
+            self._set_profile_controls(save=True, delete=True, editable=True)
+
+    def _delete_profile(self) -> None:
+        box = self._profile_box()
+        index = box.currentIndex()
+        try:
+            self._store.delete(box.currentText())
+        except ProfileError:
+            logger.exception("Profile could not be deleted")
+            QtWidgets.QMessageBox.critical(self, "Error", "Error deleting the profile.")
+            return
+        box.blockSignals(True)
+        box.removeItem(index)
+        self._custom_profile_index -= 1
+        box.setCurrentIndex(self._custom_profile_index)
+        box.blockSignals(False)
+        self._on_profile_changed(self._custom_profile_index)
+
+    def _commit(self) -> None:
+        name = self._profile_box().currentData()
+        params = self._build_params()
+        if name not in (DEFAULT_PROFILE, SOURCE_PROFILE):
+            try:
+                self._store.set_active(params)
+            except ProfileError:
+                logger.exception("The default parameters could not be stored")
+        self._settings.current_profile = name
+        try:
+            self._settings.save()
+        except OSError:
+            logger.exception("The settings could not be saved")
         self.params_changed.emit()
         self.accept()
 
-    def _save_params(self) -> None:
-        """Save UI values to parameters."""
-        if not self._params:
-            return
+    def get_params(self) -> DefaultParams:
+        """Build the parameters shown in the form.
 
-        # TODO: Save values to params object based on actual DefaultParams structure
+        Returns:
+            DefaultParams: The values of the form, in millimetres.
+        """
+        return self._build_params()
 
-    def _save_profile(self) -> None:
-        """Save current settings as a profile."""
-        name, ok = QtWidgets.QInputDialog.getText(
-            self,
-            "Save Profile",
-            "Profile name:",
+    # ---------------------------------------------------------------- loading
+
+    def _load_params(self, params: DefaultParams) -> None:
+        """Show ``params`` in the form without triggering the edit handlers."""
+        self._loaded = params
+        self._loading = True
+        try:
+            self._load_units()
+            self._load_fix_orientation(params.fix_orientation)
+            self._load_page_split(params.page_split)
+            self._load_deskew(params.deskew)
+            self._load_select_content(params.select_content)
+            self._load_page_layout(params.page_layout)
+            self._load_output(params.output)
+        finally:
+            self._loading = False
+        self._update_page_detect()
+        self._update_alignment_enabled()
+        self._update_output_enabled()
+        self._on_method_changed()
+
+    def _spin(self, name: str) -> QtWidgets.QDoubleSpinBox:
+        return self._w(QtWidgets.QDoubleSpinBox, name)
+
+    def _load_units(self) -> None:
+        self._w(QtWidgets.QLabel, "unitsLabel").setText(_UNIT_LABEL[self._units])
+        decimals, step = (1, 1.0) if self._units is Units.MILLIMETERS else (2, 0.01)
+        for name in (
+            "widthSpinBox",
+            "heightSpinBox",
+            "topMarginSpinBox",
+            "bottomMarginSpinBox",
+            "leftMarginSpinBox",
+            "rightMarginSpinBox",
+        ):
+            spin = self._spin(name)
+            spin.setDecimals(decimals)
+            spin.setSingleStep(step)
+
+    def _to_display(self, mm: float) -> float:
+        return mm / _MM_PER_UNIT[self._units]
+
+    def _from_display(
+        self, spin: QtWidgets.QDoubleSpinBox, original_mm: float
+    ) -> float:
+        """Convert a spin box to millimetres, keeping the original if untouched.
+
+        Showing a value rounds it, so converting the rounded number back would
+        drift a profile that the user never edited.
+        """
+        if round(self._to_display(original_mm), spin.decimals()) == round(
+            spin.value(), spin.decimals()
+        ):
+            return original_mm
+        return spin.value() * _MM_PER_UNIT[self._units]
+
+    def _check(self, name: str, checked: bool) -> None:
+        self._w(QtWidgets.QAbstractButton, name).setChecked(checked)
+
+    def _checked(self, name: str) -> bool:
+        return self._w(QtWidgets.QAbstractButton, name).isChecked()
+
+    def _uncheck_exclusive(self, button: QtWidgets.QAbstractButton) -> None:
+        """Clear a group of auto-exclusive buttons, which Qt cannot do directly."""
+        button.setAutoExclusive(False)
+        button.setChecked(False)
+        button.setAutoExclusive(True)
+
+    def _load_fix_orientation(self, defaults: FixOrientationDefaults) -> None:
+        self._rotation = defaults.image_rotation
+        self._update_rotation_indicator()
+
+    def _load_page_split(self, defaults: PageSplitDefaults) -> None:
+        layout_type = defaults.layout_type
+        auto = layout_type is LayoutType.AUTO_LAYOUT_TYPE
+        modes = self._w(QtWidgets.QComboBox, "layoutModeCB")
+        modes.setCurrentIndex(modes.findData("auto" if auto else "manual"))
+        self._w(QtWidgets.QWidget, "pageLayoutGroup").setEnabled(not auto)
+        buttons = {
+            LayoutType.SINGLE_PAGE_UNCUT: "singlePageUncutBtn",
+            LayoutType.PAGE_PLUS_OFFCUT: "pagePlusOffcutBtn",
+            LayoutType.TWO_PAGES: "twoPagesBtn",
+        }
+        if auto:
+            self._uncheck_exclusive(self._w(QtWidgets.QToolButton, "twoPagesBtn"))
+        else:
+            self._check(buttons[layout_type], True)
+
+    def _load_deskew(self, defaults: DeskewDefaults) -> None:
+        auto = defaults.mode is AutoManualMode.AUTO
+        self._check("deskewAutoBtn" if auto else "deskewManualBtn", True)
+        angle = self._spin("angleSpinBox")
+        angle.setEnabled(not auto)
+        angle.setValue(defaults.deskew_angle_deg)
+
+    def _load_select_content(self, defaults: SelectContentDefaults) -> None:
+        page_buttons = {
+            PageDetectionMode.AUTO: "pageDetectAutoBtn",
+            PageDetectionMode.MANUAL: "pageDetectManualBtn",
+            PageDetectionMode.DISABLED: "pageDetectDisableBtn",
+        }
+        self._check(page_buttons[defaults.page_detection_mode], True)
+        auto_content = defaults.content_detection_mode is ContentDetectionMode.AUTO
+        self._check(
+            "contentDetectAutoBtn" if auto_content else "contentDetectDisableBtn", True
         )
-        if ok and name:
-            # Add to combo box if new
-            if self._profile_cb.findText(name) == -1:
-                self._profile_cb.addItem(name)
-            self._profile_cb.setCurrentText(name)
-            # TODO: Actually save the profile to disk
+        self._spin("widthSpinBox").setValue(
+            self._to_display(defaults.page_rect_size_mm.width_mm)
+        )
+        self._spin("heightSpinBox").setValue(
+            self._to_display(defaults.page_rect_size_mm.height_mm)
+        )
+        self._check("fineTuneBtn", defaults.fine_tune_corners)
 
-    def _delete_profile(self) -> None:
-        """Delete the current profile."""
-        current = self._profile_cb.currentText()
-        if current == "Default":
-            QtWidgets.QMessageBox.warning(
-                self,
-                "Cannot Delete",
-                "Cannot delete the default profile.",
+    def _load_page_layout(self, defaults: PageLayoutDefaults) -> None:
+        self._check("autoMargins", defaults.auto_margins)
+        self._w(QtWidgets.QWidget, "marginsWidget").setEnabled(
+            not defaults.auto_margins
+        )
+        margins = defaults.hard_margins_mm
+        self._spin("topMarginSpinBox").setValue(self._to_display(margins.top))
+        self._spin("rightMarginSpinBox").setValue(self._to_display(margins.right))
+        self._spin("bottomMarginSpinBox").setValue(self._to_display(margins.bottom))
+        self._spin("leftMarginSpinBox").setValue(self._to_display(margins.left))
+        self._check("topBottomLink", margins.top == margins.bottom)
+        self._check("leftRightLink", margins.left == margins.right)
+
+        alignment = defaults.alignment
+        self._w(QtWidgets.QComboBox, "hAlignmentModeCB").setCurrentIndex(
+            {H.HAUTO: 0, H.HORIGINAL: 2}.get(alignment.horizontal, 1)
+        )
+        self._w(QtWidgets.QComboBox, "vAlignmentModeCB").setCurrentIndex(
+            {V.VAUTO: 0, V.VORIGINAL: 2}.get(alignment.vertical, 1)
+        )
+        self._check("alignWithOthersCB", not alignment.is_null)
+        self._check_alignment_button(alignment)
+
+    def _check_alignment_button(self, alignment: Alignment) -> None:
+        for name, (vertical, horizontal) in _ALIGNMENT_BUTTONS.items():
+            if alignment.is_auto_vertical():
+                match = vertical is V.VCENTER and horizontal is alignment.horizontal
+            elif alignment.is_auto_horizontal():
+                match = horizontal is H.HCENTER and vertical is alignment.vertical
+            else:
+                match = (vertical, horizontal) == (
+                    alignment.vertical,
+                    alignment.horizontal,
+                )
+            if match:
+                self._check(name, True)
+                return
+
+    def _load_output(self, defaults: OutputDefaults) -> None:
+        self._select(
+            self._w(QtWidgets.QComboBox, "colorModeSelector"), defaults.color_mode
+        )
+        common = defaults.color_common
+        binarization = defaults.binarization
+        self._check("fillMarginsCB", common.fill_margins)
+        self._check("fillOffcutCB", common.fill_offcut)
+        self._check("equalizeIlluminationCB", binarization.normalize_illumination)
+        self._check("equalizeIlluminationColorCB", common.normalize_illumination)
+        self._check("savitzkyGolaySmoothingCB", binarization.savitzky_golay_smoothing)
+        self._check("morphologicalSmoothingCB", binarization.morphological_smoothing)
+        self._select(
+            self._w(QtWidgets.QComboBox, "fillingColorBox"), common.filling_color
+        )
+
+        segmenter = binarization.color_segmenter
+        self._check("colorSegmentationCB", segmenter.enabled)
+        self._w(QtWidgets.QSpinBox, "reduceNoiseSB").setValue(segmenter.noise_reduction)
+        self._w(QtWidgets.QSpinBox, "redAdjustmentSB").setValue(
+            segmenter.red_threshold_adjustment
+        )
+        self._w(QtWidgets.QSpinBox, "greenAdjustmentSB").setValue(
+            segmenter.green_threshold_adjustment
+        )
+        self._w(QtWidgets.QSpinBox, "blueAdjustmentSB").setValue(
+            segmenter.blue_threshold_adjustment
+        )
+        posterization = common.posterization
+        self._check("posterizeCB", posterization.enabled)
+        self._w(QtWidgets.QSpinBox, "posterizeLevelSB").setValue(posterization.level)
+        self._check("posterizeNormalizationCB", posterization.normalization_enabled)
+        self._check("posterizeForceBwCB", posterization.force_black_and_white)
+
+        method_name = next(
+            (
+                name
+                for name, method in _METHODS.items()
+                if method is binarization.method
+            ),
+            "Otsu",
+        )
+        self._select(self._w(QtWidgets.QComboBox, "thresholdMethodBox"), method_name)
+        self._w(QtWidgets.QSlider, "thresholdSlider").setValue(
+            binarization.threshold_adjustment
+        )
+        self._w(QtWidgets.QSpinBox, "sauvolaWindowSize").setValue(
+            binarization.window_size
+        )
+        self._w(QtWidgets.QSpinBox, "wolfWindowSize").setValue(binarization.window_size)
+        self._spin("sauvolaCoef").setValue(binarization.sauvola_coef)
+        self._spin("wolfCoef").setValue(binarization.wolf_coef)
+        self._w(QtWidgets.QSpinBox, "lowerBound").setValue(
+            binarization.wolf_lower_bound
+        )
+        self._w(QtWidgets.QSpinBox, "upperBound").setValue(
+            binarization.wolf_upper_bound
+        )
+
+        shape = defaults.picture_shape
+        self._select(self._w(QtWidgets.QComboBox, "pictureShapeSelector"), shape.shape)
+        self._w(QtWidgets.QSpinBox, "pictureShapeSensitivitySB").setValue(
+            shape.sensitivity
+        )
+        self._check("higherSearchSensitivityCB", shape.higher_search_sensitivity)
+
+        dpi_box = self._w(QtWidgets.QComboBox, "dpiSelector")
+        dpi = defaults.dpi.vertical
+        index = dpi_box.findData(dpi)
+        if index == -1 or index == self._custom_dpi_index:
+            self._custom_dpi = dpi
+            index = self._custom_dpi_index
+        dpi_box.setCurrentIndex(index)
+        self._on_dpi_selected(index)
+
+        splitting = defaults.splitting
+        self._check("splittingCB", splitting.split_output)
+        self._check(
+            "colorForegroundRB" if splitting.color_foreground else "bwForegroundRB",
+            True,
+        )
+        self._check("originalBackgroundCB", splitting.original_background)
+
+        level = defaults.despeckle_level
+        self._check("despeckleCB", level is not DespeckleLevel.OFF)
+        if level is not DespeckleLevel.OFF:
+            self._w(QtWidgets.QSlider, "despeckleSlider").setValue(
+                _DESPECKLE_LEVELS.index(level) + 1
             )
-            return
 
-        reply = QtWidgets.QMessageBox.question(
-            self,
-            "Delete Profile",
-            f"Delete profile '{current}'?",
-            QtWidgets.QMessageBox.StandardButton.Yes
-            | QtWidgets.QMessageBox.StandardButton.No,
+        self._select(
+            self._w(QtWidgets.QComboBox, "dewarpingModeCB"), defaults.dewarping.mode
         )
-        if reply == QtWidgets.QMessageBox.StandardButton.Yes:
-            index = self._profile_cb.currentIndex()
-            self._profile_cb.removeItem(index)
-            # TODO: Actually delete the profile from disk
+        self._check("dewarpingPostDeskewCB", defaults.dewarping.post_deskew)
+        self._w(QtWidgets.QSlider, "depthPerceptionSlider").setValue(
+            round(defaults.depth_perception * _DEPTH_STEPS_PER_UNIT)
+        )
 
-    def _on_profile_changed(self, index: int) -> None:
-        """Handle profile selection change."""
-        # TODO: Load the selected profile
-        pass
+    @staticmethod
+    def _select(box: QtWidgets.QComboBox, data: object) -> None:
+        index = box.findData(data)
+        if index != -1:
+            box.setCurrentIndex(index)
 
-    def _rotate_left(self) -> None:
-        """Rotate default orientation left by 90 degrees."""
-        self._current_rotation = (self._current_rotation - 90) % 360
-        self._update_rotation_indicator()
+    # --------------------------------------------------------------- building
 
-    def _rotate_right(self) -> None:
-        """Rotate default orientation right by 90 degrees."""
-        self._current_rotation = (self._current_rotation + 90) % 360
-        self._update_rotation_indicator()
+    def _build_params(self) -> DefaultParams:
+        """Read the form into a profile, keeping what the form cannot show."""
+        base = self._loaded
+        return DefaultParams(
+            fix_orientation=FixOrientationDefaults(image_rotation=self._rotation),
+            deskew=DeskewDefaults(
+                deskew_angle_deg=self._spin("angleSpinBox").value(),
+                mode=AutoManualMode.AUTO
+                if self._checked("deskewAutoBtn")
+                else AutoManualMode.MANUAL,
+            ),
+            page_split=PageSplitDefaults(layout_type=self._build_layout_type()),
+            select_content=self._build_select_content(base.select_content),
+            page_layout=self._build_page_layout(base.page_layout),
+            output=self._build_output(base.output),
+            units=self._units,
+        )
 
-    def _reset_rotation(self) -> None:
-        """Reset rotation to 0 degrees."""
-        self._current_rotation = 0
+    def _build_layout_type(self) -> LayoutType:
+        if self._w(QtWidgets.QComboBox, "layoutModeCB").currentData() == "auto":
+            return LayoutType.AUTO_LAYOUT_TYPE
+        if self._checked("singlePageUncutBtn"):
+            return LayoutType.SINGLE_PAGE_UNCUT
+        if self._checked("pagePlusOffcutBtn"):
+            return LayoutType.PAGE_PLUS_OFFCUT
+        return LayoutType.TWO_PAGES
+
+    def _build_select_content(
+        self, base: SelectContentDefaults
+    ) -> SelectContentDefaults:
+        if self._checked("pageDetectDisableBtn"):
+            page_mode = PageDetectionMode.DISABLED
+        elif self._checked("pageDetectManualBtn"):
+            page_mode = PageDetectionMode.MANUAL
+        else:
+            page_mode = PageDetectionMode.AUTO
+        content_mode = (
+            ContentDetectionMode.DISABLED
+            if self._checked("contentDetectDisableBtn")
+            else ContentDetectionMode.AUTO
+        )
+        return SelectContentDefaults(
+            page_rect_size_mm=PhysicalSize(
+                width_mm=self._from_display(
+                    self._spin("widthSpinBox"), base.page_rect_size_mm.width_mm
+                ),
+                height_mm=self._from_display(
+                    self._spin("heightSpinBox"), base.page_rect_size_mm.height_mm
+                ),
+            ),
+            content_detection_mode=content_mode,
+            page_detection_mode=page_mode,
+            fine_tune_corners=self._checked("fineTuneBtn"),
+        )
+
+    def _checked_alignment(self) -> tuple[VerticalAlignment, HorizontalAlignment]:
+        button = self._alignment_group.checkedButton()
+        return _ALIGNMENT_BUTTONS.get(
+            button.objectName() if button else "", (V.VCENTER, H.HCENTER)
+        )
+
+    def _build_alignment(self) -> Alignment:
+        vertical, horizontal = self._checked_alignment()
+        h_mode = self._w(QtWidgets.QComboBox, "hAlignmentModeCB").currentIndex()
+        v_mode = self._w(QtWidgets.QComboBox, "vAlignmentModeCB").currentIndex()
+        return Alignment(
+            horizontal={0: H.HAUTO, 2: H.HORIGINAL}.get(h_mode, horizontal),
+            vertical={0: V.VAUTO, 2: V.VORIGINAL}.get(v_mode, vertical),
+            is_null=not self._checked("alignWithOthersCB"),
+        )
+
+    def _build_page_layout(self, base: PageLayoutDefaults) -> PageLayoutDefaults:
+        old = base.hard_margins_mm
+        return PageLayoutDefaults(
+            hard_margins_mm=Margins(
+                left=self._from_display(self._spin("leftMarginSpinBox"), old.left),
+                right=self._from_display(self._spin("rightMarginSpinBox"), old.right),
+                top=self._from_display(self._spin("topMarginSpinBox"), old.top),
+                bottom=self._from_display(
+                    self._spin("bottomMarginSpinBox"), old.bottom
+                ),
+            ),
+            alignment=self._build_alignment(),
+            auto_margins=self._checked("autoMargins"),
+        )
+
+    def _build_output(self, base: OutputDefaults) -> OutputDefaults:
+        method_name = self._w(QtWidgets.QComboBox, "thresholdMethodBox").currentData()
+        method = _METHODS[method_name] or base.binarization.method
+        window_widget = (
+            "wolfWindowSize"
+            if method is BinarizationMethod.WOLF
+            else "sauvolaWindowSize"
+        )
+        binarization = base.binarization.model_copy(
+            update={
+                "method": method,
+                "threshold_adjustment": self._w(
+                    QtWidgets.QSlider, "thresholdSlider"
+                ).value(),
+                "window_size": self._w(QtWidgets.QSpinBox, window_widget).value(),
+                "sauvola_coef": self._spin("sauvolaCoef").value(),
+                "wolf_coef": self._spin("wolfCoef").value(),
+                "wolf_lower_bound": self._w(QtWidgets.QSpinBox, "lowerBound").value(),
+                "wolf_upper_bound": self._w(QtWidgets.QSpinBox, "upperBound").value(),
+                "normalize_illumination": self._checked("equalizeIlluminationCB"),
+                "savitzky_golay_smoothing": self._checked("savitzkyGolaySmoothingCB"),
+                "morphological_smoothing": self._checked("morphologicalSmoothingCB"),
+                "color_segmenter": ColorSegmenterOptions(
+                    enabled=self._checked("colorSegmentationCB"),
+                    noise_reduction=self._w(
+                        QtWidgets.QSpinBox, "reduceNoiseSB"
+                    ).value(),
+                    red_threshold_adjustment=self._w(
+                        QtWidgets.QSpinBox, "redAdjustmentSB"
+                    ).value(),
+                    green_threshold_adjustment=self._w(
+                        QtWidgets.QSpinBox, "greenAdjustmentSB"
+                    ).value(),
+                    blue_threshold_adjustment=self._w(
+                        QtWidgets.QSpinBox, "blueAdjustmentSB"
+                    ).value(),
+                ),
+            }
+        )
+        common = base.color_common.model_copy(
+            update={
+                "fill_offcut": self._checked("fillOffcutCB"),
+                "fill_margins": self._checked("fillMarginsCB"),
+                "normalize_illumination": self._checked("equalizeIlluminationColorCB"),
+                "filling_color": self._w(
+                    QtWidgets.QComboBox, "fillingColorBox"
+                ).currentData(),
+                "posterization": PosterizationOptions(
+                    enabled=self._checked("posterizeCB"),
+                    level=self._w(QtWidgets.QSpinBox, "posterizeLevelSB").value(),
+                    normalization_enabled=self._checked("posterizeNormalizationCB"),
+                    force_black_and_white=self._checked("posterizeForceBwCB"),
+                ),
+            }
+        )
+        dpi = self._current_dpi()
+        despeckle = DespeckleLevel.OFF
+        if self._checked("despeckleCB"):
+            despeckle = _DESPECKLE_LEVELS[
+                self._w(QtWidgets.QSlider, "despeckleSlider").value() - 1
+            ]
+        return OutputDefaults(
+            dpi=Dpi.uniform(dpi),
+            color_mode=self._w(QtWidgets.QComboBox, "colorModeSelector").currentData(),
+            binarization=binarization,
+            despeckle_level=despeckle,
+            black_on_white=base.black_on_white,
+            color_common=common,
+            picture_shape=PictureShapeOptions(
+                shape=PictureShape(
+                    self._w(QtWidgets.QComboBox, "pictureShapeSelector").currentData()
+                ),
+                sensitivity=self._w(
+                    QtWidgets.QSpinBox, "pictureShapeSensitivitySB"
+                ).value(),
+                higher_search_sensitivity=self._checked("higherSearchSensitivityCB"),
+            ),
+            splitting=SplittingOptions(
+                split_output=self._checked("splittingCB"),
+                original_background=self._checked("originalBackgroundCB"),
+                color_foreground=self._checked("colorForegroundRB"),
+            ),
+            dewarping=base.dewarping.model_copy(
+                update={
+                    "mode": DewarpingMode(
+                        self._w(QtWidgets.QComboBox, "dewarpingModeCB").currentData()
+                    ),
+                    "post_deskew": self._checked("dewarpingPostDeskewCB"),
+                }
+            ),
+            depth_perception=self._w(QtWidgets.QSlider, "depthPerceptionSlider").value()
+            / _DEPTH_STEPS_PER_UNIT,
+        )
+
+    def _current_dpi(self) -> int:
+        box = self._w(QtWidgets.QComboBox, "dpiSelector")
+        if box.currentIndex() == self._custom_dpi_index:
+            return max(1, self._custom_dpi)
+        return int(box.currentData())
+
+    # --------------------------------------------------------------- handlers
+
+    def _set_rotation(self, rotation: OrthogonalRotation) -> None:
+        self._rotation = rotation
         self._update_rotation_indicator()
 
     def _update_rotation_indicator(self) -> None:
-        """Update the rotation indicator image."""
-        # The indicator shows an arrow that rotates with the current rotation
-        pixmap = QPixmap(":/icons/big-up-arrow.svg")
-        if not pixmap.isNull():
-            from PySide6.QtGui import QTransform
+        """Show an up arrow turned by the chosen rotation."""
+        label = self._w(QtWidgets.QLabel, "rotationIndicator")
+        ratio = label.devicePixelRatioF()
+        size = QtCore.QSize(_ROTATION_INDICATOR_SIZE, _ROTATION_INDICATOR_SIZE)
+        pixmap = icon("arrow-up").pixmap(size, ratio)
+        transform = QtGui.QTransform().rotate(self._rotation.degrees)
+        label.setPixmap(
+            pixmap.transformed(
+                transform, QtCore.Qt.TransformationMode.SmoothTransformation
+            )
+        )
 
-            transform = QTransform()
-            transform.rotate(self._current_rotation)
-            rotated = pixmap.transformed(transform)
-            self._rotation_indicator.setPixmap(rotated)
+    def changeEvent(self, event: QtCore.QEvent) -> None:
+        """Redraw the rotation indicator when the palette changes.
 
-    def _on_auto_margins_toggled(self, checked: bool) -> None:
-        """Handle auto margins checkbox toggle."""
-        # Enable/disable margin spin boxes
-        enabled = not checked
-        self._top_margin_sb.setEnabled(enabled)
-        self._bottom_margin_sb.setEnabled(enabled)
-        self._left_margin_sb.setEnabled(enabled)
-        self._right_margin_sb.setEnabled(enabled)
-        self._top_bottom_link.setEnabled(enabled)
-        self._left_right_link.setEnabled(enabled)
-
-    def _on_top_bottom_link_toggled(self, checked: bool) -> None:
-        """Handle top/bottom margin link toggle."""
-        if checked:
-            self._bottom_margin_sb.setValue(self._top_margin_sb.value())
-
-    def _on_left_right_link_toggled(self, checked: bool) -> None:
-        """Handle left/right margin link toggle."""
-        if checked:
-            self._right_margin_sb.setValue(self._left_margin_sb.value())
-
-    def _on_top_margin_changed(self, value: float) -> None:
-        """Sync bottom margin if linked."""
-        if self._top_bottom_link.isChecked():
-            self._bottom_margin_sb.setValue(value)
-
-    def _on_left_margin_changed(self, value: float) -> None:
-        """Sync right margin if linked."""
-        if self._left_right_link.isChecked():
-            self._right_margin_sb.setValue(value)
-
-    def _on_threshold_method_changed(self, index: int) -> None:
-        """Handle binarization method change."""
-        method = self._threshold_method_box.currentText()
-
-        # Show/hide method-specific options
-        is_sauvola = method == "Sauvola"
-        is_wolf = method == "Wolf"
-
-        self._sauvola_window_size.setVisible(is_sauvola)
-        self._sauvola_coef.setVisible(is_sauvola)
-        self._wolf_window_size.setVisible(is_wolf)
-        self._wolf_coef.setVisible(is_wolf)
-
-    def _reset_threshold(self) -> None:
-        """Reset threshold slider to neutral position."""
-        self._threshold_slider.setValue(0)
-
-    def _on_posterize_toggled(self, checked: bool) -> None:
-        """Handle posterize checkbox toggle."""
-        self._posterize_level_sb.setEnabled(checked)
-        self._posterize_normalization_cb.setEnabled(checked)
-        self._posterize_force_bw_cb.setEnabled(checked)
-
-    def _on_splitting_toggled(self, checked: bool) -> None:
-        """Handle splitting checkbox toggle."""
-        self._original_background_cb.setEnabled(checked)
-
-    def _on_color_segmentation_toggled(self, checked: bool) -> None:
-        """Handle color segmentation checkbox toggle."""
-        self._reduce_noise_sb.setEnabled(checked)
-        self._red_adjustment_sb.setEnabled(checked)
-        self._green_adjustment_sb.setEnabled(checked)
-        self._blue_adjustment_sb.setEnabled(checked)
-
-    def get_params(self) -> DefaultParams | None:
-        """Get the (possibly modified) default parameters.
-
-        Returns:
-            The default parameters, or None if not set.
+        Args:
+            event (QtCore.QEvent): The event.
         """
-        return self._params
+        super().changeEvent(event)
+        if event.type() == QtCore.QEvent.Type.PaletteChange and hasattr(
+            self, "_rotation"
+        ):
+            self._update_rotation_indicator()
 
-    def get_current_rotation(self) -> int:
-        """Get the current rotation value.
+    def _on_layout_mode_changed(self, index: int) -> None:
+        if self._loading:
+            return
+        manual = (
+            self._w(QtWidgets.QComboBox, "layoutModeCB").itemData(index) == "manual"
+        )
+        if manual:
+            self._check("singlePageUncutBtn", True)
+        else:
+            self._uncheck_exclusive(self._w(QtWidgets.QToolButton, "twoPagesBtn"))
+        self._w(QtWidgets.QWidget, "pageLayoutGroup").setEnabled(manual)
 
-        Returns:
-            Rotation in degrees (0, 90, 180, or 270).
-        """
-        return self._current_rotation
+    def _update_page_detect(self) -> None:
+        disabled = self._checked("pageDetectDisableBtn")
+        manual = self._checked("pageDetectManualBtn")
+        self._w(QtWidgets.QWidget, "pageDetectOptions").setEnabled(not disabled)
+        self._w(QtWidgets.QWidget, "fineTuneBtn").setEnabled(
+            not disabled and not manual
+        )
+        self._w(QtWidgets.QWidget, "dimensionsWidget").setEnabled(manual)
 
-    def show(self) -> None:
-        """Show the dialog."""
-        self.ui.show()
+    def _on_link_clicked(self) -> None:
+        for link, first, second in (
+            ("topBottomLink", "topMarginSpinBox", "bottomMarginSpinBox"),
+            ("leftRightLink", "leftMarginSpinBox", "rightMarginSpinBox"),
+        ):
+            if self.sender() is self._w(QtWidgets.QToolButton, link) and self._checked(
+                link
+            ):
+                smaller = min(self._spin(first).value(), self._spin(second).value())
+                self._spin(first).setValue(smaller)
+                self._spin(second).setValue(smaller)
+
+    def _mirror_margins(self, link: str, first: str, second: str, value: float) -> None:
+        if self._loading or not self._checked(link):
+            return
+        for name in (first, second):
+            spin = self._spin(name)
+            if spin.value() != value:
+                spin.blockSignals(True)
+                spin.setValue(value)
+                spin.blockSignals(False)
+
+    def _on_vertical_margin_changed(self, value: float) -> None:
+        self._mirror_margins(
+            "topBottomLink", "topMarginSpinBox", "bottomMarginSpinBox", value
+        )
+
+    def _on_horizontal_margin_changed(self, value: float) -> None:
+        self._mirror_margins(
+            "leftRightLink", "leftMarginSpinBox", "rightMarginSpinBox", value
+        )
+
+    def _on_alignment_mode_changed(self, _index: int) -> None:
+        if self._loading:
+            return
+        self._update_alignment_enabled()
+        self._keep_auto_axis_button()
+
+    def _keep_auto_axis_button(self) -> None:
+        """Move the checked button onto the axis that is still chosen by hand."""
+        h_auto = self._w(QtWidgets.QComboBox, "hAlignmentModeCB").currentIndex() != 1
+        v_auto = self._w(QtWidgets.QComboBox, "vAlignmentModeCB").currentIndex() != 1
+        vertical, horizontal = self._checked_alignment()
+        if v_auto and not h_auto:
+            target = {H.LEFT: "alignLeftBtn", H.RIGHT: "alignRightBtn"}.get(
+                horizontal, "alignCenterBtn"
+            )
+        elif h_auto and not v_auto:
+            target = {V.TOP: "alignTopBtn", V.BOTTOM: "alignBottomBtn"}.get(
+                vertical, "alignCenterBtn"
+            )
+        else:
+            return
+        self._check(target, True)
+
+    def _update_alignment_enabled(self) -> None:
+        aligned = self._checked("alignWithOthersCB")
+        self._w(QtWidgets.QComboBox, "hAlignmentModeCB").setEnabled(aligned)
+        self._w(QtWidgets.QComboBox, "vAlignmentModeCB").setEnabled(aligned)
+        horizontal = (
+            aligned
+            and self._w(QtWidgets.QComboBox, "hAlignmentModeCB").currentIndex() == 1
+        )
+        vertical = (
+            aligned
+            and self._w(QtWidgets.QComboBox, "vAlignmentModeCB").currentIndex() == 1
+        )
+        enabled = {
+            "alignTopLeftBtn": horizontal and vertical,
+            "alignTopBtn": vertical,
+            "alignTopRightBtn": horizontal and vertical,
+            "alignLeftBtn": horizontal,
+            "alignCenterBtn": horizontal or vertical,
+            "alignRightBtn": horizontal,
+            "alignBottomLeftBtn": horizontal and vertical,
+            "alignBottomBtn": vertical,
+            "alignBottomRightBtn": horizontal and vertical,
+        }
+        for name, state in enabled.items():
+            self._w(QtWidgets.QToolButton, name).setEnabled(state)
+
+    def _on_method_changed(self, _index: int = 0) -> None:
+        name = self._w(QtWidgets.QComboBox, "thresholdMethodBox").currentData()
+        self._w(QtWidgets.QStackedWidget, "binarizationOptions").setCurrentIndex(
+            _METHOD_PAGES.get(name, 0)
+        )
+
+    def _on_threshold_changed(self, value: int) -> None:
+        self._w(QtWidgets.QLabel, "thresholLabel").setText(str(value))
+        self._w(QtWidgets.QSlider, "thresholdSlider").setToolTip(str(value))
+
+    def _on_dpi_selected(self, index: int) -> None:
+        box = self._w(QtWidgets.QComboBox, "dpiSelector")
+        custom = index == self._custom_dpi_index
+        box.setEditable(custom)
+        if custom:
+            box.setEditText(str(self._custom_dpi))
+            box.setValidator(QtGui.QIntValidator(1, 9999, box))
+            line_edit = box.lineEdit()
+            if line_edit is not None:
+                line_edit.selectAll()
+
+    def _on_dpi_text_changed(self, text: str) -> None:
+        box = self._w(QtWidgets.QComboBox, "dpiSelector")
+        if box.currentIndex() == self._custom_dpi_index and text.isdigit():
+            self._custom_dpi = int(text)
+
+    def _update_output_enabled(self, *_ignored: object) -> None:
+        """Enable the output controls that apply to the chosen colour mode."""
+        w = self._w
+        mode = w(QtWidgets.QComboBox, "colorModeSelector").currentData()
+        mixed = mode is ColorMode.MIXED
+        binary_path = mode is not ColorMode.COLOR_GRAYSCALE
+        w(QtWidgets.QWidget, "thresholdOptions").setEnabled(binary_path)
+        w(QtWidgets.QWidget, "despecklePanel").setEnabled(binary_path)
+        w(QtWidgets.QSlider, "despeckleSlider").setEnabled(
+            binary_path and self._checked("despeckleCB")
+        )
+        w(QtWidgets.QWidget, "pictureShapeOptions").setEnabled(mixed)
+        w(QtWidgets.QWidget, "splittingOptions").setEnabled(mixed)
+        w(QtWidgets.QWidget, "fillingOptions").setEnabled(
+            mode is not ColorMode.BLACK_AND_WHITE
+        )
+
+        w(QtWidgets.QWidget, "equalizeIlluminationCB").setEnabled(
+            mode is not ColorMode.COLOR_GRAYSCALE
+        )
+        color_equalize = w(QtWidgets.QWidget, "equalizeIlluminationColorCB")
+        color_equalize.setEnabled(mode is not ColorMode.BLACK_AND_WHITE)
+        if mixed:
+            equalize_on = self._checked("equalizeIlluminationCB")
+            if self._checked("equalizeIlluminationColorCB") and not equalize_on:
+                self._check("equalizeIlluminationColorCB", False)
+            color_equalize.setEnabled(equalize_on)
+        for name in ("savitzkyGolaySmoothingCB", "morphologicalSmoothingCB"):
+            w(QtWidgets.QWidget, name).setEnabled(mode is not ColorMode.COLOR_GRAYSCALE)
+
+        segmentation = self._checked("colorSegmentationCB")
+        w(QtWidgets.QWidget, "colorSegmentationCB").setEnabled(binary_path)
+        w(QtWidgets.QWidget, "segmenterOptionsWidget").setEnabled(
+            binary_path and segmentation
+        )
+        if binary_path:
+            w(QtWidgets.QWidget, "posterizeCB").setEnabled(segmentation)
+            w(QtWidgets.QWidget, "posterizeOptionsWidget").setEnabled(
+                segmentation and self._checked("posterizeCB")
+            )
+        else:
+            w(QtWidgets.QWidget, "posterizeCB").setEnabled(True)
+            w(QtWidgets.QWidget, "posterizeOptionsWidget").setEnabled(
+                self._checked("posterizeCB")
+            )
+
+        shape = PictureShape(
+            w(QtWidgets.QComboBox, "pictureShapeSelector").currentData()
+        )
+        w(QtWidgets.QWidget, "pictureShapeSensitivityOptions").setEnabled(
+            shape is PictureShape.RECTANGULAR
+        )
+        w(QtWidgets.QWidget, "higherSearchSensitivityCB").setEnabled(
+            shape is not PictureShape.OFF
+        )
+
+        splitting = self._checked("splittingCB")
+        w(QtWidgets.QWidget, "bwForegroundRB").setEnabled(splitting)
+        w(QtWidgets.QWidget, "colorForegroundRB").setEnabled(splitting)
+        w(QtWidgets.QWidget, "originalBackgroundCB").setEnabled(
+            splitting and self._checked("bwForegroundRB")
+        )

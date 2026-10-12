@@ -13,7 +13,7 @@
   <property name="windowTitle">
    <string>Project Files</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
+  <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,1,0,0,0,0">
    <item>
     <widget class="QGroupBox" name="groupBox_2">
      <property name="title">
@@ -113,9 +113,8 @@ p, li { white-space: pre-wrap; }
          <property name="text">
           <string notr="true"/>
          </property>
-         <property name="icon">
-          <iconset resource="../resources/resources.qrc">
-           <normaloff>:/icons/right-arrow-inscribed.svg</normaloff>:/icons/right-arrow-inscribed.svg</iconset>
+         <property name="iconName" stdset="0">
+          <string notr="true">circle-arrow-right</string>
          </property>
          <property name="iconSize">
           <size>
@@ -142,9 +141,8 @@ p, li { white-space: pre-wrap; }
          <property name="text">
           <string notr="true"/>
          </property>
-         <property name="icon">
-          <iconset resource="../resources/resources.qrc">
-           <normaloff>:/icons/left-arrow-inscribed.svg</normaloff>:/icons/left-arrow-inscribed.svg</iconset>
+         <property name="iconName" stdset="0">
+          <string notr="true">circle-arrow-left</string>
          </property>
          <property name="iconSize">
           <size>
@@ -233,9 +231,6 @@ p, li { white-space: pre-wrap; }
    </item>
   </layout>
  </widget>
- <resources>
-  <include location="../resources/resources.qrc"/>
- </resources>
  <connections>
   <connection>
    <sender>buttonBox</sender>

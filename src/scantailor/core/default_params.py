@@ -5,16 +5,31 @@ values for each stage of the ScanTailor processing pipeline. These defaults
 are applied when processing new pages.
 """
 
+from collections.abc import Iterable
+from typing import Self
+
 from pydantic import BaseModel, Field
 
-from scantailor.core.models import Dpi, Margins, OrthogonalRotation
+from scantailor.core.models import (
+    Dpi,
+    ImageId,
+    Margins,
+    OrthogonalRotation,
+    PageId,
+    SubPage,
+)
 from scantailor.core.settings import Units
+from scantailor.core.stage_sequence import StageSequence
 from scantailor.filters.deskew.params import AutoManualMode as DeskewMode
 from scantailor.filters.deskew.params import Params as DeskewParams
 from scantailor.filters.output.binarization import BinarizationOptions
 from scantailor.filters.output.color_mode import ColorMode
+from scantailor.filters.output.color_options import ColorCommonOptions
 from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.dewarping_options import DewarpingOptions
 from scantailor.filters.output.params import Params as OutputParams
+from scantailor.filters.output.picture_shape import PictureShapeOptions
+from scantailor.filters.output.splitting_options import SplittingOptions
 from scantailor.filters.page_layout.alignment import Alignment
 from scantailor.filters.page_layout.params import Params as PageLayoutParams
 from scantailor.filters.page_split.layout_type import LayoutType
@@ -129,6 +144,11 @@ class OutputDefaults(BaseModel):
         binarization: Default binarization options.
         despeckle_level: Default despeckling level.
         black_on_white: Default text polarity.
+        color_common: Default options of the grayscale and colour paths.
+        picture_shape: Default automatic picture detection.
+        splitting: Default layer splitting of mixed output.
+        dewarping: Default dewarping options.
+        depth_perception: Default dewarping depth perception, 1 to 3.
     """
 
     dpi: Dpi = Field(default_factory=lambda: Dpi.uniform(600))
@@ -136,6 +156,11 @@ class OutputDefaults(BaseModel):
     binarization: BinarizationOptions = Field(default_factory=BinarizationOptions)
     despeckle_level: DespeckleLevel = DespeckleLevel.CAUTIOUS
     black_on_white: bool = True
+    color_common: ColorCommonOptions = Field(default_factory=ColorCommonOptions)
+    picture_shape: PictureShapeOptions = Field(default_factory=PictureShapeOptions)
+    splitting: SplittingOptions = Field(default_factory=SplittingOptions)
+    dewarping: DewarpingOptions = Field(default_factory=DewarpingOptions)
+    depth_perception: float = Field(default=2.0, ge=1.0, le=3.0)
 
     def to_params(self) -> OutputParams:
         """Convert to filter Params instance."""
@@ -145,6 +170,11 @@ class OutputDefaults(BaseModel):
             binarization=self.binarization,
             despeckle_level=self.despeckle_level,
             black_on_white=self.black_on_white,
+            color_common=self.color_common,
+            picture_shape=self.picture_shape,
+            splitting=self.splitting,
+            dewarping=self.dewarping,
+            depth_perception=self.depth_perception,
         )
 
 
@@ -182,6 +212,29 @@ class DefaultParams(BaseModel):
     output: OutputDefaults = Field(default_factory=OutputDefaults)
     units: Units = Units.MILLIMETERS
 
+    @classmethod
+    def source(cls) -> Self:
+        """Return the Source profile: leave the scan as it is.
+
+        Pages are not split, deskewed, cropped or given margins, and the output
+        stays grayscale.
+        """
+        return cls(
+            deskew=DeskewDefaults(mode=DeskewMode.MANUAL),
+            page_split=PageSplitDefaults(layout_type=LayoutType.SINGLE_PAGE_UNCUT),
+            select_content=SelectContentDefaults(
+                content_detection_mode=ContentDetectionMode.DISABLED
+            ),
+            page_layout=PageLayoutDefaults(
+                hard_margins_mm=Margins(left=0.0, right=0.0, top=0.0, bottom=0.0),
+                alignment=Alignment.independent(),
+            ),
+            output=OutputDefaults(
+                color_mode=ColorMode.COLOR_GRAYSCALE,
+                color_common=ColorCommonOptions(fill_margins=False),
+            ),
+        )
+
     def get_deskew_params(self) -> DeskewParams:
         """Get default Deskew filter parameters."""
         return self.deskew.to_params()
@@ -201,3 +254,64 @@ class DefaultParams(BaseModel):
     def get_output_params(self) -> OutputParams:
         """Get default Output filter parameters."""
         return self.output.to_params()
+
+
+def apply_default_params(
+    stages: StageSequence, images: Iterable[ImageId], defaults: DefaultParams
+) -> None:
+    """Make the stages of a new project start from ``defaults``.
+
+    Stages whose defaults equal the factory ones are left alone so that the
+    pipeline keeps detecting by itself. Deskew is only seeded when manual, as an
+    explicit automatic entry would be trusted instead of detected.
+
+    Pages that a split will create later (left and right) are seeded together
+    with the single page, because the filters keep no default for them.
+
+    Args:
+        stages (StageSequence): Stages of the new project.
+        images (Iterable[ImageId]): Images of the project.
+        defaults (DefaultParams): The selected profile.
+    """
+    factory = DefaultParams()
+    image_list = list(images)
+    pages = [
+        PageId(image_id=image_id, sub_page=sub_page)
+        for image_id in image_list
+        for sub_page in SubPage
+    ]
+
+    if defaults.fix_orientation != factory.fix_orientation:
+        for image_id in image_list:
+            stages.fix_orientation_filter.settings.apply_rotation(
+                image_id, defaults.fix_orientation.image_rotation
+            )
+
+    if defaults.page_split != factory.page_split:
+        stages.page_split_filter.settings.set_default_layout_type(
+            defaults.page_split.layout_type
+        )
+
+    if defaults.deskew.mode is DeskewMode.MANUAL:
+        deskew_params = defaults.get_deskew_params()
+        for page in pages:
+            stages.deskew_filter.settings.set_params(page, deskew_params)
+
+    if defaults.select_content != factory.select_content:
+        size = defaults.select_content.page_rect_size_mm
+        stages.select_content_filter.settings.set_page_detection_box(
+            size.width_mm, size.height_mm
+        )
+        select_params = defaults.get_select_content_params()
+        for page in pages:
+            stages.select_content_filter.settings.set_params(page, select_params)
+
+    if defaults.page_layout != factory.page_layout:
+        layout_params = defaults.get_page_layout_params()
+        for page in pages:
+            stages.page_layout_filter.settings.set_params(page, layout_params)
+
+    if defaults.output != factory.output:
+        output_params = defaults.get_output_params()
+        for page in pages:
+            stages.output_filter.settings.set_params(page, output_params)
