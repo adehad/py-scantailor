@@ -38,6 +38,12 @@ OUTPUT_GROUP_TITLES: dict[ApplyGroup, str] = {
     ApplyGroup.DEWARPING: "Apply Dewarping Mode",
     ApplyGroup.DEPTH_PERCEPTION: "Apply Depth Perception",
 }
+DESKEW_TITLE = "Apply Deskew"
+# Which parts of the Deskew settings are copied, as option key to label.
+DESKEW_OPTIONS: dict[str, str] = {
+    "deskew": "Deskew angle and mode",
+    "oblique": "Oblique angle and mode",
+}
 _SELECTION_SCOPES = (ApplyScope.SELECTED_PAGES, ApplyScope.EVERY_OTHER_SELECTED)
 
 

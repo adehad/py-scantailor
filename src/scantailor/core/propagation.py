@@ -315,26 +315,32 @@ def apply_page_split(
 
 
 def apply_deskew(
-    stages: StageSequence, source: PageId, targets: Iterable[PageId]
+    stages: StageSequence,
+    source: PageId,
+    targets: Iterable[PageId],
+    *,
+    apply_deskew: bool = True,
+    apply_oblique: bool = True,
 ) -> None:
     """Copy the source page's deskew setting.
 
     A manual angle is copied as it is. An automatic one is not: the targets
-    forget their stored angle so each detects its own.
+    detect their own. A part that is not copied stays as the target has it.
 
     Args:
         stages (StageSequence): The stages whose settings are updated.
         source (PageId): The page whose setting is copied.
         targets (Iterable[PageId]): Pages that receive it.
+        apply_deskew (bool): Copy the rotation angle and mode.
+        apply_oblique (bool): Copy the oblique angle and mode.
     """
     settings = stages.deskew_filter.settings
-    params = settings.get_params(source)
-    pages = list(targets)
-    if params.is_manual():
-        settings.apply_params_to_pages(pages, params)
-        return
-    for page in pages:
-        settings.clear_page(page)
+    settings.apply_parts_to_pages(
+        settings.get_params(source),
+        targets,
+        rotation=apply_deskew,
+        oblique=apply_oblique,
+    )
 
 
 def apply_select_content(

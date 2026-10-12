@@ -82,7 +82,9 @@ def test_deskew_auto_after_manual_redetects_the_angle(qtbot: QtBot) -> None:
     )
 
 
-def test_deskew_auto_click_forgets_the_stored_angle(qtbot: QtBot) -> None:
+def test_deskew_auto_click_asks_for_the_angle_to_be_detected_again(
+    qtbot: QtBot,
+) -> None:
     sequence = StageSequence()
     page = _page()
     sequence.deskew_filter.set_manual_angle(page, MANUAL_ANGLE)
@@ -92,7 +94,10 @@ def test_deskew_auto_click_forgets_the_stored_angle(qtbot: QtBot) -> None:
 
     widget._auto_btn.click()
 
-    assert not sequence.deskew_filter.settings.is_params_set(page)
+    params = sequence.deskew_filter.get_params(page)
+    assert params.is_auto()
+    assert params.redetect_rotation
+    assert sequence.deskew_filter.needs_detection(page, DeskewDependencies())
 
 
 def test_deskew_angle_detected_under_other_rotation_is_recomputed() -> None:
