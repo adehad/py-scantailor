@@ -590,9 +590,12 @@ def test_zooming_changes_the_view_transform_but_not_the_stored_parameters(
     qtbot: QtBot, project_window: MainWindowManager, stage: FilterStage
 ):
     page = project_window.current_page
-    _pin_all_pages(project_window)
     stages = project_window.stages
     stages.page_split_filter.set_manual_split(page, 300.0, PAGE_WIDTH, PAGE_HEIGHT)
+    # A stored two-page layout turns the image into two pages; follow the first.
+    project_window._adopt_stored_page_counts([page.image_id])
+    page = project_window.current_page
+    _pin_all_pages(project_window)
     if stage == FilterStage.FIX_ORIENTATION:
         view = project_window._panels.view
         qtbot.waitUntil(lambda: view.image is not None, timeout=RENDER_TIMEOUT_MS)
@@ -694,6 +697,10 @@ def test_split_lines_follow_the_page_after_a_page_switch(
     split_filter = project_window.stages.page_split_filter
     split_filter.set_manual_split(first, 200.0, PAGE_WIDTH, PAGE_HEIGHT)
     split_filter.set_manual_split(second, 420.0, PAGE_WIDTH, PAGE_HEIGHT)
+    project_window._adopt_stored_page_counts([first.image_id, second.image_id])
+    other_image_page = next(
+        page for page in project_window.pages() if page.image_id == second.image_id
+    )
     view = _open_stage(
         qtbot,
         project_window,
@@ -705,7 +712,7 @@ def test_split_lines_follow_the_page_after_a_page_switch(
     with qtbot.waitSignal(
         project_window.renderer.render_done, timeout=RENDER_TIMEOUT_MS
     ):
-        project_window.goNextPage()
+        project_window.page_selected(other_image_page)
 
     qtbot.waitUntil(
         lambda: view.page_layout is not None
