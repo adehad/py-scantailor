@@ -551,25 +551,6 @@
          <property name="toolTip">
           <string>Pause automatic thumbnail reordering while thumbnails refresh.</string>
          </property>
-         <property name="styleSheet">
-          <string notr="true">QToolButton:!hover {
-  padding: 0;
-  border: none;
-  background-color: transparent;
-}
-
-QToolButton:hover {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(base);
-}
-
-QToolButton:pressed {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(alternative-base);
-}</string>
-         </property>
          <property name="text">
           <string notr="true"/>
          </property>
