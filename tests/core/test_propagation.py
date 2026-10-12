@@ -29,6 +29,7 @@ from scantailor.core.propagation import (
 from scantailor.core.stage_sequence import StageSequence
 from scantailor.filters.deskew.params import Params as DeskewParams
 from scantailor.filters.output.color_mode import ColorMode
+from scantailor.filters.output.params import ApplyGroup
 from scantailor.filters.output.params import Params as OutputParams
 from scantailor.filters.page_layout.alignment import (
     Alignment,
@@ -504,6 +505,8 @@ class TestApplyFunctions:
         params = OutputParams(color_mode=ColorMode.COLOR_GRAYSCALE)
         stages.output_filter.set_params(source, params)
 
-        apply_output(stages, source, [target])
+        apply_output(stages, source, [target], ApplyGroup.COLOR_MODE)
 
-        assert stages.output_filter.get_params(target) == params
+        assert stages.output_filter.get_params(target).color_mode == (
+            ColorMode.COLOR_GRAYSCALE
+        )

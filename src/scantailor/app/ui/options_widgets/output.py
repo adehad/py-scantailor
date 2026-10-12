@@ -9,6 +9,7 @@ from collections.abc import Callable
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QBoxLayout,
     QButtonGroup,
     QCheckBox,
     QComboBox,
@@ -27,6 +28,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from scantailor.app.ui.icons import icon
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 from scantailor.core.models import Dpi, PageId
 from scantailor.filters.output.binarization import BinarizationMethod
@@ -35,7 +37,7 @@ from scantailor.filters.output.color_options import FillingColor
 from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.output.dewarping_options import DewarpingMode
 from scantailor.filters.output.filter import Filter
-from scantailor.filters.output.params import DistortionModelSpec, Params
+from scantailor.filters.output.params import ApplyGroup, DistortionModelSpec, Params
 
 _DEPTH_PERCEPTION_SCALE = 10  # Slider steps per unit of depth perception.
 _DESPECKLE_LEVELS = (
@@ -94,8 +96,25 @@ def _check_box(name: str, text: str, tooltip: str = "") -> QCheckBox:
     return box
 
 
+def _apply_button(layout: QVBoxLayout | QHBoxLayout, group: ApplyGroup) -> QPushButton:
+    """Add the button that copies one option group to other pages."""
+    button = QPushButton("Apply to ...")
+    button.setObjectName(f"apply_{group.value}_btn")
+    button.setToolTip("Copy these settings to other pages")
+    layout.addWidget(button)
+    return button
+
+
+_DESPECKLE_ICONS = {
+    DespeckleLevel.OFF: "despeckle_off",
+    DespeckleLevel.CAUTIOUS: "despeckle_cautious",
+    DespeckleLevel.NORMAL: "despeckle_normal",
+    DespeckleLevel.AGGRESSIVE: "despeckle_aggressive",
+}
+
+
 def _exclusive_button(
-    group: QButtonGroup, layout: QHBoxLayout, name: str, text: str, index: int
+    group: QButtonGroup, layout: QBoxLayout, name: str, text: str, index: int
 ) -> QPushButton:
     button = QPushButton(text)
     button.setObjectName(name)
@@ -116,11 +135,13 @@ class OptionsWidget(QWidget):
     Signals:
         params_changed: Emitted when any parameter changes.
             Args: page_id (PageId)
-        apply_to_requested: Emitted when user clicks "Apply to..."
+        apply_group_requested: Emitted when the user clicks the "Apply to..."
+            button of an option group.
+            Args: group (ApplyGroup)
     """
 
     params_changed = Signal(PageId)
-    apply_to_requested = Signal()
+    apply_group_requested = Signal(object)
 
     def __init__(
         self,
@@ -139,6 +160,7 @@ class OptionsWidget(QWidget):
         self._current_page_id: PageId | None = None
         self._updating = False  # Prevent signal loops
         self._dewarping_tab_active = False
+        self._apply_buttons: dict[ApplyGroup, QPushButton] = {}
 
         self._setup_ui()
         self._connect_signals()
@@ -160,14 +182,6 @@ class OptionsWidget(QWidget):
         self._build_dewarping_group(layout)
         self._build_depth_group(layout)
 
-        apply_layout = QHBoxLayout()
-        apply_layout.addItem(_spacer())
-        self._apply_btn = QPushButton("Apply to ...")
-        self._apply_btn.setObjectName("applyToBtn")
-        apply_layout.addWidget(self._apply_btn)
-        apply_layout.addItem(_spacer())
-        layout.addLayout(apply_layout)
-
         layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         )
@@ -183,6 +197,7 @@ class OptionsWidget(QWidget):
         self._dpi_spinbox.setSingleStep(50)
         dpi_layout.addWidget(self._dpi_spinbox)
         dpi_layout.addItem(_spacer())
+        self._apply_buttons[ApplyGroup.DPI] = _apply_button(dpi_layout, ApplyGroup.DPI)
         layout.addWidget(self._dpi_group)
 
     def _build_mode_group(self, layout: QVBoxLayout) -> None:
@@ -190,7 +205,7 @@ class OptionsWidget(QWidget):
         self._mode_group.setObjectName("modeGroup")
         mode_layout = QVBoxLayout(self._mode_group)
 
-        mode_btn_layout = QHBoxLayout()
+        mode_btn_layout = QVBoxLayout()
         self._mode_button_group = QButtonGroup(self)
         self._bw_btn = _exclusive_button(
             self._mode_button_group, mode_btn_layout, "bwBtn", "Black and White", 0
@@ -202,6 +217,9 @@ class OptionsWidget(QWidget):
             self._mode_button_group, mode_btn_layout, "mixedBtn", "Mixed", 2
         )
         self._mixed_btn.setToolTip("Black and white with colorful pictures")
+        self._bw_btn.setIcon(icon("contrast"))
+        self._gray_btn.setIcon(icon("palette"))
+        self._mixed_btn.setIcon(icon("mixed"))
         self._bw_btn.setChecked(True)
         mode_layout.addLayout(mode_btn_layout)
 
@@ -218,6 +236,9 @@ class OptionsWidget(QWidget):
         bow_layout.addItem(_spacer())
         mode_layout.addLayout(bow_layout)
 
+        self._apply_buttons[ApplyGroup.COLOR_MODE] = _apply_button(
+            mode_layout, ApplyGroup.COLOR_MODE
+        )
         layout.addWidget(self._mode_group)
 
     def _build_common_group(self, layout: QVBoxLayout) -> None:
@@ -294,6 +315,9 @@ class OptionsWidget(QWidget):
         )
         splitting_layout.addWidget(self._original_background_check)
 
+        self._apply_buttons[ApplyGroup.SPLITTING] = _apply_button(
+            splitting_layout, ApplyGroup.SPLITTING
+        )
         layout.addWidget(self._splitting_group)
 
     def _build_binarization_group(self, layout: QVBoxLayout) -> None:
@@ -338,6 +362,9 @@ class OptionsWidget(QWidget):
         self._build_method_pages()
         bin_layout.addWidget(self._method_options)
 
+        self._apply_buttons[ApplyGroup.BINARIZATION] = _apply_button(
+            bin_layout, ApplyGroup.BINARIZATION
+        )
         layout.addWidget(self._binarization_group)
 
     def _build_method_pages(self) -> None:
@@ -462,8 +489,13 @@ class OptionsWidget(QWidget):
             DespeckleLevel.AGGRESSIVE
         ]
         self._despeckle_cautious_btn.setChecked(True)
+        for level, glyph in _DESPECKLE_ICONS.items():
+            self._despeckle_buttons[level].setIcon(icon(glyph))
         despeckle_layout.addLayout(btn_layout)
 
+        self._apply_buttons[ApplyGroup.DESPECKLE] = _apply_button(
+            despeckle_layout, ApplyGroup.DESPECKLE
+        )
         layout.addWidget(self._despeckle_group)
 
     def _build_dewarping_group(self, layout: QVBoxLayout) -> None:
@@ -497,6 +529,9 @@ class OptionsWidget(QWidget):
         self._post_deskew_check.setChecked(True)
         dewarp_layout.addWidget(self._post_deskew_check)
 
+        self._apply_buttons[ApplyGroup.DEWARPING] = _apply_button(
+            dewarp_layout, ApplyGroup.DEWARPING
+        )
         layout.addWidget(self._dewarping_group)
 
     def _build_depth_group(self, layout: QVBoxLayout) -> None:
@@ -515,6 +550,9 @@ class OptionsWidget(QWidget):
         self._depth_label.setMinimumWidth(30)
         depth_layout.addWidget(self._depth_label)
         self._depth_group.setVisible(False)
+        self._apply_buttons[ApplyGroup.DEPTH_PERCEPTION] = _apply_button(
+            depth_layout, ApplyGroup.DEPTH_PERCEPTION
+        )
         layout.addWidget(self._depth_group)
 
     def _connect_signals(self) -> None:
@@ -613,7 +651,12 @@ class OptionsWidget(QWidget):
         self._depth_slider.valueChanged.connect(self._on_depth_changed)
         self._depth_slider.sliderReleased.connect(self._commit_depth)
 
-        self._apply_btn.clicked.connect(self.apply_to_requested.emit)
+        for group, button in self._apply_buttons.items():
+            button.clicked.connect(
+                lambda _checked=False, group=group: self.apply_group_requested.emit(
+                    group
+                )
+            )
 
     def set_current_page(self, page_id: PageId) -> None:
         """Set the current page being edited.
