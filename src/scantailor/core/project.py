@@ -7,7 +7,7 @@ Handles loading, saving, and managing ScanTailor projects. Supports:
 
 import json
 import os
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from enum import IntEnum
 from pathlib import Path
 from typing import Any, Literal, Self
@@ -145,6 +145,50 @@ class StageParamsEntry(BaseModel):
     params: dict[str, Any]
 
 
+class OutputFileLabel(BaseModel):
+    """The number that tells apart source files sharing a file name.
+
+    It appears in the output file name as ``name(label).tif``. The labels
+    outlive the images: removing a page keeps its file's label, so the other
+    outputs keep their names.
+
+    Args:
+        file_path (Path): The source file.
+        label (int): Zero for the first file of a name, then counting up.
+    """
+
+    file_path: Path
+    label: int = Field(ge=0)
+
+
+def assign_output_file_labels(
+    files: Iterable[Path], known: Mapping[Path, int] | None = None
+) -> dict[Path, int]:
+    """Give every source file an output label, keeping the known ones.
+
+    A file without a label gets one more than the highest label of any file
+    with the same name, or zero when it is the first of its name.
+
+    Args:
+        files (Iterable[Path]): Source files in project order; the order decides
+            which colliding file gets which new label.
+        known (Mapping[Path, int] | None): Labels to keep, for instance those
+            written by an earlier session.
+
+    Returns:
+        dict[Path, int]: The known labels plus a label for each file in ``files``.
+    """
+    labels = dict(known or {})
+    highest: dict[str, int] = {}
+    for file_path, label in labels.items():
+        highest[file_path.name] = max(highest.get(file_path.name, -1), label)
+    for file_path in files:
+        if file_path not in labels:
+            labels[file_path] = highest.get(file_path.name, -1) + 1
+            highest[file_path.name] = labels[file_path]
+    return labels
+
+
 class Project(BaseModel):
     """A ScanTailor project.
 
@@ -156,6 +200,10 @@ class Project(BaseModel):
         selected_page (PageId | None): Currently selected page.
         stage_params (dict[str, list[StageParamsEntry]]): Explicitly set per-page
             parameters, keyed by stage key (see ``core.stage_params``).
+        stage_defaults (dict[str, Any]): Stage-wide values that unset pages fall
+            back to (see ``core.stage_params.collect_stage_defaults``).
+        output_file_labels (list[OutputFileLabel]): Labels that keep output file
+            names stable; see ``batch.output_file_names``.
     """
 
     version: int = 1
@@ -164,6 +212,8 @@ class Project(BaseModel):
     images: list[ImageInfo] = Field(default_factory=list)
     selected_page: PageId | None = None
     stage_params: dict[str, list[StageParamsEntry]] = Field(default_factory=dict)
+    stage_defaults: dict[str, Any] = Field(default_factory=dict)
+    output_file_labels: list[OutputFileLabel] = Field(default_factory=list)
 
     def get_pages(self) -> list[PageId]:
         """Get all page IDs in the project, respecting layout direction.
@@ -171,34 +221,22 @@ class Project(BaseModel):
         Returns:
             list[PageId]: All pages in display order.
         """
-        pages: list[PageId] = []
-        for image_info in self.images:
-            if image_info.num_sub_pages == 1:
-                # Single page or one half removed
-                if image_info.left_half_removed:
-                    sub_page = SubPage.RIGHT_PAGE
-                elif image_info.right_half_removed:
-                    sub_page = SubPage.LEFT_PAGE
-                else:
-                    sub_page = SubPage.SINGLE_PAGE
-                pages.append(PageId(image_id=image_info.id, sub_page=sub_page))
+        return [page for info in self.images for page in self._pages_of_image(info)]
+
+    def _pages_of_image(self, image_info: ImageInfo) -> list[PageId]:
+        """List the pages one image contributes, in display order."""
+        if image_info.num_sub_pages == 1:
+            if image_info.left_half_removed:
+                sub_page = SubPage.RIGHT_PAGE
+            elif image_info.right_half_removed:
+                sub_page = SubPage.LEFT_PAGE
             else:
-                # Two pages
-                if self.layout_direction == "LTR":
-                    pages.append(
-                        PageId(image_id=image_info.id, sub_page=SubPage.LEFT_PAGE)
-                    )
-                    pages.append(
-                        PageId(image_id=image_info.id, sub_page=SubPage.RIGHT_PAGE)
-                    )
-                else:  # RTL
-                    pages.append(
-                        PageId(image_id=image_info.id, sub_page=SubPage.RIGHT_PAGE)
-                    )
-                    pages.append(
-                        PageId(image_id=image_info.id, sub_page=SubPage.LEFT_PAGE)
-                    )
-        return pages
+                sub_page = SubPage.SINGLE_PAGE
+            return [PageId(image_id=image_info.id, sub_page=sub_page)]
+        halves = [SubPage.LEFT_PAGE, SubPage.RIGHT_PAGE]
+        if self.layout_direction == "RTL":
+            halves.reverse()
+        return [PageId(image_id=image_info.id, sub_page=half) for half in halves]
 
     def add_image(
         self, image_id: ImageId, metadata: ImageMetadata | None = None
@@ -219,9 +257,160 @@ class Project(BaseModel):
         self.images.append(info)
         return info
 
+    def insert_image(
+        self,
+        image_info: ImageInfo,
+        existing: ImageId | None,
+        *,
+        before: bool,
+    ) -> list[PageId]:
+        """Insert an image next to an image already in the project.
+
+        Args:
+            image_info (ImageInfo): The image to insert. Both halves of a
+                two-page image are kept; for a one-page image, removing both
+                halves is read as removing none.
+            existing (ImageId | None): The image to insert beside. None with
+                ``before=True`` appends at the end.
+            before (bool): Insert before ``existing`` rather than after it.
+
+        Returns:
+            list[PageId]: The pages the image adds, in display order; empty if
+                ``existing`` is not in the project (and is not the append case).
+        """
+        if existing is None:
+            if not before:
+                return []
+            position = len(self.images)
+        else:
+            position = next(
+                (n for n, info in enumerate(self.images) if info.id == existing),
+                None,
+            )
+            if position is None:
+                return []
+            if not before:
+                position += 1
+
+        both_removed = image_info.left_half_removed and image_info.right_half_removed
+        if image_info.num_sub_pages == 2 or both_removed:
+            image_info = image_info.model_copy(
+                update={"left_half_removed": False, "right_half_removed": False}
+            )
+        self.images.insert(position, image_info)
+        return self._pages_of_image(image_info)
+
+    def insert_images(
+        self,
+        image_infos: Sequence[ImageInfo],
+        existing: ImageId | None,
+        *,
+        before: bool,
+    ) -> list[PageId]:
+        """Insert several images as one block, keeping their given order.
+
+        Args:
+            image_infos (Sequence[ImageInfo]): Images in the order they should
+                appear, such as the pages of a multi-page TIFF.
+            existing (ImageId | None): The image to insert beside; see
+                ``insert_image``.
+            before (bool): Insert the block before ``existing`` rather than after.
+
+        Returns:
+            list[PageId]: The pages added, in display order.
+        """
+        added: list[PageId] = []
+        anchor = existing
+        for image_info in image_infos:
+            pages = self.insert_image(image_info, anchor, before=before)
+            if not pages:
+                break
+            added.extend(pages)
+            if not before:
+                anchor = image_info.id
+        return added
+
+    def remove_pages(self, pages: Iterable[PageId]) -> list[PageId]:
+        """Remove pages, whole images or single halves of split images.
+
+        Removing a single-page entry removes its image. Removing one half of a
+        two-page image keeps the other half as a one-page image; removing both
+        halves removes the image. Parameters of pages that remain are kept and
+        those of removed pages are dropped.
+
+        Args:
+            pages (Iterable[PageId]): Pages to remove; pages not in the project
+                are ignored.
+
+        Returns:
+            list[PageId]: The pages that were removed, in display order.
+        """
+        wanted = set(pages)
+        present = self.get_pages()
+        doomed = [page for page in present if page in wanted]
+        if not doomed:
+            return []
+        doomed_set = set(doomed)
+
+        remaining: list[ImageInfo] = []
+        for info in self.images:
+            image_pages = self._pages_of_image(info)
+            kept = [page for page in image_pages if page not in doomed_set]
+            if len(kept) == len(image_pages):
+                remaining.append(info)
+            elif kept:
+                removed_half = next(p for p in image_pages if p in doomed_set)
+                remaining.append(
+                    info.model_copy(
+                        update={
+                            "num_sub_pages": 1,
+                            "left_half_removed": removed_half.sub_page
+                            == SubPage.LEFT_PAGE,
+                            "right_half_removed": removed_half.sub_page
+                            == SubPage.RIGHT_PAGE,
+                        }
+                    )
+                )
+        self.images = remaining
+
+        surviving_images = {info.id for info in remaining}
+        survivors = set(self.get_pages())
+        if self.selected_page is not None and self.selected_page not in survivors:
+            self.selected_page = None
+        self.stage_params = {
+            stage: kept_entries
+            for stage, entries in self.stage_params.items()
+            if (
+                kept_entries := [
+                    entry
+                    for entry in entries
+                    if entry.page in survivors
+                    or (
+                        entry.page.sub_page == SubPage.SINGLE_PAGE
+                        and entry.page.image_id in surviving_images
+                    )
+                ]
+            )
+        }
+        return doomed
+
     def image_ids(self) -> list[ImageId]:
         """Return the id of every image in the project."""
         return [info.id for info in self.images]
+
+    def output_file_label_map(self) -> dict[Path, int]:
+        """Return the stored output labels keyed by source file."""
+        return {entry.file_path: entry.label for entry in self.output_file_labels}
+
+    def register_output_file_labels(self) -> None:
+        """Store a label for every source file of the project that lacks one."""
+        labels = assign_output_file_labels(
+            (info.id.file_path for info in self.images), self.output_file_label_map()
+        )
+        self.output_file_labels = [
+            OutputFileLabel(file_path=file_path, label=label)
+            for file_path, label in labels.items()
+        ]
 
     def remap_image_paths(self, remap: Callable[[Path], Path]) -> None:
         """Replace the file path of every image, including in stored parameters.
@@ -241,6 +430,10 @@ class Project(BaseModel):
         ]
         if self.selected_page is not None:
             self.selected_page = remap_page(self.selected_page)
+        self.output_file_labels = [
+            OutputFileLabel(file_path=remap(entry.file_path), label=entry.label)
+            for entry in self.output_file_labels
+        ]
         self.stage_params = {
             stage: [
                 StageParamsEntry(page=remap_page(entry.page), params=entry.params)
@@ -258,6 +451,7 @@ class Project(BaseModel):
         Args:
             path (Path): Path to save the project to.
         """
+        self.register_output_file_labels()
         data = self.model_dump(mode="json")
         base = path.resolve().parent
         _map_paths(data, lambda stored: _to_stored_path(Path(stored), base))
@@ -278,7 +472,9 @@ class Project(BaseModel):
         Raises:
             ValueError: If the file format is not recognized.
         """
-        content = path.read_text(encoding="utf-8")
+        from scantailor.core.xml_reader import decode_project_bytes
+
+        content = decode_project_bytes(path.read_bytes())
 
         # Detect format by content
         stripped = content.lstrip()
@@ -378,6 +574,9 @@ def _path_holders(data: dict[str, Any]) -> Iterator[tuple[dict[str, Any], str]]:
     for image_id in image_ids:
         if isinstance(image_id, dict):
             yield image_id, "file_path"
+    yield from (
+        (entry, "file_path") for entry in _dicts(data.get("output_file_labels"))
+    )
 
 
 def _map_paths(data: dict[str, Any], convert: Callable[[str], str]) -> None:

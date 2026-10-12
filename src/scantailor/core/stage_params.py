@@ -10,9 +10,12 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from scantailor.core.models import ImageId, OrthogonalRotation, PageId
+from scantailor.core.models import Dpi, ImageId, OrthogonalRotation, PageId
 from scantailor.core.project import StageParamsEntry
 from scantailor.core.stage_sequence import FilterStage, StageSequence
+from scantailor.filters.output.color_mode import ColorMode
+from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.page_split.layout_type import LayoutType
 
 STAGE_KEYS: dict[FilterStage, str] = {
     FilterStage.FIX_ORIENTATION: "fix_orientation",
@@ -133,3 +136,54 @@ def apply_stage_params(
         set_params: Callable[[PageId, BaseModel], None] = settings.set_params
         for entry in entries:
             set_params(entry.page, params_type.model_validate(entry.params))
+
+
+def collect_stage_defaults(stages: StageSequence) -> dict[str, Any]:
+    """Read the stage-wide values that pages without their own parameters use.
+
+    Returns:
+        dict[str, Any]: JSON-compatible values for :func:`apply_stage_defaults`.
+    """
+    output = stages.output_filter.settings
+    select_content = stages.select_content_filter.settings
+    return {
+        "page_split_layout_type": (
+            stages.page_split_filter.settings.get_default_layout_type().value
+        ),
+        "output_dpi": output.get_default_dpi().model_dump(mode="json"),
+        "output_color_mode": output.get_default_color_mode().value,
+        "output_despeckle_level": output.get_default_despeckle_level().value,
+        "page_detection_box": list(select_content.get_page_detection_box()),
+        "page_detection_tolerance": select_content.get_page_detection_tolerance(),
+    }
+
+
+def apply_stage_defaults(stages: StageSequence, defaults: dict[str, Any]) -> None:
+    """Install stage-wide values into the stages' settings.
+
+    Args:
+        stages (StageSequence): The stages to populate.
+        defaults (dict[str, Any]): Output of :func:`collect_stage_defaults`. A
+            missing key leaves that default as it is, so partial data (from a
+            C++ project, or a file saved before a key existed) is accepted.
+
+    Raises:
+        ValueError: If a stored value is not valid for its setting.
+    """
+    output = stages.output_filter.settings
+    select_content = stages.select_content_filter.settings
+    if (layout_type := defaults.get("page_split_layout_type")) is not None:
+        stages.page_split_filter.settings.set_default_layout_type(
+            LayoutType(layout_type)
+        )
+    if (dpi := defaults.get("output_dpi")) is not None:
+        output.set_default_dpi(Dpi.model_validate(dpi))
+    if (color_mode := defaults.get("output_color_mode")) is not None:
+        output.set_default_color_mode(ColorMode(color_mode))
+    if (despeckle := defaults.get("output_despeckle_level")) is not None:
+        output.set_default_despeckle_level(DespeckleLevel(despeckle))
+    if (box := defaults.get("page_detection_box")) is not None:
+        width, height = box
+        select_content.set_page_detection_box(width, height)
+    if (tolerance := defaults.get("page_detection_tolerance")) is not None:
+        select_content.set_page_detection_tolerance(tolerance)

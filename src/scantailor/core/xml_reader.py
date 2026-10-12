@@ -7,8 +7,12 @@ without losing the rest of the project.
 """
 
 import base64
+import codecs
+import locale
 import math
+import re
 import struct
+import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -24,10 +28,64 @@ Line = tuple[Point, Point]
 Rect = tuple[float, float, float, float]
 
 _FLOAT32_PAIR = struct.Struct("<ff")
+_DECLARED_ENCODING = re.compile(
+    rb"""\A\s*<\?xml[^>]*?\sencoding\s*=\s*["']([A-Za-z0-9._:-]+)["']"""
+)
 
 
 class XmlFormatError(ValueError):
     """An element of a C++ project file holds a value that cannot be read."""
+
+
+def _ansi_codepage() -> str:
+    """Name the codepage a Qt5 build on this machine writes non-Unicode text in."""
+    if sys.platform == "win32":
+        return locale.getencoding()
+    return "cp1252"
+
+
+def _declared_encoding(raw: bytes) -> str | None:
+    """Return the codec named by an XML declaration, or None if absent or unknown."""
+    match = _DECLARED_ENCODING.match(raw)
+    if match is None:
+        return None
+    name = match.group(1).decode("ascii")
+    try:
+        return codecs.lookup(name).name
+    except LookupError:
+        logger.warning("The project file declares an unknown encoding {!r}", name)
+        return None
+
+
+def decode_project_bytes(raw: bytes) -> str:
+    """Decode the bytes of a project file without ever failing.
+
+    The encoding named in an XML declaration is used when there is one,
+    otherwise UTF-8. Qt5 on Windows wrote paths in the locale codepage, so bytes
+    that are not valid in that encoding are read as the Windows codepage
+    instead, and as Windows-1252 with replacement characters as a last resort.
+
+    Args:
+        raw (bytes): The file content.
+
+    Returns:
+        str: The text, without a byte order mark.
+    """
+    if raw.startswith(codecs.BOM_UTF8):
+        raw = raw[len(codecs.BOM_UTF8) :]
+    expected = _declared_encoding(raw) or "utf-8"
+    try:
+        return raw.decode(expected)
+    except UnicodeDecodeError:
+        pass
+    fallback = _ansi_codepage()
+    logger.warning(
+        "The project file is not valid {}; reading it as {}", expected, fallback
+    )
+    try:
+        return raw.decode(fallback)
+    except (UnicodeDecodeError, LookupError):
+        return raw.decode("cp1252", errors="replace")
 
 
 @dataclass

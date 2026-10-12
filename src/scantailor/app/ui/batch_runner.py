@@ -1,7 +1,7 @@
 """Runs a batch on a worker thread and reports progress as signals."""
 
 import threading
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from loguru import logger
@@ -29,6 +29,7 @@ class _BatchWorker(QtCore.QObject):
         max_workers: int | None,
         cancel: threading.Event,
         dpi_overrides: DpiOverrides,
+        file_labels: Mapping[Path, int] | None,
     ) -> None:
         super().__init__()
         self._arguments = (stages, pages, output_dir)
@@ -36,6 +37,7 @@ class _BatchWorker(QtCore.QObject):
         self._max_workers = max_workers
         self._cancel = cancel
         self._dpi_overrides = dpi_overrides
+        self._file_labels = file_labels
 
     def _on_event(self, event: BatchEvent) -> None:
         if isinstance(event, PageDetected):
@@ -57,6 +59,7 @@ class _BatchWorker(QtCore.QObject):
                 on_progress=self._on_event,
                 cancel=self._cancel,
                 dpi_overrides=self._dpi_overrides,
+                file_labels=self._file_labels,
             )
         except Exception as error:
             logger.exception("Batch processing failed")
@@ -108,6 +111,7 @@ class BatchRunner(QtCore.QObject):
         layout_direction: LayoutDirection = "LTR",
         max_workers: int | None = None,
         dpi_overrides: DpiOverrides | None = None,
+        file_labels: Mapping[Path, int] | None = None,
     ) -> None:
         """Start a batch on a new thread.
 
@@ -119,6 +123,8 @@ class BatchRunner(QtCore.QObject):
             max_workers (int | None): Worker processes; None for the CPU count.
             dpi_overrides (DpiOverrides | None): Snapshot of the project's
                 resolutions, taken on the calling thread.
+            file_labels (Mapping[Path, int] | None): Stored output file labels of
+                the project's source files.
 
         Raises:
             RuntimeError: If a batch is already running.
@@ -136,6 +142,7 @@ class BatchRunner(QtCore.QObject):
             max_workers,
             self._cancel,
             dpi_overrides or {},
+            file_labels,
         )
         thread = QtCore.QThread(self)
         worker.moveToThread(thread)

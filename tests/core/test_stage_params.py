@@ -8,12 +8,15 @@ from scantailor.core.models import Dpi, ImageId, Margins, OrthogonalRotation, Pa
 from scantailor.core.project import Project
 from scantailor.core.stage_params import (
     STAGE_KEYS,
+    apply_stage_defaults,
     apply_stage_params,
+    collect_stage_defaults,
     collect_stage_params,
 )
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.deskew.params import Params as DeskewParams
 from scantailor.filters.output.color_mode import ColorMode
+from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.output.params import Params as OutputParams
 from scantailor.filters.page_layout.params import Params as PageLayoutParams
 from scantailor.filters.page_split.layout_type import LayoutType
@@ -157,3 +160,65 @@ def test_apply_rejects_entries_that_do_not_match_the_stage_params(
 def test_stage_keys_cover_all_stages_with_unique_names():
     assert set(STAGE_KEYS) == set(FilterStage)
     assert len(set(STAGE_KEYS.values())) == len(FilterStage)
+
+
+class TestStageDefaults:
+    @pytest.fixture
+    def customised(self) -> StageSequence:
+        stages = StageSequence()
+        stages.page_split_filter.settings.set_default_layout_type(LayoutType.TWO_PAGES)
+        output = stages.output_filter.settings
+        output.set_default_dpi(Dpi.uniform(600))
+        output.set_default_color_mode(ColorMode.MIXED)
+        output.set_default_despeckle_level(DespeckleLevel.AGGRESSIVE)
+        select_content = stages.select_content_filter.settings
+        select_content.set_page_detection_box(210.0, 297.0)
+        select_content.set_page_detection_tolerance(0.25)
+        return stages
+
+    def test_defaults_survive_a_project_file_round_trip(
+        self, customised: StageSequence, tmp_path: Path
+    ):
+        project = Project()
+        project.stage_defaults = collect_stage_defaults(customised)
+        project_file = tmp_path / "p.json"
+
+        project.save(project_file)
+        restored = StageSequence()
+        apply_stage_defaults(restored, Project.load(project_file).stage_defaults)
+
+        assert collect_stage_defaults(restored) == collect_stage_defaults(customised)
+        assert (
+            restored.page_split_filter.settings.get_default_layout_type()
+            is LayoutType.TWO_PAGES
+        )
+        output = restored.output_filter.settings
+        assert output.get_default_dpi() == Dpi.uniform(600)
+        assert output.get_default_color_mode() is ColorMode.MIXED
+        assert output.get_default_despeckle_level() is DespeckleLevel.AGGRESSIVE
+        select_content = restored.select_content_filter.settings
+        assert select_content.get_page_detection_box() == (210.0, 297.0)
+        assert select_content.get_page_detection_tolerance() == pytest.approx(0.25)
+
+    def test_empty_defaults_leave_the_stage_defaults_alone(self):
+        stages = StageSequence()
+        before = collect_stage_defaults(stages)
+
+        apply_stage_defaults(stages, {})
+
+        assert collect_stage_defaults(stages) == before
+
+    def test_partial_defaults_change_only_the_keys_present(self):
+        stages = StageSequence()
+        before = collect_stage_defaults(stages)
+
+        apply_stage_defaults(stages, {"output_color_mode": ColorMode.MIXED.value})
+
+        after = collect_stage_defaults(stages)
+        assert after.pop("output_color_mode") == ColorMode.MIXED.value
+        before.pop("output_color_mode")
+        assert after == before
+
+    def test_invalid_stored_value_is_rejected(self):
+        with pytest.raises(ValueError):
+            apply_stage_defaults(StageSequence(), {"output_color_mode": "no-such-mode"})
