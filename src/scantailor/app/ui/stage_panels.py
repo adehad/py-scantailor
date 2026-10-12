@@ -560,8 +560,10 @@ class StagePanels(QtCore.QObject):
         page = self._page
         if page is None:
             return
-        filter_ = self.sequence.page_split_filter
-        filter_.set_params(page, filter_.get_params(page).with_manual_layout(layout))
+        rotation = self.sequence.fix_orientation_filter.get_rotation(page.image_id)
+        self.sequence.page_split_filter.set_manual_layout(
+            page, layout, rotation_degrees=rotation.degrees
+        )
         self._after_edit()
 
     def _on_deskew_angle_set(self, degrees: float) -> None:
