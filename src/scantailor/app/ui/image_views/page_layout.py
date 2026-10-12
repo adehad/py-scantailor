@@ -10,13 +10,14 @@ from dataclasses import dataclass
 
 from PySide6 import QtGui, QtWidgets
 from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import QAction, QColor, QPainter, QPen
+from PySide6.QtGui import QAction, QPainter, QPen
 
 from scantailor.app.ui.image_views.base import (
     Edge,
     ImageViewBase,
     point_to_segment_distance,
 )
+from scantailor.app.ui.theme.tokens import view_color
 from scantailor.core.models import Margins
 
 
@@ -45,12 +46,6 @@ class PageLayoutImageView(ImageViewBase):
 
     EDGE_HIT_DISTANCE = 10
     GUIDE_HIT_DISTANCE = 6
-
-    INNER_COLORS = (QColor(0, 0, 255, 200), QColor(0, 0, 255, 20))
-    MIDDLE_COLORS = (QColor(0, 180, 0, 200), QColor(0, 180, 0, 20))
-    OUTER_COLORS = (QColor(180, 0, 180, 150), QColor(180, 0, 180, 10))
-    GUIDE_COLOR = QColor(255, 165, 0, 180)
-    GUIDE_HIGHLIGHT = QColor(255, 200, 0, 255)
 
     _EDGES = (Edge.LEFT, Edge.RIGHT, Edge.TOP, Edge.BOTTOM)
 
@@ -302,17 +297,15 @@ class PageLayoutImageView(ImageViewBase):
 
     def _paint_overlay(self, painter: QPainter) -> None:
         if not self._outer_rect.isEmpty():
-            self._paint_rect(painter, self._outer_rect, self.OUTER_COLORS)
+            self._paint_rect(painter, self._outer_rect, "margin_outer")
         if self._show_middle_rect and not self._middle_rect.isEmpty():
-            self._paint_rect(painter, self._middle_rect, self.MIDDLE_COLORS)
+            self._paint_rect(painter, self._middle_rect, "margin_middle")
         if not self._inner_rect.isEmpty():
-            self._paint_rect(painter, self._inner_rect, self.INNER_COLORS)
+            self._paint_rect(painter, self._inner_rect, "margin_inner")
         self._paint_guides(painter)
 
-    def _paint_rect(
-        self, painter: QPainter, rect: QRectF, colors: tuple[QColor, QColor]
-    ) -> None:
-        border, fill = colors
+    def _paint_rect(self, painter: QPainter, rect: QRectF, role: str) -> None:
+        border, fill = view_color(f"{role}_border"), view_color(f"{role}_fill")
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         pen = QPen(border)
@@ -329,7 +322,7 @@ class PageLayoutImageView(ImageViewBase):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         for guide in self._guides:
             hovered = guide is self._hovered_guide
-            pen = QPen(self.GUIDE_HIGHLIGHT if hovered else self.GUIDE_COLOR)
+            pen = QPen(view_color("guide_active" if hovered else "guide"))
             pen.setWidth(2 if hovered else 1)
             pen.setStyle(Qt.PenStyle.DashLine)
             painter.setPen(pen)
