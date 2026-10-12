@@ -5,8 +5,10 @@ The collapsed state is persisted across sessions using QSettings.
 """
 
 from PySide6.QtCore import QEvent, QSettings, Signal
-from PySide6.QtGui import QIcon, QResizeEvent, QShowEvent
-from PySide6.QtWidgets import QGroupBox, QStyle, QToolButton, QWidget
+from PySide6.QtGui import QResizeEvent, QShowEvent
+from PySide6.QtWidgets import QGroupBox, QToolButton, QWidget
+
+from scantailor.app.ui.icons import icon
 
 
 class CollapsibleGroupBox(QGroupBox):
@@ -40,18 +42,8 @@ class CollapsibleGroupBox(QGroupBox):
         self._ignore_visibility_events = 0
         self._collapsed_widgets: set[QWidget] = set()
 
-        # Icons for collapse/expand states
-        style = self.style()
-        if style is not None:
-            self._collapse_icon = style.standardIcon(
-                QStyle.StandardPixmap.SP_TitleBarMinButton
-            )
-            self._expand_icon = style.standardIcon(
-                QStyle.StandardPixmap.SP_TitleBarNormalButton
-            )
-        else:
-            self._collapse_icon = QIcon()
-            self._expand_icon = QIcon()
+        self._collapse_icon = icon("chevron-down")
+        self._expand_icon = icon("chevron-right")
 
         self._initialize()
 

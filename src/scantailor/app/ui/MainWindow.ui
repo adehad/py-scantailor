@@ -167,31 +167,14 @@
          <property name="statusTip">
           <string/>
          </property>
-         <property name="styleSheet">
-          <string notr="true">QToolButton:!hover {
-  padding: 0;
-  border: none;
-  background-color: transparent;
-}
-
-QToolButton:hover {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(base);
-}
-
-QToolButton:pressed {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(alternative-base);
-}</string>
-         </property>
          <property name="text">
           <string/>
          </property>
-         <property name="icon">
-          <iconset resource="../../resources/resources.qrc">
-           <normaloff>:/icons/eye.svg</normaloff>:/icons/eye.svg</iconset>
+         <property name="iconName" stdset="0">
+          <string notr="true">eye-off</string>
+         </property>
+         <property name="iconNameOn" stdset="0">
+          <string notr="true">eye</string>
          </property>
          <property name="iconSize">
           <size>
@@ -240,31 +223,11 @@ QToolButton:pressed {
          <property name="toolTip">
           <string>Previous page.</string>
          </property>
-         <property name="styleSheet">
-          <string notr="true">QToolButton:!hover {
-  padding: 0;
-  border: none;
-  background-color: transparent;
-}
-
-QToolButton:hover {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(base);
-}
-
-QToolButton:pressed {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(alternative-base);
-}</string>
-         </property>
          <property name="text">
           <string notr="true"/>
          </property>
-         <property name="icon">
-          <iconset resource="../../resources/resources.qrc">
-           <normaloff>:/icons/triangle-up-arrow.svg</normaloff>:/icons/triangle-up-arrow.svg</iconset>
+         <property name="iconName" stdset="0">
+          <string notr="true">chevron-up</string>
          </property>
          <property name="iconSize">
           <size>
@@ -297,31 +260,11 @@ QToolButton:pressed {
          <property name="toolTip">
           <string>Next page.</string>
          </property>
-         <property name="styleSheet">
-          <string notr="true">QToolButton:!hover {
-  padding: 0;
-  border: none;
-  background-color: transparent;
-}
-
-QToolButton:hover {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(base);
-}
-
-QToolButton:pressed {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(alternative-base);
-}</string>
-         </property>
          <property name="text">
           <string notr="true"/>
          </property>
-         <property name="icon">
-          <iconset resource="../../resources/resources.qrc">
-           <normaloff>:/icons/triangle-down-arrow.svg</normaloff>:/icons/triangle-down-arrow.svg</iconset>
+         <property name="iconName" stdset="0">
+          <string notr="true">chevron-down</string>
          </property>
          <property name="iconSize">
           <size>
@@ -354,31 +297,11 @@ QToolButton:pressed {
          <property name="toolTip">
           <string>Navigate through selected pages only.</string>
          </property>
-         <property name="styleSheet">
-          <string notr="true">QToolButton:!hover {
-  padding: 0;
-  border: none;
-  background-color: transparent;
-}
-
-QToolButton:hover {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(base);
-}
-
-QToolButton:pressed {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(alternative-base);
-}</string>
-         </property>
          <property name="text">
           <string notr="true"/>
          </property>
-         <property name="icon">
-          <iconset resource="../../resources/resources.qrc">
-           <normaloff>:/icons/check-mark.svg</normaloff>:/icons/check-mark.svg</iconset>
+         <property name="iconName" stdset="0">
+          <string notr="true">list-checks</string>
          </property>
          <property name="iconSize">
           <size>
@@ -424,31 +347,11 @@ QToolButton:pressed {
          <property name="toolTip">
           <string>Magnify thumbnails.  (Ctrl++)</string>
          </property>
-         <property name="styleSheet">
-          <string notr="true">QToolButton:!hover {
-  padding: 0;
-  border: none;
-  background-color: transparent;
-}
-
-QToolButton:hover {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(base);
-}
-
-QToolButton:pressed {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(alternative-base);
-}</string>
-         </property>
          <property name="text">
           <string notr="true"/>
          </property>
-         <property name="icon">
-          <iconset resource="../../resources/resources.qrc">
-           <normaloff>:/icons/magnifying-glass.svg</normaloff>:/icons/magnifying-glass.svg</iconset>
+         <property name="iconName" stdset="0">
+          <string notr="true">zoom-in</string>
          </property>
          <property name="iconSize">
           <size>
@@ -481,31 +384,11 @@ QToolButton:pressed {
          <property name="toolTip">
           <string>Diminish thumbnails.  (Ctrl+-)</string>
          </property>
-         <property name="styleSheet">
-          <string notr="true">QToolButton:!hover {
-  padding: 0;
-  border: none;
-  background-color: transparent;
-}
-
-QToolButton:hover {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(base);
-}
-
-QToolButton:pressed {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(alternative-base);
-}</string>
-         </property>
          <property name="text">
           <string notr="true"/>
          </property>
-         <property name="icon">
-          <iconset resource="../../resources/resources.qrc">
-           <normaloff>:/icons/diminishing-glass.svg</normaloff>:/icons/diminishing-glass.svg</iconset>
+         <property name="iconName" stdset="0">
+          <string notr="true">zoom-out</string>
          </property>
          <property name="iconSize">
           <size>
@@ -548,31 +431,11 @@ QToolButton:pressed {
          <property name="toolTip">
           <string>Go To Page...  (Ctrl+G)</string>
          </property>
-         <property name="styleSheet">
-          <string notr="true">QToolButton:!hover {
-  padding: 0;
-  border: none;
-  background-color: transparent;
-}
-
-QToolButton:hover {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(base);
-}
-
-QToolButton:pressed {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(alternative-base);
-}</string>
-         </property>
          <property name="text">
           <string notr="true"/>
          </property>
-         <property name="icon">
-          <iconset resource="../../resources/resources.qrc">
-           <normaloff>:/icons/right-pointing.svg</normaloff>:/icons/right-pointing.svg</iconset>
+         <property name="iconName" stdset="0">
+          <string notr="true">square-arrow-right</string>
          </property>
          <property name="iconSize">
           <size>
@@ -605,43 +468,11 @@ QToolButton:pressed {
          <property name="toolTip">
           <string>Enable multi page selection mode.</string>
          </property>
-         <property name="styleSheet">
-          <string notr="true">QToolButton:!hover {
-  padding: 0;
-  border: none;
-  background-color: transparent;
-}
-
-QToolButton:hover {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(base);
-}
-
-QToolButton:pressed {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(alternative-base);
-}
-
-QToolButton:checked:hover {
-  padding: 0;
-  border: 1px solid palette(window-text);
-  background-color: palette(base);
-}
-
-QToolButton:checked {
-  padding: 0;
-  border: 1px solid palette(window-text);
-  background-color: palette(alternative-base);
-}</string>
-         </property>
          <property name="text">
           <string notr="true"/>
          </property>
-         <property name="icon">
-          <iconset resource="../../resources/resources.qrc">
-           <normaloff>:/icons/checkbox-styled.svg</normaloff>:/icons/checkbox-styled.svg</iconset>
+         <property name="iconName" stdset="0">
+          <string notr="true">square-check-big</string>
          </property>
          <property name="iconSize">
           <size>
@@ -677,31 +508,14 @@ QToolButton:checked {
          <property name="toolTip">
           <string>Single/multi column display.</string>
          </property>
-         <property name="styleSheet">
-          <string notr="true">QToolButton:!hover {
-  padding: 0;
-  border: none;
-  background-color: transparent;
-}
-
-QToolButton:hover {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(base);
-}
-
-QToolButton:pressed {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(alternative-base);
-}</string>
-         </property>
          <property name="text">
           <string notr="true"/>
          </property>
-         <property name="icon">
-          <iconset resource="../../resources/resources.qrc">
-           <normaloff>:/icons/single-column-view.svg</normaloff>:/icons/single-column-view.svg</iconset>
+         <property name="iconName" stdset="0">
+          <string notr="true">layout-grid</string>
+         </property>
+         <property name="iconNameOn" stdset="0">
+          <string notr="true">rows-3</string>
          </property>
          <property name="iconSize">
           <size>
@@ -793,31 +607,14 @@ QToolButton:pressed {
          <property name="toolTip">
           <string>Sorting order.</string>
          </property>
-         <property name="styleSheet">
-          <string notr="true">QToolButton:!hover {
-  padding: 0;
-  border: none;
-  background-color: transparent;
-}
-
-QToolButton:hover {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(base);
-}
-
-QToolButton:pressed {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(alternative-base);
-}</string>
-         </property>
          <property name="text">
           <string notr="true"/>
          </property>
-         <property name="icon">
-          <iconset resource="../../resources/resources.qrc">
-           <normaloff>:/icons/ascending_sorting_order.svg</normaloff>:/icons/ascending_sorting_order.svg</iconset>
+         <property name="iconName" stdset="0">
+          <string notr="true">arrow-down-0-1</string>
+         </property>
+         <property name="iconNameOn" stdset="0">
+          <string notr="true">arrow-down-1-0</string>
          </property>
          <property name="iconSize">
           <size>
@@ -853,31 +650,11 @@ QToolButton:pressed {
          <property name="toolTip">
           <string>Highlight deviation.</string>
          </property>
-         <property name="styleSheet">
-          <string notr="true">QToolButton:!hover {
-  padding: 0;
-  border: none;
-  background-color: transparent;
-}
-
-QToolButton:hover {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(base);
-}
-
-QToolButton:pressed {
-  padding: 0;
-  border: 1px solid palette(highlight);
-  background-color: palette(alternative-base);
-}</string>
-         </property>
          <property name="text">
           <string notr="true"/>
          </property>
-         <property name="icon">
-          <iconset resource="../../resources/resources.qrc">
-           <normaloff>:/icons/six-spoked-asterisk.svg</normaloff>:/icons/six-spoked-asterisk.svg</iconset>
+         <property name="iconName" stdset="0">
+          <string notr="true">asterisk</string>
          </property>
          <property name="iconSize">
           <size>
@@ -1538,12 +1315,12 @@ QToolButton:pressed {
   <customwidget>
    <class>StageListView</class>
    <extends>QTableView</extends>
-   <header>StageListView.h</header>
+   <header>scantailor.app.ui.widgets.stage_list_view</header>
   </customwidget>
   <customwidget>
    <class>NonOwningWidget</class>
    <extends>QWidget</extends>
-   <header>NonOwningWidget.h</header>
+   <header>scantailor.app.ui.widgets.non_owning_widget</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

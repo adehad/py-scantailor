@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from scantailor.app.ui.icons import icon
 from scantailor.core.stage_sequence import StageSequence
 
 
@@ -202,7 +203,7 @@ class StageListView(QTableView):
 
         # Create launch button (initially hidden)
         self._launch_btn = QToolButton(self.viewport())
-        self._launch_btn.setText("▶")  # Play icon
+        self._launch_btn.setIcon(icon("play"))
         self._launch_btn.setMinimumSize(18, 18)
         self._launch_btn.setToolTip("Launch batch processing")
         self._launch_btn.hide()
