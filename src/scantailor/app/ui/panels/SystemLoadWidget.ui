@@ -71,9 +71,8 @@
      <property name="text">
       <string>...</string>
      </property>
-     <property name="icon">
-      <iconset resource="../resources/resources.qrc">
-       <normaloff>:/icons/minus.svg</normaloff>:/icons/minus.svg</iconset>
+     <property name="iconName" stdset="0">
+      <string notr="true">minus</string>
      </property>
      <property name="autoRaise">
       <bool>true</bool>
@@ -124,9 +123,8 @@
      <property name="text">
       <string>...</string>
      </property>
-     <property name="icon">
-      <iconset resource="../resources/resources.qrc">
-       <normaloff>:/icons/plus.svg</normaloff>:/icons/plus.svg</iconset>
+     <property name="iconName" stdset="0">
+      <string notr="true">plus</string>
      </property>
      <property name="autoRaise">
       <bool>true</bool>

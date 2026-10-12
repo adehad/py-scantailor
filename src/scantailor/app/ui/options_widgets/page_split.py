@@ -29,6 +29,10 @@ class OptionsWidget(QWidget):
     Provides buttons to select the page layout type (single, page+offcut, two pages)
     and whether the split line should be auto-detected or manually placed.
 
+    Until the page has a stored layout the Auto and Manual buttons are disabled
+    and no layout type is shown for an automatic request. :meth:`refresh` shows
+    the layout once processing has stored it.
+
     Signals:
         layout_type_changed: Emitted when layout type changes.
             Args: page_id (PageId), layout_type (LayoutType)
@@ -60,6 +64,8 @@ class OptionsWidget(QWidget):
 
         self._filter = filter_
         self._current_page_id: PageId | None = None
+        # Pressing the button that is already checked changes nothing.
+        self._shown_type: LayoutType | None = None
 
         self._setup_ui()
         self._connect_signals()
@@ -69,74 +75,42 @@ class OptionsWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Page Layout group box
         self._layout_group = CollapsibleGroupBox("Page Layout", self)
         self._layout_group.setObjectName("pageLayoutGroup")
         layout_group_layout = QVBoxLayout(self._layout_group)
 
-        # Layout type buttons row
         buttons_layout = QHBoxLayout()
         buttons_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
 
-        # Create button group for exclusive selection
         self._layout_button_group = QButtonGroup(self)
-
-        self._single_page_btn = QToolButton()
-        self._single_page_btn.setObjectName("singlePageUncutBtn")
-        self._single_page_btn.setCheckable(True)
-        self._single_page_btn.setAutoExclusive(True)
-        self._single_page_btn.setIcon(icon("single_page"))
-        self._single_page_btn.setToolTip("Single page (no cutting)")
-        self._single_page_btn.setMinimumSize(40, 40)
-        self._layout_button_group.addButton(self._single_page_btn, 0)
-        buttons_layout.addWidget(self._single_page_btn)
-
-        self._page_offcut_btn = QToolButton()
-        self._page_offcut_btn.setObjectName("pagePlusOffcutBtn")
-        self._page_offcut_btn.setCheckable(True)
-        self._page_offcut_btn.setAutoExclusive(True)
-        self._page_offcut_btn.setIcon(icon("page_offcut_right"))
-        self._page_offcut_btn.setToolTip("Page with offcut to remove")
-        self._page_offcut_btn.setMinimumSize(40, 40)
-        self._layout_button_group.addButton(self._page_offcut_btn, 1)
-        buttons_layout.addWidget(self._page_offcut_btn)
-
-        self._two_pages_btn = QToolButton()
-        self._two_pages_btn.setObjectName("twoPagesBtn")
-        self._two_pages_btn.setCheckable(True)
-        self._two_pages_btn.setAutoExclusive(True)
-        self._two_pages_btn.setIcon(icon("two_pages"))
-        self._two_pages_btn.setToolTip("Two pages (split in middle)")
-        self._two_pages_btn.setMinimumSize(40, 40)
-        self._layout_button_group.addButton(self._two_pages_btn, 2)
-        buttons_layout.addWidget(self._two_pages_btn)
+        self._single_page_btn = self._layout_button(
+            "singlePageUncutBtn", "split-single-uncut", 0
+        )
+        self._page_offcut_btn = self._layout_button(
+            "pagePlusOffcutBtn", "split-right-page-plus-offcut", 1
+        )
+        self._two_pages_btn = self._layout_button("twoPagesBtn", "book-open", 2)
+        for button in self._layout_button_group.buttons():
+            buttons_layout.addWidget(button)
 
         buttons_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
         layout_group_layout.addLayout(buttons_layout)
 
-        # Scope label (shows current setting)
         self._scope_label = QLabel("?")
         self._scope_label.setObjectName("scopeLabel")
-        self._scope_label.setAlignment(
-            self._scope_label.alignment()
-        )  # Keep default center
         layout_group_layout.addWidget(self._scope_label)
 
-        # Change button row
         change_layout = QHBoxLayout()
         change_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
-
         self._change_btn = QPushButton("Change ...")
         self._change_btn.setObjectName("changeBtn")
-        self._change_btn.setToolTip("Change layout type for multiple pages")
         change_layout.addWidget(self._change_btn)
-
         change_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
@@ -144,36 +118,40 @@ class OptionsWidget(QWidget):
 
         layout.addWidget(self._layout_group)
 
-        # Split Line group box
         self._split_group = CollapsibleGroupBox("Split Line", self)
         self._split_group.setObjectName("splitLineGroup")
         split_group_layout = QVBoxLayout(self._split_group)
 
-        # Auto/Manual buttons
         split_mode_layout = QHBoxLayout()
+        self._mode_button_group = QButtonGroup(self)
 
         self._auto_btn = QPushButton("Auto")
         self._auto_btn.setObjectName("autoBtn")
         self._auto_btn.setCheckable(True)
-        self._auto_btn.setChecked(True)
-        self._auto_btn.setAutoExclusive(True)
-        self._auto_btn.setToolTip("Automatically detect split line")
+        self._mode_button_group.addButton(self._auto_btn)
         split_mode_layout.addWidget(self._auto_btn)
 
         self._manual_btn = QPushButton("Manual")
         self._manual_btn.setObjectName("manualBtn")
         self._manual_btn.setCheckable(True)
-        self._manual_btn.setAutoExclusive(True)
-        self._manual_btn.setToolTip("Manually position split line")
+        self._mode_button_group.addButton(self._manual_btn)
         split_mode_layout.addWidget(self._manual_btn)
 
         split_group_layout.addLayout(split_mode_layout)
         layout.addWidget(self._split_group)
 
-        # Vertical spacer
         layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         )
+
+    def _layout_button(self, name: str, glyph: str, button_id: int) -> QToolButton:
+        button = QToolButton()
+        button.setObjectName(name)
+        button.setCheckable(True)
+        button.setIcon(icon(glyph))
+        button.setMinimumSize(40, 40)
+        self._layout_button_group.addButton(button, button_id)
+        return button
 
     def _connect_signals(self) -> None:
         """Connect widget signals to slots."""
@@ -197,58 +175,100 @@ class OptionsWidget(QWidget):
             page_id: The page ID to edit.
         """
         self._current_page_id = page_id
-        self._update_ui()
+        self._show_requested_type()
+        self.refresh()
 
-    def _update_ui(self) -> None:
-        """Update the UI to reflect current page settings."""
+    def refresh(self) -> None:
+        """Show the page's stored layout, as it is after processing."""
         if self._current_page_id is None:
-            self._scope_label.setText("?")
+            return
+        params = self._filter.get_params(self._current_page_id)
+        layout = params.page_layout
+        if layout is None:
             return
 
-        params = self._filter.get_params(self._current_page_id)
-        layout_type = params.layout_type
+        self._change_btn.setEnabled(True)
+        self._auto_btn.setEnabled(True)
+        self._manual_btn.setEnabled(True)
+        (self._manual_btn if params.is_manual() else self._auto_btn).setChecked(True)
 
-        # Update layout type buttons
-        if layout_type == LayoutType.SINGLE_PAGE_UNCUT:
-            self._single_page_btn.setChecked(True)
-            self._scope_label.setText("Single page")
-        elif layout_type == LayoutType.PAGE_PLUS_OFFCUT:
-            self._page_offcut_btn.setChecked(True)
-            self._scope_label.setText("Page + offcut")
-        elif layout_type == LayoutType.TWO_PAGES:
-            self._two_pages_btn.setChecked(True)
-            self._scope_label.setText("Two pages")
-        else:  # AUTO
-            self._scope_label.setText("Auto-detect")
+        layout_type = layout.to_layout_type()
+        self._show_layout_type(layout_type)
+        self._split_group.setVisible(layout_type != LayoutType.SINGLE_PAGE_UNCUT)
+        if params.layout_type == LayoutType.AUTO_LAYOUT_TYPE:
+            self._scope_label.setText("Auto detected")
 
-        # Update split mode buttons
-        is_manual = params.is_manual()
-        self._auto_btn.setChecked(not is_manual)
-        self._manual_btn.setChecked(is_manual)
+    def _show_requested_type(self) -> None:
+        """Show the requested layout type while nothing is detected yet."""
+        if self._current_page_id is None:
+            return
+        requested = self._filter.get_layout_type(self._current_page_id)
+        self._show_layout_type(
+            None if requested == LayoutType.AUTO_LAYOUT_TYPE else requested
+        )
+        self._split_group.setVisible(requested != LayoutType.SINGLE_PAGE_UNCUT)
+        if requested == LayoutType.AUTO_LAYOUT_TYPE:
+            self._change_btn.setEnabled(False)
+            self._scope_label.setText("?")
+        else:
+            self._change_btn.setEnabled(True)
+            self._scope_label.setText("Set manually")
+        self._uncheck(self._mode_button_group)
+        self._auto_btn.setEnabled(False)
+        self._manual_btn.setEnabled(False)
 
-        # Show/hide split line group based on layout type
-        show_split = layout_type in (LayoutType.PAGE_PLUS_OFFCUT, LayoutType.TWO_PAGES)
-        self._split_group.setVisible(show_split)
+    def _show_layout_type(self, layout_type: LayoutType | None) -> None:
+        """Check the button of a layout type; None checks none."""
+        self._shown_type = layout_type
+        buttons = {
+            LayoutType.SINGLE_PAGE_UNCUT: self._single_page_btn,
+            LayoutType.PAGE_PLUS_OFFCUT: self._page_offcut_btn,
+            LayoutType.TWO_PAGES: self._two_pages_btn,
+        }
+        if layout_type is None:
+            self._uncheck(self._layout_button_group)
+        else:
+            buttons[layout_type].setChecked(True)
+
+    @staticmethod
+    def _uncheck(group: QButtonGroup) -> None:
+        """Uncheck every button of an exclusive group."""
+        group.setExclusive(False)
+        for button in group.buttons():
+            button.setChecked(False)
+        group.setExclusive(True)
 
     def _on_layout_type_changed(self, layout_type: LayoutType) -> None:
         """Handle layout type button clicks.
 
+        A single uncut page, or two pages with a split line placed by hand, are
+        switched in place so the line survives. Every other change makes the
+        next run detect a layout of the new type.
+
         Args:
             layout_type: The selected layout type.
         """
-        if self._current_page_id is None:
+        page = self._current_page_id
+        if page is None or layout_type == self._shown_type:
             return
+        self._shown_type = layout_type
 
-        params = self._filter.get_params(self._current_page_id)
-        if params.layout_type != layout_type:
-            # Update params with new layout type
-            new_params = params.with_layout_type(layout_type)
-            self._filter.set_params(self._current_page_id, new_params)
-            self._update_ui()
-            count = layout_type.sub_page_count()
-            if count is not None:
-                self.page_count_requested.emit(self._current_page_id.image_id, count)
-            self.layout_type_changed.emit(self._current_page_id, layout_type)
+        self._split_group.setVisible(layout_type != LayoutType.SINGLE_PAGE_UNCUT)
+        self._scope_label.setText("Set manually")
+
+        params = self._filter.get_params(page)
+        detects_again = layout_type == LayoutType.PAGE_PLUS_OFFCUT or (
+            layout_type != LayoutType.SINGLE_PAGE_UNCUT and params.is_auto()
+        )
+        if detects_again:
+            self._filter.set_layout_type(page, layout_type)
+        else:
+            self._filter.retype_layout(page, layout_type)
+
+        count = layout_type.sub_page_count()
+        if count is not None:
+            self.page_count_requested.emit(page.image_id, count)
+        self.layout_type_changed.emit(page, layout_type)
 
     def _on_split_mode_changed(self, is_manual: bool) -> None:
         """Handle split mode button clicks.

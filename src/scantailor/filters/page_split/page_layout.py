@@ -13,6 +13,8 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from scantailor.core.models import SubPage
 
+from .layout_type import LayoutType
+
 
 class PageLayoutType(Enum):
     """Internal type of the page layout."""
@@ -286,6 +288,42 @@ class PageLayout(BaseModel):
         if sub_page == SubPage.RIGHT_PAGE:
             return self.get_right_page_outline()
         return self.get_single_page_outline()
+
+    def to_layout_type(self) -> LayoutType:
+        """Return the layout type a user would request to get this layout."""
+        return {
+            PageLayoutType.SINGLE_PAGE_UNCUT: LayoutType.SINGLE_PAGE_UNCUT,
+            PageLayoutType.SINGLE_PAGE_CUT: LayoutType.PAGE_PLUS_OFFCUT,
+            PageLayoutType.TWO_PAGES: LayoutType.TWO_PAGES,
+        }[self.layout_type]
+
+    def with_type(self, layout_type: PageLayoutType) -> Self:
+        """Change the layout type and keep the cutter lines.
+
+        Keeping them lets a hand-placed line come back after the type was
+        switched away and back. Two pages share the first cutter. A cutter the
+        layout never had defaults to the left edge (first) or right edge
+        (second) of the outline.
+
+        Args:
+            layout_type (PageLayoutType): The new type.
+
+        Returns:
+            PageLayout: A layout of that type.
+        """
+        x, y, width, height = self.outline
+        cutter1, cutter2 = self.cutter1, self.cutter2
+        if layout_type != PageLayoutType.SINGLE_PAGE_UNCUT:
+            cutter1 = cutter1 or ((x, y), (x, y + height))
+            cutter2 = cutter2 or ((x + width, y), (x + width, y + height))
+        if layout_type == PageLayoutType.TWO_PAGES:
+            cutter2 = cutter1
+        return PageLayout(
+            outline=self.outline,
+            layout_type=layout_type,
+            cutter1=cutter1,
+            cutter2=cutter2,
+        )
 
     def with_split_line(self, split_x: float) -> Self:
         """Create a new layout with a different split line position.
