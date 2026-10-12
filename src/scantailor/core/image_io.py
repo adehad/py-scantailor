@@ -14,11 +14,13 @@ C++ metadata loaders do; callers decide how to prompt for a fallback using
 ``ImageMetadata.is_dpi_ok()``.
 """
 
+import io
+import struct
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Final
+from typing import Any, BinaryIO, Final
 
 import numpy as np
 from loguru import logger
@@ -36,6 +38,10 @@ _TIFF_SUFFIXES: Final = frozenset({".tif", ".tiff"})
 _TAG_X_RESOLUTION: Final = 282
 _TAG_Y_RESOLUTION: Final = 283
 _TAG_RESOLUTION_UNIT: Final = 296
+_TAG_ORIENTATION: Final = 274
+_TIFF_MAGIC: Final = 42
+_BIGTIFF_MAGIC: Final = 43
+_TIFF_TYPE_SHORT: Final = 3
 _RESUNIT_INCH: Final = 2
 _RESUNIT_CENTIMETER: Final = 3
 _CM_PER_INCH: Final = 2.54
@@ -113,20 +119,172 @@ def _dpi_of(image: Image.Image) -> Dpi:
     return Dpi(horizontal=max(horizontal, 0), vertical=max(vertical, 0))
 
 
+# EXIF orientation value to the transpose that makes the stored pixels upright.
+_ORIENTATION_TRANSPOSE: Final = {
+    2: Image.Transpose.FLIP_LEFT_RIGHT,
+    3: Image.Transpose.ROTATE_180,
+    4: Image.Transpose.FLIP_TOP_BOTTOM,
+    5: Image.Transpose.TRANSPOSE,
+    6: Image.Transpose.ROTATE_270,
+    7: Image.Transpose.TRANSVERSE,
+    8: Image.Transpose.ROTATE_90,
+}
+_AXIS_SWAPPING_ORIENTATIONS: Final = frozenset({5, 6, 7, 8})
+
+
+_TIFF_ORIENTATIONS_ATTRIBUTE: Final = "_scantailor_tiff_orientations"
+_TIFF_MAX_IFDS: Final = 1_000_000
+
+
+class _OrientationMaskedFile(io.RawIOBase):
+    """Read-only view of a TIFF that shows every orientation tag as 1.
+
+    Pillow applies TIFF orientation itself, but inconsistently: compressed
+    files come out upright, uncompressed ones with a 90 degree orientation come
+    out scrambled, and the reported size depends on the code path. Masking the
+    tag makes every path return the stored pixels so that one transpose here
+    covers every format. Wrap it in ``io.BufferedReader`` to hand to Pillow.
+    """
+
+    def __init__(self, file: BinaryIO, patches: dict[int, bytes]) -> None:
+        super().__init__()
+        self._file = file
+        self._patches = patches
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return True
+
+    def readinto(self, buffer: Any) -> int:
+        start = self._file.tell()
+        count = self._file.readinto(buffer)  # pyrefly: ignore[missing-attribute]
+        for offset, replacement in self._patches.items():
+            for index, value in enumerate(replacement):
+                position = offset + index - start
+                if 0 <= position < count:
+                    buffer[position] = value
+        return count
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        return self._file.seek(offset, whence)
+
+    def tell(self) -> int:
+        return self._file.tell()
+
+
+def _scan_tiff_orientations(file: BinaryIO) -> tuple[list[int], dict[int, bytes]]:
+    """Find the orientation of every IFD of a TIFF without decoding it.
+
+    Returns:
+        tuple[list[int], dict[int, bytes]]: The orientation of each IFD in file
+            order (1 where the tag is absent or unusable), and the byte
+            replacements that turn every orientation other than 1 into 1.
+            Both are empty for a file that is not a well-formed TIFF.
+    """
+    header = file.read(16)
+    endian = {b"II": "<", b"MM": ">"}.get(header[:2])
+    if endian is None:
+        return [], {}
+    magic = struct.unpack(endian + "H", header[2:4])[0]
+    if magic == _TIFF_MAGIC:
+        first_ifd = struct.unpack(endian + "I", header[4:8])[0]
+        count_format, entry_size, value_offset, link_format = "H", 12, 8, "I"
+    elif magic == _BIGTIFF_MAGIC and len(header) == 16:
+        first_ifd = struct.unpack(endian + "Q", header[8:16])[0]
+        count_format, entry_size, value_offset, link_format = "Q", 20, 12, "Q"
+    else:
+        return [], {}
+    count_size = struct.calcsize(count_format)
+    link_size = struct.calcsize(link_format)
+    orientations: list[int] = []
+    patches: dict[int, bytes] = {}
+    visited: set[int] = set()
+    ifd = first_ifd
+    try:
+        while ifd and ifd not in visited and len(visited) < _TIFF_MAX_IFDS:
+            visited.add(ifd)
+            file.seek(ifd)
+            (count,) = struct.unpack(endian + count_format, file.read(count_size))
+            table = file.read(entry_size * count)
+            (ifd,) = struct.unpack(endian + link_format, file.read(link_size))
+            orientation = 1
+            for index in range(count):
+                entry = table[index * entry_size : (index + 1) * entry_size]
+                tag, kind = struct.unpack(endian + "HH", entry[:4])
+                if tag != _TAG_ORIENTATION or kind != _TIFF_TYPE_SHORT:
+                    continue
+                (value,) = struct.unpack(
+                    endian + "H", entry[value_offset : value_offset + 2]
+                )
+                if 1 < value <= 8:
+                    orientation = value
+                    entry_start = (
+                        file.tell() - link_size - len(table) + index * entry_size
+                    )
+                    patches[entry_start + value_offset] = struct.pack(endian + "H", 1)
+            orientations.append(orientation)
+    except (struct.error, OSError, ValueError):
+        return [], {}
+    return orientations, patches
+
+
+def _exif_orientation(image: Image.Image) -> int:
+    """Return the EXIF orientation (1 to 8) of the current frame; 1 if unusable."""
+    tiff_orientations = getattr(image, _TIFF_ORIENTATIONS_ATTRIBUTE, None)
+    if tiff_orientations is not None:
+        frame = getattr(image, "tell", lambda: 0)()
+        return tiff_orientations[frame] if frame < len(tiff_orientations) else 1
+    try:
+        value = image.getexif().get(_TAG_ORIENTATION, 1)
+    except (OSError, SyntaxError, ValueError, TypeError):
+        return 1
+    return value if isinstance(value, int) and 1 <= value <= 8 else 1
+
+
+def _upright(image: Image.Image) -> Image.Image:
+    """Return the image with its EXIF orientation applied to the pixels."""
+    transpose = _ORIENTATION_TRANSPOSE.get(_exif_orientation(image))
+    return image if transpose is None else image.transpose(transpose)
+
+
 def _metadata_of(image: Image.Image) -> ImageMetadata:
     width, height = image.size
-    return ImageMetadata(width=width, height=height, dpi=_dpi_of(image))
+    dpi = _dpi_of(image)
+    if _exif_orientation(image) in _AXIS_SWAPPING_ORIENTATIONS:
+        width, height = height, width
+        dpi = Dpi(horizontal=dpi.vertical, vertical=dpi.horizontal)
+    return ImageMetadata(width=width, height=height, dpi=dpi)
 
 
-def _open(path: Path) -> Image.Image:
+@contextmanager
+def _open(path: Path) -> Iterator[Image.Image]:
+    """Open an image with its pixels as stored, leaving EXIF orientation alone."""
     try:
-        return Image.open(path)
-    except UnidentifiedImageError as exc:
-        raise UnsupportedImageFormatError(f"Unrecognised image format: {path}") from exc
+        file = path.open("rb")
     except FileNotFoundError:
         raise
-    except (OSError, SyntaxError, ValueError) as exc:
+    except OSError as exc:
         raise ImageLoadError(f"Cannot read image {path}: {exc}") from exc
+    with file:
+        orientations, patches = _scan_tiff_orientations(file)
+        file.seek(0)
+        source: BinaryIO = file
+        if patches:
+            source = io.BufferedReader(_OrientationMaskedFile(file, patches))
+        try:
+            image = Image.open(source)
+        except UnidentifiedImageError as exc:
+            raise UnsupportedImageFormatError(
+                f"Unrecognised image format: {path}"
+            ) from exc
+        except (OSError, SyntaxError, ValueError) as exc:
+            raise ImageLoadError(f"Cannot read image {path}: {exc}") from exc
+        if image.format == "TIFF" and orientations:
+            setattr(image, _TIFF_ORIENTATIONS_ATTRIBUTE, orientations)
+        with image:
+            yield image
 
 
 def _select_page(image: Image.Image, path: Path, zero_based_page: int) -> None:
@@ -204,13 +362,16 @@ def _to_array(image: Image.Image) -> NDArray[np.uint8]:
 def load_image(
     image_id: ImageId, dpi: Dpi | None = None
 ) -> tuple[NDArray[np.uint8], ImageMetadata]:
-    """Decode one page of an image file.
+    """Decode one page of an image file, upright according to its EXIF orientation.
+
+    A 90 or 270 degree orientation swaps the width and height, and the
+    horizontal and vertical DPI, of the stored image.
 
     Args:
         image_id (ImageId): File and page; ``page`` is 1-based for multi-page
             TIFFs and 0 (or 1) for single-page files.
         dpi (Dpi | None): Resolution that replaces the one in the file; ignored
-            when None or null.
+            when None or null. Given for the upright image.
 
     Returns:
         tuple[NDArray[np.uint8], ImageMetadata]: Pixels as ``(H, W)`` gray
@@ -227,10 +388,10 @@ def load_image(
         _select_page(image, path, image_id.zero_based_page())
         try:
             image.load()
-            pixels = _to_array(image)
+            metadata = _metadata_of(image)
+            pixels = _to_array(_upright(image))
         except (OSError, SyntaxError, EOFError, ValueError) as exc:
             raise ImageLoadError(f"Cannot decode {path}: {exc}") from exc
-        metadata = _metadata_of(image)
     if dpi is not None and not dpi.is_null():
         metadata = metadata.model_copy(update={"dpi": dpi})
     logger.debug(
