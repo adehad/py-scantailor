@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 from scantailor.app.ui.icons import icon
 from scantailor.app.ui.theme.fonts import CAPTION_PX
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
+from scantailor.app.ui.widgets.ticked_slider import TickedSlider
 from scantailor.core.models import Dpi, PageId
 from scantailor.filters.output.binarization import BinarizationMethod
 from scantailor.filters.output.color_mode import ColorMode
@@ -459,6 +460,27 @@ class OptionsWidget(QWidget):
                 grid.addWidget(QLabel(label), row, 0)
                 grid.addWidget(spinbox, row, 1)
             self._method_options.addWidget(page)
+        self._method_options.currentChanged.connect(self._fit_method_options)
+
+    def _fit_method_options(self, index: int) -> None:
+        """Size the stack to the shown page only, and hide it when that is empty.
+
+        A stacked widget is as tall as its tallest page, which leaves a gap
+        under the shorter ones.
+        """
+        for page_index in range(self._method_options.count()):
+            page = self._method_options.widget(page_index)
+            vertical = (
+                QSizePolicy.Policy.Preferred
+                if page_index == index
+                else QSizePolicy.Policy.Ignored
+            )
+            page.setSizePolicy(QSizePolicy.Policy.Preferred, vertical)
+        page_layout = self._method_options.widget(index).layout()
+        self._method_options.setVisible(
+            page_layout is not None and page_layout.count() > 0
+        )
+        self._method_options.updateGeometry()
 
     def _build_segmentation_group(self, layout: QVBoxLayout) -> None:
         self._segmentation_group = CollapsibleGroupBox("Color segmentation", self)
@@ -522,7 +544,7 @@ class OptionsWidget(QWidget):
         self._despeckle_group.setObjectName("despeckleGroup")
         despeckle_layout = QVBoxLayout(self._despeckle_group)
 
-        self._despeckle_slider = QSlider(Qt.Orientation.Horizontal)
+        self._despeckle_slider = TickedSlider(Qt.Orientation.Horizontal)
         self._despeckle_slider.setObjectName("despeckleSlider")
         self._despeckle_slider.setRange(0, len(_DESPECKLE_LEVELS) - 1)
         self._despeckle_slider.setPageStep(1)
@@ -894,9 +916,9 @@ class OptionsWidget(QWidget):
         self._threshold_label.setText(str(options.threshold_adjustment))
         self._window_size_spinbox.setValue(options.window_size)
         self._window_size_row.setVisible(options.method != BinarizationMethod.OTSU)
-        self._method_options.setCurrentIndex(
-            list(BinarizationMethod).index(options.method)
-        )
+        method_index = list(BinarizationMethod).index(options.method)
+        self._method_options.setCurrentIndex(method_index)
+        self._fit_method_options(method_index)
         self._sauvola_coef_spinbox.setValue(options.sauvola_coef)
         self._wolf_coef_spinbox.setValue(options.wolf_coef)
         self._wolf_lower_spinbox.setValue(options.wolf_lower_bound)

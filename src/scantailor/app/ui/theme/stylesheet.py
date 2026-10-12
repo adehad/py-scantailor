@@ -236,6 +236,7 @@ QStatusBar::item {{ border: none; }}
 QTabWidget::pane {{
     border: 1px solid {t.panel_border}; border-radius: {RADIUS_PANEL}px;
 }}
+QTabBar {{ qproperty-drawBase: 0; }}
 QTabBar::tab {{
     padding: 6px 14px; border-radius: 8px; margin: 2px; background: transparent;
 }}

@@ -12,11 +12,29 @@ import math
 import numpy as np
 from numpy.typing import NDArray
 from PySide6 import QtGui, QtWidgets
-from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import QColor, QImage, QPainter, QPen
+from PySide6.QtCore import QLineF, QLocale, QPointF, QRectF, Qt, Signal
+from PySide6.QtGui import QColor, QImage, QPainter, QPalette, QPen
 
 from scantailor.app.ui.image_views.base import ImageViewBase
 from scantailor.core.transformation import ImageTransformation
+
+
+def format_angle(degrees: float) -> str:
+    """Format an angle as the Deskew spin box shows it.
+
+    Args:
+        degrees (float): Angle in degrees.
+
+    Returns:
+        str: Two decimals and a degree sign, rounded by Qt's number formatting so
+        the view label and the spin box never disagree on ties such as 0.125;
+        a value that rounds to zero carries no minus sign.
+    """
+    locale = QLocale()
+    text = locale.toString(degrees, ord("f"), 2)
+    if not any(digit in text for digit in "123456789"):
+        text = text.removeprefix(locale.negativeSign())
+    return f"{text}°"
 
 
 class DeskewImageView(ImageViewBase):
@@ -246,7 +264,8 @@ class DeskewImageView(ImageViewBase):
 
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        arc_pen = QPen(QColor(0, 0, 0xD1))
+        accent = self.palette().color(QPalette.ColorRole.Accent)
+        arc_pen = QPen(accent)
         arc_pen.setWidthF(1.5)
         painter.setPen(arc_pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
@@ -255,22 +274,23 @@ class DeskewImageView(ImageViewBase):
         painter.drawArc(square, int(16 * (180 - self.MAX_ROTATION_DEG)), span)
         painter.drawArc(square, int(16 * -self.MAX_ROTATION_DEG), span)
 
-        handle_pen = QPen(QColor(0, 0, 0xD1))
+        handle_pen = QPen(accent)
         handle_pen.setWidth(2)
         painter.setPen(handle_pen)
         for index, handle in enumerate(self.rotation_handles()):
-            alpha = 200 if self._dragging_handle == index else 150
-            painter.setBrush(QColor(0, 0x99, 0xFF, alpha))
+            fill = QColor(accent)
+            fill.setAlpha(200 if self._dragging_handle == index else 150)
+            painter.setBrush(fill)
             painter.drawEllipse(handle, self.HANDLE_RADIUS, self.HANDLE_RADIUS)
 
-        painter.setPen(QColor(0, 0, 0))
+        painter.setPen(self.palette().color(QPalette.ColorRole.Text))
         font = painter.font()
         font.setPointSize(10)
         painter.setFont(font)
         painter.drawText(
             QRectF(square.center().x() - 30, square.bottom() + 5, 60, 20),
             Qt.AlignmentFlag.AlignCenter,
-            f"{self._deskew_angle:.2f}°",
+            format_angle(self._deskew_angle),
         )
         painter.restore()
 

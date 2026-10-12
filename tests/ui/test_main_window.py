@@ -23,6 +23,7 @@ def test_show_about(qtbot: QtBot):
     after_qdialog = window.findChild(QtWidgets.QDialog)
     assert before_qdialog is None
     assert isinstance(after_qdialog, AboutDialog)
+    after_qdialog.close()
 
 
 def test_navigation_without_a_project_keeps_no_current_page(
