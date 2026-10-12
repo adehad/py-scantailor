@@ -63,6 +63,22 @@ def isolated_settings(tmp_path: pathlib.Path) -> Iterator[pathlib.Path]:
     QtCore.QCoreApplication.setApplicationName(previous_app)
 
 
+@pytest.fixture(autouse=True)
+def no_window_outlives_its_test() -> Iterator[None]:
+    """Hide windows a test left showing and let their deferred deletes run.
+
+    QTest.mouseMove moves the platform cursor, and the offscreen platform hands the
+    move to the first exposed top-level window, in creation order, that contains
+    the point. A window left over from an earlier test on the same worker therefore
+    swallows the hover meant for the widget under test.
+    """
+    yield
+    for widget in QtWidgets.QApplication.topLevelWidgets():
+        if widget.isVisible():
+            widget.hide()
+    QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
+
+
 @pytest.fixture
 def main_window(
     qtbot: QtBot, isolated_settings: pathlib.Path
