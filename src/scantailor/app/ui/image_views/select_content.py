@@ -12,13 +12,14 @@ from typing import ClassVar
 
 from PySide6 import QtGui, QtWidgets
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import QAction, QColor, QKeySequence, QPainter, QPen
+from PySide6.QtGui import QAction, QKeySequence, QPainter, QPen
 
 from scantailor.app.ui.image_views.base import (
     Edge,
     ImageViewBase,
     point_to_segment_distance,
 )
+from scantailor.app.ui.theme.tokens import view_color
 
 
 class BoxKind(Enum):
@@ -47,11 +48,10 @@ class SelectContentImageView(ImageViewBase):
     MIN_BOX_SIZE = 10  # In virtual pixels
     NEW_BOX_FRACTION = 0.7  # Size of a new content box relative to the page
 
-    BOX_COLORS: ClassVar[dict[BoxKind, tuple[QColor, QColor]]] = {
-        BoxKind.CONTENT: (QColor(0, 0, 255, 180), QColor(0, 0, 255, 30)),
-        BoxKind.PAGE: (QColor(255, 0, 0, 180), QColor(255, 0, 0, 20)),
+    _BOX_COLOR_NAMES: ClassVar[dict[BoxKind, tuple[str, str]]] = {
+        BoxKind.CONTENT: ("content_border", "content_fill"),
+        BoxKind.PAGE: ("page_border", "page_fill"),
     }
-    HANDLE_COLOR = QColor(0, 0, 255, 200)
 
     _CORNERS = (
         Edge.LEFT | Edge.TOP,
@@ -304,7 +304,7 @@ class SelectContentImageView(ImageViewBase):
                 self._paint_box(painter, kind)
 
     def _paint_box(self, painter: QPainter, kind: BoxKind) -> None:
-        border, fill = self.BOX_COLORS[kind]
+        border, fill = (view_color(n) for n in self._BOX_COLOR_NAMES[kind])
         rect = self.virtual_to_widget_rect(self._rects[kind])
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -315,7 +315,7 @@ class SelectContentImageView(ImageViewBase):
         painter.drawRect(rect)
 
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(self.HANDLE_COLOR)
+        painter.setBrush(view_color("box_handle"))
         size = 6
         for corner in (
             rect.topLeft(),

@@ -1,10 +1,8 @@
 """QPalette for the light and dark looks so natively drawn parts match the QSS."""
 
-import re
-
 from PySide6 import QtGui
 
-from .tokens import Tokens
+from .tokens import Tokens, qcolor
 
 
 def build_palette(t: Tokens) -> QtGui.QPalette:
@@ -26,8 +24,7 @@ def build_palette(t: Tokens) -> QtGui.QPalette:
     dim = QtGui.QColor(t.text_dim)
     # Item delegates that paint selection with palette.highlight() (the
     # thumbnail list) get the translucent tint instead of a solid block.
-    r, g, b, a = (int(v) for v in re.findall(r"\d+", t.accent_tint))
-    tint = QtGui.QColor(r, g, b, a)
+    tint = qcolor(t.accent_tint)
     for color_role, color in (
         (role.Window, window),
         (role.WindowText, text),
@@ -46,6 +43,19 @@ def build_palette(t: Tokens) -> QtGui.QPalette:
         (role.Dark, QtGui.QColor(t.viewport)),
     ):
         palette.setColor(color_role, color)
-    for color_role in (role.WindowText, role.Text, role.ButtonText):
-        palette.setColor(group.Disabled, color_role, dim)
+    disabled_text = QtGui.QColor(t.text_disabled)
+    disabled_fill = qcolor(t.field_disabled)
+    disabled_tint = QtGui.QColor(tint)
+    disabled_tint.setAlpha(tint.alpha() // 2)
+    for color_role, color in (
+        (role.WindowText, disabled_text),
+        (role.Text, disabled_text),
+        (role.ButtonText, disabled_text),
+        (role.HighlightedText, disabled_text),
+        (role.PlaceholderText, disabled_text),
+        (role.Base, disabled_fill),
+        (role.Button, disabled_fill),
+        (role.Highlight, disabled_tint),
+    ):
+        palette.setColor(group.Disabled, color_role, color)
     return palette

@@ -14,6 +14,7 @@ from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QImage, QPainter, QPen
 
 from scantailor.app.ui.image_views.base import ImageViewBase
+from scantailor.app.ui.theme.tokens import view_color
 from scantailor.core.models import OrthogonalRotation
 from scantailor.core.transformation import ImageTransformation
 
@@ -101,14 +102,14 @@ class FixOrientationImageView(ImageViewBase):
 
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setBrush(QtGui.QColor(0, 0, 0, 128))
+        painter.setBrush(view_color("indicator_scrim"))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawEllipse(center, size / 2, size / 2)
 
-        pen = QPen(Qt.GlobalColor.white)
+        pen = QPen(view_color("indicator_glyph"))
         pen.setWidth(2)
         painter.setPen(pen)
-        painter.setBrush(Qt.GlobalColor.white)
+        painter.setBrush(view_color("indicator_glyph"))
         painter.translate(center)
         painter.rotate(self._rotation.degrees)
         length = size / 2 - 10
@@ -125,7 +126,7 @@ class FixOrientationImageView(ImageViewBase):
         )
 
         painter.resetTransform()
-        painter.setPen(QtGui.QColor(255, 255, 255, 200))
+        painter.setPen(view_color("indicator_label"))
         painter.drawText(
             QRectF(left, top + size + 2, size, 16),
             Qt.AlignmentFlag.AlignCenter,
