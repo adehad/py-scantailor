@@ -4,6 +4,7 @@ This module defines the Params class which stores all output settings
 for a specific page.
 """
 
+from enum import Enum
 from typing import Self
 
 import numpy as np
@@ -26,6 +27,36 @@ from .picture_shape import PictureShapeOptions
 from .splitting_options import SplittingOptions
 
 _MIN_CURVE_POINTS = 2
+
+
+class ApplyGroup(Enum):
+    """A group of output options that "Apply to..." copies on its own."""
+
+    DPI = "dpi"
+    COLOR_MODE = "color_mode"
+    SPLITTING = "splitting"
+    BINARIZATION = "binarization"
+    DESPECKLE = "despeckle"
+    DEWARPING = "dewarping"
+    DEPTH_PERCEPTION = "depth_perception"
+
+
+# Zones, the manual distortion model and every other per-page geometry are
+# deliberately in no group: they only make sense for the page they were drawn on.
+_GROUP_FIELDS: dict[ApplyGroup, tuple[str, ...]] = {
+    ApplyGroup.DPI: ("output_dpi",),
+    ApplyGroup.COLOR_MODE: (
+        "color_mode",
+        "color_common",
+        "picture_shape",
+        "black_on_white",
+    ),
+    ApplyGroup.SPLITTING: ("splitting",),
+    ApplyGroup.BINARIZATION: ("binarization",),
+    ApplyGroup.DESPECKLE: ("despeckle_level",),
+    ApplyGroup.DEWARPING: ("dewarping",),
+    ApplyGroup.DEPTH_PERCEPTION: ("depth_perception",),
+}
 
 
 class ZoneOutline(BaseModel):
@@ -192,6 +223,21 @@ class Params(BaseModel):
     def with_splitting(self, options: SplittingOptions) -> Self:
         """Create a copy with different layer splitting options."""
         return self.model_copy(update={"splitting": options})
+
+    def with_group_from(self, source: "Params", group: ApplyGroup) -> Self:
+        """Create a copy that takes one group of options from another page.
+
+        Args:
+            source (Params): Parameters of the page being copied from.
+            group (ApplyGroup): The options to copy; everything else, zones and
+                the distortion model included, stays as it is.
+
+        Returns:
+            Self: The merged parameters.
+        """
+        return self.model_copy(
+            update={name: getattr(source, name) for name in _GROUP_FIELDS[group]}
+        )
 
     def needs_binarization(self) -> bool:
         """Return True if the color mode requires binarization."""
