@@ -18,16 +18,22 @@ def test_numbers_compare_by_value_not_by_text(tmp_path: Path):
     assert _names(sort_smart(paths)) == ["p1.png", "p2.png", "p10.png", "p100.png"]
 
 
-def test_digit_sorts_before_letter_at_the_same_position(tmp_path: Path):
+def test_digit_sorts_before_any_other_character_at_the_same_position(tmp_path: Path):
     paths = [tmp_path / name for name in ("a.png", "1.png", "b1.png")]
 
-    assert _names(sort_smart(paths)) == ["1.png", "a.png", "b1.png"]
+    assert _names(sort_smart(paths)) == ["1.png", "b1.png", "a.png"]
 
 
-def test_mixed_case_names_order_by_character_code_after_numbers(tmp_path: Path):
+def test_letters_do_not_decide_order_so_numbers_do_like_cpp(tmp_path: Path):
+    paths = [tmp_path / name for name in ("a2.png", "b1.png")]
+
+    assert _names(sort_smart(paths)) == ["b1.png", "a2.png"]
+
+
+def test_names_tied_on_numbers_fall_back_to_case_sensitive_name_order(tmp_path: Path):
     paths = [tmp_path / name for name in ("b2.png", "B10.png", "B2.png", "a1.png")]
 
-    assert _names(sort_smart(paths)) == ["B2.png", "B10.png", "a1.png", "b2.png"]
+    assert _names(sort_smart(paths)) == ["a1.png", "B2.png", "b2.png", "B10.png"]
 
 
 def test_names_equal_apart_from_leading_zeros_fall_back_to_plain_order(tmp_path: Path):
