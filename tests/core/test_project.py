@@ -9,11 +9,13 @@ from pathlib import Path
 
 import pytest
 
+from scantailor.core.batch import output_file_names
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 from scantailor.core.project import (
     DpiStatus,
     ImageInfo,
     ImageMetadata,
+    OutputFileLabel,
     Project,
     StageParamsEntry,
 )
@@ -580,3 +582,113 @@ class TestRemapImagePaths:
 
         assert project.images[0].metadata.width == 10
         assert project.images[0].num_sub_pages == 2
+
+
+class TestOutputFileLabels:
+    """Labels that keep output file names stable across sessions and removals."""
+
+    @staticmethod
+    def _project(tmp_path: Path, files: list[Path]) -> Project:
+        project = Project(output_directory=tmp_path / "out")
+        for file_path in files:
+            project.add_image(ImageId(file_path=file_path))
+        return project
+
+    def test_labels_round_trip_through_json_with_relative_paths(self, tmp_path: Path):
+        first, second = tmp_path / "a" / "x.png", tmp_path / "b" / "x.png"
+        project = self._project(tmp_path, [first, second])
+        project.output_file_labels = [
+            OutputFileLabel(file_path=first, label=0),
+            OutputFileLabel(file_path=second, label=3),
+        ]
+        project_file = tmp_path / "p.json"
+
+        project.save(project_file)
+        stored = json.loads(project_file.read_text(encoding="utf-8"))
+        loaded = Project.load(project_file)
+
+        assert [entry["file_path"] for entry in stored["output_file_labels"]] == [
+            "a/x.png",
+            "b/x.png",
+        ]
+        assert loaded.output_file_label_map() == {first: 0, second: 3}
+
+    def test_save_registers_labels_for_files_that_have_none(self, tmp_path: Path):
+        first, second = tmp_path / "a" / "x.png", tmp_path / "b" / "x.png"
+        project = self._project(tmp_path, [first, second])
+
+        project.save(tmp_path / "p.json")
+
+        assert project.output_file_label_map() == {first: 0, second: 1}
+
+    def test_project_file_without_labels_loads_with_none(self, tmp_path: Path):
+        project_file = tmp_path / "old.json"
+        project_file.write_text(json.dumps({"version": 1}), encoding="utf-8")
+
+        project = Project.load(project_file)
+
+        assert project.output_file_labels == []
+        assert project.stage_defaults == {}
+
+    def test_registering_keeps_stored_labels_and_numbers_new_files_after_them(
+        self, tmp_path: Path
+    ):
+        old, new = tmp_path / "a" / "x.png", tmp_path / "b" / "x.png"
+        project = self._project(tmp_path, [new])
+        project.output_file_labels = [OutputFileLabel(file_path=old, label=4)]
+
+        project.register_output_file_labels()
+
+        assert project.output_file_label_map() == {old: 4, new: 5}
+
+    def test_names_keep_stored_labels_after_a_page_is_removed(self, tmp_path: Path):
+        first, second = tmp_path / "a" / "x.png", tmp_path / "b" / "x.png"
+        project = self._project(tmp_path, [first, second])
+        project.register_output_file_labels()
+        removed = project.get_pages()[0]
+
+        project.remove_pages([removed])
+        names = output_file_names(
+            project.get_pages(),
+            project.layout_direction,
+            project.output_file_label_map(),
+        )
+
+        assert list(names.values()) == ["x(1).tif"]
+
+    def test_names_without_stored_labels_would_have_shifted(self, tmp_path: Path):
+        first, second = tmp_path / "a" / "x.png", tmp_path / "b" / "x.png"
+        project = self._project(tmp_path, [first, second])
+        project.remove_pages([project.get_pages()[0]])
+
+        names = output_file_names(project.get_pages(), project.layout_direction)
+
+        assert list(names.values()) == ["x.tif"]
+
+    def test_stored_labels_win_over_page_order(self, tmp_path: Path):
+        first, second = tmp_path / "a" / "x.png", tmp_path / "b" / "x.png"
+        pages = [PageId(image_id=ImageId(file_path=p)) for p in (first, second)]
+
+        names = output_file_names(pages, file_labels={first: 1, second: 0})
+
+        assert [names[page] for page in pages] == ["x(1).tif", "x.tif"]
+
+    def test_new_file_is_labelled_after_the_highest_label_of_its_name(
+        self, tmp_path: Path
+    ):
+        old, other = tmp_path / "a" / "x.png", tmp_path / "b" / "y.png"
+        new = tmp_path / "c" / "x.png"
+        pages = [PageId(image_id=ImageId(file_path=p)) for p in (old, other, new)]
+
+        names = output_file_names(pages, file_labels={old: 2, other: 0})
+
+        assert [names[page] for page in pages] == ["x(2).tif", "y.tif", "x(3).tif"]
+
+    def test_remapping_image_paths_moves_the_labels_too(self, tmp_path: Path):
+        old = tmp_path / "a" / "x.png"
+        project = self._project(tmp_path, [old])
+        project.register_output_file_labels()
+
+        project.remap_image_paths(lambda path: tmp_path / "moved" / path.name)
+
+        assert project.output_file_label_map() == {tmp_path / "moved" / "x.png": 0}
