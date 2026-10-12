@@ -9,7 +9,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 
 from scantailor.app.ui import theme
 from scantailor.app.ui.theme import fonts
-from scantailor.app.ui.theme.legacy_icons import tint_icon
+from scantailor.app.ui.theme.tokens import DARK, LIGHT
 
 SRC_ROOT = pathlib.Path(theme.__file__).resolve().parents[3]
 
@@ -18,6 +18,10 @@ SRC_ROOT = pathlib.Path(theme.__file__).resolve().parents[3]
 def app(qapp: QtWidgets.QApplication, monkeypatch):
     """Application restored to its original look; QSettings is isolated by conftest."""
     monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
+    for widget in qapp.topLevelWidgets():
+        widget.hide()
+        widget.deleteLater()
+    QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
     style = qapp.style().name()
     palette = qapp.palette()
     font = qapp.font()
@@ -233,35 +237,9 @@ def test_line_edits_keep_proportional_figures(app, qtbot):
     assert not edit.font().isFeatureSet(QtGui.QFont.Tag("tnum"))
 
 
-def test_tint_icon_recolours_opaque_pixels_and_keeps_transparency(app):
-    source = QtGui.QPixmap(8, 8)
-    source.fill(QtCore.Qt.GlobalColor.transparent)
-    painter = QtGui.QPainter(source)
-    painter.fillRect(0, 0, 4, 8, QtGui.QColor("black"))
-    painter.end()
-
-    tinted = (
-        tint_icon(QtGui.QIcon(source), QtGui.QColor("#e8ecf4"), QtCore.QSize(8, 8))
-        .pixmap(8, 8)
-        .toImage()
-    )
-
-    assert tinted.pixelColor(1, 4).name() == "#e8ecf4"
-    assert tinted.pixelColor(6, 4).alpha() == 0
-
-
-def test_old_black_icons_follow_the_palette_when_the_scheme_changes(app, qtbot):
-    theme.apply_theme(app, "light")
-    source = QtGui.QPixmap(8, 8)
-    source.fill(QtGui.QColor("black"))
-    button = QtWidgets.QToolButton()
-    qtbot.addWidget(button)
-    button.setIconSize(QtCore.QSize(8, 8))
-    button.setIcon(QtGui.QIcon(source))
-    button.ensurePolished()
-    light = button.icon().pixmap(8, 8).toImage().pixelColor(4, 4)
-
-    theme.apply_theme(app, "dark")
-    dark = button.icon().pixmap(8, 8).toImage().pixelColor(4, 4)
-
-    assert dark.lightness() > light.lightness()
+def test_semantic_roles_are_green_and_red_for_each_scheme():
+    assert (LIGHT.positive, DARK.positive) == ("#008a1a", "#5ccf72")
+    for tokens in (LIGHT, DARK):
+        positive, danger = QtGui.QColor(tokens.positive), QtGui.QColor(tokens.danger)
+        assert positive.green() > positive.red() and positive.green() > positive.blue()
+        assert danger.red() > danger.green() and danger.red() > danger.blue()

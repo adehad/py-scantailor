@@ -24,6 +24,7 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import QTabWidget
 
+from scantailor.app.ui.icons import icon
 from scantailor.app.ui.image_views.base import ImageViewBase
 from scantailor.dewarping.page_dewarper import dewarper_from_polylines
 from scantailor.filters.output.params import DistortionModelSpec
@@ -45,6 +46,13 @@ class ImageViewTab(Enum):
     PICTURE_ZONES = auto()
     FILL_ZONES = auto()
     DEWARPING = auto()
+
+
+_TAB_ICONS: dict[ImageViewTab, str] = {
+    ImageViewTab.PICTURE_ZONES: "image",
+    ImageViewTab.FILL_ZONES: "paint-bucket",
+    ImageViewTab.DEWARPING: "dewarp-grid",
+}
 
 
 class TabbedImageView(QTabWidget):
@@ -95,7 +103,11 @@ class TabbedImageView(QTabWidget):
             label: Tab label text.
             tab: The ImageViewTab enum value for this tab.
         """
-        self.addTab(widget, label)
+        glyph = _TAB_ICONS.get(tab)
+        if glyph is None:
+            self.addTab(widget, label)
+        else:
+            self.addTab(widget, icon(glyph), label)
         self._registry[widget] = tab
 
     def set_image_rect_map(self, rects: dict[ImageViewTab, QRectF]) -> None:
