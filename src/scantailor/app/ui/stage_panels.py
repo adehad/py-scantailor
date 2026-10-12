@@ -261,7 +261,15 @@ class StagePanels(QtCore.QObject):
             image (NDArray[np.uint8]): ``(H, W)`` gray or ``(H, W, 3)`` RGB pixels.
         """
         self._stage_image = image
+        self._refresh_detected_options()
         self._present()
+
+    def _refresh_detected_options(self) -> None:
+        """Show what processing detected in the options that display it."""
+        if self._page is not None and isinstance(
+            self.options, page_split.OptionsWidget | deskew.OptionsWidget
+        ):
+            self.options.refresh()
 
     def _request_source(self, image_id: ImageId) -> None:
         if self._source is not None and self._source.image_id == image_id:

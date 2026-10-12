@@ -234,15 +234,15 @@ class OptionsWidget(QWidget):
 
         # Create 3x3 alignment button grid
         align_buttons = [
-            ("align_top_left", 0, 0, "alignTopLeftBtn"),
-            ("align_top", 0, 1, "alignTopBtn"),
-            ("align_top_right", 0, 2, "alignTopRightBtn"),
-            ("align_left", 1, 0, "alignLeftBtn"),
-            ("align_center", 1, 1, "alignCenterBtn"),
-            ("align_right", 1, 2, "alignRightBtn"),
-            ("align_bottom_left", 2, 0, "alignBottomLeftBtn"),
-            ("align_bottom", 2, 1, "alignBottomBtn"),
-            ("align_bottom_right", 2, 2, "alignBottomRightBtn"),
+            ("align-north-west", 0, 0, "alignTopLeftBtn"),
+            ("arrow-up-to-line", 0, 1, "alignTopBtn"),
+            ("align-north-east", 0, 2, "alignTopRightBtn"),
+            ("arrow-left-to-line", 1, 0, "alignLeftBtn"),
+            ("shrink", 1, 1, "alignCenterBtn"),
+            ("arrow-right-to-line", 1, 2, "alignRightBtn"),
+            ("align-south-west", 2, 0, "alignBottomLeftBtn"),
+            ("arrow-down-to-line", 2, 1, "alignBottomBtn"),
+            ("align-south-east", 2, 2, "alignBottomRightBtn"),
         ]
 
         self._align_buttons: dict[str, QToolButton] = {}

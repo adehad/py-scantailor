@@ -146,16 +146,18 @@ class TestFilter:
         assert params.is_auto()
         assert params.layout_type == LayoutType.AUTO_LAYOUT_TYPE
 
-    def test_apply_to_pages(self):
-        """Apply params to multiple pages."""
+    def test_apply_layout_type_requests_the_type_for_every_page(self):
+        """Applying a layout type reaches every target."""
         filter = Filter()
+        source = make_page_id("source.tiff")
         page_ids = [make_page_id(f"test{i}.tiff") for i in range(3)]
-        params = Params(layout_type=LayoutType.TWO_PAGES)
 
-        filter.apply_to_pages(page_ids, params)
+        filter.apply_layout_type(
+            source, page_ids, LayoutType.TWO_PAGES, apply_cut=False
+        )
 
         for page_id in page_ids:
-            assert filter.get_params(page_id) == params
+            assert filter.get_layout_type(page_id) == LayoutType.TWO_PAGES
 
     def test_process_auto_mode(self):
         """Process in auto mode detects split."""

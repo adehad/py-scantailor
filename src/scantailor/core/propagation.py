@@ -137,6 +137,55 @@ def propagate_page_orientations(
     return changed
 
 
+def set_page_count(project: Project, image_id: ImageId, count: int) -> bool:
+    """Make an image hold one or two logical pages.
+
+    An image with exactly one half removed keeps a single page whatever is asked.
+
+    Args:
+        project (Project): The open project; updated in place.
+        image_id (ImageId): The image to change.
+        count (int): The wanted number of pages, 1 or 2.
+
+    Returns:
+        bool: True if the image's page count changed.
+    """
+    for info in project.images:
+        if info.id != image_id:
+            continue
+        if count == 2 and info.left_half_removed != info.right_half_removed:
+            count = 1
+        if count == info.num_sub_pages:
+            return False
+        info.num_sub_pages = count
+        return True
+    return False
+
+
+def adopt_requested_page_counts(
+    project: Project, stages: StageSequence, images: Iterable[ImageId]
+) -> list[ImageId]:
+    """Give images the page count their requested Page Split layout type implies.
+
+    Images whose layout type is automatic are left alone.
+
+    Args:
+        project (Project): The open project; page counts are updated in place.
+        stages (StageSequence): Source of the requested layout types.
+        images (Iterable[ImageId]): The images to look at.
+
+    Returns:
+        list[ImageId]: Images whose page count changed.
+    """
+    split = stages.page_split_filter
+    changed: list[ImageId] = []
+    for image_id in images:
+        count = split.get_layout_type(PageId(image_id=image_id)).sub_page_count()
+        if count is not None and set_page_count(project, image_id, count):
+            changed.append(image_id)
+    return changed
+
+
 def propagate_content_boxes(project: Project, stages: StageSequence) -> None:
     """Record every page's content geometry in the Page Layout settings.
 
@@ -182,6 +231,32 @@ def apply_orientation(
     """
     filter_ = stages.fix_orientation_filter
     filter_.apply_to_pages(list(targets), filter_.get_rotation(source.image_id))
+
+
+def apply_page_split(
+    stages: StageSequence,
+    source: PageId,
+    targets: Iterable[PageId],
+    layout_type: LayoutType,
+    *,
+    apply_cut: bool,
+) -> None:
+    """Give the targets a layout type, and optionally the source's cutters.
+
+    Cutters are adapted to each target's own outline instead of being copied as
+    coordinates; see ``Filter.apply_layout_type``.
+
+    Args:
+        stages (StageSequence): The stages whose settings are updated.
+        source (PageId): The page whose layout is copied.
+        targets (Iterable[PageId]): Pages that receive it.
+        layout_type (LayoutType): The layout type to request; automatic makes
+            every target detect its own.
+        apply_cut (bool): Copy the source's cutter lines.
+    """
+    stages.page_split_filter.apply_layout_type(
+        source, list(targets), layout_type, apply_cut=apply_cut
+    )
 
 
 def apply_deskew(
