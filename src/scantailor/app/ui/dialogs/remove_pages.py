@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6 import QtWidgets
 from PySide6.QtWidgets import QStyle
 
-from scantailor.app.ui import load_ui_widget
+from scantailor.app.ui import embed_ui, load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
 
 _UI_FOLDER = Path(__file__).parent
@@ -34,6 +34,7 @@ class RemovePagesDialog(QtWidgets.QDialog):
 
         # Load UI
         self.ui = load_ui_widget(_UI_FOLDER / "RemovePagesDialog.ui", self)
+        embed_ui(self, self.ui)
         self._setup_widgets()
         self._connect_signals()
 
@@ -75,7 +76,3 @@ class RemovePagesDialog(QtWidgets.QDialog):
         """
         dialog = RemovePagesDialog(page_count, parent)
         return dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted
-
-    def show(self) -> None:
-        """Show the dialog."""
-        self.ui.show()

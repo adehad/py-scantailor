@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6 import QtWidgets
 from PySide6.QtCore import Signal
 
-from scantailor.app.ui import load_ui_widget
+from scantailor.app.ui import embed_ui, load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
 
 _UI_FOLDER = Path(__file__).parent
@@ -36,6 +36,7 @@ class OutOfMemoryDialog(QtWidgets.QDialog):
 
         # Load UI
         self.ui = load_ui_widget(_UI_FOLDER / "OutOfMemoryDialog.ui", self)
+        embed_ui(self, self.ui)
         self._setup_widgets()
         self._connect_signals()
 
@@ -79,7 +80,3 @@ class OutOfMemoryDialog(QtWidgets.QDialog):
     def show_save_success(self) -> None:
         """Show the success page after project is saved."""
         self._top_level_stack.setCurrentIndex(1)
-
-    def show(self) -> None:
-        """Show the dialog."""
-        self.ui.show()

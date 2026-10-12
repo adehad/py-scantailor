@@ -10,7 +10,7 @@ from pathlib import Path
 from PySide6 import QtWidgets
 from PySide6.QtCore import Signal
 
-from scantailor.app.ui import load_ui_widget
+from scantailor.app.ui import embed_ui, load_ui_widget
 from scantailor.app.ui.utils import get_cwidget
 from scantailor.core.models import PageId
 from scantailor.filters.page_split.layout_type import LayoutType
@@ -78,11 +78,7 @@ class SplitModeDialog(QtWidgets.QDialog):
         """Load the UI from the .ui file."""
         self._ui = load_ui_widget(_UI_FOLDER / "SplitModeDialog.ui", self)
 
-        # Set up the dialog layout
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self._ui)
-
+        embed_ui(self, self._ui)
         self.setWindowTitle("Split Pages")
         self.setModal(True)
 
