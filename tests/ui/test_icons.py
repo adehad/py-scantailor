@@ -8,7 +8,6 @@ import shiboken6
 from PySide6 import QtCore, QtGui, QtSvg, QtWidgets
 
 from scantailor.app.ui import icons, theme
-from scantailor.app.ui.theme.legacy_icons import IconTinter
 from scantailor.app.ui.theme.tokens import DARK, LIGHT
 
 SRC_ROOT = pathlib.Path(icons.__file__).resolve().parents[2]
@@ -121,15 +120,9 @@ def test_unknown_glyph_name_raises_instead_of_returning_a_blank_icon(palette_app
         icons.icon("eye", "missing-on")
 
 
-def test_icons_are_recognised_by_the_legacy_tinter(palette_app, qtbot):
+def test_icons_are_recognised_as_palette_icons(palette_app):
     assert icons.is_palette_icon(icons.icon("minus"))
     assert not icons.is_palette_icon(QtGui.QIcon())
-    button = QtWidgets.QToolButton()
-    qtbot.addWidget(button)
-    button.setIcon(icons.icon("minus"))
-    tinter = IconTinter()
-    tinter.eventFilter(button, QtCore.QEvent(QtCore.QEvent.Type.Polish))
-    assert icons.is_palette_icon(button.icon())
 
 
 def test_binder_gives_a_button_its_icon_from_the_name_property(palette_app, qtbot):
@@ -228,7 +221,7 @@ def test_every_glyph_file_is_a_valid_svg_drawn_with_current_colour():
             *(RESOURCES / "icons/custom").glob("*.svg"),
         ]
     )
-    assert len(files) > 80
+    assert len(files) > 60
     for path in files:
         text = path.read_text("utf-8")
         assert "currentColor" in text, path.name
@@ -248,7 +241,7 @@ def test_glyph_files_and_licences_are_registered_as_resources():
     for resource in (
         ":/icons/lucide/chevron-down.svg",
         ":/icons/lucide/LICENSE",
-        ":/icons/custom/align_top_left.svg",
+        ":/icons/custom/align-north-west.svg",
         ":/fonts/inter/Inter-Regular.ttf",
         ":/fonts/inter/OFL.txt",
     ):
@@ -268,9 +261,134 @@ def test_every_glyph_named_in_the_sources_exists():
         source = path.read_text("utf-8")
         for match in call.finditer(source):
             names.update(group for group in match.groups() if group)
-        names.update(re.findall(r'"(align_[a-z_]+)"', source))
     for path in SRC_ROOT.rglob("*.ui"):
         names.update(prop.findall(path.read_text("utf-8")))
-    assert {"zoom-in", "play", "chevron-down", "align_top_left"} <= names
+    assert {
+        "zoom-in",
+        "play",
+        "chevron-down",
+    } <= names
     for name in sorted(names):
         assert icons.svg_source(name), name
+
+
+def dominant_colors(pixmap: QtGui.QPixmap) -> set[str]:
+    """Colours of all nearly opaque pixels."""
+    image = pixmap.toImage()
+    return {
+        image.pixelColor(x, y).name()
+        for y in range(image.height())
+        for x in range(image.width())
+        if image.pixelColor(x, y).alpha() > 250
+    }
+
+
+@pytest.fixture
+def scheme_app(qapp: QtWidgets.QApplication, monkeypatch):
+    """Application with the real theme, restored afterwards."""
+    monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
+    original = (qapp.palette(), qapp.style().name(), qapp.font())
+    yield qapp
+    controller = qapp.findChild(QtCore.QObject, "scantailorThemeController")
+    if controller is not None:
+        shiboken6.delete(controller)
+    qapp.setStyleSheet("")
+    qapp.setStyle(original[1])
+    qapp.setPalette(original[0])
+    qapp.setFont(original[2])
+    icons.set_semantic_colors(QtGui.QColor("#008a1a"), QtGui.QColor("#d92d20"))
+
+
+@pytest.mark.parametrize("name", ["insert-before", "insert-after", "insert-here"])
+def test_positive_accent_is_green_in_normal_and_disabled_ink_when_disabled(
+    scheme_app, name
+):
+    theme.apply_theme(scheme_app, "light")
+    glyph = icons.icon(name)
+    normal = dominant_colors(glyph.pixmap(SIZE, Mode.Normal))
+    disabled = dominant_colors(glyph.pixmap(SIZE, Mode.Disabled))
+    ink = LIGHT.text
+    dim = LIGHT.text_dim
+    assert LIGHT.positive in normal
+    assert ink in normal
+    assert disabled == {dim}
+
+
+def test_positive_accent_takes_the_dark_green_in_dark_mode(scheme_app):
+    theme.apply_theme(scheme_app, "dark")
+    colors = dominant_colors(icons.icon("insert-before").pixmap(SIZE, Mode.Normal))
+    assert DARK.positive in colors
+    assert LIGHT.positive not in colors
+
+
+@pytest.mark.parametrize("name", ["trash-2", "circle-stop", "archive"])
+def test_danger_tint_colours_the_whole_glyph_except_when_disabled(scheme_app, name):
+    theme.apply_theme(scheme_app, "light")
+    glyph = icons.icon(name, tint="danger")
+    assert dominant_colors(glyph.pixmap(SIZE, Mode.Normal)) == {LIGHT.danger}
+    assert dominant_colors(glyph.pixmap(SIZE, Mode.Active)) == {LIGHT.danger}
+    assert dominant_colors(glyph.pixmap(SIZE, Mode.Disabled)) == {LIGHT.text_dim}
+
+
+def test_accent_tint_follows_the_palette_accent(scheme_app):
+    theme.apply_theme(scheme_app, "dark")
+    glyph = icons.icon("archive-restore", tint="accent")
+    assert dominant_colors(glyph.pixmap(SIZE, Mode.Normal)) == {DARK.accent}
+
+
+def test_unknown_tint_is_rejected(scheme_app):
+    with pytest.raises(ValueError, match="tint"):
+        icons.icon("trash-2", tint="purple")  # type: ignore[arg-type]
+
+
+def test_scheme_switch_recolours_semantic_parts_of_a_live_button(scheme_app, qtbot):
+    theme.apply_theme(scheme_app, "light")
+    button = QtWidgets.QToolButton()
+    qtbot.addWidget(button)
+    button.setIcon(icons.icon("insert-after"))
+    button.setIconSize(SIZE)
+    assert LIGHT.positive in dominant_colors(button.icon().pixmap(SIZE))
+    theme.apply_theme(scheme_app, "dark")
+    after = dominant_colors(button.icon().pixmap(SIZE))
+    assert DARK.positive in after
+    assert DARK.text in after
+
+
+def test_binder_applies_the_tint_property(scheme_app, qtbot):
+    theme.apply_theme(scheme_app, "light")
+    button = QtWidgets.QToolButton()
+    qtbot.addWidget(button)
+    button.setProperty(icons.ICON_NAME_PROPERTY, "trash-2")
+    button.setProperty(icons.ICON_TINT_PROPERTY, "danger")
+    icons.IconBinder().eventFilter(button, QtCore.QEvent(QtCore.QEvent.Type.Polish))
+    assert dominant_colors(button.icon().pixmap(SIZE)) == {LIGHT.danger}
+
+
+def test_final_icon_set_is_shipped_with_no_legacy_glyphs():
+    top_level = [p.name for p in (RESOURCES / "icons").iterdir()]
+    assert sorted(top_level) == ["custom", "lucide"]
+    assert len(list((RESOURCES / "icons/lucide").glob("*.svg"))) == 48
+    assert len(list((RESOURCES / "icons/custom").glob("*.svg"))) == 19
+    assert not (SRC_ROOT / "app/ui/theme/legacy_icons.py").exists()
+
+
+def test_sources_reference_no_removed_icons_or_legacy_tinter():
+    registered = set(
+        re.findall(r"<file>([^<]+)</file>", (RESOURCES / "resources.qrc").read_text())
+    )
+    resource_ref = re.compile(r":/(icons/[A-Za-z0-9_./-]+\.svg)")
+    offenders: list[str] = []
+    for path in SRC_ROOT.rglob("*"):
+        if path.suffix not in {".py", ".ui", ".qrc", ".xml"}:
+            continue
+        if path.name == "resources_rc.py":
+            continue
+        text = path.read_text("utf-8")
+        if "legacy_icons" in text or "IconTinter" in text:
+            offenders.append(f"{path.name}: legacy tinter")
+        offenders.extend(
+            f"{path.name}: {ref}"
+            for ref in resource_ref.findall(text)
+            if ref not in registered
+        )
+    assert not offenders, offenders

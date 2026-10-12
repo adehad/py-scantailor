@@ -15,8 +15,17 @@ a = Analysis(
     ["src/scantailor/__main__.py"],
     pathex=["."],
     binaries=None,
-    datas=[],
-    hiddenimports=[],
+    # fonts.py reads the Korean fallback from disk next to the package; Inter and
+    # the icons are compiled into resources_rc.
+    datas=[
+        (
+            "src/scantailor/resources/fonts/noto-sans-kr",
+            "scantailor/resources/fonts/noto-sans-kr",
+        ),
+    ],
+    # QtSvg gives PyInstaller's hook the qsvg image-format plugin that draws the
+    # glyphs; resources_rc is the compiled Qt resource module.
+    hiddenimports=["PySide6.QtSvg", "scantailor.app._ui.resources_rc"],
     hookspath=None,
     runtime_hooks=None,
     excludes=None,

@@ -3777,63 +3777,6 @@ e=\x22@float\x22] />\x0d\x0a\
   ...\x0d\x0a</icon>\x0d\x0a\
 ...\x0d\x0a-->\x0d\x0a<icons\
 >\x0d\x0a</icons>\x0d\x0a\
-\x00\x00\x03n\
-\x00\
-\x00\x19Cx\xda\x9dY_s\xa3 \x10\x7f\xefL\xbf\
-\x83\xe7;\xed\xfbM\x9a\xe9\xf7\xe8t\x1cTT.\x08\
-\x1e`Ro\xfa\xe1\x0f\xd0Dc5\xee\xfa\x16\xcb\xef\
-\xcf\xb2\xac\xc8\xd2\xc3/B\x9e\x9f\x0e<S2\x92\xb4\
-fo\xf1\xbb\xb1\x9a\xcb2\x8e>\x8c\xed\x04\xcb\xdfb\
-%\xbfUQ\xc4\x9f\xc7\xe7\xa7(:\x14\x5c\xb0\xe8\xa3\
-V\xb9\xc3J\xa5k*\xbesnh\xea\xa0\xdf\x86\x09\
-\x96Y\xf7\x83f\x96\x9fY\xfc\xe9E\xa8e\xa3F\xf4\
-q\xe1\xb9\xad\x9c\x0d\x976\x8e*\xc6\xcb\xca\x0eO\x9f\
-\xc7\xf7\x86\xda*\xb1*\xf1\xf1\x1c^\xbdU0}y\
-yqA\xbe\xfa\xbf\xba\xe7\xf0D\xc8q\x88\xdb\xf4q\
-M\xa6\xe0yq4\x86\x1f\x07\xc4\x10\xfb\xf1w\xd01\
-A\xfd\xc5\x9c\xcb\x89\xcf\xcdb\xa6\xa7D\xce4@1\
-\xe0`\x9a\xad\xcc\xd5\xb6\xa2G\xc1\xf4\x1a\xd1\x9ae\x0d\
-?\x02\xd3\xb0\x9a\x9a\x8a\xe5\xcb2\xc3 tv\x01\xbe\
-6\xa90\x08S\xaa\xb9\x5c\x9bX\x18\x82\xa9pi\x98\
-\xb6\xa4b\x1aP\x18\x130p\xb6\x0eO\x1eM\xf86\
-\x8e\x8a\x96\x16\x16RuS4J?e\x85B\xe4\xa3\
-\x87C\xab\x91v\xa4Rg\x97\xc2|\xdb`\x8a\x86\xeb\
-\xc3t\x11\xf16\x9a\x19\x03\x8ew@\xc3\xf4\x8dU\xcd\
-\xb2\x96\x1f\x81k\xdcr\xba\xaa\x85\xcbc`\x5c\xe7\xbd\
-\xae\x89\x9dkv\x22\x19\x93\xa0\xea\x9d\xa21\xfa\xa5\xa6\
-gn;\xc2\xa8\xb1P\x97)g\x8f\x97\xfb\xdc\xd9\x0a\
-k\x16H\xbb\xddv\xcdod\xee\xf7\xbd\xb0\xbd\xbe\x9e\
-\xb9\xc7\xd7\xa8\x16\x9f\xdd@\xda\xed\xb6+\xbb#s\xbf\
-\xef\x9e\xec\x8e\xcc=\xbe{\x1c\xb1^\xe7\xac\xa2\x5cB\
-]z4^\x9f\xa4Z\x9d\x18\xd2f \xc1\xdc\xb4?\
-\x94&\x0d-Yb\xab\xb6N\xb7\xad\xe6\x0c\x98\x8f`\
-\x05\xcefF\x80\xb9\xd0\xbf-%\xa6\x09g\x9fE\xd5\
-\x09\x00\xa6\x98\xf2\x92\xe4\xea\x22\x09\xd5Z]\xb6\xc3\xbe\
-\xc7\xc3=\xfct1\x1e#\x1e\xee\x11V\x0ec2!\
-\xc0]\xda\x06cqE\xc3\xf4U\xfa\xc75]D+\
-\xdfi\x85\x1cl\xbb\xfc\xe4\xec\xf1\x0a\xa9\xc0\x9a\x05\x12\
-\xb0\x1f\xb9\xa8P\xedf\xdb\xe3\x06\x05\xbey\xb4s\xbb\
-ib\xbb\x86%\xb4\xb5\x80Nl\xce\x00\xee[\xae\x93\
-\x16\xac\x7fe[\x99\xb5\x90-xN\xc1\xee%\xbe\xdf\
-K\x5c\xb3\x0dr[\xa4\xa1wI\x94\xe52\x0f\xe6\xc9\
-\xba\xf5~%\xba^5\x14E|3s\x04r\xbd\x9e\
-\x98Y\xcci\xf2\x8e\x05\xed\x989\xf5\xcb\x85\xda\x0e\x17\
-HH7\xf8v\xf2\x83\x02s\xca*\xe6>\x9d5\xd5\
-'\x5c\xbaG\xde\x8e\xac\x8fdx\xc9\xf7\x93\x22\xaeE\
-\xcd4O!\xcd\xdb\x12\x0bQ\xf0x\xc3E\x1ap\x19\
-\x94\x10\xb41\x80\x1e\xfd\x8a\x04\xbeF_\x0d\x95\x80\xd0\
-{\x1c\xa2dR\xf5Ez\xd1\x07\xe2\x93\xd5\x1e\xf1\x98\
-%h\x14\x976\xdcQnx\xdc\xc3\xc19okI\
-\xce\x9c]p\xb5_\xb7\xc2r2\xa1\xc3+\xbf\xdf\xf3\
-\x1fp\xd7>/\xae\xe1rT\xa2\xf4\xa3\xfb\xc9\xfbh\
-\x873\x9fq-w\xee\xb8\xc9\xa0\x91\x04\x0d@\xc8=\
-?g \x81\xd5\xcf\xaf1\x8a\xfcS\x92\x11\x7f\x91\xbc\
-\xb9\x8e3<\xf0NG\x89\xaeT\x92\x0a\x84\xd1\x02\x07\
-X\x98\xee\x84\xe36\xdaVP\x8d\xb0[dAO\x16\
-\xee\xcdi\x5cO\x93\x13\xd7\x892\xcd\xcd\x09U\x00\x0b\
-|\xcc\x96\xbd*\x02\x8b>\xe75\x97\xdcT\xbexK\
-\xbf\xba\x9b\xa9\xfa\xc1\x00^\x1f\xd3R\xf2\xa2\x83\xfb\xcc\
-\x09k6\xfd\x0f\xff\xbf\x87\xff&\x1d\x15\xf9\
 \x00\x06^\x14\
 \x00\
 \x01\x00\x00\x00\x11\x01\x00\x00\x04\x00\x10GDEF\x90\
@@ -29918,282 +29861,288 @@ TX\xb9\x00\x03\x00\x00DYYYYY@\x10v\
 \x06f\x06V\x06J\x04>\x04.\x06 \x05\x07\x0e*\
 \xb8\x01\xff\x85\xb0\x04\x8d\xb1\x02\x00D\xb3\x05d\x06\x00\
 DD\x00\
-\x00\x00\x11\x1c\
+\x00\x00\x11x\
 C\
 opyright (c) 201\
 6 The Inter Proj\
 ect Authors (htt\
 ps://github.com/\
-rsms/inter)\x0a\x0aThi\
-s Font Software \
-is licensed unde\
-r the SIL Open F\
-ont License, Ver\
-sion 1.1.\x0aThis l\
-icense is copied\
- below, and is a\
-lso available wi\
-th a FAQ at:\x0ahtt\
-p://scripts.sil.\
-org/OFL\x0a\x0a-------\
+rsms/inter)\x0d\x0a\x0d\x0aT\
+his Font Softwar\
+e is licensed un\
+der the SIL Open\
+ Font License, V\
+ersion 1.1.\x0d\x0aThi\
+s license is cop\
+ied below, and i\
+s also available\
+ with a FAQ at:\x0d\
+\x0ahttp://scripts.\
+sil.org/OFL\x0d\x0a\x0d\x0a-\
 ----------------\
 ----------------\
 ----------------\
-----\x0aSIL OPEN FO\
-NT LICENSE Versi\
-on 1.1 - 26 Febr\
-uary 2007\x0a------\
+----------\x0d\x0aSIL \
+OPEN FONT LICENS\
+E Version 1.1 - \
+26 February 2007\
+\x0d\x0a--------------\
 ----------------\
 ----------------\
-----------------\
------\x0a\x0aPREAMBLE\x0a\
-The goals of the\
- Open Font Licen\
-se (OFL) are to \
-stimulate worldw\
-ide\x0adevelopment \
-of collaborative\
- font projects, \
-to support the f\
-ont creation\x0aeff\
-orts of academic\
- and linguistic \
-communities, and\
- to provide a fr\
-ee and\x0aopen fram\
-ework in which f\
-onts may be shar\
-ed and improved \
-in partnership\x0aw\
-ith others.\x0a\x0aThe\
- OFL allows the \
-licensed fonts t\
-o be used, studi\
-ed, modified and\
-\x0aredistributed f\
-reely as long as\
- they are not so\
-ld by themselves\
-. The\x0afonts, inc\
-luding any deriv\
-ative works, can\
- be bundled, emb\
-edded,\x0aredistrib\
-uted and/or sold\
- with any softwa\
-re provided that\
- any reserved\x0ana\
-mes are not used\
- by derivative w\
-orks. The fonts \
-and derivatives,\
-\x0ahowever, cannot\
- be released und\
-er any other typ\
-e of license. Th\
-e\x0arequirement fo\
-r fonts to remai\
-n under this lic\
-ense does not ap\
-ply\x0ato any docum\
-ent created usin\
-g the fonts or t\
-heir derivatives\
-.\x0a\x0aDEFINITIONS\x0a\x22\
-Font Software\x22 r\
-efers to the set\
- of files releas\
-ed by the Copyri\
-ght\x0aHolder(s) un\
-der this license\
- and clearly mar\
-ked as such. Thi\
-s may\x0ainclude so\
-urce files, buil\
-d scripts and do\
-cumentation.\x0a\x0a\x22R\
-eserved Font Nam\
-e\x22 refers to any\
- names specified\
- as such after t\
-he\x0acopyright sta\
-tement(s).\x0a\x0a\x22Ori\
-ginal Version\x22 r\
-efers to the col\
-lection of Font \
-Software compone\
-nts as\x0adistribut\
-ed by the Copyri\
-ght Holder(s).\x0a\x0a\
-\x22Modified Versio\
-n\x22 refers to any\
- derivative made\
- by adding to, d\
-eleting,\x0aor subs\
-tituting -- in p\
-art or in whole \
--- any of the co\
-mponents of the\x0a\
-Original Version\
-, by changing fo\
-rmats or by port\
-ing the Font Sof\
-tware to a\x0anew e\
-nvironment.\x0a\x0a\x22Au\
-thor\x22 refers to \
-any designer, en\
-gineer, programm\
-er, technical\x0awr\
-iter or other pe\
-rson who contrib\
-uted to the Font\
- Software.\x0a\x0aPERM\
-ISSION AND CONDI\
-TIONS\x0aPermission\
- is hereby grant\
-ed, free of char\
-ge, to any perso\
-n obtaining\x0aa co\
-py of the Font S\
-oftware, to use,\
- study, copy, me\
-rge, embed, modi\
-fy,\x0aredistribute\
+-------------\x0d\x0a\x0d\
+\x0aPREAMBLE\x0d\x0aThe g\
+oals of the Open\
+ Font License (O\
+FL) are to stimu\
+late worldwide\x0d\x0a\
+development of c\
+ollaborative fon\
+t projects, to s\
+upport the font \
+creation\x0d\x0aeffort\
+s of academic an\
+d linguistic com\
+munities, and to\
+ provide a free \
+and\x0d\x0aopen framew\
+ork in which fon\
+ts may be shared\
+ and improved in\
+ partnership\x0d\x0awi\
+th others.\x0d\x0a\x0d\x0aTh\
+e OFL allows the\
+ licensed fonts \
+to be used, stud\
+ied, modified an\
+d\x0d\x0aredistributed\
+ freely as long \
+as they are not \
+sold by themselv\
+es. The\x0d\x0afonts, \
+including any de\
+rivative works, \
+can be bundled, \
+embedded,\x0d\x0aredis\
+tributed and/or \
+sold with any so\
+ftware provided \
+that any reserve\
+d\x0d\x0anames are not\
+ used by derivat\
+ive works. The f\
+onts and derivat\
+ives,\x0d\x0ahowever, \
+cannot be releas\
+ed under any oth\
+er type of licen\
+se. The\x0d\x0arequire\
+ment for fonts t\
+o remain under t\
+his license does\
+ not apply\x0d\x0ato a\
+ny document crea\
+ted using the fo\
+nts or their der\
+ivatives.\x0d\x0a\x0d\x0aDEF\
+INITIONS\x0d\x0a\x22Font \
+Software\x22 refers\
+ to the set of f\
+iles released by\
+ the Copyright\x0d\x0a\
+Holder(s) under \
+this license and\
+ clearly marked \
+as such. This ma\
+y\x0d\x0ainclude sourc\
+e files, build s\
+cripts and docum\
+entation.\x0d\x0a\x0d\x0a\x22Re\
+served Font Name\
+\x22 refers to any \
+names specified \
+as such after th\
+e\x0d\x0acopyright sta\
+tement(s).\x0d\x0a\x0d\x0a\x22O\
+riginal Version\x22\
+ refers to the c\
+ollection of Fon\
+t Software compo\
+nents as\x0d\x0adistri\
+buted by the Cop\
+yright Holder(s)\
+.\x0d\x0a\x0d\x0a\x22Modified V\
+ersion\x22 refers t\
+o any derivative\
+ made by adding \
+to, deleting,\x0d\x0ao\
+r substituting -\
+- in part or in \
+whole -- any of \
+the components o\
+f the\x0d\x0aOriginal \
+Version, by chan\
+ging formats or \
+by porting the F\
+ont Software to \
+a\x0d\x0anew environme\
+nt.\x0d\x0a\x0d\x0a\x22Author\x22 \
+refers to any de\
+signer, engineer\
+, programmer, te\
+chnical\x0d\x0awriter \
+or other person \
+who contributed \
+to the Font Soft\
+ware.\x0d\x0a\x0d\x0aPERMISS\
+ION AND CONDITIO\
+NS\x0d\x0aPermission i\
+s hereby granted\
+, free of charge\
+, to any person \
+obtaining\x0d\x0aa cop\
+y of the Font So\
+ftware, to use, \
+study, copy, mer\
+ge, embed, modif\
+y,\x0d\x0aredistribute\
 , and sell modif\
 ied and unmodifi\
 ed copies of the\
- Font\x0aSoftware, \
-subject to the f\
-ollowing conditi\
-ons:\x0a\x0a1) Neither\
- the Font Softwa\
-re nor any of it\
-s individual com\
-ponents,\x0ain Orig\
+ Font\x0d\x0aSoftware,\
+ subject to the \
+following condit\
+ions:\x0d\x0a\x0d\x0a1) Neit\
+her the Font Sof\
+tware nor any of\
+ its individual \
+components,\x0d\x0ain \
+Original or Modi\
+fied Versions, m\
+ay be sold by it\
+self.\x0d\x0a\x0d\x0a2) Orig\
 inal or Modified\
- Versions, may b\
-e sold by itself\
-.\x0a\x0a2) Original o\
-r Modified Versi\
-ons of the Font \
-Software may be \
-bundled,\x0aredistr\
-ibuted and/or so\
-ld with any soft\
-ware, provided t\
-hat each copy\x0aco\
-ntains the above\
- copyright notic\
-e and this licen\
-se. These can be\
-\x0aincluded either\
- as stand-alone \
-text files, huma\
-n-readable heade\
-rs or\x0ain the app\
-ropriate machine\
--readable metada\
-ta fields within\
- text or\x0abinary \
-files as long as\
- those fields ca\
-n be easily view\
-ed by the user.\x0a\
-\x0a3) No Modified \
-Version of the F\
-ont Software may\
- use the Reserve\
-d Font\x0aName(s) u\
-nless explicit w\
-ritten permissio\
-n is granted by \
-the correspondin\
-g\x0aCopyright Hold\
-er. This restric\
-tion only applie\
-s to the primary\
- font name as\x0apr\
-esented to the u\
-sers.\x0a\x0a4) The na\
-me(s) of the Cop\
-yright Holder(s)\
- or the Author(s\
-) of the Font\x0aSo\
-ftware shall not\
- be used to prom\
-ote, endorse or \
-advertise any\x0aMo\
-dified Version, \
-except to acknow\
-ledge the contri\
-bution(s) of the\
+ Versions of the\
+ Font Software m\
+ay be bundled,\x0d\x0a\
+redistributed an\
+d/or sold with a\
+ny software, pro\
+vided that each \
+copy\x0d\x0acontains t\
+he above copyrig\
+ht notice and th\
+is license. Thes\
+e can be\x0d\x0ainclud\
+ed either as sta\
+nd-alone text fi\
+les, human-reada\
+ble headers or\x0d\x0a\
+in the appropria\
+te machine-reada\
+ble metadata fie\
+lds within text \
+or\x0d\x0abinary files\
+ as long as thos\
+e fields can be \
+easily viewed by\
+ the user.\x0d\x0a\x0d\x0a3)\
+ No Modified Ver\
+sion of the Font\
+ Software may us\
+e the Reserved F\
+ont\x0d\x0aName(s) unl\
+ess explicit wri\
+tten permission \
+is granted by th\
+e corresponding\x0d\
 \x0aCopyright Holde\
-r(s) and the Aut\
-hor(s) or with t\
-heir explicit wr\
-itten\x0apermission\
-.\x0a\x0a5) The Font S\
-oftware, modifie\
-d or unmodified,\
- in part or in w\
-hole,\x0amust be di\
-stributed entire\
-ly under this li\
-cense, and must \
-not be\x0adistribut\
-ed under any oth\
-er license. The \
-requirement for \
-fonts to\x0aremain \
-under this licen\
-se does not appl\
-y to any documen\
-t created\x0ausing \
-the Font Softwar\
-e.\x0a\x0aTERMINATION\x0a\
-This license bec\
-omes null and vo\
-id if any of the\
- above condition\
-s are\x0anot met.\x0a\x0a\
-DISCLAIMER\x0aTHE F\
-ONT SOFTWARE IS \
-PROVIDED \x22AS IS\x22\
-, WITHOUT WARRAN\
-TY OF ANY KIND,\x0a\
-EXPRESS OR IMPLI\
-ED, INCLUDING BU\
-T NOT LIMITED TO\
- ANY WARRANTIES \
-OF\x0aMERCHANTABILI\
-TY, FITNESS FOR \
-A PARTICULAR PUR\
-POSE AND NONINFR\
-INGEMENT\x0aOF COPY\
-RIGHT, PATENT, T\
-RADEMARK, OR OTH\
-ER RIGHT. IN NO \
-EVENT SHALL THE\x0a\
-COPYRIGHT HOLDER\
- BE LIABLE FOR A\
-NY CLAIM, DAMAGE\
-S OR OTHER LIABI\
-LITY,\x0aINCLUDING \
-ANY GENERAL, SPE\
-CIAL, INDIRECT, \
-INCIDENTAL, OR C\
-ONSEQUENTIAL\x0aDAM\
-AGES, WHETHER IN\
- AN ACTION OF CO\
-NTRACT, TORT OR \
-OTHERWISE, ARISI\
-NG\x0aFROM, OUT OF \
-THE USE OR INABI\
-LITY TO USE THE \
-FONT SOFTWARE OR\
- FROM\x0aOTHER DEAL\
-INGS IN THE FONT\
- SOFTWARE.\x0a\
+r. This restrict\
+ion only applies\
+ to the primary \
+font name as\x0d\x0apr\
+esented to the u\
+sers.\x0d\x0a\x0d\x0a4) The \
+name(s) of the C\
+opyright Holder(\
+s) or the Author\
+(s) of the Font\x0d\
+\x0aSoftware shall \
+not be used to p\
+romote, endorse \
+or advertise any\
+\x0d\x0aModified Versi\
+on, except to ac\
+knowledge the co\
+ntribution(s) of\
+ the\x0d\x0aCopyright \
+Holder(s) and th\
+e Author(s) or w\
+ith their explic\
+it written\x0d\x0aperm\
+ission.\x0d\x0a\x0d\x0a5) Th\
+e Font Software,\
+ modified or unm\
+odified, in part\
+ or in whole,\x0d\x0am\
+ust be distribut\
+ed entirely unde\
+r this license, \
+and must not be\x0d\
+\x0adistributed und\
+er any other lic\
+ense. The requir\
+ement for fonts \
+to\x0d\x0aremain under\
+ this license do\
+es not apply to \
+any document cre\
+ated\x0d\x0ausing the \
+Font Software.\x0d\x0a\
+\x0d\x0aTERMINATION\x0d\x0aT\
+his license beco\
+mes null and voi\
+d if any of the \
+above conditions\
+ are\x0d\x0anot met.\x0d\x0a\
+\x0d\x0aDISCLAIMER\x0d\x0aTH\
+E FONT SOFTWARE \
+IS PROVIDED \x22AS \
+IS\x22, WITHOUT WAR\
+RANTY OF ANY KIN\
+D,\x0d\x0aEXPRESS OR I\
+MPLIED, INCLUDIN\
+G BUT NOT LIMITE\
+D TO ANY WARRANT\
+IES OF\x0d\x0aMERCHANT\
+ABILITY, FITNESS\
+ FOR A PARTICULA\
+R PURPOSE AND NO\
+NINFRINGEMENT\x0d\x0aO\
+F COPYRIGHT, PAT\
+ENT, TRADEMARK, \
+OR OTHER RIGHT. \
+IN NO EVENT SHAL\
+L THE\x0d\x0aCOPYRIGHT\
+ HOLDER BE LIABL\
+E FOR ANY CLAIM,\
+ DAMAGES OR OTHE\
+R LIABILITY,\x0d\x0aIN\
+CLUDING ANY GENE\
+RAL, SPECIAL, IN\
+DIRECT, INCIDENT\
+AL, OR CONSEQUEN\
+TIAL\x0d\x0aDAMAGES, W\
+HETHER IN AN ACT\
+ION OF CONTRACT,\
+ TORT OR OTHERWI\
+SE, ARISING\x0d\x0aFRO\
+M, OUT OF THE US\
+E OR INABILITY T\
+O USE THE FONT S\
+OFTWARE OR FROM\x0d\
+\x0aOTHER DEALINGS \
+IN THE FONT SOFT\
+WARE.\x0d\x0a\
 \x00\x06G\xf8\
 \x00\
 \x01\x00\x00\x00\x11\x01\x00\x00\x04\x00\x10GDEF\x90\
@@ -82160,4318 +82109,39 @@ H\x06<\x06,\x08\x1e\x07\x07\x0a*\xb1\x00\x07B@\
 \x03\x00\x00DYYYYY@\x10v\x06f\x06V\
 \x06J\x04>\x04.\x06 \x05\x07\x0e*\xb8\x01\xff\x85\
 \xb0\x04\x8d\xb1\x02\x00D\xb3\x05d\x06\x00DD\x00\
-\x00\x00\x01\xea\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 24 24\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 24 \
-24;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<g>\x0d\x0a\x09\x09<rect x\
-=\x223\x22 y=\x223\x22 width\
-=\x2218\x22 height=\x222\x22\
-/>\x0d\x0a\x09</g>\x0d\x0a\x09<pol\
-ygon points=\x2212,\
-6 7,11 11,11 11,\
-21 13,21 13,11 1\
-7,11 \x09\x22/>\x0d\x0a</g>\x0d\
-\x0a</svg>\x0d\x0a\
-\x00\x00\x04\x08\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 23 17\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 23 \
-17;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M0,0h\
-23v17H0V0 M1,1c0\
-,5,0,10,0,15c3.3\
-,0,6.7,0,10,0c0-\
-5,0-10,0-15C7.7,\
-1,4.3,1,1,1 M12,\
-1c0,5,0,10,0,15c\
-3.3,0,6.7,0,10,0\
-\x0d\x0a\x09\x09c0-5,0-10,0-\
-15C18.7,1,15.3,1\
-,12,1z\x22/>\x0d\x0a\x09<pat\
-h d=\x22M14,3c2,0,4\
-,0,6,0c0,0.3,0,0\
-.7,0,1c-2,0-4,0-\
-6,0C14,3.7,14,3.\
-3,14,3z\x22/>\x0d\x0a\x09<pa\
-th d=\x22M14,5c2,0,\
-4,0,6,0c0,0.3,0,\
-0.7,0,1c-2,0-4,0\
--6,0C14,5.7,14,5\
-.3,14,5z\x22/>\x0d\x0a\x09<p\
-ath d=\x22M14,7c2,0\
-,4,0,6,0c0,0.3,0\
-,0.7,0,1c-2,0-4,\
-0-6,0C14,7.7,14,\
-7.3,14,7z\x22/>\x0d\x0a\x09<\
-path d=\x22M14,9c2,\
-0,4,0,6,0c0,0.3,\
-0,0.7,0,1c-2,0-4\
-,0-6,0C14,9.7,14\
-,9.3,14,9z\x22/>\x0d\x0a\x09\
-<path d=\x22M14,11c\
-2,0,4,0,6,0c0,0.\
-3,0,0.7,0,1c-2,0\
--4,0-6,0C14,11.7\
-,14,11.3,14,11z\x22\
-/>\x0d\x0a\x09<path d=\x22M1\
-4,13c2,0,4,0,6,0\
-c0,0.3,0,0.7,0,1\
-c-2,0-4,0-6,0C14\
-,13.7,14,13.3,14\
-,13z\x22/>\x0d\x0a</g>\x0d\x0a<\
-/svg>\x0d\x0a\
-\x00\x00\x03R\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 22 22\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 22 \
-22;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M7.36\
-,1.76c0.45-0.37,\
-1.2-0.04,1.25,0.\
-54c0.02,0.81,0,1\
-.63,0.01,2.44c2.\
-95,0.31,5.9,1.07\
-,8.45,2.63\x0d\x0a\x09\x09c1\
-.3,0.82,2.51,1.8\
-7,3.26,3.23c0.77\
-,1.36,0.9,3.06,0\
-.29,4.5c-1.17,2.\
-72-3.94,4.29-6.6\
-,5.27c-0.48,0.17\
--0.82-0.57-0.38-\
-0.82\x0d\x0a\x09\x09c1.29-0.\
-63,2.59-1.5,3.18\
--2.86c0.62-1.33-\
-0.02-2.88-1.11-3\
-.75c-1.97-1.63-4\
-.59-2.19-7.09-2.\
-39c-0.01,0.85,0.\
-01,1.7-0.01,2.55\
-\x0d\x0a\x09\x09c-0.06,0.57-\
-0.79,0.87-1.25,0\
-.53c-2.05-1.79-4\
-.09-3.59-6.14-5.\
-38C0.92,7.95,0.9\
-2,7.4,1.25,7.11C\
-3.28,5.34,5.32,3\
-.55,7.36,1.76z\x22/\
->\x0d\x0a</g>\x0d\x0a</svg>\x0d\
-\x0a\
-\x00\x00\x01\x94\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M3,11\
-l5-8l5,8H3L3,11z\
-\x22/>\x0d\x0a</g>\x0d\x0a</svg\
->\x0d\x0a\
-\x00\x00\x04\xf9\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 32 32\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 32 \
-32;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M26,0\
-h1c0,10.7,0,21.3\
-,0,32h-1C26,21.3\
-,26,10.7,26,0z\x22/\
->\x0d\x0a\x09<path d=\x22M3,\
-3c6.7,0,13.3,0,2\
-0,0v1C16.3,4,9.7\
-,4,3,4V3z\x22/>\x0d\x0a\x09<\
-path d=\x22M30,3h2v\
-1h-2V3z\x22/>\x0d\x0a\x09<pa\
-th d=\x22M3,6c6.7,0\
-,13.3,0,20,0v1C1\
-6.3,7,9.7,7,3,7V\
-6z\x22/>\x0d\x0a\x09<path d=\
-\x22M30,6h2v1h-2V6z\
-\x22/>\x0d\x0a\x09<path d=\x22M\
-3,9c6.7,0,13.3,0\
-,20,0v1c-6.7,0-1\
-3.3,0-20,0V9z\x22/>\
-\x0d\x0a\x09<path d=\x22M30,\
-9h2v1h-2V9z\x22/>\x0d\x0a\
-\x09<path d=\x22M3,12c\
-6.7,0,13.3,0,20,\
-0v1c-6.7,0-13.3,\
-0-20,0V12z\x22/>\x0d\x0a\x09\
-<path d=\x22M30,12h\
-2v1h-2V12z\x22/>\x0d\x0a\x09\
-<path d=\x22M3,15c6\
-.7,0,13.3,0,20,0\
-v1c-6.7,0-13.3,0\
--20,0V15z\x22/>\x0d\x0a\x09<\
-path d=\x22M30,15h2\
-v1h-2V15z\x22/>\x0d\x0a\x09<\
-path d=\x22M3,18c6.\
-7,0,13.3,0,20,0v\
-1c-6.7,0-13.3,0-\
-20,0V18z\x22/>\x0d\x0a\x09<p\
-ath d=\x22M30,18h2v\
-1h-2V18z\x22/>\x0d\x0a\x09<p\
-ath d=\x22M3,21c6.7\
-,0,13.3,0,20,0v1\
-c-6.7,0-13.3,0-2\
-0,0V21z\x22/>\x0d\x0a\x09<pa\
-th d=\x22M30,21h2v1\
-h-2V21z\x22/>\x0d\x0a\x09<pa\
-th d=\x22M3,24c6.7,\
-0,13.3,0,20,0v1c\
--6.7,0-13.3,0-20\
-,0V24z\x22/>\x0d\x0a\x09<pat\
-h d=\x22M30,24h2v1h\
--2V24z\x22/>\x0d\x0a\x09<pat\
-h d=\x22M3,27c6.7,0\
-,13.3,0,20,0v1c-\
-6.7,0-13.3,0-20,\
-0V27z\x22/>\x0d\x0a\x09<path\
- d=\x22M30,27h2v1h-\
-2V27z\x22/>\x0d\x0a</g>\x0d\x0a\
-</svg>\x0d\x0a\
-\x00\x00\x01\x82\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 18 18\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 18 \
-18;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<pat\
-h d=\x22M14,9l-8,4.\
-5v-9\x22/>\x0d\x0a</svg>\x0d\
-\x0a\
-\x00\x00\x02\xc1\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 24 24\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 24 \
-24;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M3.27\
-,16l2-2H10v4.73l\
--2,2v-3.54L4.19,\
-21L3,19.82L6.81,\
-16H3.27z\x22/>\x0d\x0a</g\
->\x0d\x0a<g>\x0d\x0a\x09<path d\
-=\x22M8,3.27l2,2V10\
-H5.27l-2-2h3.54L\
-3,4.19L4.18,3L8,\
-6.81V3.27z\x22/>\x0d\x0a<\
-/g>\x0d\x0a<g>\x0d\x0a\x09<path\
- d=\x22M16,20.73l-2\
--2V14h4.73l2,2h-\
-3.54L21,19.81L19\
-.82,21L16,17.19V\
-20.73z\x22/>\x0d\x0a</g>\x0d\
-\x0a<g>\x0d\x0a\x09<path d=\x22\
-M20.73,8l-2,2H14\
-V5.27l2-2v3.54L1\
-9.81,3L21,4.18L1\
-7.19,8H20.73z\x22/>\
-\x0d\x0a</g>\x0d\x0a</svg>\x0d\x0a\
-\
-\x00\x00\x02\xcc\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 32 32\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 32 \
-32;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<sty\
-le type=\x22text/cs\
-s\x22>\x0d\x0a\x09.st0{fill:\
-#f10000;}\x0d\x0a</sty\
-le>\x0d\x0a<path class\
-=\x22st0\x22 d=\x22M16,30\
-c-3.74,0-7.26-1.\
-46-9.9-4.1S2,19.\
-74,2,16s1.46-7.2\
-6,4.1-9.9S12.26,\
-2,16,2s7.26,1.46\
-,9.9,4.1\x0d\x0a\x09\x09\x09S30\
-,12.26,30,16s-1.\
-46,7.26-4.1,9.9S\
-19.74,30,16,30z \
-M16,4C9.38,4,4,9\
-.38,4,16s5.38,12\
-,12,12s12-5.38,1\
-2-12S22.62,4,16,\
-4z\x22/>\x0d\x0a<rect x=\x22\
-9.5\x22 y=\x229.5\x22 cla\
-ss=\x22st0\x22 width=\x22\
-13\x22 height=\x2213\x22/\
->\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x03\xd3\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<rect x=\x224\x22 y=\
-\x226\x22 width=\x225\x22 he\
-ight=\x221\x22/>\x0d\x0a</g>\
-\x0d\x0a<g>\x0d\x0a\x09<path d=\
-\x22M15.08,13.62c-0\
-.06-0.14-0.13-0.\
-25-0.24-0.34l-3.\
-83-3.64l0,0C11.6\
-3,8.75,12,7.67,1\
-2,6.5C12,3.46,9.\
-54,1,6.5,1S1,3.4\
-6,1,6.5\x0d\x0a\x09\x09S3.46\
-,12,6.5,12c1.08,\
-0,2.08-0.31,2.93\
--0.85l3.9,3.72c0\
-.08,0.09,0.19,0.\
-16,0.32,0.21s0.2\
-8,0.08,0.42,0.08\
-\x0d\x0a\x09\x09c0.15,0,0.29\
--0.03,0.43-0.08c\
-0.13-0.05,0.25-0\
-.14,0.36-0.25c0.\
-1-0.11,0.18-0.23\
-,0.23-0.36c0.05-\
-0.13,0.08-0.26,0\
-.08-0.4\x0d\x0a\x09\x09C15.1\
-7,13.92,15.14,13\
-.77,15.08,13.62z\
- M2,6.5C2,4.01,4\
-.01,2,6.5,2S11,4\
-.01,11,6.5S8.99,\
-11,6.5,11S2,8.99\
-,2,6.5z M10.29,1\
-0.48\x0d\x0a\x09\x09C10.29,1\
-0.47,10.3,10.47,\
-10.29,10.48C10.3\
-,10.47,10.29,10.\
-47,10.29,10.48z\x22\
-/>\x0d\x0a</g>\x0d\x0a</svg>\
-\x0d\x0a\
-\x00\x00\x06=\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M16,8\
-c-0.48,0.86-1.07\
-,1.6-1.76,2.21c-\
-1.67,1.48-3.75,2\
-.22-6.23,2.22s-4\
-.56-0.74-6.24-2.\
-22C1.08,9.61,0.4\
-8,8.87,0,8\x0d\x0a\x09\x09c0\
-.48-0.86,1.08-1.\
-6,1.77-2.22C3.45\
-,4.3,5.53,3.56,8\
-.01,3.56s4.56,0.\
-74,6.23,2.22C14.\
-93,6.4,15.52,7.1\
-4,16,8z M10.96,8\
-\x0d\x0a\x09\x09c0-0.8-0.29-\
-1.48-0.87-2.04S8\
-.81,5.11,8,5.11c\
--0.43,0-0.84,0.0\
-9-1.22,0.26l-0.3\
-1-0.7C4.21,5.06,\
-2.56,6.17,1.52,8\
-\x0d\x0a\x09\x09c0.3,0.53,0.\
-67,1.01,1.1,1.43\
-c1.04,1,2.31,1.6\
-3,3.82,1.89c-0.6\
-5-0.29-1.18-0.74\
--1.58-1.33c-0.4-\
-0.6-0.6-1.26-0.6\
--1.99\x0d\x0a\x09\x09c0-0.44\
-,0.08-0.87,0.23-\
-1.29l0.75,0.23C5\
-.11,7.29,5.04,7.\
-64,5.04,8c0,0.8,\
-0.29,1.48,0.87,2\
-.05S7.19,10.9,8,\
-10.9\x0d\x0a\x09\x09s1.51-0.\
-28,2.09-0.84S10.\
-96,8.81,10.96,8z\
- M10.24,8c0,0.6-\
-0.22,1.12-0.66,1\
-.55S8.62,10.2,8,\
-10.2S6.85,9.99,6\
-.41,9.56\x0d\x0a\x09\x09S5.7\
-6,8.61,5.76,8c0-\
-0.27,0.05-0.53,0\
-.14-0.77l2.28,1.\
-03L7.11,6C7.39,5\
-.88,7.69,5.81,8,\
-5.81c0.62,0,1.14\
-,0.21,1.58,0.64\x0d\
-\x0a\x09\x09C10.02,6.89,1\
-0.24,7.4,10.24,8\
-z M14.48,8c-0.3-\
-0.53-0.67-1.01-1\
-.11-1.44c-1.04-1\
-.01-2.33-1.64-3.\
-86-1.89\x0d\x0a\x09\x09c0.67\
-,0.29,1.2,0.72,1\
-.6,1.31C11.52,6.\
-6,11.73,7.27,11.\
-73,8s-0.2,1.39-0\
-.6,1.99s-0.93,1.\
-04-1.58,1.33\x0d\x0a\x09\x09\
-C11.8,10.94,13.4\
-4,9.83,14.48,8z\x22\
-/>\x0d\x0a</g>\x0d\x0a<g>\x0d\x0a\x09\
-<path d=\x22M11.8,1\
-2.81l3.2,3.2l1-1\
-l-2.83-2.83C12.7\
-3,12.42,12.28,12\
-.63,11.8,12.81z\x22\
-/>\x0d\x0a\x09<path d=\x22M4\
-.2,3.2L1,0.01l-1\
-,1l2.83,2.83C3.2\
-7,3.59,3.72,3.38\
-,4.2,3.2z\x22/>\x0d\x0a</\
-g>\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x01\xea\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 24 24\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 24 \
-24;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<g>\x0d\x0a\x09\x09<rect x\
-=\x223\x22 y=\x2219\x22 widt\
-h=\x2218\x22 height=\x222\
-\x22/>\x0d\x0a\x09</g>\x0d\x0a\x09<po\
-lygon points=\x2212\
-,18 17,13 13,13 \
-13,3 11,3 11,13 \
-7,13 \x09\x22/>\x0d\x0a</g>\x0d\
-\x0a</svg>\x0d\x0a\
-\x00\x00\x02`\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 18 18\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 18 \
-18;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<pat\
-h d=\x22M9,18c-2.4,\
-0-4.7-0.9-6.4-2.\
-6C0.9,13.7,0,11.\
-4,0,9s0.9-4.7,2.\
-6-6.4S6.6,0,9,0s\
-4.7,0.9,6.4,2.6C\
-17.1,4.3,18,6.6,\
-18,9\x0d\x0a\x09s-0.9,4.7\
--2.6,6.4C13.7,17\
-.1,11.4,18,9,18z\
- M9,1C4.6,1,1,4.\
-6,1,9s3.6,8,8,8s\
-8-3.6,8-8S13.4,1\
-,9,1z\x22/>\x0d\x0a<path \
-d=\x22M14,9l-8,4.5v\
--9\x22/>\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x02\xec\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 32 32\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 32 \
-32;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<sty\
-le type=\x22text/cs\
-s\x22>\x0d\x0a\x09.st0{fill:\
-#f10000;opacity:\
-0.5;}\x0d\x0a\x09.st1{fil\
-l:#f10000;}\x0d\x0a</s\
-tyle>\x0d\x0a<path cla\
-ss=\x22st0\x22 d=\x22M16,\
-30c-3.74,0-7.26-\
-1.46-9.9-4.1S2,1\
-9.74,2,16s1.46-7\
-.26,4.1-9.9S12.2\
-6,2,16,2s7.26,1.\
-46,9.9,4.1\x0d\x0a\x09S30\
-,12.26,30,16s-1.\
-46,7.26-4.1,9.9S\
-19.74,30,16,30z \
-M16,4C9.38,4,4,9\
-.38,4,16s5.38,12\
-,12,12s12-5.38,1\
-2-12S22.62,4,16,\
-4z\x22/>\x0d\x0a<rect x=\x22\
-9.5\x22 y=\x229.5\x22 cla\
-ss=\x22st1\x22 width=\x22\
-13\x22 height=\x2213\x22/\
->\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x01\xea\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 24 24\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 24 \
-24;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<g>\x0d\x0a\x09\x09<rect x\
-=\x223\x22 y=\x223\x22 width\
-=\x222\x22 height=\x2218\x22\
-/>\x0d\x0a\x09</g>\x0d\x0a\x09<pol\
-ygon points=\x226,1\
-2 11,17 11,13 21\
-,13 21,11 11,11 \
-11,7 \x09\x22/>\x0d\x0a</g>\x0d\
-\x0a</svg>\x0d\x0a\
-\x00\x00\x01\xf9\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 24 24\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 24 \
-24;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<polygon point\
-s=\x2221,21 21,3 19\
-,3 19,19 3,19 3,\
-21 \x09\x22/>\x0d\x0a</g>\x0d\x0a<\
-path d=\x22M17,10l-\
-2.79,2.79L4.41,3\
-L3,4.41l9.79,9.8\
-L10,17h7C17,17,1\
-7,17,17,10z\x22/>\x0d\x0a\
-</svg>\x0d\x0a\
-\x00\x00\x01\xdc\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<rect opacity=\
-\x220.12\x22 x=\x222\x22 y=\x22\
-4\x22 width=\x2212\x22 he\
-ight=\x228\x22/>\x0d\x0a\x09<pa\
-th d=\x22M15,13H1V3\
-h14V13z M2,12h12\
-V4H2V12z\x22/>\x0d\x0a</g\
->\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x02\x1c\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<rect x=\x221\x22 y=\
-\x221\x22 width=\x226\x22 he\
-ight=\x226\x22/>\x0d\x0a\x09<re\
-ct x=\x221\x22 y=\x229\x22 w\
-idth=\x226\x22 height=\
-\x226\x22/>\x0d\x0a\x09<rect x=\
-\x229\x22 y=\x221\x22 width=\
-\x226\x22 height=\x226\x22/>\
-\x0d\x0a\x09<rect x=\x229\x22 y\
-=\x229\x22 width=\x226\x22 h\
-eight=\x226\x22/>\x0d\x0a</g\
->\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x05\xa1\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M2.67\
-,9.88c-0.1-0.11-\
-0.18-0.2-0.24-0.\
-28C2.37,9.52,2.3\
-5,9.45,2.35,9.37\
-c0-0.09,0.05-0.1\
-9,0.14-0.28\x0d\x0a\x09\x09C\
-2.57,9,2.69,8.92\
-,2.83,8.84c0.14-\
-0.07,0.3-0.13,0.\
-47-0.18C3.47,8.6\
-3,3.63,8.6,3.79,\
-8.6c0.17,0,0.3,0\
-.02,0.41,0.07\x0d\x0a\x09\
-\x09s0.2,0.12,0.3,0\
-.22c0.4,0.42,0.7\
-6,0.85,1.09,1.29\
-c0.32,0.44,0.64,\
-0.89,0.95,1.36c0\
-.3-0.8,0.61-1.58\
-,0.93-2.33S8.14,\
-7.72,8.49,7\x0d\x0a\x09\x09s\
-0.75-1.43,1.16-2\
-.13s0.86-1.4,1.3\
-4-2.11c0.18-0.26\
-,0.44-0.46,0.78-\
-0.58C12.13,2.06,\
-12.57,2,13.11,2c\
-0.16,0,0.29,0.02\
-,0.39,0.07\x0d\x0a\x09\x09s0\
-.15,0.11,0.15,0.\
-19c0,0.07-0.02,0\
-.13-0.05,0.2c-0.\
-03,0.07-0.08,0.1\
-5-0.14,0.23c-1.1\
-8,1.65-2.25,3.37\
--3.22,5.17s-1.8,\
-3.7-2.52,5.7\x0d\x0a\x09\x09\
-c-0.05,0.15-0.16\
-,0.25-0.34,0.33C\
-7.2,13.96,6.94,1\
-4,6.59,14c-0.17,\
-0-0.31-0.01-0.42\
--0.02s-0.21-0.03\
--0.29-0.06\x0d\x0a\x09\x09c-\
-0.08-0.03-0.14-0\
-.06-0.19-0.11c-0\
-.05-0.04-0.1-0.0\
-9-0.13-0.16c-0.2\
-2-0.36-0.44-0.7-\
-0.65-1.02c-0.21-\
-0.31-0.43-0.62-0\
-.65-0.91\x0d\x0a\x09\x09c-0.\
-23-0.3-0.47-0.59\
--0.72-0.9C3.27,1\
-0.54,2.98,10.22,\
-2.67,9.88z\x22/>\x0d\x0a<\
-/g>\x0d\x0a<g>\x0d\x0a\x09<path\
- d=\x22M7.58,6.58L1\
-,0L0,1l6.95,6.95\
-C7.16,7.49,7.36,\
-7.03,7.58,6.58z\x22\
-/>\x0d\x0a\x09<path d=\x22M1\
-0.51,9.51c-0.22,\
-0.44-0.43,0.9-0.\
-64,1.36L15,16l1-\
-1L10.51,9.51z\x22/>\
-\x0d\x0a</g>\x0d\x0a</svg>\x0d\x0a\
-\
-\x00\x00\x01\xb0\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 32 32\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 32 \
-32;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<polygon point\
-s=\x2216,4 4,16 10,\
-16 10,28 22,28 2\
-2,16 28,16 \x09\x22/>\x0d\
-\x0a</g>\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x05\xaf\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 32 32\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 32 \
-32;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M15,0\
-h1c0,10.7,0,21.3\
-,0,32h-1C15,21.3\
-,15,10.7,15,0z\x22/\
->\x0d\x0a\x09<path d=\x22M2,\
-3c2.8,0,8.3,0,11\
-,0v1C10.3,4,4.8,\
-4,2,4V3z\x22/>\x0d\x0a\x09<p\
-ath d=\x22M18,3c4,0\
-,8,0,12,0v1c-4,0\
--8,0-12,0V3z\x22/>\x0d\
-\x0a\x09<path d=\x22M2,6c\
-2.8,0,8.3,0,11,0\
-v1C10.3,7,4.8,7,\
-2,7V6z\x22/>\x0d\x0a\x09<pat\
-h d=\x22M18,6c4,0,8\
-,0,12,0v1c-4,0-8\
-,0-12,0V6z\x22/>\x0d\x0a\x09\
-<path d=\x22M2,9c2.\
-8,0,8.3,0,11,0v1\
-c-2.8,0-8.3,0-11\
-,0V9z\x22/>\x0d\x0a\x09<path\
- d=\x22M18,9c4,0,8,\
-0,12,0v1c-4,0-8,\
-0-12,0V9z\x22/>\x0d\x0a\x09<\
-path d=\x22M2,12c2.\
-8,0,8.3,0,11,0v1\
-c-2.8,0-8.3,0-11\
-,0V12z\x22/>\x0d\x0a\x09<pat\
-h d=\x22M18,12c4,0,\
-8,0,12,0v1c-4,0-\
-8,0-12,0V12z\x22/>\x0d\
-\x0a\x09<path d=\x22M2,15\
-c2.8,0,8.3,0,11,\
-0v1c-2.8,0-8.3,0\
--11,0V15z\x22/>\x0d\x0a\x09<\
-path d=\x22M18,15c4\
-,0,8,0,12,0v1c-4\
-,0-8,0-12,0V15z\x22\
-/>\x0d\x0a\x09<path d=\x22M2\
-,18c2.8,0,8.3,0,\
-11,0v1c-2.8,0-8.\
-3,0-11,0V18z\x22/>\x0d\
-\x0a\x09<path d=\x22M18,1\
-8c4,0,8,0,12,0v1\
-c-4,0-8,0-12,0V1\
-8z\x22/>\x0d\x0a\x09<path d=\
-\x22M2,21c2.8,0,8.3\
-,0,11,0v1c-2.8,0\
--8.3,0-11,0V21z\x22\
-/>\x0d\x0a\x09<path d=\x22M1\
-8,21c4,0,8,0,12,\
-0v1c-4,0-8,0-12,\
-0V21z\x22/>\x0d\x0a\x09<path\
- d=\x22M2,24c2.8,0,\
-8.3,0,11,0v1c-2.\
-8,0-8.3,0-11,0V2\
-4z\x22/>\x0d\x0a\x09<path d=\
-\x22M18,24c4,0,8,0,\
-12,0v1c-4,0-8,0-\
-12,0V24z\x22/>\x0d\x0a\x09<p\
-ath d=\x22M2,27c2.8\
-,0,8.3,0,11,0v1c\
--2.8,0-8.3,0-11,\
-0V27z\x22/>\x0d\x0a\x09<path\
- d=\x22M18,27c4,0,8\
-,0,12,0v1c-4,0-8\
-,0-12,0V27z\x22/>\x0d\x0a\
-</g>\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x03\xed\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 23 17\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 23 \
-17;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M0,0h\
-23v17H0V0 M1,1c0\
-,5,0,10,0,15c3.3\
-,0,6.7,0,10,0c0-\
-5,0-10,0-15C7.7,\
-1,4.3,1,1,1 M12,\
-1c0,5,0,10,0,15c\
-3.3,0,6.7,0,10,0\
-\x0d\x0a\x09\x09c0-5,0-10,0-\
-15C18.7,1,15.3,1\
-,12,1z\x22/>\x0d\x0a\x09<pat\
-h d=\x22M3,3c2,0,4,\
-0,6,0c0,0.3,0,0.\
-7,0,1C7,4,5,4,3,\
-4C3,3.7,3,3.3,3,\
-3z\x22/>\x0d\x0a\x09<path d=\
-\x22M3,5c2,0,4,0,6,\
-0c0,0.3,0,0.7,0,\
-1C7,6,5,6,3,6C3,\
-5.7,3,5.3,3,5z\x22/\
->\x0d\x0a\x09<path d=\x22M3,\
-7c2,0,4,0,6,0c0,\
-0.3,0,0.7,0,1C7,\
-8,5,8,3,8C3,7.7,\
-3,7.3,3,7z\x22/>\x0d\x0a\x09\
-<path d=\x22M3,9c2,\
-0,4,0,6,0c0,0.3,\
-0,0.7,0,1c-2,0-4\
-,0-6,0C3,9.7,3,9\
-.3,3,9z\x22/>\x0d\x0a\x09<pa\
-th d=\x22M3,11c2,0,\
-4,0,6,0c0,0.3,0,\
-0.7,0,1c-2,0-4,0\
--6,0C3,11.7,3,11\
-.3,3,11z\x22/>\x0d\x0a\x09<p\
-ath d=\x22M3,13c2,0\
-,4,0,6,0c0,0.3,0\
-,0.7,0,1c-2,0-4,\
-0-6,0C3,13.7,3,1\
-3.3,3,13z\x22/>\x0d\x0a</\
-g>\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x01\xaf\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 32 32\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 32 \
-32;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<polygon point\
-s=\x2228,16 16,4 16\
-,10 4,10 4,22 16\
-,22 16,28 \x09\x22/>\x0d\x0a\
-</g>\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x03\xf0\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<polygon point\
-s=\x229,6 7,6 7,4 6\
-,4 6,6 4,6 4,7 6\
-,7 6,9 7,9 7,7 9\
-,7 \x09\x22/>\x0d\x0a</g>\x0d\x0a<\
-g>\x0d\x0a\x09<path d=\x22M1\
-5.08,13.62c-0.06\
--0.14-0.13-0.25-\
-0.24-0.34l-3.83-\
-3.64l0,0C11.63,8\
-.75,12,7.67,12,6\
-.5C12,3.46,9.54,\
-1,6.5,1S1,3.46,1\
-,6.5\x0d\x0a\x09\x09S3.46,12\
-,6.5,12c1.08,0,2\
-.08-0.31,2.93-0.\
-85l3.9,3.72c0.08\
-,0.09,0.19,0.16,\
-0.32,0.21s0.28,0\
-.08,0.42,0.08\x0d\x0a\x09\
-\x09c0.15,0,0.29-0.\
-03,0.43-0.08c0.1\
-3-0.05,0.25-0.14\
-,0.36-0.25c0.1-0\
-.11,0.18-0.23,0.\
-23-0.36c0.05-0.1\
-3,0.08-0.26,0.08\
--0.4\x0d\x0a\x09\x09C15.17,1\
-3.92,15.14,13.77\
-,15.08,13.62z M2\
-,6.5C2,4.01,4.01\
-,2,6.5,2S11,4.01\
-,11,6.5S8.99,11,\
-6.5,11S2,8.99,2,\
-6.5z M10.29,10.4\
-8\x0d\x0a\x09\x09C10.29,10.4\
-7,10.3,10.47,10.\
-29,10.48C10.3,10\
-.47,10.29,10.47,\
-10.29,10.48z\x22/>\x0d\
-\x0a</g>\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x02\x1e\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<polygon opaci\
-ty=\x220.12\x22 points\
-=\x221.5,1.5 1.5,14\
-.5 14.5,10.5 8.5\
-,2.5 \x09\x22/>\x0d\x0a\x09<pat\
-h d=\x22M1,15.18V0.\
-92l7.78,1.11l6.5\
-5,8.73L1,15.18z \
-M2,2.08v11.75l11\
-.67-3.59L8.22,2.\
-97L2,2.08z\x22/>\x0d\x0a<\
-/g>\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x01\xaf\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 32 32\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 32 \
-32;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<polygon point\
-s=\x2216,28 28,16 2\
-2,16 22,4 10,4 1\
-0,16 4,16 \x09\x22/>\x0d\x0a\
-</g>\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x01\x9c\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 10 10\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 10 \
-10;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M4,9V\
-6H1V4h3V1h2v3h3v\
-2H6v3H4z\x22/>\x0d\x0a</g\
->\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x01\xda\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 32 32\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 32 \
-32;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<sty\
-le type=\x22text/cs\
-s\x22>\x0d\x0a\x09.st0{fill:\
-#f10000;}\x0d\x0a</sty\
-le>\x0d\x0a<rect x=\x229.\
-5\x22 y=\x229.5\x22 class\
-=\x22st0\x22 width=\x2213\
-\x22 height=\x2213\x22/>\x0d\
-\x0a</svg>\x0d\x0a\
-\x00\x00\x02\xb1\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 18 18\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 18 \
-18;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<sty\
-le type=\x22text/cs\
-s\x22>\x0d\x0a\x09.st0{opaci\
-ty:0.5;}\x0d\x0a</styl\
-e>\x0d\x0a<g class=\x22st\
-0\x22>\x0d\x0a\x09<path d=\x22M\
-9,18c-2.4,0-4.7-\
-0.9-6.4-2.6C0.9,\
-13.7,0,11.4,0,9s\
-0.9-4.7,2.6-6.4S\
-6.6,0,9,0s4.7,0.\
-9,6.4,2.6C17.1,4\
-.3,18,6.6,18,9\x0d\x0a\
-\x09\x09s-0.9,4.7-2.6,\
-6.4C13.7,17.1,11\
-.4,18,9,18z M9,1\
-C4.6,1,1,4.6,1,9\
-s3.6,8,8,8s8-3.6\
-,8-8S13.4,1,9,1z\
-\x22/>\x0d\x0a</g>\x0d\x0a<path\
- d=\x22M14,9l-8,4.5\
-v-9\x22/>\x0d\x0a</svg>\x0d\x0a\
-\
-\x00\x00\x05a\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path opacity=\
-\x220.12\x22 d=\x22M3.5,1\
-2.5c0.87,0.67,1.\
-84,0.82,3,1c0.59\
-,0.09,1.71,0.25,\
-3,0c2.33-0.46,5.\
-08-2.24,5-4c-0.0\
-4-0.79-0.61-0.79\
--1-2\x0d\x0a\x09\x09c-0.6-1.\
-87,0.48-2.81,0-4\
-c-0.74-1.84-4.29\
--1.97-5-2c-2.15-\
-0.08-6.01,0.5-7,\
-3c-0.3,0.75-0.2,\
-1.5,0,3C1.75,9.3\
-9,2.01,11.35,3.5\
-,12.5z\x0d\x0a\x09\x09\x22/>\x0d\x0a\x09\
-<path d=\x22M8.06,1\
-4.14c-0.71,0-1.2\
-9-0.09-1.64-0.14\
-c-1.21-0.19-2.26\
--0.35-3.23-1.1h0\
-C1.54,11.62,1.25\
-,9.46,1,7.57\x0d\x0a\x09\x09\
-C0.8,6.03,0.69,5\
-.18,1.04,4.32C2.\
-15,1.52,6.27,0.9\
-2,8.52,1c2.09,0.\
-08,4.74,0.54,5.4\
-5,2.31c0.28,0.69\
-,0.14,1.3,0.01,1\
-.9\x0d\x0a\x09\x09c-0.14,0.6\
-2-0.28,1.26,0,2.\
-14c0.16,0.51,0.3\
-6,0.75,0.54,0.99\
-c0.21,0.27,0.46,\
-0.58,0.48,1.14c0\
-.09,2.02-2.77,4-\
-5.4,4.51\x0d\x0a\x09\x09C9.0\
-4,14.1,8.53,14.1\
-4,8.06,14.14z M3\
-.81,12.1c0.77,0.\
-59,1.65,0.73,2.7\
-7,0.9c0.52,0.08,\
-1.6,0.24,2.83,0\x0d\
-\x0a\x09\x09c2.13-0.42,4.\
-66-2.07,4.6-3.49\
-c-0.01-0.24-0.09\
--0.34-0.27-0.57c\
--0.21-0.26-0.49-\
-0.62-0.71-1.3C12\
-.66,6.52,12.85,5\
-.67,13,4.99\x0d\x0a\x09\x09c\
-0.12-0.52,0.2-0.\
-9,0.04-1.31C12.6\
-4,2.71,10.98,2.0\
-9,8.48,2C6.62,1.\
-94,2.87,2.4,1.96\
-,4.68C1.72,5.31,\
-1.8,5.98,2,7.43\x0d\
-\x0a\x09\x09C2.23,9.23,2.\
-48,11.08,3.81,12\
-.1L3.81,12.1z\x22/>\
-\x0d\x0a</g>\x0d\x0a</svg>\x0d\x0a\
-\
-\x00\x00\x05\x08\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M2.67\
-,9.88c-0.1-0.11-\
-0.18-0.2-0.24-0.\
-28C2.37,9.52,2.3\
-5,9.45,2.35,9.37\
-c0-0.09,0.05-0.1\
-9,0.14-0.28\x0d\x0a\x09\x09C\
-2.57,9,2.69,8.92\
-,2.83,8.84c0.14-\
-0.07,0.3-0.13,0.\
-47-0.18C3.47,8.6\
-3,3.63,8.6,3.79,\
-8.6c0.17,0,0.3,0\
-.02,0.41,0.07\x0d\x0a\x09\
-\x09s0.2,0.12,0.3,0\
-.22c0.4,0.42,0.7\
-6,0.85,1.09,1.29\
-c0.32,0.44,0.64,\
-0.89,0.95,1.36c0\
-.3-0.8,0.61-1.58\
-,0.93-2.33S8.14,\
-7.72,8.49,7\x0d\x0a\x09\x09s\
-0.75-1.43,1.16-2\
-.13s0.86-1.4,1.3\
-4-2.11c0.18-0.26\
-,0.44-0.46,0.78-\
-0.58C12.13,2.06,\
-12.57,2,13.11,2c\
-0.16,0,0.29,0.02\
-,0.39,0.07\x0d\x0a\x09\x09s0\
-.15,0.11,0.15,0.\
-19c0,0.07-0.02,0\
-.13-0.05,0.2c-0.\
-03,0.07-0.08,0.1\
-5-0.14,0.23c-1.1\
-8,1.65-2.25,3.37\
--3.22,5.17s-1.8,\
-3.7-2.52,5.7\x0d\x0a\x09\x09\
-c-0.05,0.15-0.16\
-,0.25-0.34,0.33C\
-7.2,13.96,6.94,1\
-4,6.59,14c-0.17,\
-0-0.31-0.01-0.42\
--0.02c-0.11-0.01\
--0.21-0.03-0.29-\
-0.06\x0d\x0a\x09\x09c-0.08-0\
-.03-0.14-0.06-0.\
-19-0.11c-0.05-0.\
-04-0.1-0.09-0.13\
--0.16c-0.22-0.36\
--0.44-0.7-0.65-1\
-.02c-0.21-0.31-0\
-.43-0.62-0.65-0.\
-91\x0d\x0a\x09\x09c-0.23-0.3\
--0.47-0.59-0.72-\
-0.9C3.27,10.54,2\
-.98,10.22,2.67,9\
-.88z\x22/>\x0d\x0a</g>\x0d\x0a<\
-/svg>\x0d\x0a\
-\x00\x00\x02\xfc\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<polygon point\
-s=\x2210.97,8.56 14\
-.01,11.6 14.57,1\
-0.64 \x09\x22/>\x0d\x0a\x09<pol\
-ygon points=\x2210.\
-27,7.85 14.57,5.\
-36 13.56,3.64 9,\
-6.26 9,1 7,1 7,4\
-.59 \x09\x22/>\x0d\x0a\x09<poly\
-gon points=\x221.99\
-,4.4 1.43,5.36 5\
-.03,7.44 \x09\x22/>\x0d\x0a\x09\
-<polygon points=\
-\x225.73,8.15 1.5,1\
-0.59 1.43,10.64 \
-2.44,12.37 7,9.7\
-4 7,15 9,15 9,11\
-.41 \x09\x22/>\x0d\x0a</g>\x0d\x0a\
-<rect x=\x227.29\x22 y\
-=\x22-2.61\x22 transfo\
-rm=\x22matrix(0.707\
-1 -0.7071 0.7071\
- 0.7071 -3.3137 \
-8)\x22 width=\x221.41\x22\
- height=\x2221.21\x22/\
->\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x02\xcc\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 24 24\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 24 \
-24;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<pat\
-h d=\x22M8.9,2.7c2.\
-8-0.7,6,0,8.2,1.\
-9c1.9,1.5,3.1,4,\
-3.2,6.4H23c-1.4,\
-1.5-2.8,2.8-4.3,\
-4.2c-0.2,0.2-0.6\
-,0.2-0.7,0\x0d\x0a\x09c-1\
-.4-1.4-2.8-2.8-4\
-.2-4.2h2.7c-0.3-\
-2.5-2.7-4.7-5.3-\
-4.7c-2.7-0.1-5.1\
-,2.2-5.3,4.8c-0.\
-3,2.7,1.9,5.4,4.\
-6,5.7c0.2,0,0.6,\
-0,0.7,0.3\x0d\x0a\x09c0,1\
-.1,0,2.2,0,3.2c0\
-,0.2-0.1,0.4-0.3\
-,0.4c-3.1-0.1-6-\
-1.8-7.5-4.4C2.5,\
-15,2.1,13.5,2,11\
-.9v-0.6C2.1,7.3,\
-5,3.6,8.9,2.7z\x22/\
->\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x06V\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 18 24\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 18 \
-24;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M7,6.\
-5V4.08c0-0.27,0.\
-05-0.51,0.16-0.7\
-4c0.11-0.22,0.25\
--0.42,0.43-0.6c0\
-.18-0.17,0.39-0.\
-31,0.63-0.41\x0d\x0a\x09\x09\
-c0.24-0.1,0.5-0.\
-15,0.77-0.15c0.2\
-8,0,0.54,0.05,0.\
-78,0.15c0.24,0.0\
-9,0.46,0.23,0.64\
-,0.41c0.18,0.17,\
-0.33,0.38,0.43,0\
-.6\x0d\x0a\x09\x09C10.95,3.5\
-7,11,3.82,11,4.0\
-8v7.04c0.29-0.16\
-,0.55-0.36,0.79-\
-0.58c0.24-0.24,0\
-.46-0.51,0.64-0.\
-8s0.32-0.61,0.42\
--0.94\x0d\x0a\x09\x09S13,8.1\
-1,13,7.76V4.08c0\
--0.53-0.1-1.03-0\
-.31-1.5s-0.5-0.8\
-8-0.86-1.23s-0.7\
-8-0.63-1.26-0.83\
-c-0.48-0.2-1.01-\
-0.3-1.57-0.3\x0d\x0a\x09\x09\
-c-0.55,0-1.08,0.\
-1-1.56,0.3C6.95,\
-0.72,6.53,1,6.17\
-,1.35C5.8,1.7,5.\
-52,2.11,5.31,2.5\
-8S5,3.55,5,4.08v\
-0.04L7,6.5z\x22/>\x0d\x0a\
-\x09<path d=\x22M11,17\
-.49v2.46c0,0.26-\
-0.05,0.5-0.16,0.\
-73c-0.1,0.23-0.2\
-5,0.44-0.43,0.61\
-s-0.4,0.31-0.64,\
-0.41\x0d\x0a\x09\x09c-0.24,0\
-.1-0.51,0.15-0.7\
-8,0.15c-0.26,0-0\
-.52-0.05-0.77-0.\
-15c-0.24-0.1-0.4\
-5-0.24-0.63-0.41\
-c-0.18-0.18-0.32\
--0.38-0.43-0.61\x0d\
-\x0a\x09\x09C7.05,20.46,7\
-,20.21,7,19.95l0\
-.04-7.07c-0.63,0\
-.34-1.13,0.81-1.\
-49,1.39C5.19,14.\
-86,5,15.53,5,16.\
-26v3.69c0,0.52,0\
-.1,1.03,0.31,1.4\
-9\x0d\x0a\x09\x09c0.2,0.47,0\
-.49,0.87,0.85,1.\
-22c0.36,0.35,0.7\
-9,0.63,1.27,0.83\
-s1.01,0.3,1.56,0\
-.3c0.57,0,1.09-0\
-.1,1.57-0.31\x0d\x0a\x09\x09\
-c0.48-0.2,0.91-0\
-.48,1.27-0.82c0.\
-36-0.35,0.65-0.7\
-6,0.86-1.22S13,2\
-0.48,13,19.95v-0\
-.07L11,17.49z\x22/>\
-\x0d\x0a</g>\x0d\x0a<rect x=\
-\x227.95\x22 y=\x22-0.83\x22\
- transform=\x22matr\
-ix(0.7662 -0.642\
-6 0.6426 0.7662 \
--5.6069 8.5496)\x22\
- width=\x222\x22 heigh\
-t=\x2225.62\x22/>\x0d\x0a</s\
-vg>\x0d\x0a\
-\x00\x00\x01\xa1\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M3,14\
-V2h6v4h4v8H3z M1\
-0,5V2l3,3H10z\x22/>\
-\x0d\x0a</g>\x0d\x0a</svg>\x0d\x0a\
-\
-\x00\x00\x02\xd3\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M15,1\
-5H1V1h13.5c0.4-0\
-.3,0.9-0.5,1.2-0\
-.8l0.3,0.5C15.8,\
-1,15.4,1.3,15,1.\
-6V15z M14,2.7c-1\
-,1.1-2.1,2.5-3.4\
-,4.3\x0d\x0a\x09\x09c-1.2,1.\
-8-2.1,3.3-2.7,4.\
-5L7.1,12c-0.6,0.\
-4-1,0.8-1.3,1c-0\
-.1-0.3-0.3-0.9-0\
-.6-1.6L5,10.7C4.\
-6,9.8,4.2,9.1,3.\
-9,8.6\x0d\x0a\x09\x09C3.5,8.\
-2,3.1,7.9,2.7,7.\
-7c0.7-0.8,1.4-1.\
-2,2-1.2c0.5,0,1.\
-1,0.7,1.7,2.1l0.\
-3,0.7c1.2-2,3.1-\
-4.3,5.6-6.7L13,2\
-L2,2v12h12V2.7z\x22\
-/>\x0d\x0a</g>\x0d\x0a</svg>\
-\x0d\x0a\
-\x00\x00\x01\xf4\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 24 24\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 24 \
-24;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<polygon point\
-s=\x2221,3 3,3 3,5 \
-19,5 19,21 21,21\
- \x09\x22/>\x0d\x0a</g>\x0d\x0a<pa\
-th d=\x22M10,7l2.79\
-,2.79L3,19.59L4.\
-41,21l9.8-9.79L1\
-7,14V7C17,7,17,7\
-,10,7z\x22/>\x0d\x0a</svg\
->\x0d\x0a\
-\x00\x00\x01\xb6\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M11,5\
-h2v1H2.6L1,10.5V\
-5h5l1-2h4 M15,7l\
--2.2,6H1l2.2-6H1\
-5z\x22/>\x0d\x0a</g>\x0d\x0a</s\
-vg>\x0d\x0a\
-\x00\x00\x01\x91\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M13,5\
-l-5,8L3,5H13z\x22/>\
-\x0d\x0a</g>\x0d\x0a</svg>\x0d\x0a\
-\
-\x00\x00\x01\xb0\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 32 32\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 32 \
-32;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<polygon point\
-s=\x224,16 16,28 16\
-,22 28,22 28,10 \
-16,10 16,4 \x09\x22/>\x0d\
-\x0a</g>\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x06\xcd\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 20 20\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 20 \
-20;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M19,1\
-0.01c0,0.82-0.11\
-,1.61-0.32,2.37c\
--0.22,0.76-0.52,\
-1.47-0.92,2.14c-\
-0.4,0.67-0.87,1.\
-28-1.42,1.82\x0d\x0a\x09\x09\
-c-0.55,0.55-1.16\
-,1.02-1.82,1.42c\
--0.67,0.4-1.38,0\
-.7-2.14,0.92C11.\
-61,18.89,10.82,1\
-9,10,19c-0.82,0-\
-1.61-0.11-2.37-0\
-.32\x0d\x0a\x09\x09c-0.76-0.\
-22-1.48-0.52-2.1\
-4-0.91s-1.28-0.8\
-6-1.83-1.41c-0.5\
-5-0.55-1.02-1.16\
--1.42-1.82s-0.7-\
-1.38-0.92-2.14\x0d\x0a\
-\x09\x09C1.11,11.63,1,\
-10.83,1,10.01C1,\
-9.19,1.11,8.4,1.\
-32,7.64C1.54,6.8\
-8,1.85,6.17,2.24\
-,5.5s0.87-1.28,1\
-.42-1.83s1.16-1.\
-02,1.83-1.42\x0d\x0a\x09\x09\
-s1.38-0.7,2.14-0\
-.92S9.19,1,10,1c\
-0.82,0,1.61,0.11\
-,2.37,0.32c0.76,\
-0.22,1.48,0.52,2\
-.14,0.91s1.28,0.\
-87,1.82,1.42\x0d\x0a\x09\x09\
-c0.55,0.55,1.02,\
-1.16,1.42,1.83c0\
-.4,0.67,0.7,1.38\
-,0.92,2.15C18.89\
-,8.4,19,9.19,19,\
-10.01z M17.81,10\
-c0-0.71-0.09-1.4\
--0.28-2.07\x0d\x0a\x09\x09c-\
-0.19-0.66-0.45-1\
-.29-0.79-1.87C16\
-.41,5.49,16,4.96\
-,15.53,4.49s-1-0\
-.89-1.58-1.23s-1\
-.2-0.6-1.86-0.79\
-s-1.36-0.28-2.07\
--0.28\x0d\x0a\x09\x09c-0.71,\
-0-1.4,0.09-2.06,\
-0.28S6.67,2.92,6\
-.09,3.26S4.99,4.\
-01,4.51,4.49S3.6\
-1,5.49,3.27,6.07\
-s-0.61,1.2-0.8,1\
-.87S2.19,9.29,2.\
-19,10\x0d\x0a\x09\x09c0,0.71\
-,0.09,1.4,0.28,2\
-.07c0.19,0.66,0.\
-45,1.29,0.79,1.8\
-6c0.34,0.58,0.75\
-,1.1,1.23,1.58c0\
-.48,0.47,1.01,0.\
-88,1.59,1.22\x0d\x0a\x09\x09\
-s1.2,0.6,1.87,0.\
-79c0.66,0.19,1.3\
-5,0.28,2.07,0.28\
-c0.72,0,1.41-0.0\
-9,2.07-0.28c0.66\
--0.19,1.29-0.45,\
-1.86-0.79\x0d\x0a\x09\x09c0.\
-58-0.34,1.1-0.74\
-,1.58-1.22c0.47-\
-0.47,0.88-1,1.22\
--1.58c0.34-0.58,\
-0.6-1.2,0.79-1.8\
-6C17.72,11.41,17\
-.81,10.72,17.81,\
-10z\x0d\x0a\x09\x09 M15,10.0\
-2V9.98L11.18,14H\
-8.42l2.9-3H5V9h6\
-.32l-2.9-3h2.76L\
-15,10.02z\x22/>\x0d\x0a</\
-g>\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x01\xe7\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<sty\
-le type=\x22text/cs\
-s\x22>\x0d\x0a\x09.st0{fill:\
-#008A1A;}\x0d\x0a</sty\
-le>\x0d\x0a<g>\x0d\x0a\x09<path\
- class=\x22st0\x22 d=\x22\
-M15,9H9v6H7V9H1V\
-7h6V1h2v6h6V9L15\
-,9z\x22/>\x0d\x0a</g>\x0d\x0a</\
-svg>\x0d\x0a\
-\x00\x00\x02\xca\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 24 24\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 24 \
-24;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<pat\
-h d=\x22M15.1,2.7c-\
-2.8-0.7-5.9,0-8.\
-2,1.9c-1.9,1.5-3\
-,4-3.2,6.4H1c1.4\
-,1.5,2.8,2.8,4.3\
-,4.2c0.2,0.2,0.6\
-,0.2,0.7,0\x0d\x0a\x09c1.\
-4-1.4,2.8-2.8,4.\
-2-4.2H7.6c0.3-2.\
-5,2.7-4.7,5.3-4.\
-7c2.7-0.1,5.1,2.\
-2,5.3,4.8c0.3,2.\
-7-1.9,5.4-4.6,5.\
-7c-0.2,0-0.6,0-0\
-.7,0.3\x0d\x0a\x09c0,1.1,\
-0,2.2,0,3.2c0,0.\
-2,0.1,0.4,0.3,0.\
-4c3-0.1,6-1.8,7.\
-5-4.4c0.8-1.3,1.\
-3-2.9,1.3-4.4v-0\
-.6C21.9,7.3,19,3\
-.6,15.1,2.7z\x22/>\x0d\
-\x0a</svg>\x0d\x0a\
-\x00\x00\x05\xa2\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M16,8\
-c-0.48,0.86-1.07\
-,1.6-1.76,2.21c-\
-1.67,1.48-3.75,2\
-.22-6.23,2.22s-4\
-.56-0.74-6.24-2.\
-22C1.08,9.61,0.4\
-8,8.87,0,8\x0d\x0a\x09\x09c0\
-.48-0.86,1.08-1.\
-6,1.77-2.22c1.68\
--1.48,3.76-2.22,\
-6.24-2.22s4.56,0\
-.74,6.23,2.22C14\
-.93,6.4,15.52,7.\
-14,16,8z M10.96,\
-8\x0d\x0a\x09\x09c0-0.8-0.29\
--1.48-0.87-2.04S\
-8.81,5.11,8,5.11\
-c-0.43,0-0.84,0.\
-09-1.22,0.26l-0.\
-31-0.7C4.21,5.06\
-,2.56,6.17,1.52,\
-8\x0d\x0a\x09\x09c0.3,0.53,0\
-.67,1.01,1.1,1.4\
-3c1.04,1,2.31,1.\
-63,3.82,1.89c-0.\
-65-0.29-1.18-0.7\
-4-1.58-1.33c-0.4\
--0.6-0.6-1.26-0.\
-6-1.99\x0d\x0a\x09\x09c0-0.4\
-4,0.08-0.87,0.23\
--1.29l0.75,0.23C\
-5.11,7.29,5.04,7\
-.64,5.04,8c0,0.8\
-,0.29,1.48,0.87,\
-2.05S7.19,10.9,8\
-,10.9\x0d\x0a\x09\x09s1.51-0\
-.28,2.09-0.84S10\
-.96,8.81,10.96,8\
-z M10.24,8c0,0.6\
--0.22,1.12-0.66,\
-1.55S8.62,10.2,8\
-,10.2c-0.62,0-1.\
-15-0.21-1.59-0.6\
-4\x0d\x0a\x09\x09S5.76,8.61,\
-5.76,8c0-0.27,0.\
-05-0.53,0.14-0.7\
-7l2.28,1.03L7.11\
-,6C7.39,5.88,7.6\
-9,5.81,8,5.81c0.\
-62,0,1.14,0.21,1\
-.58,0.64\x0d\x0a\x09\x09C10.\
-02,6.89,10.24,7.\
-4,10.24,8z M14.4\
-8,8c-0.3-0.53-0.\
-67-1.01-1.11-1.4\
-4c-1.04-1.01-2.3\
-3-1.64-3.86-1.89\
-\x0d\x0a\x09\x09c0.67,0.29,1\
-.2,0.72,1.6,1.31\
-C11.52,6.6,11.73\
-,7.27,11.73,8c0,\
-0.73-0.2,1.39-0.\
-6,1.99s-0.93,1.0\
-4-1.58,1.33\x0d\x0a\x09\x09C\
-11.8,10.94,13.44\
-,9.83,14.48,8z\x22/\
->\x0d\x0a</g>\x0d\x0a</svg>\x0d\
-\x0a\
-\x00\x00\x08\x13\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 64 64\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 64 \
-64;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<sty\
-le type=\x22text/cs\
-s\x22>\x0d\x0a\x09.st0{fill:\
-#DC3236;}\x0d\x0a\x09.st1\
-{fill:#3C6EFF;}\x0d\
-\x0a</style>\x0d\x0a<g>\x0d\x0a\
-\x09<path class=\x22st\
-0\x22 d=\x22M31.43,6.7\
-3c1.11-1.6,3.5-2\
-.1,5.13-1.01c2.4\
-6,1.69,4.86,3.46\
-,7.3,5.17c0.84-1\
-.24,1.93-3.2,3.7\
-6-2.4\x0d\x0a\x09\x09c2.94,1\
-.97,5.84,4.07,8.\
-7,6.17c1.4,1.44-\
-0.09,3.16-1,4.37\
-c2.49,1.8,5.03,3\
-.5,7.46,5.36c1.6\
-7,1.46,1.56,4.12\
-,0.1,5.69\x0d\x0a\x09\x09c-1\
-.7,2.39-3.39,4.7\
-7-5.09,7.16c-0.8\
-1-0.6-1.66-1.19-\
-2.49-1.77c-0.03,\
-6.72,0.06,13.45-\
-0.04,20.15c-0.79\
-,2.07-3.47,2.16-\
-5.34,2.59\x0d\x0a\x09\x09c-7\
-.52,0.87-15.18,0\
-.87-22.69-0.01c-\
-1.84-0.43-4.6-0.\
-53-5.26-2.67c-0.\
-06-9.37-0.01-18.\
-73-0.03-28.11c7.\
-35,0,14.69,0,22.\
-02,0\x0d\x0a\x09\x09c-6.02-4\
-.32-12.09-8.57-1\
-8.11-12.9C27.71,\
-11.9,29.57,9.31,\
-31.43,6.73 M31.1\
-3,13.72c8.56,6.1\
-,17.15,12.19,25.\
-71,18.29\x0d\x0a\x09\x09c1.1\
-3-1.59,2.26-3.19\
-,3.4-4.77c-8.57-\
-6.09-17.13-12.18\
--25.69-18.27C33.\
-4,10.53,32.27,12\
-.13,31.13,13.72 \
-M25.77,30.88\x0d\x0a\x09\x09\
-c0,7.7,0,15.4,0,\
-23.12c8.46,1.43,\
-17.26,1.41,25.74\
-,0.01c0-7.07,0-1\
-4.16,0-21.24c-0.\
-9-0.61-1.76-1.37\
--2.73-1.87\x0d\x0a\x09\x09C4\
-1.1,30.86,33.43,\
-30.89,25.77,30.8\
-8z\x22/>\x0d\x0a\x09<path cl\
-ass=\x22st1\x22 d=\x22M13\
-.43,20.95c5.33-2\
-.83,12.12-2.59,1\
-7.25,0.57c-0.09,\
-0.23-0.17,0.46-0\
-.24,0.69\x0d\x0a\x09\x09c-7.\
-95-3.2-17.58,2.9\
-3-18.09,11.46c1.\
-63,0,3.26,0,4.89\
-,0c-2.84,3.63-5.\
-69,7.27-8.55,10.\
-9c-2.9-3.63-5.8-\
-7.26-8.69-10.92\x0d\
-\x0a\x09\x09c1.37,0.01,2.\
-76,0,4.13,0.01C5\
-.02,28.28,8.55,2\
-3.42,13.43,20.95\
-z\x22/>\x0d\x0a\x09<path cla\
-ss=\x22st0\x22 d=\x22M29.\
-77,35.56c1.01,0,\
-2.04,0,3.06,0c0,\
-5.22-0.01,10.45,\
-0,15.66c-1.01,0-\
-2.03,0-3.04,0\x0d\x0a\x09\
-\x09C29.75,46,29.8,\
-40.78,29.77,35.5\
-6z\x22/>\x0d\x0a\x09<path cl\
-ass=\x22st0\x22 d=\x22M37\
-.24,35.55c1.01,0\
-.01,2.04,0,3.07,\
-0.01c-0.04,5.23,\
-0.01,10.45-0.03,\
-15.66c-1.01-0.01\
--2.03-0.01-3.04-\
-0.01\x0d\x0a\x09\x09C37.24,4\
-6,37.24,40.78,37\
-.24,35.55z\x22/>\x0d\x0a\x09\
-<path class=\x22st0\
-\x22 d=\x22M44.43,35.5\
-6c1.01,0,2.03,0,\
-3.04,0c0,5.23,0,\
-10.45,0,15.68c-1\
-.01-0.01-2.03,0-\
-3.04-0.01\x0d\x0a\x09\x09C44\
-.43,46,44.46,40.\
-78,44.43,35.56z\x22\
-/>\x0d\x0a</g>\x0d\x0a</svg>\
-\x0d\x0a\
 \x00\x00\x01\xf2\
 <\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 24 24\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 24 \
-24;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<polygon point\
-s=\x223,3 3,21 5,21\
- 5,5 21,5 21,3 \x09\
-\x22/>\x0d\x0a</g>\x0d\x0a<path\
- d=\x22M7,14l2.79-2\
-.79l9.8,9.79L21,\
-19.59l-9.79-9.8L\
-14,7H7C7,7,7,7,7\
-,14z\x22/>\x0d\x0a</svg>\x0d\
-\x0a\
-\x00\x00\x01\x8c\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 10 10\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 10 \
-10;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M1,6V\
-4h8v2H1z\x22/>\x0d\x0a</g\
->\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x01\xc6\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<rect x=\x225\x22 y=\
-\x221\x22 width=\x226\x22 he\
-ight=\x226\x22/>\x0d\x0a\x09<re\
-ct x=\x225\x22 y=\x229\x22 w\
-idth=\x226\x22 height=\
-\x226\x22/>\x0d\x0a</g>\x0d\x0a</s\
-vg>\x0d\x0a\
-\x00\x00\x02*\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<polygon point\
-s=\x2214.57,5.36 13\
-.56,3.64 9,6.26 \
-9,1 7,1 7,6.26 2\
-.43,3.63 1.43,5.\
-36 5.99,8 1.5,10\
-.59 1.43,10.64 2\
-.44,12.37 7,9.74\
-\x0d\x0a\x09\x097,15 9,15 9,\
-9.74 13.56,12.37\
- 14.57,10.64 10.\
-01,8 \x09\x22/>\x0d\x0a</g>\x0d\
-\x0a</svg>\x0d\x0a\
-\x00\x00\x03\x9f\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 32 32\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 32 \
-32;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M5,3c\
-7.3,0,14.7,0,22,\
-0v1C19.7,4,12.3,\
-4,5,4V3z\x22/>\x0d\x0a\x09<p\
-ath d=\x22M5,6c7.3,\
-0,14.7,0,22,0v1C\
-19.7,7,12.3,7,5,\
-7V6z\x22/>\x0d\x0a\x09<path \
-d=\x22M5,9c7.3,0,14\
-.7,0,22,0v1c-7.3\
-,0-14.7,0-22,0V9\
-z\x22/>\x0d\x0a\x09<path d=\x22\
-M5,12c7.3,0,14.7\
-,0,22,0v1c-7.3,0\
--14.7,0-22,0V12z\
-\x22/>\x0d\x0a\x09<path d=\x22M\
-5,15c7.3,0,14.7,\
-0,22,0v1c-7.3,0-\
-14.7,0-22,0V15z\x22\
-/>\x0d\x0a\x09<path d=\x22M5\
-,18c7.3,0,14.7,0\
-,22,0v1c-7.3,0-1\
-4.7,0-22,0V18z\x22/\
->\x0d\x0a\x09<path d=\x22M5,\
-21c7.3,0,14.7,0,\
-22,0v1c-7.3,0-14\
-.7,0-22,0V21z\x22/>\
-\x0d\x0a\x09<path d=\x22M5,2\
-4c7.3,0,14.7,0,2\
-2,0v1c-7.3,0-14.\
-7,0-22,0V24z\x22/>\x0d\
-\x0a\x09<path d=\x22M5,27\
-c7.3,0,14.7,0,22\
-,0v1c-7.3,0-14.7\
-,0-22,0V27z\x22/>\x0d\x0a\
-</g>\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x04\xac\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<rect y=\x224\x22 wi\
-dth=\x222\x22 height=\x22\
-8\x22/>\x0d\x0a\x09<path d=\x22\
-M3,4.7c0.4,0,0.8\
--0.1,1.3-0.1s0.9\
--0.1,1.3-0.1c0.4\
-,0,0.8-0.1,1.2-0\
-.1c0.4,0,0.7,0,1\
-,0c0.4,0,0.7,0,0\
-.8,0.1\x0d\x0a\x09\x09C8.9,4\
-.6,9,4.6,9.2,4.8\
-c0.7,0,1.4,0,2,0\
-c0.6,0,1.2,0,1.7\
-,0c0.5,0,1,0,1.4\
--0.1c0.4,0,0.9-0\
-.1,1.2-0.1c0.2,0\
-.1,0.3,0.3,0.4,0\
-.4\x0d\x0a\x09\x09C16,5.1,16\
-,5.2,16,5.4c0,0.\
-3-0.1,0.5-0.2,0.\
-7c-0.2,0.2-0.4,0\
-.3-0.7,0.5c-0.3,\
-0.1-0.6,0.2-1,0.\
-2c-0.4,0.1-0.7,0\
-.1-1.1,0.1h-2.4\x0d\
-\x0a\x09\x09c0.2,0.2,0.3,\
-0.5,0.5,0.8c0.1,\
-0.3,0.2,0.5,0.2,\
-0.8c0,0.1-0.1,0.\
-2-0.2,0.4c-0.1,0\
-.2-0.3,0.3-0.4,0\
-.5c-0.2,0.2-0.3,\
-0.3-0.5,0.4\x0d\x0a\x09\x09C\
-10,10,9.9,10.1,9\
-.8,10.1c0.1,0,0.\
-2,0.1,0.3,0.2c0.\
-1,0.1,0.1,0.2,0.\
-1,0.4c0,0.1,0,0.\
-3-0.1,0.4c-0.3,0\
-.1-0.6,0.2-0.9,0\
-.2\x0d\x0a\x09\x09c-0.2,0.1-\
-0.5,0.2-0.7,0.2c\
--0.2,0.1-0.5,0.1\
--0.7,0.2c-0.3,0.\
-1-0.5,0.1-0.9,0.\
-1c-0.4,0-0.6,0-0\
-.9-0.1c-0.3-0.1-\
-0.6-0.1-0.9-0.3\x0d\
-\x0a\x09\x09c-0.5,0-0.9-0\
-.1-1.3-0.2c-0.4-\
-0.2-0.7-0.4-0.9-\
-0.7V4.7z\x22/>\x0d\x0a</g\
->\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x09\xa1\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<sty\
-le type=\x22text/cs\
-s\x22>\x0d\x0a\x09.st0{fill:\
-#DC3236;}\x0d\x0a</sty\
-le>\x0d\x0a<g>\x0d\x0a\x09<path\
- class=\x22st0\x22 d=\x22\
-M14.9,1.07c0,0.0\
-3-0.07,0.09-0.2,\
-0.17c-0.14,0.08-\
-0.33,0.2-0.58,0.\
-36s-0.55,0.37-0.\
-91,0.62\x0d\x0a\x09\x09c-0.3\
-6,0.25-0.76,0.57\
--1.2,0.94c-0.44,\
-0.38-0.93,0.82-1\
-.45,1.33C10.04,4\
-.98,9.48,5.58,8.\
-9,6.25c0.03,0.04\
-,0.07,0.1,0.14,0\
-.18\x0d\x0a\x09\x09c0.06,0.0\
-8,0.13,0.16,0.21\
-,0.25c0.07,0.09,\
-0.14,0.17,0.21,0\
-.25C9.53,7.01,9.\
-58,7.07,9.6,7.1c\
-0.47,0.6,0.88,1.\
-19,1.25,1.78\x0d\x0a\x09\x09\
-c0.37,0.59,0.69,\
-1.14,0.96,1.68s0\
-.5,1.04,0.7,1.52\
-c0.19,0.48,0.34,\
-0.9,0.46,1.27c0.\
-12,0.38,0.2,0.7,\
-0.25,0.96s0.08,0\
-.45,0.08,0.57\x0d\x0a\x09\
-\x09c0,0.07-0.01,0.\
-12-0.03,0.12h-0.\
-01c-0.03,0-0.1-0\
-.08-0.19-0.25c-0\
-.09-0.17-0.23-0.\
-4-0.41-0.71s-0.4\
-1-0.68-0.68-1.11\
-\x0d\x0a\x09\x09s-0.62-0.91-\
-1.02-1.44c-0.4-0\
-.53-0.87-1.1-1.4\
--1.71C9.03,9.17,\
-8.42,8.53,7.72,7\
-.87L7.67,7.93C7.\
-63,7.97,7.58,8.0\
-3,7.52,8.1\x0d\x0a\x09\x09C7\
-.47,8.17,7.4,8.2\
-5,7.33,8.34c-0.0\
-7,0.09-0.14,0.18\
--0.2,0.27c-0.49,\
-0.7-0.92,1.33-1.\
-26,1.91c-0.35,0.\
-58-0.63,1.08-0.8\
-5,1.52\x0d\x0a\x09\x09c-0.22\
-,0.43-0.39,0.78-\
-0.5,1.05c-0.12,0\
-.27-0.19,0.44-0.\
-24,0.52c-0.05,0.\
-08-0.12,0.13-0.2\
-2,0.13c-0.05,0-0\
-.09-0.01-0.14-0.\
-04\x0d\x0a\x09\x09c-0.03-0.0\
-2-0.07-0.05-0.14\
--0.09c-0.07-0.05\
--0.16-0.11-0.26-\
-0.18c-0.1-0.07-0\
-.21-0.14-0.33-0.\
-22c-0.12-0.08-0.\
-23-0.16-0.34-0.2\
-3\x0d\x0a\x09\x09s-0.22-0.14\
--0.31-0.2s-0.17-\
-0.11-0.23-0.14c-\
-0.04-0.02-0.08-0\
-.05-0.11-0.09c-0\
-.03-0.04-0.04-0.\
-07-0.04-0.12\x0d\x0a\x09\x09\
-c0-0.02,0.01-0.0\
-6,0.03-0.11c0.09\
--0.2,0.24-0.48,0\
-.45-0.84c0.21-0.\
-36,0.49-0.79,0.8\
-2-1.27s0.74-1.03\
-,1.22-1.64s1.03-\
-1.24,1.65-1.92\x0d\x0a\
-\x09\x09C5.7,6.09,5.1,\
-5.61,4.55,5.19C4\
-,4.77,3.51,4.41,\
-3.08,4.1S2.27,3.\
-55,1.96,3.35S1.4\
-1,3,1.24,2.9c-0.\
-04-0.03-0.08-0.0\
-5-0.1-0.07\x0d\x0a\x09\x09C1\
-.11,2.8,1.09,2.7\
-8,1.09,2.73c0-0.\
-04,0.02-0.09,0.0\
-6-0.14c0.02-0.03\
-,0.07-0.11,0.16-\
-0.22c0.09-0.12,0\
-.19-0.25,0.31-0.\
-39\x0d\x0a\x09\x09c0.12-0.15\
-,0.25-0.3,0.38-0\
-.46S2.28,1.23,2.\
-4,1.12c0.04-0.03\
-,0.07-0.05,0.1-0\
-.08C2.53,1.01,2.\
-57,1,2.62,1\x0d\x0a\x09\x09c\
-0.04,0,0.08,0.01\
-,0.12,0.04c0.1,0\
-.06,0.32,0.19,0.\
-63,0.4s0.71,0.49\
-,1.16,0.84s0.95,\
-0.76,1.5,1.23c0.\
-54,0.48,1.1,1,1.\
-65,1.58\x0d\x0a\x09\x09c0.45\
--0.45,0.93-0.87,\
-1.44-1.25c0.51-0\
-.38,1.02-0.72,1.\
-52-1.02c0.5-0.3,\
-0.99-0.56,1.46-0\
-.78c0.47-0.23,0.\
-89-0.41,1.27-0.5\
-6\x0d\x0a\x09\x09c0.38-0.15,\
-0.7-0.26,0.96-0.\
-33c0.26-0.07,0.4\
-3-0.11,0.51-0.11\
-c0.03,0,0.05,0,0\
-.05,0.01L14.9,1.\
-07L14.9,1.07z\x22/>\
-\x0d\x0a</g>\x0d\x0a</svg>\x0d\x0a\
-\
-\x00\x00\x02-\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M10,1\
-5V4L8,6L7,5l4-4l\
-0,0l4,4l-1,1l-2-\
-2v11H10z\x22/>\x0d\x0a</g\
->\x0d\x0a<rect x=\x221\x22 y\
-=\x2214\x22 width=\x226\x22 \
-height=\x221\x22/>\x0d\x0a<r\
-ect x=\x221\x22 y=\x2212\x22\
- width=\x226\x22 heigh\
-t=\x221\x22/>\x0d\x0a<rect x\
-=\x221\x22 y=\x2210\x22 widt\
-h=\x226\x22 height=\x221\x22\
-/>\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x02)\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M12,1\
-v11l2-2l1,1l-4,4\
-l0,0l-4-4l1-1l2,\
-2V1H12z\x22/>\x0d\x0a</g>\
-\x0d\x0a<rect x=\x221\x22 y=\
-\x221\x22 width=\x226\x22 he\
-ight=\x221\x22/>\x0d\x0a<rec\
-t x=\x221\x22 y=\x223\x22 wi\
-dth=\x226\x22 height=\x22\
-1\x22/>\x0d\x0a<rect x=\x221\
-\x22 y=\x225\x22 width=\x226\
-\x22 height=\x221\x22/>\x0d\x0a\
-</svg>\x0d\x0a\
-\x00\x00\x06\x81\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 64 64\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 64 \
-64;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<sty\
-le type=\x22text/cs\
-s\x22>\x0d\x0a\x09.st0{fill:\
-#DC3236;}\x0d\x0a</sty\
-le>\x0d\x0a<g>\x0d\x0a\x09<path\
- class=\x22st0\x22 d=\x22\
-M26.43,8.05c3.7-\
-0.06,7.43-0.08,1\
-1.13,0c2.05,0.38\
-,1.89,2.76,1.8,4\
-.35c3.11,0,6.23-\
-0.01,9.34,0\x0d\x0a\x09\x09c\
-2.01,0.05,3.78,1\
-.83,3.83,3.84c0.\
-03,3.43,0,6.86,0\
-.01,10.29c-1.03,\
-0.04-2.05,0.01-3\
-.06,0.01c0,8.59,\
-0.01,17.17,0,25.\
-75\x0d\x0a\x09\x09c-0.01,1.2\
-8-1.29,1.93-2.34\
-,2.29c-3.18,1.03\
--6.54,1.14-9.84,\
-1.33c-6.28,0.13-\
-12.64,0.3-18.84-\
-0.88c-1.48-0.39-\
-3.61-0.79-3.93-2\
-.58\x0d\x0a\x09\x09c-0.04-8.\
-64,0-17.28-0.01-\
-25.92c-1.03,0.01\
--2.05,0.01-3.06-\
-0.01c0.03-3.43-0\
-.01-6.86,0.01-10\
-.29c0.05-2.01,1.\
-81-3.78,3.83-3.8\
-4\x0d\x0a\x09\x09c3.11-0.03,\
-6.23,0.01,9.34-0\
-.03C24.53,10.78,\
-24.38,8.41,26.43\
-,8.05 M15.45,16.\
-4c-0.01,2.05,0.0\
-1,4.1,0,6.15\x0d\x0a\x09\x09\
-c11.03,0,22.05,0\
-,33.08,0c0-2.04,\
-0-4.08,0-6.11c-1\
-1.01-0.03-22.03-\
-0.06-33.04-0.04 \
-M18.5,26.54c0,8.\
-14,0,16.27,0,24.\
-4\x0d\x0a\x09\x09c8.88,1.48,\
-18.1,1.49,26.98,\
-0c0-8.14,0-16.27\
-,0-24.4C36.49,26\
-.54,27.49,26.55,\
-18.5,26.54z\x22/>\x0d\x0a\
-\x09<path class=\x22st\
-0\x22 d=\x22M22.7,30.6\
-4c1.06,0,2.13,0,\
-3.2,0c0,5.8,0,11\
-.6,0,17.4c-1.06,\
-0-2.13,0-3.2,0C2\
-2.7,42.24,22.7,3\
-6.44,22.7,30.64z\
-\x0d\x0a\x09\x09\x22/>\x0d\x0a\x09<path \
-class=\x22st0\x22 d=\x22M\
-30.53,30.62c1.06\
-,0,2.13,0,3.18,0\
-c0.01,5.8,0.01,1\
-1.6,0,17.4c-1.06\
-,0-2.13,0.01-3.1\
-9-0.01\x0d\x0a\x09\x09C30.54\
-,42.23,30.53,36.\
-43,30.53,30.62z\x22\
-/>\x0d\x0a\x09<path class\
-=\x22st0\x22 d=\x22M38.08\
-,30.64c1.06,0,2.\
-13,0,3.2,0c0,5.8\
-,0,11.6,0,17.4c-\
-1.06,0-2.13,0-3.\
-19,0\x0d\x0a\x09\x09C38.08,4\
-2.24,38.08,36.44\
-,38.08,30.64z\x22/>\
-\x0d\x0a</g>\x0d\x0a</svg>\x0d\x0a\
-\
-\x00\x00\x04\xe4\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 32 32\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 32 \
-32;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M5,0h\
-1c0,10.7,0,21.3,\
-0,32H5C5,21.3,5,\
-10.7,5,0z\x22/>\x0d\x0a\x09<\
-path d=\x22M0,3h2v1\
-H0V3z\x22/>\x0d\x0a\x09<path\
- d=\x22M9,3c6.7,0,1\
-3.3,0,20,0v1C22.\
-3,4,15.7,4,9,4V3\
-z\x22/>\x0d\x0a\x09<path d=\x22\
-M0,6h2v1H0V6z\x22/>\
-\x0d\x0a\x09<path d=\x22M9,6\
-c6.7,0,13.3,0,20\
-,0v1C22.3,7,15.7\
-,7,9,7V6z\x22/>\x0d\x0a\x09<\
-path d=\x22M0,9h2v1\
-H0V9z\x22/>\x0d\x0a\x09<path\
- d=\x22M9,9c6.7,0,1\
-3.3,0,20,0v1c-6.\
-7,0-13.3,0-20,0V\
-9z\x22/>\x0d\x0a\x09<path d=\
-\x22M0,12h2v1H0V12z\
-\x22/>\x0d\x0a\x09<path d=\x22M\
-9,12c6.7,0,13.3,\
-0,20,0v1c-6.7,0-\
-13.3,0-20,0V12z\x22\
-/>\x0d\x0a\x09<path d=\x22M0\
-,15h2v1H0V15z\x22/>\
-\x0d\x0a\x09<path d=\x22M9,1\
-5c6.7,0,13.3,0,2\
-0,0v1c-6.7,0-13.\
-3,0-20,0V15z\x22/>\x0d\
-\x0a\x09<path d=\x22M0,18\
-h2v1H0V18z\x22/>\x0d\x0a\x09\
-<path d=\x22M9,18c6\
-.7,0,13.3,0,20,0\
-v1c-6.7,0-13.3,0\
--20,0V18z\x22/>\x0d\x0a\x09<\
-path d=\x22M0,21h2v\
-1H0V21z\x22/>\x0d\x0a\x09<pa\
-th d=\x22M9,21c6.7,\
-0,13.3,0,20,0v1c\
--6.7,0-13.3,0-20\
-,0V21z\x22/>\x0d\x0a\x09<pat\
-h d=\x22M0,24h2v1H0\
-V24z\x22/>\x0d\x0a\x09<path \
-d=\x22M9,24c6.7,0,1\
-3.3,0,20,0v1c-6.\
-7,0-13.3,0-20,0V\
-24z\x22/>\x0d\x0a\x09<path d\
-=\x22M0,27h2v1H0V27\
-z\x22/>\x0d\x0a\x09<path d=\x22\
-M9,27c6.7,0,13.3\
-,0,20,0v1c-6.7,0\
--13.3,0-20,0V27z\
-\x22/>\x0d\x0a</g>\x0d\x0a</svg\
->\x0d\x0a\
-\x00\x00\x02\x95\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 32 32\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 32 \
-32;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M9,4.\
-9c3.6-1.8,8.1-2.\
-8,11.8-0.7c3.9,2\
-,4.1,7.9,1.2,10.\
-8c-1.6,1.7-3.9,2\
-.3-6,3.1c0,0.7,0\
-,2.1,0,2.9c-0.5,\
-0-1.5,0-2,0\x0d\x0a\x09\x09c\
-0-1.3,0-2.6,0-3.\
-9c3.6-0.9,6.45-3\
-.95,5.95-8.11c-0\
-.33-3.05-3.72-4.\
-91-6.49-3.56C11.\
-21,6.49,12,10.4,\
-9,10.2C9,8.4,9,6\
-.7,9,4.9z\x22/>\x0d\x0a\x09<\
-circle cx=\x2215.5\x22\
- cy=\x2226.5\x22 r=\x222.\
-5\x22/>\x0d\x0a</g>\x0d\x0a</sv\
-g>\x0d\x0a\
-\x00\x00\x03!\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<sty\
-le type=\x22text/cs\
-s\x22>\x0d\x0a\x09.st0{fill:\
-#008A1A;}\x0d\x0a</sty\
-le>\x0d\x0a<g>\x0d\x0a  <pat\
-h d=\x22M12.41,9c0.\
-48,0.12,0.72,0.4\
-4,0.72,0.96v4.31\
-l-1.74-0.9l-1.77\
-,0.9V8.94H11V8.4\
-6H5.14v2.45L2,6.\
-71V6.69l3.14-4.1\
-7v2.43H8\x0d\x0a    V4\
-.47H5.64V1L1.38,\
-6.71l4.26,5.71V8\
-.94h3.51V15l2.25\
--1.12L13.62,15V9\
-.96c0-0.39-0.07-\
-0.7-0.19-0.96H12\
-.41z\x22/>\x0d\x0a  <poly\
-gon points=\x229.65\
-,6 11,7.24 11,6.\
-62 10.33,6      \
- \x22/>\x0d\x0a</g>\x0d\x0a<g>\x0d\
-\x0a\x09<path class=\x22s\
-t0\x22 d=\x22M16,4.1V5\
-h-3v3h-1V5H9V4h3\
-V1h1v3h3V4.1z\x22/>\
-\x0d\x0a</g>\x0d\x0a</svg>\x0d\x0a\
-\
-\x00\x00\x07\xa8\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 18 24\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 18 \
-24;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<pat\
-h d=\x22M8.99,23.79\
-c-0.55,0-1.08-0.\
-1-1.56-0.3c-0.48\
--0.2-0.91-0.48-1\
-.27-0.83s-0.65-0\
-.75-0.85-1.22C5.\
-1,20.98,5,20.47,\
-5,19.95\x0d\x0a\x09v-3.69\
-c0-0.73,0.19-1.4\
-,0.55-1.99c0.36-\
-0.58,0.86-1.05,1\
-.49-1.39L7,19.95\
-c0,0.26,0.05,0.5\
-1,0.16,0.73c0.11\
-,0.23,0.25,0.43,\
-0.43,0.61\x0d\x0a\x09c0.1\
-8,0.17,0.39,0.31\
-,0.63,0.41c0.25,\
-0.1,0.51,0.15,0.\
-77,0.15c0.27,0,0\
-.54-0.05,0.78-0.\
-15s0.46-0.24,0.6\
-4-0.41s0.33-0.38\
-,0.43-0.61\x0d\x0a\x09c0.\
-11-0.23,0.16-0.4\
-7,0.16-0.73v-7.0\
-9c0.27,0.19,0.54\
-,0.39,0.79,0.62s\
-0.46,0.5,0.64,0.\
-79s0.32,0.6,0.42\
-,0.94\x0d\x0a\x09c0.1,0.3\
-4,0.15,0.69,0.15\
-,1.05v3.69c0,0.5\
-3-0.1,1.03-0.31,\
-1.49s-0.5,0.87-0\
-.86,1.22c-0.36,0\
-.34-0.79,0.62-1.\
-27,0.82\x0d\x0a\x09C10.08\
-,23.69,9.56,23.7\
-9,8.99,23.79z\x22/>\
-\x0d\x0a<path d=\x22M8.99\
-,18.4c-0.14,0-0.\
-27-0.03-0.39-0.0\
-9s-0.23-0.15-0.3\
-2-0.25c-0.09-0.1\
-1-0.16-0.23-0.21\
--0.37\x0d\x0a\x09c-0.05-0\
-.14-0.08-0.29-0.\
-08-0.45V6.79c0-0\
-.33,0.1-0.61,0.2\
-9-0.83c0.19-0.22\
-,0.43-0.33,0.71-\
-0.33c0.29,0,0.53\
-,0.11,0.72,0.33\x0d\
-\x0a\x09c0.18,0.22,0.2\
-8,0.5,0.28,0.83v\
-10.45c0,0.32-0.0\
-9,0.59-0.28,0.82\
-C9.52,18.28,9.28\
-,18.4,8.99,18.4z\
-\x22/>\x0d\x0a<path d=\x22M7\
-,11.16c-0.58-0.3\
-6-1.08-0.83-1.45\
--1.43C5.19,9.14,\
-5,8.48,5,7.76V4.\
-08c0-0.53,0.1-1.\
-03,0.31-1.5S5.8,\
-1.7,6.17,1.35\x0d\x0a\x09\
-C6.53,1,6.95,0.7\
-2,7.44,0.52c0.48\
--0.2,1.01-0.3,1.\
-56-0.3c0.56,0,1.\
-09,0.1,1.57,0.3s\
-0.9,0.48,1.26,0.\
-83\x0d\x0a\x09c0.36,0.35,\
-0.65,0.76,0.86,1\
-.23S13,3.55,13,4\
-.08v3.68c0,0.35-\
-0.05,0.71-0.15,1\
-.04c-0.1,0.33-0.\
-24,0.65-0.42,0.9\
-4s-0.4,0.56-0.64\
-,0.8\x0d\x0a\x09c-0.24,0.\
-22-0.5,0.42-0.79\
-,0.58V4.08c0-0.2\
-6-0.05-0.51-0.16\
--0.74c-0.1-0.22-\
-0.25-0.43-0.43-0\
-.6c-0.18-0.18-0.\
-4-0.32-0.64-0.41\
-\x0d\x0a\x09c-0.24-0.1-0.\
-5-0.15-0.78-0.15\
-c-0.27,0-0.53,0.\
-05-0.77,0.15c-0.\
-24,0.1-0.45,0.24\
--0.63,0.41c-0.18\
-,0.18-0.32,0.38-\
-0.43,0.6\x0d\x0a\x09C7.05\
-,3.57,7,3.81,7,4\
-.08V11.16z\x22/>\x0d\x0a<\
-/svg>\x0d\x0a\
-\x00\x00\x03\x1a\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<sty\
-le type=\x22text/cs\
-s\x22>\x0d\x0a\x09.st0{fill:\
-#008A1A;}\x0d\x0a</sty\
-le>\x0d\x0a<g>\x0d\x0a\x09<path\
- d=\x22M13.43,7c0.1\
-2-0.26,0.19-0.57\
-,0.19-0.96V1L11.\
-4,2.12L9.15,1v6.\
-06H5.64V3.58L1.3\
-8,9.29L5.64,15v-\
-3.47H8v-0.48H5.1\
-4v2.43\x0d\x0a\x09\x09L2,9.3\
-1V9.29l3.14-4.2v\
-2.45H11V7.06H9.6\
-2V1.73l1.77,0.9l\
-1.74-0.9v4.31c0,\
-0.52-0.24,0.84-0\
-.72,0.96H13.43z\x22\
-/>\x0d\x0a\x09<polygon po\
-ints=\x2210.33,10 1\
-1,9.38 11,8.76 9\
-.65,10 \x09\x22/>\x0d\x0a</g\
->\x0d\x0a<g>\x0d\x0a\x09<path c\
-lass=\x22st0\x22 d=\x22M1\
-6,12h-3v3h-1v-3H\
-9v-1h3V8h1v3h3v0\
-.9V12z\x22/>\x0d\x0a</g>\x0d\
-\x0a</svg>\x0d\x0a\
-\x00\x00\x02\xf9\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<sty\
-le type=\x22text/cs\
-s\x22>\x0d\x0a\x09.st0{opaci\
-ty:0.97;fill:#32\
-629F;enable-back\
-ground:new    ;}\
-\x0d\x0a\x09.st1{fill:#A4\
-C1E1;}\x0d\x0a</style>\
-\x0d\x0a<g>\x0d\x0a\x09<path cl\
-ass=\x22st0\x22 d=\x22M2,\
-6c4,0,8,0,12,0c0\
-,1.3,0,2.7,0,4c-\
-4,0-8,0-12,0C2,8\
-.7,2,7.3,2,6 M3,\
-7c0,0.5,0,1.5,0,\
-2c2.5,0,7.5,0,10\
-,0\x0d\x0a\x09\x09c0-0.5,0-1\
-.5,0-2C10.5,7,5.\
-5,7,3,7z\x22/>\x0d\x0a</g\
->\x0d\x0a<g>\x0d\x0a\x09<path c\
-lass=\x22st1\x22 d=\x22M3\
-,7c2.5,0,7.5,0,1\
-0,0c0,0.5,0,1.5,\
-0,2C10.5,9,5.5,9\
-,3,9C3,8.5,3,7.5\
-,3,7z\x22/>\x0d\x0a</g>\x0d\x0a\
-</svg>\x0d\x0a\
-\x00\x00\x01\xf7\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 24 24\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 24 \
-24;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<polygon point\
-s=\x223,21 21,21 21\
-,19 5,19 5,3 3,3\
- \x09\x22/>\x0d\x0a</g>\x0d\x0a<pa\
-th d=\x22M14,17l-2.\
-79-2.79L21,4.41L\
-19.59,3l-9.8,9.7\
-9L7,10v7C7,17,7,\
-17,14,17z\x22/>\x0d\x0a</\
-svg>\x0d\x0a\
-\x00\x00\x06\xc4\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 20 20\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 20 \
-20;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<path d=\x22M1,10\
-.01C1,9.19,1.11,\
-8.4,1.32,7.63s0.\
-52-1.48,0.92-2.1\
-5s0.87-1.28,1.42\
--1.83s1.16-1.02,\
-1.82-1.42s1.38-0\
-.7,2.14-0.91\x0d\x0a\x09\x09\
-S9.18,1,10,1c0.8\
-2,0,1.61,0.11,2.\
-37,0.33c0.76,0.2\
-2,1.48,0.53,2.14\
-,0.92c0.67,0.4,1\
-.28,0.87,1.83,1.\
-42\x0d\x0a\x09\x09c0.55,0.55\
-,1.02,1.16,1.42,\
-1.83c0.4,0.67,0.\
-7,1.38,0.92,2.14\
-C18.89,8.4,19,9.\
-19,19,10.01c0,0.\
-82-0.11,1.62-0.3\
-2,2.38\x0d\x0a\x09\x09c-0.22\
-,0.76-0.52,1.48-\
-0.92,2.14c-0.4,0\
-.67-0.87,1.28-1.\
-42,1.82c-0.55,0.\
-55-1.16,1.02-1.8\
-3,1.41c-0.67,0.3\
-9-1.38,0.69-2.14\
-,0.91\x0d\x0a\x09\x09C11.6,1\
-8.89,10.81,19,10\
-,19c-0.82,0-1.61\
--0.11-2.37-0.32c\
--0.76-0.22-1.48-\
-0.52-2.14-0.92c-\
-0.67-0.4-1.28-0.\
-87-1.82-1.42\x0d\x0a\x09\x09\
-c-0.55-0.55-1.02\
--1.16-1.42-1.82s\
--0.7-1.38-0.92-2\
-.14S1,10.83,1,10\
-.01z M2.19,10c0,\
-0.72,0.09,1.41,0\
-.28,2.07\x0d\x0a\x09\x09c0.1\
-9,0.66,0.45,1.28\
-,0.79,1.86c0.34,\
-0.58,0.74,1.11,1\
-.22,1.58c0.47,0.\
-47,1,0.88,1.58,1\
-.22c0.58,0.34,1.\
-2,0.6,1.86,0.79\x0d\
-\x0a\x09\x09c0.66,0.19,1.\
-36,0.28,2.07,0.2\
-8c0.71,0,1.4-0.0\
-9,2.07-0.28c0.66\
--0.19,1.29-0.45,\
-1.87-0.79c0.58-0\
-.34,1.11-0.75,1.\
-59-1.22\x0d\x0a\x09\x09c0.48\
--0.47,0.89-1,1.2\
-3-1.58c0.34-0.58\
-,0.6-1.2,0.79-1.\
-86c0.19-0.66,0.2\
-8-1.35,0.28-2.07\
-c0-0.71-0.09-1.4\
--0.28-2.07\x0d\x0a\x09\x09s-\
-0.45-1.29-0.8-1.\
-87s-0.75-1.11-1.\
-23-1.59c-0.48-0.\
-48-1.01-0.89-1.5\
-9-1.23s-1.2-0.6-\
-1.86-0.79S10.7,2\
-.19,9.99,2.19\x0d\x0a\x09\
-\x09c-0.72,0-1.41,0\
-.09-2.07,0.28S6.\
-63,2.92,6.05,3.2\
-6s-1.1,0.75-1.58\
-,1.23S3.59,5.49,\
-3.25,6.07s-0.6,1\
-.2-0.79,1.87S2.1\
-9,9.29,2.19,10z\x0d\
-\x0a\x09\x09 M8.82,6h2.76\
-l-2.9,3H15v2H8.6\
-8l2.9,3H8.82L5,9\
-.98v0.05L8.82,6z\
-\x22/>\x0d\x0a</g>\x0d\x0a</svg\
->\x0d\x0a\
-\x00\x00\x01\xea\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 24 24\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 24 \
-24;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<g>\x0d\
-\x0a\x09<g>\x0d\x0a\x09\x09<rect x\
-=\x2219\x22 y=\x223\x22 widt\
-h=\x222\x22 height=\x2218\
-\x22/>\x0d\x0a\x09</g>\x0d\x0a\x09<po\
-lygon points=\x2218\
-,12 13,7 13,11 3\
-,11 3,13 13,13 1\
-3,17 \x09\x22/>\x0d\x0a</g>\x0d\
-\x0a</svg>\x0d\x0a\
-\x00\x00\x08(\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<sty\
-le type=\x22text/cs\
-s\x22>\x0d\x0a\x09.st0{fill:\
-#2643FF;}\x0d\x0a\x09.st1\
-{fill:url(#path3\
-147_1_);}\x0d\x0a\x09.st2\
-{fill:url(#path3\
-159_2_);}\x0d\x0a\x09.st3\
-{fill:url(#path3\
-159_3_);}\x0d\x0a</sty\
-le>\x0d\x0a<g id=\x22laye\
-r1\x22>\x0d\x0a\x09<g id=\x22pa\
-th2174\x22>\x0d\x0a\x09\x09<cir\
-cle class=\x22st0\x22 \
-cx=\x228\x22 cy=\x228\x22 r=\
-\x227.5\x22/>\x0d\x0a\x09</g>\x0d\x0a\
-\x0d\x0a\x09\x09<linearGradi\
-ent id=\x22path3147\
-_1_\x22 gradientUni\
-ts=\x22userSpaceOnU\
-se\x22 x1=\x228\x22 y1=\x22-\
-1000.5101\x22 x2=\x228\
-\x22 y2=\x22-982.1426\x22\
- gradientTransfo\
-rm=\x22matrix(1 0 0\
- -1 0 -985.0101)\
-\x22>\x0d\x0a\x09\x09<stop  off\
-set=\x220\x22 style=\x22s\
-top-color:#00000\
-0;stop-opacity:0\
-\x22/>\x0d\x0a\x09\x09<stop  of\
-fset=\x221\x22 style=\x22\
-stop-color:#0000\
-00;stop-opacity:\
-0.549\x22/>\x0d\x0a\x09</lin\
-earGradient>\x0d\x0a\x09<\
-path id=\x22path314\
-7\x22 class=\x22st1\x22 d\
-=\x22M15.5,8c0,4.1-\
-3.4,7.5-7.5,7.5S\
-0.5,12.1,0.5,8S3\
-.9,0.5,8,0.5S15.\
-5,3.9,15.5,8L15.\
-5,8z\x22/>\x0d\x0a\x0d\x0a\x09\x09<li\
-nearGradient id=\
-\x22path3159_2_\x22 gr\
-adientUnits=\x22use\
-rSpaceOnUse\x22 x1=\
-\x22-244.8176\x22 y1=\x22\
--1215.5052\x22 x2=\x22\
--244.8176\x22 y2=\x22-\
-1228.6334\x22 gradi\
-entTransform=\x22ma\
-trix(0.6786 0 0 \
--0.4643 174.1332\
- -562.9453)\x22>\x0d\x0a\x09\
-\x09<stop  offset=\x22\
-0\x22 style=\x22stop-c\
-olor:#FFFFFF;sto\
-p-opacity:0.7333\
-\x22/>\x0d\x0a\x09\x09<stop  of\
-fset=\x221\x22 style=\x22\
-stop-color:#FFFF\
-FF;stop-opacity:\
-0\x22/>\x0d\x0a\x09</linearG\
-radient>\x0d\x0a\x09<path\
- id=\x22path3159\x22 c\
-lass=\x22st2\x22 d=\x22M1\
-3.1,4.9c0,1.9-2.\
-3,3.5-5.1,3.5S2.\
-9,6.8,2.9,4.9S5.\
-2,1.4,8,1.4S13.1\
-,3,13.1,4.9L13.1\
-,4.9z\x22/>\x0d\x0a</g>\x0d\x0a\
-<radialGradient \
-id=\x22path3159_3_\x22\
- cx=\x228\x22 cy=\x22122.\
-3267\x22 r=\x224.6124\x22\
- gradientTransfo\
-rm=\x22matrix(1 0 0\
- -0.7307 0 101.9\
-04)\x22 gradientUni\
-ts=\x22userSpaceOnU\
-se\x22>\x0d\x0a\x09<stop  of\
-fset=\x220\x22 style=\x22\
-stop-color:#00C2\
-E3\x22/>\x0d\x0a\x09<stop  o\
-ffset=\x220.3843\x22 s\
-tyle=\x22stop-color\
-:#00E0F1;stop-op\
-acity:0.6157\x22/>\x0d\
-\x0a\x09<stop  offset=\
-\x220.7615\x22 style=\x22\
-stop-color:#00F7\
-FB;stop-opacity:\
-0.2385\x22/>\x0d\x0a\x09<sto\
-p  offset=\x221\x22 st\
-yle=\x22stop-color:\
-#00FFFF;stop-opa\
-city:0\x22/>\x0d\x0a</rad\
-ialGradient>\x0d\x0a<p\
-ath id=\x22path3159\
-_1_\x22 class=\x22st3\x22\
- d=\x22M13.6,12c0,2\
-.1-2.5,3.8-5.6,3\
-.8S2.4,14.1,2.4,\
-12S4.9,8.2,8,8.2\
-S13.6,9.9,13.6,1\
-2L13.6,12z\x22/>\x0d\x0a<\
-/svg>\x0d\x0a\
-\x00\x00\x04\x8c\
-<\
-?xml version=\x221.\
-0\x22 encoding=\x22utf\
--8\x22?>\x0d\x0a<!-- Gene\
-rator: Adobe Ill\
-ustrator 23.0.3,\
- SVG Export Plug\
--In . SVG Versio\
-n: 6.00 Build 0)\
-  -->\x0d\x0a<svg vers\
-ion=\x221.1\x22 id=\x22La\
-yer_1\x22 xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22 xmlns:\
-xlink=\x22http://ww\
-w.w3.org/1999/xl\
-ink\x22 x=\x220px\x22 y=\x22\
-0px\x22\x0d\x0a\x09 viewBox=\
-\x220 0 16 16\x22 styl\
-e=\x22enable-backgr\
-ound:new 0 0 16 \
-16;\x22 xml:space=\x22\
-preserve\x22>\x0d\x0a<sty\
-le type=\x22text/cs\
-s\x22>\x0d\x0a\x09.st0{opaci\
-ty:0.96;fill:#32\
-619E;enable-back\
-ground:new    ;}\
-\x0d\x0a\x09.st1{fill:#A7\
-C3E2;}\x0d\x0a</style>\
-\x0d\x0a<g>\x0d\x0a\x09<path cl\
-ass=\x22st0\x22 d=\x22M6,\
-2c1.3,0,2.7,0,4,\
-0c0,1.3,0,2.7,0,\
-4c1.3,0,2.7,0,4,\
-0c0,1.3,0,2.7,0,\
-4c-1.3,0-2.7,0-4\
-,0c0,1.3,0,2.7,0\
-,4\x0d\x0a\x09\x09c-1.3,0-2.\
-7,0-4,0c0-1.3,0-\
-2.7,0-4c-1.3,0-2\
-.7,0-4,0c0-1.3,0\
--2.7,0-4c1.3,0,2\
-.7,0,4,0C6,4.7,6\
-,3.3,6,2 M7,3c0,\
-1.3,0,2.7,0,4\x0d\x0a\x09\
-\x09C5.7,7,4.3,7,3,\
-7c0,0.5,0,1.5,0,\
-2c1.3,0,2.7,0,4,\
-0c0,1.3,0,2.7,0,\
-4c0.5,0,1.5,0,2,\
-0c0-1.3,0-2.7,0-\
-4c1.3,0,2.7,0,4,\
-0\x0d\x0a\x09\x09c0-0.5,0-1.\
-5,0-2c-1.3,0-2.7\
-,0-4,0c0-1.3,0-2\
-.7,0-4C8.5,3,7.5\
-,3,7,3z\x22/>\x0d\x0a</g>\
-\x0d\x0a<g>\x0d\x0a\x09<path cl\
-ass=\x22st1\x22 d=\x22M7,\
-3c0.5,0,1.5,0,2,\
-0c0,1.3,0,2.7,0,\
-4c1.3,0,2.7,0,4,\
-0c0,0.5,0,1.5,0,\
-2c-1.3,0-2.7,0-4\
-,0c0,1.3,0,2.7,0\
-,4\x0d\x0a\x09\x09c-0.5,0-1.\
-5,0-2,0c0-1.3,0-\
-2.7,0-4C5.7,9,4.\
-3,9,3,9c0-0.5,0-\
-1.5,0-2c1.3,0,2.\
-7,0,4,0C7,5.7,7,\
-4.3,7,3z\x22/>\x0d\x0a</g\
->\x0d\x0a</svg>\x0d\x0a\
-\x00\x00\x014\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><rect x=\x229.\
-5\x22 y=\x2213\x22 width=\
-\x225\x22 height=\x225\x22 r\
-x=\x22.5\x22 fill=\x22cur\
-rentColor\x22/></sv\
-g>\x0a\
-\x00\x00\x01<\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><path d=\x22M3\
- 9.5c3-2 6-2 9 0\
-s6 2 9 0M3 15c3-\
-2 6-2 9 0s6 2 9 \
-0M9 3v18M15 3v18\
-\x22/></svg>\x0d\x0a\
-\x00\x00\x01\x08\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x224\x22 \
-y=\x225\x22 width=\x2211\x22\
- height=\x2216\x22 rx=\
-\x222\x22/><path d=\x22M1\
-9 2v6M16 5h6\x22/><\
-/svg>\x0d\x0a\
-\x00\x00\x01\x18\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x229\x22 \
-y=\x223\x22 width=\x2211\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><path d=\x22M5\
- 4v16\x22 stroke-da\
-sharray=\x222 3\x22/><\
-/svg>\x0d\x0a\
-\x00\x00\x02\x05\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><path d=\x22M7\
- 15h6\x22/><circle \
-cx=\x228\x22 cy=\x228\x22 r=\
-\x22.6\x22 fill=\x22curre\
-ntColor\x22/><circl\
-e cx=\x2216\x22 cy=\x227.\
-5\x22 r=\x22.6\x22 fill=\x22\
-currentColor\x22/><\
-circle cx=\x2212.5\x22\
- cy=\x2211\x22 r=\x22.6\x22 \
-fill=\x22currentCol\
-or\x22/><circle cx=\
-\x2217\x22 cy=\x2216\x22 r=\x22\
-.6\x22 fill=\x22curren\
-tColor\x22/><circle\
- cx=\x228\x22 cy=\x2218\x22 \
-r=\x22.6\x22 fill=\x22cur\
-rentColor\x22/></sv\
-g>\x0d\x0a\
-\x00\x00\x01:\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22 stroke-dasha\
-rray=\x222 2.5\x22/><r\
-ect x=\x227.5\x22 y=\x227\
-.5\x22 width=\x229\x22 he\
-ight=\x229\x22 rx=\x221\x22/\
-></svg>\x0d\x0a\
-\x00\x00\x015\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><path d=\x22M7\
- 15h6\x22/><circle \
-cx=\x2217\x22 cy=\x2216\x22 \
-r=\x22.6\x22 fill=\x22cur\
-rentColor\x22/></sv\
-g>\x0d\x0a\
-\x00\x00\x013\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><rect x=\x2213\
-\x22 y=\x2213\x22 width=\x22\
-5\x22 height=\x225\x22 rx\
-=\x22.5\x22 fill=\x22curr\
-entColor\x22/></svg\
->\x0a\
-\x00\x00\x01 \
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><path d=\x22M7\
- 15h6\x22/><path d=\
-\x22M15 6l4 4M19 6l\
--4 4\x22/></svg>\x0d\x0a\
-\x00\x00\x012\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><rect x=\x226\x22\
- y=\x2213\x22 width=\x225\
-\x22 height=\x225\x22 rx=\
-\x22.5\x22 fill=\x22curre\
-ntColor\x22/></svg>\
-\x0a\
-\x00\x00\x015\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><rect x=\x229.\
-5\x22 y=\x229.5\x22 width\
-=\x225\x22 height=\x225\x22 \
-rx=\x22.5\x22 fill=\x22cu\
-rrentColor\x22/></s\
-vg>\x0a\
-\x00\x00\x013\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><rect x=\x229.\
-5\x22 y=\x226\x22 width=\x22\
-5\x22 height=\x225\x22 rx\
-=\x22.5\x22 fill=\x22curr\
-entColor\x22/></svg\
->\x0a\
-\x00\x00\x01\x11\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><circle cx=\x22\
-12\x22 cy=\x2212\x22 r=\x227\
-\x22/><circle cx=\x221\
-2\x22 cy=\x2212\x22 r=\x222.\
-5\x22 fill=\x22current\
-Color\x22/></svg>\x0d\x0a\
-\
-\x00\x00\x01\x9d\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><path d=\x22M7\
- 15h6\x22/><circle \
-cx=\x2216\x22 cy=\x227.5\x22\
- r=\x22.6\x22 fill=\x22cu\
-rrentColor\x22/><ci\
-rcle cx=\x2217\x22 cy=\
-\x2216\x22 r=\x22.6\x22 fill\
-=\x22currentColor\x22/\
-><circle cx=\x228\x22 \
-cy=\x2218\x22 r=\x22.6\x22 f\
-ill=\x22currentColo\
-r\x22/></svg>\x0d\x0a\
-\x00\x00\x01B\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><path d=\x22M7\
- 8h4M7 12h4M7 16\
-h10\x22/><rect x=\x221\
-3.5\x22 y=\x227\x22 width\
-=\x224\x22 height=\x225\x22 \
-rx=\x22.5\x22/></svg>\x0d\
-\x0a\
-\x00\x00\x00\xee\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x226\x22 \
-y=\x223\x22 width=\x2212\x22\
- height=\x2218\x22 rx=\
-\x222\x22/></svg>\x0d\x0a\
-\x00\x00\x011\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><rect x=\x226\x22\
- y=\x226\x22 width=\x225\x22\
- height=\x225\x22 rx=\x22\
-.5\x22 fill=\x22curren\
-tColor\x22/></svg>\x0a\
-\
-\x00\x00\x013\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><rect x=\x226\x22\
- y=\x229.5\x22 width=\x22\
-5\x22 height=\x225\x22 rx\
-=\x22.5\x22 fill=\x22curr\
-entColor\x22/></svg\
->\x0a\
-\x00\x00\x01M\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x222\x22 \
-y=\x224\x22 width=\x228\x22 \
-height=\x2216\x22 rx=\x22\
-1.5\x22/><rect x=\x221\
-4\x22 y=\x224\x22 width=\x22\
-8\x22 height=\x2216\x22 r\
-x=\x221.5\x22/><path d\
-=\x22M12 2v20\x22 stro\
-ke-dasharray=\x221 \
-3\x22/></svg>\x0d\x0a\
-\x00\x00\x01\x1f\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x222\x22 \
-y=\x224\x22 width=\x2220\x22\
- height=\x2216\x22 rx=\
-\x222\x22/><path d=\x22M1\
-2 4v16M15.5 9h3M\
-15.5 12h3M15.5 1\
-5h3\x22/></svg>\x0d\x0a\
-\x00\x00\x01\x1c\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x222\x22 \
-y=\x224\x22 width=\x2220\x22\
- height=\x2216\x22 rx=\
-\x222\x22/><path d=\x22M1\
-2 4v16M5.5 9h3M5\
-.5 12h3M5.5 15h3\
-\x22/></svg>\x0d\x0a\
-\x00\x00\x01h\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><rect x=\x226\x22\
- y=\x226\x22 width=\x227\x22\
- height=\x228\x22 rx=\x22\
-1\x22 stroke-dashar\
-ray=\x221.5 2.5\x22/><\
-rect x=\x2210\x22 y=\x229\
-\x22 width=\x227\x22 heig\
-ht=\x228\x22 rx=\x221\x22/><\
-/svg>\x0d\x0a\
-\x00\x00\x013\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><rect x=\x227.\
-5\x22 y=\x227.5\x22 width\
-=\x229\x22 height=\x229\x22 \
-stroke-dasharray\
-=\x222 2.5\x22/></svg>\
-\x0d\x0a\
-\x00\x00\x01\x19\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x224\x22 \
-y=\x223\x22 width=\x2211\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><path d=\x22M1\
-9 4v16\x22 stroke-d\
-asharray=\x222 3\x22/>\
-</svg>\x0d\x0a\
-\x00\x00\x014\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><rect x=\x2213\
-\x22 y=\x229.5\x22 width=\
-\x225\x22 height=\x225\x22 r\
-x=\x22.5\x22 fill=\x22cur\
-rentColor\x22/></sv\
-g>\x0a\
-\x00\x00\x012\
-<\
-svg xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22 width=\x2224\
-\x22 height=\x2224\x22 vi\
-ewBox=\x220 0 24 24\
-\x22 fill=\x22none\x22 st\
-roke=\x22currentCol\
-or\x22 stroke-width\
-=\x222\x22 stroke-line\
-cap=\x22round\x22 stro\
-ke-linejoin=\x22rou\
-nd\x22><rect x=\x223\x22 \
-y=\x223\x22 width=\x2218\x22\
- height=\x2218\x22 rx=\
-\x222\x22/><rect x=\x2213\
-\x22 y=\x226\x22 width=\x225\
-\x22 height=\x225\x22 rx=\
-\x22.5\x22 fill=\x22curre\
-ntColor\x22/></svg>\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-layout-\
+grid\x22\x0a  xmlns=\x22h\
+ttp://www.w3.org\
+/2000/svg\x22\x0a  wid\
+th=\x2224\x22\x0a  height\
+=\x2224\x22\x0a  viewBox=\
+\x220 0 24 24\x22\x0a  fi\
+ll=\x22none\x22\x0a  stro\
+ke=\x22currentColor\
+\x22\x0a  stroke-width\
+=\x222\x22\x0a  stroke-li\
+necap=\x22round\x22\x0a  \
+stroke-linejoin=\
+\x22round\x22\x0a>\x0a  <rec\
+t width=\x227\x22 heig\
+ht=\x227\x22 x=\x223\x22 y=\x22\
+3\x22 rx=\x221\x22 />\x0a  <\
+rect width=\x227\x22 h\
+eight=\x227\x22 x=\x2214\x22\
+ y=\x223\x22 rx=\x221\x22 />\
+\x0a  <rect width=\x22\
+7\x22 height=\x227\x22 x=\
+\x2214\x22 y=\x2214\x22 rx=\x22\
+1\x22 />\x0a  <rect wi\
+dth=\x227\x22 height=\x22\
+7\x22 x=\x223\x22 y=\x2214\x22 \
+rx=\x221\x22 />\x0a</svg>\
 \x0a\
 \x00\x00\x01K\
 <\
@@ -86496,35 +82166,117 @@ linejoin=\x22round\x22\
  12h14\x22 />\x0a  <pa\
 th d=\x22M12 5v14\x22 \
 />\x0a</svg>\x0a\
-\x00\x00\x01\xb9\
+\x00\x00\x01\xc8\
 <\
 !-- @license luc\
 ide-static v1.48\
 .0 - ISC -->\x0a<sv\
 g\x0a  class=\x22lucid\
-e lucide-pentago\
-n\x22\x0a  xmlns=\x22http\
-://www.w3.org/20\
-00/svg\x22\x0a  width=\
-\x2224\x22\x0a  height=\x222\
-4\x22\x0a  viewBox=\x220 \
-0 24 24\x22\x0a  fill=\
-\x22none\x22\x0a  stroke=\
-\x22currentColor\x22\x0a \
- stroke-width=\x222\
-\x22\x0a  stroke-linec\
-ap=\x22round\x22\x0a  str\
-oke-linejoin=\x22ro\
-und\x22\x0a>\x0a  <path d\
-=\x22M10.83 2.38a2 \
-2 0 0 1 2.34 0l8\
- 5.74a2 2 0 0 1 \
-.73 2.25l-3.04 9\
-.26a2 2 0 0 1-1.\
-9 1.37H7.04a2 2 \
-0 0 1-1.9-1.37L2\
-.1 10.37a2 2 0 0\
- 1 .73-2.25z\x22 />\
+e lucide-shrink\x22\
+\x0a  xmlns=\x22http:/\
+/www.w3.org/2000\
+/svg\x22\x0a  width=\x222\
+4\x22\x0a  height=\x2224\x22\
+\x0a  viewBox=\x220 0 \
+24 24\x22\x0a  fill=\x22n\
+one\x22\x0a  stroke=\x22c\
+urrentColor\x22\x0a  s\
+troke-width=\x222\x22\x0a\
+  stroke-linecap\
+=\x22round\x22\x0a  strok\
+e-linejoin=\x22roun\
+d\x22\x0a>\x0a  <path d=\x22\
+m15 15 6 6m-6-6v\
+4.8m0-4.8h4.8\x22 /\
+>\x0a  <path d=\x22M9 \
+19.8V15m0 0H4.2M\
+9 15l-6 6\x22 />\x0a  \
+<path d=\x22M15 4.2\
+V9m0 0h4.8M15 9l\
+6-6\x22 />\x0a  <path \
+d=\x22M9 4.2V9m0 0H\
+4.2M9 9 3 3\x22 />\x0a\
+</svg>\x0a\
+\x00\x00\x01\xa2\
+<\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-archive\
+\x22\x0a  xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22\x0a  width=\x22\
+24\x22\x0a  height=\x2224\
+\x22\x0a  viewBox=\x220 0\
+ 24 24\x22\x0a  fill=\x22\
+none\x22\x0a  stroke=\x22\
+currentColor\x22\x0a  \
+stroke-width=\x222\x22\
+\x0a  stroke-lineca\
+p=\x22round\x22\x0a  stro\
+ke-linejoin=\x22rou\
+nd\x22\x0a>\x0a  <rect wi\
+dth=\x2220\x22 height=\
+\x225\x22 x=\x222\x22 y=\x223\x22 \
+rx=\x221\x22 />\x0a  <pat\
+h d=\x22M4 8v11a2 2\
+ 0 0 0 2 2h12a2 \
+2 0 0 0 2-2V8\x22 /\
+>\x0a  <path d=\x22M10\
+ 12h4\x22 />\x0a</svg>\
+\x0a\
+\x00\x00\x01v\
+<\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-arrow-d\
+own-to-line\x22\x0a  x\
+mlns=\x22http://www\
+.w3.org/2000/svg\
+\x22\x0a  width=\x2224\x22\x0a \
+ height=\x2224\x22\x0a  v\
+iewBox=\x220 0 24 2\
+4\x22\x0a  fill=\x22none\x22\
+\x0a  stroke=\x22curre\
+ntColor\x22\x0a  strok\
+e-width=\x222\x22\x0a  st\
+roke-linecap=\x22ro\
+und\x22\x0a  stroke-li\
+nejoin=\x22round\x22\x0a>\
+\x0a  <path d=\x22M12 \
+17V3\x22 />\x0a  <path\
+ d=\x22m6 11 6 6 6-\
+6\x22 />\x0a  <path d=\
+\x22M19 21H5\x22 />\x0a</\
+svg>\x0a\
+\x00\x00\x01y\
+<\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-circle-\
+stop\x22\x0a  xmlns=\x22h\
+ttp://www.w3.org\
+/2000/svg\x22\x0a  wid\
+th=\x2224\x22\x0a  height\
+=\x2224\x22\x0a  viewBox=\
+\x220 0 24 24\x22\x0a  fi\
+ll=\x22none\x22\x0a  stro\
+ke=\x22currentColor\
+\x22\x0a  stroke-width\
+=\x222\x22\x0a  stroke-li\
+necap=\x22round\x22\x0a  \
+stroke-linejoin=\
+\x22round\x22\x0a>\x0a  <cir\
+cle cx=\x2212\x22 cy=\x22\
+12\x22 r=\x2210\x22 />\x0a  \
+<rect x=\x229\x22 y=\x229\
+\x22 width=\x226\x22 heig\
+ht=\x226\x22 rx=\x221\x22 />\
 \x0a</svg>\x0a\
 \x00\x00\x01\x97\
 <\
@@ -86582,55 +82334,110 @@ x=\x223\x22 y=\x223\x22 rx=\x22\
 path d=\x22m12 16 4\
 -4-4-4\x22 />\x0a</svg\
 >\x0a\
-\x00\x00\x01o\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-panel-r\
-ight\x22\x0a  xmlns=\x22h\
-ttp://www.w3.org\
-/2000/svg\x22\x0a  wid\
-th=\x2224\x22\x0a  height\
-=\x2224\x22\x0a  viewBox=\
-\x220 0 24 24\x22\x0a  fi\
-ll=\x22none\x22\x0a  stro\
-ke=\x22currentColor\
-\x22\x0a  stroke-width\
-=\x222\x22\x0a  stroke-li\
-necap=\x22round\x22\x0a  \
-stroke-linejoin=\
-\x22round\x22\x0a>\x0a  <rec\
-t width=\x2218\x22 hei\
-ght=\x2218\x22 x=\x223\x22 y\
-=\x223\x22 rx=\x222\x22 />\x0a \
- <path d=\x22M15 3v\
-18\x22 />\x0a</svg>\x0a\
-\x00\x00\x01Z\
+\x00\x00\x01\xc1\
 <\
 !-- @license luc\
 ide-static v1.48\
 .0 - ISC -->\x0a<sv\
 g\x0a  class=\x22lucid\
 e lucide-arrow-d\
-own-left\x22\x0a  xmln\
-s=\x22http://www.w3\
-.org/2000/svg\x22\x0a \
- width=\x2224\x22\x0a  he\
-ight=\x2224\x22\x0a  view\
-Box=\x220 0 24 24\x22\x0a\
-  fill=\x22none\x22\x0a  \
-stroke=\x22currentC\
-olor\x22\x0a  stroke-w\
-idth=\x222\x22\x0a  strok\
-e-linecap=\x22round\
-\x22\x0a  stroke-linej\
-oin=\x22round\x22\x0a>\x0a  \
-<path d=\x22M17 7 7\
- 17\x22 />\x0a  <path \
-d=\x22M17 17H7V7\x22 /\
->\x0a</svg>\x0a\
+own-1-0\x22\x0a  xmlns\
+=\x22http://www.w3.\
+org/2000/svg\x22\x0a  \
+width=\x2224\x22\x0a  hei\
+ght=\x2224\x22\x0a  viewB\
+ox=\x220 0 24 24\x22\x0a \
+ fill=\x22none\x22\x0a  s\
+troke=\x22currentCo\
+lor\x22\x0a  stroke-wi\
+dth=\x222\x22\x0a  stroke\
+-linecap=\x22round\x22\
+\x0a  stroke-linejo\
+in=\x22round\x22\x0a>\x0a  <\
+path d=\x22m3 16 4 \
+4 4-4\x22 />\x0a  <pat\
+h d=\x22M7 20V4\x22 />\
+\x0a  <path d=\x22M17 \
+10V4h-2\x22 />\x0a  <p\
+ath d=\x22M15 10h4\x22\
+ />\x0a  <rect x=\x221\
+5\x22 y=\x2214\x22 width=\
+\x224\x22 height=\x226\x22 r\
+y=\x222\x22 />\x0a</svg>\x0a\
+\
+\x00\x00\x01t\
+<\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-arrow-u\
+p-to-line\x22\x0a  xml\
+ns=\x22http://www.w\
+3.org/2000/svg\x22\x0a\
+  width=\x2224\x22\x0a  h\
+eight=\x2224\x22\x0a  vie\
+wBox=\x220 0 24 24\x22\
+\x0a  fill=\x22none\x22\x0a \
+ stroke=\x22current\
+Color\x22\x0a  stroke-\
+width=\x222\x22\x0a  stro\
+ke-linecap=\x22roun\
+d\x22\x0a  stroke-line\
+join=\x22round\x22\x0a>\x0a \
+ <path d=\x22M5 3h1\
+4\x22 />\x0a  <path d=\
+\x22m18 13-6-6-6 6\x22\
+ />\x0a  <path d=\x22M\
+12 7v14\x22 />\x0a</sv\
+g>\x0a\
+\x00\x00\x02\xc1\
+<\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-paint-b\
+ucket\x22\x0a  xmlns=\x22\
+http://www.w3.or\
+g/2000/svg\x22\x0a  wi\
+dth=\x2224\x22\x0a  heigh\
+t=\x2224\x22\x0a  viewBox\
+=\x220 0 24 24\x22\x0a  f\
+ill=\x22none\x22\x0a  str\
+oke=\x22currentColo\
+r\x22\x0a  stroke-widt\
+h=\x222\x22\x0a  stroke-l\
+inecap=\x22round\x22\x0a \
+ stroke-linejoin\
+=\x22round\x22\x0a>\x0a  <pa\
+th d=\x22M11 7 6 2\x22\
+ />\x0a  <path d=\x22M\
+18.992 12H2.041\x22\
+ />\x0a  <path d=\x22M\
+21.145 18.38A3.3\
+4 3.34 0 0 1 20 \
+16.5a3.3 3.3 0 0\
+ 1-1.145 1.88c-.\
+575.46-.855 1.02\
+-.855 1.595A2 2 \
+0 0 0 20 22a2 2 \
+0 0 0 2-2.025c0-\
+.58-.285-1.13-.8\
+55-1.595\x22 />\x0a  <\
+path d=\x22m8.5 4.5\
+ 2.148-2.148a1.2\
+05 1.205 0 0 1 1\
+.704 0l7.296 7.2\
+96a1.205 1.205 0\
+ 0 1 0 1.704l-7.\
+592 7.592a3.615 \
+3.615 0 0 1-5.11\
+2 0l-3.888-3.888\
+a3.615 3.615 0 0\
+ 1 0-5.112L5.67 \
+7.33\x22 />\x0a</svg>\x0a\
+\
 \x00\x00\x01}\
 <\
 !-- @license luc\
@@ -86657,36 +82464,6 @@ linejoin=\x22round\x22\
 .003 3.458l-12 7\
 A2 2 0 0 1 5 19z\
 \x22 />\x0a</svg>\x0a\
-\x00\x00\x01\xb4\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-between\
--horizontal-star\
-t\x22\x0a  xmlns=\x22http\
-://www.w3.org/20\
-00/svg\x22\x0a  width=\
-\x2224\x22\x0a  height=\x222\
-4\x22\x0a  viewBox=\x220 \
-0 24 24\x22\x0a  fill=\
-\x22none\x22\x0a  stroke=\
-\x22currentColor\x22\x0a \
- stroke-width=\x222\
-\x22\x0a  stroke-linec\
-ap=\x22round\x22\x0a  str\
-oke-linejoin=\x22ro\
-und\x22\x0a>\x0a  <rect w\
-idth=\x2213\x22 height\
-=\x227\x22 x=\x228\x22 y=\x223\x22\
- rx=\x221\x22 />\x0a  <pa\
-th d=\x22m2 9 3 3-3\
- 3\x22 />\x0a  <rect w\
-idth=\x2213\x22 height\
-=\x227\x22 x=\x228\x22 y=\x2214\
-\x22 rx=\x221\x22 />\x0a</sv\
-g>\x0a\
 \x00\x00\x01\xa2\
 <\
 !-- @license luc\
@@ -86716,31 +82493,106 @@ h d=\x22M13 5h8\x22 />\
 <path d=\x22m3 7 2 \
 2 4-4\x22 />\x0a</svg>\
 \x0a\
-\x00\x00\x01m\
+\x00\x00\x01\xc0\
 <\
 !-- @license luc\
 ide-static v1.48\
 .0 - ISC -->\x0a<sv\
 g\x0a  class=\x22lucid\
-e lucide-panel-l\
-eft\x22\x0a  xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22\x0a  widt\
-h=\x2224\x22\x0a  height=\
-\x2224\x22\x0a  viewBox=\x22\
-0 0 24 24\x22\x0a  fil\
-l=\x22none\x22\x0a  strok\
-e=\x22currentColor\x22\
-\x0a  stroke-width=\
-\x222\x22\x0a  stroke-lin\
-ecap=\x22round\x22\x0a  s\
-troke-linejoin=\x22\
-round\x22\x0a>\x0a  <rect\
- width=\x2218\x22 heig\
-ht=\x2218\x22 x=\x223\x22 y=\
-\x223\x22 rx=\x222\x22 />\x0a  \
-<path d=\x22M9 3v18\
-\x22 />\x0a</svg>\x0a\
+e lucide-file\x22\x0a \
+ xmlns=\x22http://w\
+ww.w3.org/2000/s\
+vg\x22\x0a  width=\x2224\x22\
+\x0a  height=\x2224\x22\x0a \
+ viewBox=\x220 0 24\
+ 24\x22\x0a  fill=\x22non\
+e\x22\x0a  stroke=\x22cur\
+rentColor\x22\x0a  str\
+oke-width=\x222\x22\x0a  \
+stroke-linecap=\x22\
+round\x22\x0a  stroke-\
+linejoin=\x22round\x22\
+\x0a>\x0a  <path d=\x22M6\
+ 22a2 2 0 0 1-2-\
+2V4a2 2 0 0 1 2-\
+2h8a2.4 2.4 0 0 \
+1 1.704.706l3.58\
+8 3.588A2.4 2.4 \
+0 0 1 20 8v12a2 \
+2 0 0 1-2 2z\x22 />\
+\x0a  <path d=\x22M14 \
+2v5a1 1 0 0 0 1 \
+1h5\x22 />\x0a</svg>\x0a\
+\x00\x00\x02e\
+<\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-wand-sp\
+arkles\x22\x0a  xmlns=\
+\x22http://www.w3.o\
+rg/2000/svg\x22\x0a  w\
+idth=\x2224\x22\x0a  heig\
+ht=\x2224\x22\x0a  viewBo\
+x=\x220 0 24 24\x22\x0a  \
+fill=\x22none\x22\x0a  st\
+roke=\x22currentCol\
+or\x22\x0a  stroke-wid\
+th=\x222\x22\x0a  stroke-\
+linecap=\x22round\x22\x0a\
+  stroke-linejoi\
+n=\x22round\x22\x0a>\x0a  <p\
+ath d=\x22m21.64 3.\
+64-1.28-1.28a1.2\
+1 1.21 0 0 0-1.7\
+2 0L2.36 18.64a1\
+.21 1.21 0 0 0 0\
+ 1.72l1.28 1.28a\
+1.2 1.2 0 0 0 1.\
+72 0L21.64 5.36a\
+1.2 1.2 0 0 0 0-\
+1.72\x22 />\x0a  <path\
+ d=\x22m14 7 3 3\x22 /\
+>\x0a  <path d=\x22M5 \
+6v4\x22 />\x0a  <path \
+d=\x22M19 14v4\x22 />\x0a\
+  <path d=\x22M10 2\
+v2\x22 />\x0a  <path d\
+=\x22M7 8H3\x22 />\x0a  <\
+path d=\x22M21 16h-\
+4\x22 />\x0a  <path d=\
+\x22M11 3H9\x22 />\x0a</s\
+vg>\x0a\
+\x00\x00\x01\xa3\
+<\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-folder\x22\
+\x0a  xmlns=\x22http:/\
+/www.w3.org/2000\
+/svg\x22\x0a  width=\x222\
+4\x22\x0a  height=\x2224\x22\
+\x0a  viewBox=\x220 0 \
+24 24\x22\x0a  fill=\x22n\
+one\x22\x0a  stroke=\x22c\
+urrentColor\x22\x0a  s\
+troke-width=\x222\x22\x0a\
+  stroke-linecap\
+=\x22round\x22\x0a  strok\
+e-linejoin=\x22roun\
+d\x22\x0a>\x0a  <path d=\x22\
+M20 20a2 2 0 0 0\
+ 2-2V8a2 2 0 0 0\
+-2-2h-7.9a2 2 0 \
+0 1-1.69-.9L9.6 \
+3.9A2 2 0 0 0 7.\
+93 3H4a2 2 0 0 0\
+-2 2v13a2 2 0 0 \
+0 2 2Z\x22 />\x0a</svg\
+>\x0a\
 \x00\x00\x02\x89\
 <\
 !-- @license luc\
@@ -86836,43 +82688,6 @@ join=\x22round\x22\x0a>\x0a \
 2-2V7a2 2 0 0 0-\
 2-2h-2\x22 />\x0a</svg\
 >\x0a\
-\x00\x00\x02(\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-file-im\
-age\x22\x0a  xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22\x0a  widt\
-h=\x2224\x22\x0a  height=\
-\x2224\x22\x0a  viewBox=\x22\
-0 0 24 24\x22\x0a  fil\
-l=\x22none\x22\x0a  strok\
-e=\x22currentColor\x22\
-\x0a  stroke-width=\
-\x222\x22\x0a  stroke-lin\
-ecap=\x22round\x22\x0a  s\
-troke-linejoin=\x22\
-round\x22\x0a>\x0a  <path\
- d=\x22M6 22a2 2 0 \
-0 1-2-2V4a2 2 0 \
-0 1 2-2h8a2.4 2.\
-4 0 0 1 1.704.70\
-6l3.588 3.588A2.\
-4 2.4 0 0 1 20 8\
-v12a2 2 0 0 1-2 \
-2z\x22 />\x0a  <path d\
-=\x22M14 2v5a1 1 0 \
-0 0 1 1h5\x22 />\x0a  \
-<circle cx=\x2210\x22 \
-cy=\x2212\x22 r=\x222\x22 />\
-\x0a  <path d=\x22m20 \
-17-1.296-1.296a2\
-.41 2.41 0 0 0-3\
-.408 0L9 22\x22 />\x0a\
-</svg>\x0a\
 \x00\x00\x01\x97\
 <\
 !-- @license luc\
@@ -86901,6 +82716,31 @@ ath d=\x22M15 7h2a5\
 \x228\x22 x2=\x2216\x22 y1=\x22\
 12\x22 y2=\x2212\x22 />\x0a<\
 /svg>\x0a\
+\x00\x00\x01l\
+<\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-contras\
+t\x22\x0a  xmlns=\x22http\
+://www.w3.org/20\
+00/svg\x22\x0a  width=\
+\x2224\x22\x0a  height=\x222\
+4\x22\x0a  viewBox=\x220 \
+0 24 24\x22\x0a  fill=\
+\x22none\x22\x0a  stroke=\
+\x22currentColor\x22\x0a \
+ stroke-width=\x222\
+\x22\x0a  stroke-linec\
+ap=\x22round\x22\x0a  str\
+oke-linejoin=\x22ro\
+und\x22\x0a>\x0a  <circle\
+ cx=\x2212\x22 cy=\x2212\x22\
+ r=\x2210\x22 />\x0a  <pa\
+th d=\x22M12 18a6 6\
+ 0 0 0 0-12v12z\x22\
+ />\x0a</svg>\x0a\
 \x00\x00\x02h\
 <\
 !-- @license luc\
@@ -86942,54 +82782,90 @@ h d=\x22M21 9v1\x22 />\
 4v1\x22 />\x0a  <path \
 d=\x22M21 14v1\x22 />\x0a\
 </svg>\x0a\
-\x00\x00\x01h\
+\x00\x00\x01\xc6\
 <\
 !-- @license luc\
 ide-static v1.48\
 .0 - ISC -->\x0a<sv\
 g\x0a  class=\x22lucid\
-e lucide-circle-\
-dot\x22\x0a  xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22\x0a  widt\
-h=\x2224\x22\x0a  height=\
-\x2224\x22\x0a  viewBox=\x22\
-0 0 24 24\x22\x0a  fil\
-l=\x22none\x22\x0a  strok\
-e=\x22currentColor\x22\
-\x0a  stroke-width=\
-\x222\x22\x0a  stroke-lin\
-ecap=\x22round\x22\x0a  s\
-troke-linejoin=\x22\
-round\x22\x0a>\x0a  <circ\
-le cx=\x2212\x22 cy=\x221\
-2\x22 r=\x221\x22 />\x0a  <c\
-ircle cx=\x2212\x22 cy\
-=\x2212\x22 r=\x2210\x22 />\x0a\
-</svg>\x0a\
-\x00\x00\x01R\
+e lucide-zoom-in\
+\x22\x0a  xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22\x0a  width=\x22\
+24\x22\x0a  height=\x2224\
+\x22\x0a  viewBox=\x220 0\
+ 24 24\x22\x0a  fill=\x22\
+none\x22\x0a  stroke=\x22\
+currentColor\x22\x0a  \
+stroke-width=\x222\x22\
+\x0a  stroke-lineca\
+p=\x22round\x22\x0a  stro\
+ke-linejoin=\x22rou\
+nd\x22\x0a>\x0a  <circle \
+cx=\x2211\x22 cy=\x2211\x22 \
+r=\x228\x22 />\x0a  <line\
+ x1=\x2221\x22 x2=\x2216.\
+65\x22 y1=\x2221\x22 y2=\x22\
+16.65\x22 />\x0a  <lin\
+e x1=\x2211\x22 x2=\x2211\
+\x22 y1=\x228\x22 y2=\x2214\x22\
+ />\x0a  <line x1=\x22\
+8\x22 x2=\x2214\x22 y1=\x221\
+1\x22 y2=\x2211\x22 />\x0a</\
+svg>\x0a\
+\x00\x00\x01T\
 <\
 !-- @license luc\
 ide-static v1.48\
 .0 - ISC -->\x0a<sv\
 g\x0a  class=\x22lucid\
-e lucide-square\x22\
-\x0a  xmlns=\x22http:/\
-/www.w3.org/2000\
-/svg\x22\x0a  width=\x222\
-4\x22\x0a  height=\x2224\x22\
-\x0a  viewBox=\x220 0 \
-24 24\x22\x0a  fill=\x22n\
-one\x22\x0a  stroke=\x22c\
-urrentColor\x22\x0a  s\
-troke-width=\x222\x22\x0a\
-  stroke-linecap\
-=\x22round\x22\x0a  strok\
-e-linejoin=\x22roun\
-d\x22\x0a>\x0a  <rect wid\
-th=\x2218\x22 height=\x22\
-18\x22 x=\x223\x22 y=\x223\x22 \
-rx=\x222\x22 />\x0a</svg>\
+e lucide-arrow-u\
+p\x22\x0a  xmlns=\x22http\
+://www.w3.org/20\
+00/svg\x22\x0a  width=\
+\x2224\x22\x0a  height=\x222\
+4\x22\x0a  viewBox=\x220 \
+0 24 24\x22\x0a  fill=\
+\x22none\x22\x0a  stroke=\
+\x22currentColor\x22\x0a \
+ stroke-width=\x222\
+\x22\x0a  stroke-linec\
+ap=\x22round\x22\x0a  str\
+oke-linejoin=\x22ro\
+und\x22\x0a>\x0a  <path d\
+=\x22m5 12 7-7 7 7\x22\
+ />\x0a  <path d=\x22M\
+12 19V5\x22 />\x0a</sv\
+g>\x0a\
+\x00\x00\x01\xb2\
+<\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-eye\x22\x0a  \
+xmlns=\x22http://ww\
+w.w3.org/2000/sv\
+g\x22\x0a  width=\x2224\x22\x0a\
+  height=\x2224\x22\x0a  \
+viewBox=\x220 0 24 \
+24\x22\x0a  fill=\x22none\
+\x22\x0a  stroke=\x22curr\
+entColor\x22\x0a  stro\
+ke-width=\x222\x22\x0a  s\
+troke-linecap=\x22r\
+ound\x22\x0a  stroke-l\
+inejoin=\x22round\x22\x0a\
+>\x0a  <path d=\x22M2.\
+062 12.348a1 1 0\
+ 0 1 0-.696 10.7\
+5 10.75 0 0 1 19\
+.876 0 1 1 0 0 1\
+ 0 .696 10.75 10\
+.75 0 0 1-19.876\
+ 0\x22 />\x0a  <circle\
+ cx=\x2212\x22 cy=\x2212\x22\
+ r=\x223\x22 />\x0a</svg>\
 \x0a\
 \x00\x00\x01?\
 <\
@@ -87076,36 +82952,6 @@ round\x22\x0a>\x0a  <path\
 \x0a  <path d=\x22m19 \
 12-7 7-7-7\x22 />\x0a<\
 /svg>\x0a\
-\x00\x00\x01\xbe\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-move\x22\x0a \
- xmlns=\x22http://w\
-ww.w3.org/2000/s\
-vg\x22\x0a  width=\x2224\x22\
-\x0a  height=\x2224\x22\x0a \
- viewBox=\x220 0 24\
- 24\x22\x0a  fill=\x22non\
-e\x22\x0a  stroke=\x22cur\
-rentColor\x22\x0a  str\
-oke-width=\x222\x22\x0a  \
-stroke-linecap=\x22\
-round\x22\x0a  stroke-\
-linejoin=\x22round\x22\
-\x0a>\x0a  <path d=\x22M1\
-2 2v20\x22 />\x0a  <pa\
-th d=\x22m15 19-3 3\
--3-3\x22 />\x0a  <path\
- d=\x22m19 9 3 3-3 \
-3\x22 />\x0a  <path d=\
-\x22M2 12h20\x22 />\x0a  \
-<path d=\x22m5 9-3 \
-3 3 3\x22 />\x0a  <pat\
-h d=\x22m9 5 3-3 3 \
-3\x22 />\x0a</svg>\x0a\
 \x00\x00\x0c\x88\
 I\
 SC License\x0a\x0aCopy\
@@ -87336,81 +83182,95 @@ ejoin=\x22round\x22\x0a>\x0a\
 \x0a  <path d=\x22M16 \
 12H8\x22 />\x0a</svg>\x0a\
 \
-\x00\x00\x01\xb9\
+\x00\x00\x01\xdf\
 <\
 !-- @license luc\
 ide-static v1.48\
 .0 - ISC -->\x0a<sv\
 g\x0a  class=\x22lucid\
-e lucide-scan\x22\x0a \
- xmlns=\x22http://w\
-ww.w3.org/2000/s\
-vg\x22\x0a  width=\x2224\x22\
-\x0a  height=\x2224\x22\x0a \
- viewBox=\x220 0 24\
- 24\x22\x0a  fill=\x22non\
-e\x22\x0a  stroke=\x22cur\
-rentColor\x22\x0a  str\
-oke-width=\x222\x22\x0a  \
-stroke-linecap=\x22\
-round\x22\x0a  stroke-\
-linejoin=\x22round\x22\
-\x0a>\x0a  <path d=\x22M3\
- 7V5a2 2 0 0 1 2\
--2h2\x22 />\x0a  <path\
- d=\x22M17 3h2a2 2 \
-0 0 1 2 2v2\x22 />\x0a\
-  <path d=\x22M21 1\
-7v2a2 2 0 0 1-2 \
-2h-2\x22 />\x0a  <path\
- d=\x22M7 21H5a2 2 \
-0 0 1-2-2v-2\x22 />\
-\x0a</svg>\x0a\
-\x00\x00\x01L\
+e lucide-archive\
+-restore\x22\x0a  xmln\
+s=\x22http://www.w3\
+.org/2000/svg\x22\x0a \
+ width=\x2224\x22\x0a  he\
+ight=\x2224\x22\x0a  view\
+Box=\x220 0 24 24\x22\x0a\
+  fill=\x22none\x22\x0a  \
+stroke=\x22currentC\
+olor\x22\x0a  stroke-w\
+idth=\x222\x22\x0a  strok\
+e-linecap=\x22round\
+\x22\x0a  stroke-linej\
+oin=\x22round\x22\x0a>\x0a  \
+<rect width=\x2220\x22\
+ height=\x225\x22 x=\x222\
+\x22 y=\x223\x22 rx=\x221\x22 /\
+>\x0a  <path d=\x22M4 \
+8v11a2 2 0 0 0 2\
+ 2h2\x22 />\x0a  <path\
+ d=\x22M20 8v11a2 2\
+ 0 0 1-2 2h-2\x22 /\
+>\x0a  <path d=\x22m9 \
+15 3-3 3 3\x22 />\x0a \
+ <path d=\x22M12 12\
+v9\x22 />\x0a</svg>\x0a\
+\x00\x00\x01\xb2\
 <\
 !-- @license luc\
 ide-static v1.48\
 .0 - ISC -->\x0a<sv\
 g\x0a  class=\x22lucid\
-e lucide-x\x22\x0a  xm\
-lns=\x22http://www.\
-w3.org/2000/svg\x22\
-\x0a  width=\x2224\x22\x0a  \
-height=\x2224\x22\x0a  vi\
-ewBox=\x220 0 24 24\
-\x22\x0a  fill=\x22none\x22\x0a\
-  stroke=\x22curren\
-tColor\x22\x0a  stroke\
--width=\x222\x22\x0a  str\
-oke-linecap=\x22rou\
-nd\x22\x0a  stroke-lin\
-ejoin=\x22round\x22\x0a>\x0a\
-  <path d=\x22M18 6\
- 6 18\x22 />\x0a  <pat\
-h d=\x22m6 6 12 12\x22\
- />\x0a</svg>\x0a\
-\x00\x00\x01=\
+e lucide-image\x22\x0a\
+  xmlns=\x22http://\
+www.w3.org/2000/\
+svg\x22\x0a  width=\x2224\
+\x22\x0a  height=\x2224\x22\x0a\
+  viewBox=\x220 0 2\
+4 24\x22\x0a  fill=\x22no\
+ne\x22\x0a  stroke=\x22cu\
+rrentColor\x22\x0a  st\
+roke-width=\x222\x22\x0a \
+ stroke-linecap=\
+\x22round\x22\x0a  stroke\
+-linejoin=\x22round\
+\x22\x0a>\x0a  <rect widt\
+h=\x2218\x22 height=\x221\
+8\x22 x=\x223\x22 y=\x223\x22 r\
+x=\x222\x22 ry=\x222\x22 />\x0a\
+  <circle cx=\x229\x22\
+ cy=\x229\x22 r=\x222\x22 />\
+\x0a  <path d=\x22m21 \
+15-3.086-3.086a2\
+ 2 0 0 0-2.828 0\
+L6 21\x22 />\x0a</svg>\
+\x0a\
+\x00\x00\x01\x82\
 <\
 !-- @license luc\
 ide-static v1.48\
 .0 - ISC -->\x0a<sv\
 g\x0a  class=\x22lucid\
-e lucide-dot\x22\x0a  \
-xmlns=\x22http://ww\
-w.w3.org/2000/sv\
-g\x22\x0a  width=\x2224\x22\x0a\
-  height=\x2224\x22\x0a  \
-viewBox=\x220 0 24 \
-24\x22\x0a  fill=\x22none\
-\x22\x0a  stroke=\x22curr\
-entColor\x22\x0a  stro\
-ke-width=\x222\x22\x0a  s\
-troke-linecap=\x22r\
-ound\x22\x0a  stroke-l\
-inejoin=\x22round\x22\x0a\
->\x0a  <circle cx=\x22\
-12\x22 cy=\x2212\x22 r=\x221\
-\x22 />\x0a</svg>\x0a\
+e lucide-undo-2\x22\
+\x0a  xmlns=\x22http:/\
+/www.w3.org/2000\
+/svg\x22\x0a  width=\x222\
+4\x22\x0a  height=\x2224\x22\
+\x0a  viewBox=\x220 0 \
+24 24\x22\x0a  fill=\x22n\
+one\x22\x0a  stroke=\x22c\
+urrentColor\x22\x0a  s\
+troke-width=\x222\x22\x0a\
+  stroke-linecap\
+=\x22round\x22\x0a  strok\
+e-linejoin=\x22roun\
+d\x22\x0a>\x0a  <path d=\x22\
+M9 14 4 9l5-5\x22 /\
+>\x0a  <path d=\x22M4 \
+9h10.5a5.5 5.5 0\
+ 0 1 5.5 5.5a5.5\
+ 5.5 0 0 1-5.5 5\
+.5H11\x22 />\x0a</svg>\
+\x0a\
 \x00\x00\x01\x99\
 <\
 !-- @license luc\
@@ -87439,60 +83299,91 @@ d=\x22M7 22a5 5 0 0\
  <circle cx=\x225\x22 \
 cy=\x2216\x22 r=\x222\x22 />\
 \x0a</svg>\x0a\
-\x00\x00\x01Y\
+\x00\x00\x01\x82\
 <\
 !-- @license luc\
 ide-static v1.48\
 .0 - ISC -->\x0a<sv\
 g\x0a  class=\x22lucid\
-e lucide-arrow-u\
-p-right\x22\x0a  xmlns\
-=\x22http://www.w3.\
-org/2000/svg\x22\x0a  \
-width=\x2224\x22\x0a  hei\
-ght=\x2224\x22\x0a  viewB\
-ox=\x220 0 24 24\x22\x0a \
- fill=\x22none\x22\x0a  s\
-troke=\x22currentCo\
-lor\x22\x0a  stroke-wi\
-dth=\x222\x22\x0a  stroke\
--linecap=\x22round\x22\
-\x0a  stroke-linejo\
-in=\x22round\x22\x0a>\x0a  <\
-path d=\x22M7 7h10v\
-10\x22 />\x0a  <path d\
-=\x22M7 17 17 7\x22 />\
-\x0a</svg>\x0a\
-\x00\x00\x01\xb2\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-grid-3x\
-3\x22\x0a  xmlns=\x22http\
-://www.w3.org/20\
-00/svg\x22\x0a  width=\
-\x2224\x22\x0a  height=\x222\
-4\x22\x0a  viewBox=\x220 \
-0 24 24\x22\x0a  fill=\
-\x22none\x22\x0a  stroke=\
-\x22currentColor\x22\x0a \
- stroke-width=\x222\
-\x22\x0a  stroke-linec\
-ap=\x22round\x22\x0a  str\
-oke-linejoin=\x22ro\
-und\x22\x0a>\x0a  <rect w\
-idth=\x2218\x22 height\
-=\x2218\x22 x=\x223\x22 y=\x223\
-\x22 rx=\x222\x22 />\x0a  <p\
-ath d=\x22M3 9h18\x22 \
-/>\x0a  <path d=\x22M3\
- 15h18\x22 />\x0a  <pa\
-th d=\x22M9 3v18\x22 /\
->\x0a  <path d=\x22M15\
- 3v18\x22 />\x0a</svg>\
+e lucide-circle-\
+arrow-right\x22\x0a  x\
+mlns=\x22http://www\
+.w3.org/2000/svg\
+\x22\x0a  width=\x2224\x22\x0a \
+ height=\x2224\x22\x0a  v\
+iewBox=\x220 0 24 2\
+4\x22\x0a  fill=\x22none\x22\
+\x0a  stroke=\x22curre\
+ntColor\x22\x0a  strok\
+e-width=\x222\x22\x0a  st\
+roke-linecap=\x22ro\
+und\x22\x0a  stroke-li\
+nejoin=\x22round\x22\x0a>\
+\x0a  <circle cx=\x221\
+2\x22 cy=\x2212\x22 r=\x2210\
+\x22 />\x0a  <path d=\x22\
+m12 16 4-4-4-4\x22 \
+/>\x0a  <path d=\x22M8\
+ 12h8\x22 />\x0a</svg>\
 \x0a\
+\x00\x00\x01\xd3\
+<\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-trash-2\
+\x22\x0a  xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22\x0a  width=\x22\
+24\x22\x0a  height=\x2224\
+\x22\x0a  viewBox=\x220 0\
+ 24 24\x22\x0a  fill=\x22\
+none\x22\x0a  stroke=\x22\
+currentColor\x22\x0a  \
+stroke-width=\x222\x22\
+\x0a  stroke-lineca\
+p=\x22round\x22\x0a  stro\
+ke-linejoin=\x22rou\
+nd\x22\x0a>\x0a  <path d=\
+\x22M10 11v6\x22 />\x0a  \
+<path d=\x22M14 11v\
+6\x22 />\x0a  <path d=\
+\x22M19 6v14a2 2 0 \
+0 1-2 2H7a2 2 0 \
+0 1-2-2V6\x22 />\x0a  \
+<path d=\x22M3 6h18\
+\x22 />\x0a  <path d=\x22\
+M8 6V4a2 2 0 0 1\
+ 2-2h4a2 2 0 0 1\
+ 2 2v2\x22 />\x0a</svg\
+>\x0a\
+\x00\x00\x01u\
+<\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-arrow-l\
+eft-to-line\x22\x0a  x\
+mlns=\x22http://www\
+.w3.org/2000/svg\
+\x22\x0a  width=\x2224\x22\x0a \
+ height=\x2224\x22\x0a  v\
+iewBox=\x220 0 24 2\
+4\x22\x0a  fill=\x22none\x22\
+\x0a  stroke=\x22curre\
+ntColor\x22\x0a  strok\
+e-width=\x222\x22\x0a  st\
+roke-linecap=\x22ro\
+und\x22\x0a  stroke-li\
+nejoin=\x22round\x22\x0a>\
+\x0a  <path d=\x22M3 1\
+9V5\x22 />\x0a  <path \
+d=\x22m13 6-6 6 6 6\
+\x22 />\x0a  <path d=\x22\
+M7 12h14\x22 />\x0a</s\
+vg>\x0a\
 \x00\x00\x01A\
 <\
 !-- @license luc\
@@ -87515,6 +83406,33 @@ linecap=\x22round\x22\x0a\
 n=\x22round\x22\x0a>\x0a  <p\
 ath d=\x22m9 18 6-6\
 -6-6\x22 />\x0a</svg>\x0a\
+\
+\x00\x00\x01\x81\
+<\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-rows-3\x22\
+\x0a  xmlns=\x22http:/\
+/www.w3.org/2000\
+/svg\x22\x0a  width=\x222\
+4\x22\x0a  height=\x2224\x22\
+\x0a  viewBox=\x220 0 \
+24 24\x22\x0a  fill=\x22n\
+one\x22\x0a  stroke=\x22c\
+urrentColor\x22\x0a  s\
+troke-width=\x222\x22\x0a\
+  stroke-linecap\
+=\x22round\x22\x0a  strok\
+e-linejoin=\x22roun\
+d\x22\x0a>\x0a  <rect wid\
+th=\x2218\x22 height=\x22\
+18\x22 x=\x223\x22 y=\x223\x22 \
+rx=\x222\x22 />\x0a  <pat\
+h d=\x22M21 9H3\x22 />\
+\x0a  <path d=\x22M21 \
+15H3\x22 />\x0a</svg>\x0a\
 \
 \x00\x00\x01\xbe\
 <\
@@ -87546,6 +83464,28 @@ a5 5 0 0 1 4 8\x22 \
 line x1=\x222\x22 x2=\x22\
 22\x22 y1=\x222\x22 y2=\x222\
 2\x22 />\x0a</svg>\x0a\
+\x00\x00\x014\
+<\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-minus\x22\x0a\
+  xmlns=\x22http://\
+www.w3.org/2000/\
+svg\x22\x0a  width=\x2224\
+\x22\x0a  height=\x2224\x22\x0a\
+  viewBox=\x220 0 2\
+4 24\x22\x0a  fill=\x22no\
+ne\x22\x0a  stroke=\x22cu\
+rrentColor\x22\x0a  st\
+roke-width=\x222\x22\x0a \
+ stroke-linecap=\
+\x22round\x22\x0a  stroke\
+-linejoin=\x22round\
+\x22\x0a>\x0a  <path d=\x22M\
+5 12h14\x22 />\x0a</sv\
+g>\x0a\
 \x00\x00\x01\xd3\
 <\
 !-- @license luc\
@@ -87635,923 +83575,6 @@ M17 20v-6h-2\x22 />\
 \x0a  <path d=\x22M15 \
 20h4\x22 />\x0a</svg>\x0a\
 \
-\x00\x00\x01X\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-arrow-u\
-p-left\x22\x0a  xmlns=\
-\x22http://www.w3.o\
-rg/2000/svg\x22\x0a  w\
-idth=\x2224\x22\x0a  heig\
-ht=\x2224\x22\x0a  viewBo\
-x=\x220 0 24 24\x22\x0a  \
-fill=\x22none\x22\x0a  st\
-roke=\x22currentCol\
-or\x22\x0a  stroke-wid\
-th=\x222\x22\x0a  stroke-\
-linecap=\x22round\x22\x0a\
-  stroke-linejoi\
-n=\x22round\x22\x0a>\x0a  <p\
-ath d=\x22M7 17V7h1\
-0\x22 />\x0a  <path d=\
-\x22M17 17 7 7\x22 />\x0a\
-</svg>\x0a\
-\x00\x00\x01W\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-arrow-r\
-ight\x22\x0a  xmlns=\x22h\
-ttp://www.w3.org\
-/2000/svg\x22\x0a  wid\
-th=\x2224\x22\x0a  height\
-=\x2224\x22\x0a  viewBox=\
-\x220 0 24 24\x22\x0a  fi\
-ll=\x22none\x22\x0a  stro\
-ke=\x22currentColor\
-\x22\x0a  stroke-width\
-=\x222\x22\x0a  stroke-li\
-necap=\x22round\x22\x0a  \
-stroke-linejoin=\
-\x22round\x22\x0a>\x0a  <pat\
-h d=\x22M5 12h14\x22 /\
->\x0a  <path d=\x22m12\
- 5 7 7-7 7\x22 />\x0a<\
-/svg>\x0a\
-\x00\x00\x01W\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-arrow-l\
-eft\x22\x0a  xmlns=\x22ht\
-tp://www.w3.org/\
-2000/svg\x22\x0a  widt\
-h=\x2224\x22\x0a  height=\
-\x2224\x22\x0a  viewBox=\x22\
-0 0 24 24\x22\x0a  fil\
-l=\x22none\x22\x0a  strok\
-e=\x22currentColor\x22\
-\x0a  stroke-width=\
-\x222\x22\x0a  stroke-lin\
-ecap=\x22round\x22\x0a  s\
-troke-linejoin=\x22\
-round\x22\x0a>\x0a  <path\
- d=\x22m12 19-7-7 7\
--7\x22 />\x0a  <path d\
-=\x22M19 12H5\x22 />\x0a<\
-/svg>\x0a\
-\x00\x00\x01\xc8\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-shrink\x22\
-\x0a  xmlns=\x22http:/\
-/www.w3.org/2000\
-/svg\x22\x0a  width=\x222\
-4\x22\x0a  height=\x2224\x22\
-\x0a  viewBox=\x220 0 \
-24 24\x22\x0a  fill=\x22n\
-one\x22\x0a  stroke=\x22c\
-urrentColor\x22\x0a  s\
-troke-width=\x222\x22\x0a\
-  stroke-linecap\
-=\x22round\x22\x0a  strok\
-e-linejoin=\x22roun\
-d\x22\x0a>\x0a  <path d=\x22\
-m15 15 6 6m-6-6v\
-4.8m0-4.8h4.8\x22 /\
->\x0a  <path d=\x22M9 \
-19.8V15m0 0H4.2M\
-9 15l-6 6\x22 />\x0a  \
-<path d=\x22M15 4.2\
-V9m0 0h4.8M15 9l\
-6-6\x22 />\x0a  <path \
-d=\x22M9 4.2V9m0 0H\
-4.2M9 9 3 3\x22 />\x0a\
-</svg>\x0a\
-\x00\x00\x01^\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-rectang\
-le-vertical\x22\x0a  x\
-mlns=\x22http://www\
-.w3.org/2000/svg\
-\x22\x0a  width=\x2224\x22\x0a \
- height=\x2224\x22\x0a  v\
-iewBox=\x220 0 24 2\
-4\x22\x0a  fill=\x22none\x22\
-\x0a  stroke=\x22curre\
-ntColor\x22\x0a  strok\
-e-width=\x222\x22\x0a  st\
-roke-linecap=\x22ro\
-und\x22\x0a  stroke-li\
-nejoin=\x22round\x22\x0a>\
-\x0a  <rect width=\x22\
-12\x22 height=\x2220\x22 \
-x=\x226\x22 y=\x222\x22 rx=\x22\
-2\x22 />\x0a</svg>\x0a\
-\x00\x00\x01v\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-arrow-d\
-own-to-line\x22\x0a  x\
-mlns=\x22http://www\
-.w3.org/2000/svg\
-\x22\x0a  width=\x2224\x22\x0a \
- height=\x2224\x22\x0a  v\
-iewBox=\x220 0 24 2\
-4\x22\x0a  fill=\x22none\x22\
-\x0a  stroke=\x22curre\
-ntColor\x22\x0a  strok\
-e-width=\x222\x22\x0a  st\
-roke-linecap=\x22ro\
-und\x22\x0a  stroke-li\
-nejoin=\x22round\x22\x0a>\
-\x0a  <path d=\x22M12 \
-17V3\x22 />\x0a  <path\
- d=\x22m6 11 6 6 6-\
-6\x22 />\x0a  <path d=\
-\x22M19 21H5\x22 />\x0a</\
-svg>\x0a\
-\x00\x00\x01y\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-circle-\
-stop\x22\x0a  xmlns=\x22h\
-ttp://www.w3.org\
-/2000/svg\x22\x0a  wid\
-th=\x2224\x22\x0a  height\
-=\x2224\x22\x0a  viewBox=\
-\x220 0 24 24\x22\x0a  fi\
-ll=\x22none\x22\x0a  stro\
-ke=\x22currentColor\
-\x22\x0a  stroke-width\
-=\x222\x22\x0a  stroke-li\
-necap=\x22round\x22\x0a  \
-stroke-linejoin=\
-\x22round\x22\x0a>\x0a  <cir\
-cle cx=\x2212\x22 cy=\x22\
-12\x22 r=\x2210\x22 />\x0a  \
-<rect x=\x229\x22 y=\x229\
-\x22 width=\x226\x22 heig\
-ht=\x226\x22 rx=\x221\x22 />\
-\x0a</svg>\x0a\
-\x00\x00\x01\xb4\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-between\
--horizontal-end\x22\
-\x0a  xmlns=\x22http:/\
-/www.w3.org/2000\
-/svg\x22\x0a  width=\x222\
-4\x22\x0a  height=\x2224\x22\
-\x0a  viewBox=\x220 0 \
-24 24\x22\x0a  fill=\x22n\
-one\x22\x0a  stroke=\x22c\
-urrentColor\x22\x0a  s\
-troke-width=\x222\x22\x0a\
-  stroke-linecap\
-=\x22round\x22\x0a  strok\
-e-linejoin=\x22roun\
-d\x22\x0a>\x0a  <rect wid\
-th=\x2213\x22 height=\x22\
-7\x22 x=\x223\x22 y=\x223\x22 r\
-x=\x221\x22 />\x0a  <path\
- d=\x22m22 15-3-3 3\
--3\x22 />\x0a  <rect w\
-idth=\x2213\x22 height\
-=\x227\x22 x=\x223\x22 y=\x2214\
-\x22 rx=\x221\x22 />\x0a</sv\
-g>\x0a\
-\x00\x00\x01\xc1\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-arrow-d\
-own-1-0\x22\x0a  xmlns\
-=\x22http://www.w3.\
-org/2000/svg\x22\x0a  \
-width=\x2224\x22\x0a  hei\
-ght=\x2224\x22\x0a  viewB\
-ox=\x220 0 24 24\x22\x0a \
- fill=\x22none\x22\x0a  s\
-troke=\x22currentCo\
-lor\x22\x0a  stroke-wi\
-dth=\x222\x22\x0a  stroke\
--linecap=\x22round\x22\
-\x0a  stroke-linejo\
-in=\x22round\x22\x0a>\x0a  <\
-path d=\x22m3 16 4 \
-4 4-4\x22 />\x0a  <pat\
-h d=\x22M7 20V4\x22 />\
-\x0a  <path d=\x22M17 \
-10V4h-2\x22 />\x0a  <p\
-ath d=\x22M15 10h4\x22\
- />\x0a  <rect x=\x221\
-5\x22 y=\x2214\x22 width=\
-\x224\x22 height=\x226\x22 r\
-y=\x222\x22 />\x0a</svg>\x0a\
-\
-\x00\x00\x01t\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-arrow-u\
-p-to-line\x22\x0a  xml\
-ns=\x22http://www.w\
-3.org/2000/svg\x22\x0a\
-  width=\x2224\x22\x0a  h\
-eight=\x2224\x22\x0a  vie\
-wBox=\x220 0 24 24\x22\
-\x0a  fill=\x22none\x22\x0a \
- stroke=\x22current\
-Color\x22\x0a  stroke-\
-width=\x222\x22\x0a  stro\
-ke-linecap=\x22roun\
-d\x22\x0a  stroke-line\
-join=\x22round\x22\x0a>\x0a \
- <path d=\x22M5 3h1\
-4\x22 />\x0a  <path d=\
-\x22m18 13-6-6-6 6\x22\
- />\x0a  <path d=\x22M\
-12 7v14\x22 />\x0a</sv\
-g>\x0a\
-\x00\x00\x02\xc1\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-paint-b\
-ucket\x22\x0a  xmlns=\x22\
-http://www.w3.or\
-g/2000/svg\x22\x0a  wi\
-dth=\x2224\x22\x0a  heigh\
-t=\x2224\x22\x0a  viewBox\
-=\x220 0 24 24\x22\x0a  f\
-ill=\x22none\x22\x0a  str\
-oke=\x22currentColo\
-r\x22\x0a  stroke-widt\
-h=\x222\x22\x0a  stroke-l\
-inecap=\x22round\x22\x0a \
- stroke-linejoin\
-=\x22round\x22\x0a>\x0a  <pa\
-th d=\x22M11 7 6 2\x22\
- />\x0a  <path d=\x22M\
-18.992 12H2.041\x22\
- />\x0a  <path d=\x22M\
-21.145 18.38A3.3\
-4 3.34 0 0 1 20 \
-16.5a3.3 3.3 0 0\
- 1-1.145 1.88c-.\
-575.46-.855 1.02\
--.855 1.595A2 2 \
-0 0 0 20 22a2 2 \
-0 0 0 2-2.025c0-\
-.58-.285-1.13-.8\
-55-1.595\x22 />\x0a  <\
-path d=\x22m8.5 4.5\
- 2.148-2.148a1.2\
-05 1.205 0 0 1 1\
-.704 0l7.296 7.2\
-96a1.205 1.205 0\
- 0 1 0 1.704l-7.\
-592 7.592a3.615 \
-3.615 0 0 1-5.11\
-2 0l-3.888-3.888\
-a3.615 3.615 0 0\
- 1 0-5.112L5.67 \
-7.33\x22 />\x0a</svg>\x0a\
-\
-\x00\x00\x01[\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-arrow-d\
-own-right\x22\x0a  xml\
-ns=\x22http://www.w\
-3.org/2000/svg\x22\x0a\
-  width=\x2224\x22\x0a  h\
-eight=\x2224\x22\x0a  vie\
-wBox=\x220 0 24 24\x22\
-\x0a  fill=\x22none\x22\x0a \
- stroke=\x22current\
-Color\x22\x0a  stroke-\
-width=\x222\x22\x0a  stro\
-ke-linecap=\x22roun\
-d\x22\x0a  stroke-line\
-join=\x22round\x22\x0a>\x0a \
- <path d=\x22m7 7 1\
-0 10\x22 />\x0a  <path\
- d=\x22M17 7v10H7\x22 \
-/>\x0a</svg>\x0a\
-\x00\x00\x01\xc0\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-file\x22\x0a \
- xmlns=\x22http://w\
-ww.w3.org/2000/s\
-vg\x22\x0a  width=\x2224\x22\
-\x0a  height=\x2224\x22\x0a \
- viewBox=\x220 0 24\
- 24\x22\x0a  fill=\x22non\
-e\x22\x0a  stroke=\x22cur\
-rentColor\x22\x0a  str\
-oke-width=\x222\x22\x0a  \
-stroke-linecap=\x22\
-round\x22\x0a  stroke-\
-linejoin=\x22round\x22\
-\x0a>\x0a  <path d=\x22M6\
- 22a2 2 0 0 1-2-\
-2V4a2 2 0 0 1 2-\
-2h8a2.4 2.4 0 0 \
-1 1.704.706l3.58\
-8 3.588A2.4 2.4 \
-0 0 1 20 8v12a2 \
-2 0 0 1-2 2z\x22 />\
-\x0a  <path d=\x22M14 \
-2v5a1 1 0 0 0 1 \
-1h5\x22 />\x0a</svg>\x0a\
-\x00\x00\x02e\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-wand-sp\
-arkles\x22\x0a  xmlns=\
-\x22http://www.w3.o\
-rg/2000/svg\x22\x0a  w\
-idth=\x2224\x22\x0a  heig\
-ht=\x2224\x22\x0a  viewBo\
-x=\x220 0 24 24\x22\x0a  \
-fill=\x22none\x22\x0a  st\
-roke=\x22currentCol\
-or\x22\x0a  stroke-wid\
-th=\x222\x22\x0a  stroke-\
-linecap=\x22round\x22\x0a\
-  stroke-linejoi\
-n=\x22round\x22\x0a>\x0a  <p\
-ath d=\x22m21.64 3.\
-64-1.28-1.28a1.2\
-1 1.21 0 0 0-1.7\
-2 0L2.36 18.64a1\
-.21 1.21 0 0 0 0\
- 1.72l1.28 1.28a\
-1.2 1.2 0 0 0 1.\
-72 0L21.64 5.36a\
-1.2 1.2 0 0 0 0-\
-1.72\x22 />\x0a  <path\
- d=\x22m14 7 3 3\x22 /\
->\x0a  <path d=\x22M5 \
-6v4\x22 />\x0a  <path \
-d=\x22M19 14v4\x22 />\x0a\
-  <path d=\x22M10 2\
-v2\x22 />\x0a  <path d\
-=\x22M7 8H3\x22 />\x0a  <\
-path d=\x22M21 16h-\
-4\x22 />\x0a  <path d=\
-\x22M11 3H9\x22 />\x0a</s\
-vg>\x0a\
-\x00\x00\x01\xa3\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-folder\x22\
-\x0a  xmlns=\x22http:/\
-/www.w3.org/2000\
-/svg\x22\x0a  width=\x222\
-4\x22\x0a  height=\x2224\x22\
-\x0a  viewBox=\x220 0 \
-24 24\x22\x0a  fill=\x22n\
-one\x22\x0a  stroke=\x22c\
-urrentColor\x22\x0a  s\
-troke-width=\x222\x22\x0a\
-  stroke-linecap\
-=\x22round\x22\x0a  strok\
-e-linejoin=\x22roun\
-d\x22\x0a>\x0a  <path d=\x22\
-M20 20a2 2 0 0 0\
- 2-2V8a2 2 0 0 0\
--2-2h-7.9a2 2 0 \
-0 1-1.69-.9L9.6 \
-3.9A2 2 0 0 0 7.\
-93 3H4a2 2 0 0 0\
--2 2v13a2 2 0 0 \
-0 2 2Z\x22 />\x0a</svg\
->\x0a\
-\x00\x00\x01\xb6\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-square-\
-split-horizontal\
-\x22\x0a  xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22\x0a  width=\x22\
-24\x22\x0a  height=\x2224\
-\x22\x0a  viewBox=\x220 0\
- 24 24\x22\x0a  fill=\x22\
-none\x22\x0a  stroke=\x22\
-currentColor\x22\x0a  \
-stroke-width=\x222\x22\
-\x0a  stroke-lineca\
-p=\x22round\x22\x0a  stro\
-ke-linejoin=\x22rou\
-nd\x22\x0a>\x0a  <path d=\
-\x22M12 2v20\x22 />\x0a  \
-<path d=\x22M16 3h3\
-a2 2 0 0 1 2 2v1\
-4a2 2 0 0 1-2 2h\
--3\x22 />\x0a  <path d\
-=\x22M8 21H5a2 2 0 \
-0 1-2-2V5a2 2 0 \
-0 1 2-2h3\x22 />\x0a</\
-svg>\x0a\
-\x00\x00\x01l\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-contras\
-t\x22\x0a  xmlns=\x22http\
-://www.w3.org/20\
-00/svg\x22\x0a  width=\
-\x2224\x22\x0a  height=\x222\
-4\x22\x0a  viewBox=\x220 \
-0 24 24\x22\x0a  fill=\
-\x22none\x22\x0a  stroke=\
-\x22currentColor\x22\x0a \
- stroke-width=\x222\
-\x22\x0a  stroke-linec\
-ap=\x22round\x22\x0a  str\
-oke-linejoin=\x22ro\
-und\x22\x0a>\x0a  <circle\
- cx=\x2212\x22 cy=\x2212\x22\
- r=\x2210\x22 />\x0a  <pa\
-th d=\x22M12 18a6 6\
- 0 0 0 0-12v12z\x22\
- />\x0a</svg>\x0a\
-\x00\x00\x01\xc6\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-zoom-in\
-\x22\x0a  xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22\x0a  width=\x22\
-24\x22\x0a  height=\x2224\
-\x22\x0a  viewBox=\x220 0\
- 24 24\x22\x0a  fill=\x22\
-none\x22\x0a  stroke=\x22\
-currentColor\x22\x0a  \
-stroke-width=\x222\x22\
-\x0a  stroke-lineca\
-p=\x22round\x22\x0a  stro\
-ke-linejoin=\x22rou\
-nd\x22\x0a>\x0a  <circle \
-cx=\x2211\x22 cy=\x2211\x22 \
-r=\x228\x22 />\x0a  <line\
- x1=\x2221\x22 x2=\x2216.\
-65\x22 y1=\x2221\x22 y2=\x22\
-16.65\x22 />\x0a  <lin\
-e x1=\x2211\x22 x2=\x2211\
-\x22 y1=\x228\x22 y2=\x2214\x22\
- />\x0a  <line x1=\x22\
-8\x22 x2=\x2214\x22 y1=\x221\
-1\x22 y2=\x2211\x22 />\x0a</\
-svg>\x0a\
-\x00\x00\x01T\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-arrow-u\
-p\x22\x0a  xmlns=\x22http\
-://www.w3.org/20\
-00/svg\x22\x0a  width=\
-\x2224\x22\x0a  height=\x222\
-4\x22\x0a  viewBox=\x220 \
-0 24 24\x22\x0a  fill=\
-\x22none\x22\x0a  stroke=\
-\x22currentColor\x22\x0a \
- stroke-width=\x222\
-\x22\x0a  stroke-linec\
-ap=\x22round\x22\x0a  str\
-oke-linejoin=\x22ro\
-und\x22\x0a>\x0a  <path d\
-=\x22m5 12 7-7 7 7\x22\
- />\x0a  <path d=\x22M\
-12 19V5\x22 />\x0a</sv\
-g>\x0a\
-\x00\x00\x01\xb2\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-eye\x22\x0a  \
-xmlns=\x22http://ww\
-w.w3.org/2000/sv\
-g\x22\x0a  width=\x2224\x22\x0a\
-  height=\x2224\x22\x0a  \
-viewBox=\x220 0 24 \
-24\x22\x0a  fill=\x22none\
-\x22\x0a  stroke=\x22curr\
-entColor\x22\x0a  stro\
-ke-width=\x222\x22\x0a  s\
-troke-linecap=\x22r\
-ound\x22\x0a  stroke-l\
-inejoin=\x22round\x22\x0a\
->\x0a  <path d=\x22M2.\
-062 12.348a1 1 0\
- 0 1 0-.696 10.7\
-5 10.75 0 0 1 19\
-.876 0 1 1 0 0 1\
- 0 .696 10.75 10\
-.75 0 0 1-19.876\
- 0\x22 />\x0a  <circle\
- cx=\x2212\x22 cy=\x2212\x22\
- r=\x223\x22 />\x0a</svg>\
-\x0a\
-\x00\x00\x01\xdf\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-archive\
--restore\x22\x0a  xmln\
-s=\x22http://www.w3\
-.org/2000/svg\x22\x0a \
- width=\x2224\x22\x0a  he\
-ight=\x2224\x22\x0a  view\
-Box=\x220 0 24 24\x22\x0a\
-  fill=\x22none\x22\x0a  \
-stroke=\x22currentC\
-olor\x22\x0a  stroke-w\
-idth=\x222\x22\x0a  strok\
-e-linecap=\x22round\
-\x22\x0a  stroke-linej\
-oin=\x22round\x22\x0a>\x0a  \
-<rect width=\x2220\x22\
- height=\x225\x22 x=\x222\
-\x22 y=\x223\x22 rx=\x221\x22 /\
->\x0a  <path d=\x22M4 \
-8v11a2 2 0 0 0 2\
- 2h2\x22 />\x0a  <path\
- d=\x22M20 8v11a2 2\
- 0 0 1-2 2h-2\x22 /\
->\x0a  <path d=\x22m9 \
-15 3-3 3 3\x22 />\x0a \
- <path d=\x22M12 12\
-v9\x22 />\x0a</svg>\x0a\
-\x00\x00\x01\xf5\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-file-pl\
-us\x22\x0a  xmlns=\x22htt\
-p://www.w3.org/2\
-000/svg\x22\x0a  width\
-=\x2224\x22\x0a  height=\x22\
-24\x22\x0a  viewBox=\x220\
- 0 24 24\x22\x0a  fill\
-=\x22none\x22\x0a  stroke\
-=\x22currentColor\x22\x0a\
-  stroke-width=\x22\
-2\x22\x0a  stroke-line\
-cap=\x22round\x22\x0a  st\
-roke-linejoin=\x22r\
-ound\x22\x0a>\x0a  <path \
-d=\x22M6 22a2 2 0 0\
- 1-2-2V4a2 2 0 0\
- 1 2-2h8a2.4 2.4\
- 0 0 1 1.704.706\
-l3.588 3.588A2.4\
- 2.4 0 0 1 20 8v\
-12a2 2 0 0 1-2 2\
-z\x22 />\x0a  <path d=\
-\x22M14 2v5a1 1 0 0\
- 0 1 1h5\x22 />\x0a  <\
-path d=\x22M9 15h6\x22\
- />\x0a  <path d=\x22M\
-12 18v-6\x22 />\x0a</s\
-vg>\x0a\
-\x00\x00\x01\xb2\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-image\x22\x0a\
-  xmlns=\x22http://\
-www.w3.org/2000/\
-svg\x22\x0a  width=\x2224\
-\x22\x0a  height=\x2224\x22\x0a\
-  viewBox=\x220 0 2\
-4 24\x22\x0a  fill=\x22no\
-ne\x22\x0a  stroke=\x22cu\
-rrentColor\x22\x0a  st\
-roke-width=\x222\x22\x0a \
- stroke-linecap=\
-\x22round\x22\x0a  stroke\
--linejoin=\x22round\
-\x22\x0a>\x0a  <rect widt\
-h=\x2218\x22 height=\x221\
-8\x22 x=\x223\x22 y=\x223\x22 r\
-x=\x222\x22 ry=\x222\x22 />\x0a\
-  <circle cx=\x229\x22\
- cy=\x229\x22 r=\x222\x22 />\
-\x0a  <path d=\x22m21 \
-15-3.086-3.086a2\
- 2 0 0 0-2.828 0\
-L6 21\x22 />\x0a</svg>\
-\x0a\
-\x00\x00\x01\x82\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-undo-2\x22\
-\x0a  xmlns=\x22http:/\
-/www.w3.org/2000\
-/svg\x22\x0a  width=\x222\
-4\x22\x0a  height=\x2224\x22\
-\x0a  viewBox=\x220 0 \
-24 24\x22\x0a  fill=\x22n\
-one\x22\x0a  stroke=\x22c\
-urrentColor\x22\x0a  s\
-troke-width=\x222\x22\x0a\
-  stroke-linecap\
-=\x22round\x22\x0a  strok\
-e-linejoin=\x22roun\
-d\x22\x0a>\x0a  <path d=\x22\
-M9 14 4 9l5-5\x22 /\
->\x0a  <path d=\x22M4 \
-9h10.5a5.5 5.5 0\
- 0 1 5.5 5.5a5.5\
- 5.5 0 0 1-5.5 5\
-.5H11\x22 />\x0a</svg>\
-\x0a\
-\x00\x00\x01;\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-check\x22\x0a\
-  xmlns=\x22http://\
-www.w3.org/2000/\
-svg\x22\x0a  width=\x2224\
-\x22\x0a  height=\x2224\x22\x0a\
-  viewBox=\x220 0 2\
-4 24\x22\x0a  fill=\x22no\
-ne\x22\x0a  stroke=\x22cu\
-rrentColor\x22\x0a  st\
-roke-width=\x222\x22\x0a \
- stroke-linecap=\
-\x22round\x22\x0a  stroke\
--linejoin=\x22round\
-\x22\x0a>\x0a  <path d=\x22M\
-20 6 9 17l-5-5\x22 \
-/>\x0a</svg>\x0a\
-\x00\x00\x01m\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-columns\
--2\x22\x0a  xmlns=\x22htt\
-p://www.w3.org/2\
-000/svg\x22\x0a  width\
-=\x2224\x22\x0a  height=\x22\
-24\x22\x0a  viewBox=\x220\
- 0 24 24\x22\x0a  fill\
-=\x22none\x22\x0a  stroke\
-=\x22currentColor\x22\x0a\
-  stroke-width=\x22\
-2\x22\x0a  stroke-line\
-cap=\x22round\x22\x0a  st\
-roke-linejoin=\x22r\
-ound\x22\x0a>\x0a  <rect \
-width=\x2218\x22 heigh\
-t=\x2218\x22 x=\x223\x22 y=\x22\
-3\x22 rx=\x222\x22 />\x0a  <\
-path d=\x22M12 3v18\
-\x22 />\x0a</svg>\x0a\
-\x00\x00\x01\x82\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-circle-\
-arrow-right\x22\x0a  x\
-mlns=\x22http://www\
-.w3.org/2000/svg\
-\x22\x0a  width=\x2224\x22\x0a \
- height=\x2224\x22\x0a  v\
-iewBox=\x220 0 24 2\
-4\x22\x0a  fill=\x22none\x22\
-\x0a  stroke=\x22curre\
-ntColor\x22\x0a  strok\
-e-width=\x222\x22\x0a  st\
-roke-linecap=\x22ro\
-und\x22\x0a  stroke-li\
-nejoin=\x22round\x22\x0a>\
-\x0a  <circle cx=\x221\
-2\x22 cy=\x2212\x22 r=\x2210\
-\x22 />\x0a  <path d=\x22\
-m12 16 4-4-4-4\x22 \
-/>\x0a  <path d=\x22M8\
- 12h8\x22 />\x0a</svg>\
-\x0a\
-\x00\x00\x01\xd3\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-trash-2\
-\x22\x0a  xmlns=\x22http:\
-//www.w3.org/200\
-0/svg\x22\x0a  width=\x22\
-24\x22\x0a  height=\x2224\
-\x22\x0a  viewBox=\x220 0\
- 24 24\x22\x0a  fill=\x22\
-none\x22\x0a  stroke=\x22\
-currentColor\x22\x0a  \
-stroke-width=\x222\x22\
-\x0a  stroke-lineca\
-p=\x22round\x22\x0a  stro\
-ke-linejoin=\x22rou\
-nd\x22\x0a>\x0a  <path d=\
-\x22M10 11v6\x22 />\x0a  \
-<path d=\x22M14 11v\
-6\x22 />\x0a  <path d=\
-\x22M19 6v14a2 2 0 \
-0 1-2 2H7a2 2 0 \
-0 1-2-2V6\x22 />\x0a  \
-<path d=\x22M3 6h18\
-\x22 />\x0a  <path d=\x22\
-M8 6V4a2 2 0 0 1\
- 2-2h4a2 2 0 0 1\
- 2 2v2\x22 />\x0a</svg\
->\x0a\
-\x00\x00\x02\x1a\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-text-cu\
-rsor-input\x22\x0a  xm\
-lns=\x22http://www.\
-w3.org/2000/svg\x22\
-\x0a  width=\x2224\x22\x0a  \
-height=\x2224\x22\x0a  vi\
-ewBox=\x220 0 24 24\
-\x22\x0a  fill=\x22none\x22\x0a\
-  stroke=\x22curren\
-tColor\x22\x0a  stroke\
--width=\x222\x22\x0a  str\
-oke-linecap=\x22rou\
-nd\x22\x0a  stroke-lin\
-ejoin=\x22round\x22\x0a>\x0a\
-  <path d=\x22M12 2\
-0h-1a2 2 0 0 1-2\
--2 2 2 0 0 1-2 2\
-H6\x22 />\x0a  <path d\
-=\x22M13 8h7a2 2 0 \
-0 1 2 2v4a2 2 0 \
-0 1-2 2h-7\x22 />\x0a \
- <path d=\x22M5 16H\
-4a2 2 0 0 1-2-2v\
--4a2 2 0 0 1 2-2\
-h1\x22 />\x0a  <path d\
-=\x22M6 4h1a2 2 0 0\
- 1 2 2 2 2 0 0 1\
- 2-2h1\x22 />\x0a  <pa\
-th d=\x22M9 6v12\x22 /\
->\x0a</svg>\x0a\
-\x00\x00\x01u\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-arrow-l\
-eft-to-line\x22\x0a  x\
-mlns=\x22http://www\
-.w3.org/2000/svg\
-\x22\x0a  width=\x2224\x22\x0a \
- height=\x2224\x22\x0a  v\
-iewBox=\x220 0 24 2\
-4\x22\x0a  fill=\x22none\x22\
-\x0a  stroke=\x22curre\
-ntColor\x22\x0a  strok\
-e-width=\x222\x22\x0a  st\
-roke-linecap=\x22ro\
-und\x22\x0a  stroke-li\
-nejoin=\x22round\x22\x0a>\
-\x0a  <path d=\x22M3 1\
-9V5\x22 />\x0a  <path \
-d=\x22m13 6-6 6 6 6\
-\x22 />\x0a  <path d=\x22\
-M7 12h14\x22 />\x0a</s\
-vg>\x0a\
-\x00\x00\x01\x81\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-rows-3\x22\
-\x0a  xmlns=\x22http:/\
-/www.w3.org/2000\
-/svg\x22\x0a  width=\x222\
-4\x22\x0a  height=\x2224\x22\
-\x0a  viewBox=\x220 0 \
-24 24\x22\x0a  fill=\x22n\
-one\x22\x0a  stroke=\x22c\
-urrentColor\x22\x0a  s\
-troke-width=\x222\x22\x0a\
-  stroke-linecap\
-=\x22round\x22\x0a  strok\
-e-linejoin=\x22roun\
-d\x22\x0a>\x0a  <rect wid\
-th=\x2218\x22 height=\x22\
-18\x22 x=\x223\x22 y=\x223\x22 \
-rx=\x222\x22 />\x0a  <pat\
-h d=\x22M21 9H3\x22 />\
-\x0a  <path d=\x22M21 \
-15H3\x22 />\x0a</svg>\x0a\
-\
-\x00\x00\x014\
-<\
-!-- @license luc\
-ide-static v1.48\
-.0 - ISC -->\x0a<sv\
-g\x0a  class=\x22lucid\
-e lucide-minus\x22\x0a\
-  xmlns=\x22http://\
-www.w3.org/2000/\
-svg\x22\x0a  width=\x2224\
-\x22\x0a  height=\x2224\x22\x0a\
-  viewBox=\x220 0 2\
-4 24\x22\x0a  fill=\x22no\
-ne\x22\x0a  stroke=\x22cu\
-rrentColor\x22\x0a  st\
-roke-width=\x222\x22\x0a \
- stroke-linecap=\
-\x22round\x22\x0a  stroke\
--linejoin=\x22round\
-\x22\x0a>\x0a  <path d=\x22M\
-5 12h14\x22 />\x0a</sv\
-g>\x0a\
 \x00\x00\x01\x81\
 <\
 !-- @license luc\
@@ -88609,6 +83632,30 @@ M20 13v5a2 2 0 0\
  1-2-2V7a2 2 0 0\
  1 2-2h2\x22 />\x0a</s\
 vg>\x0a\
+\x00\x00\x01W\
+<\
+!-- @license luc\
+ide-static v1.48\
+.0 - ISC -->\x0a<sv\
+g\x0a  class=\x22lucid\
+e lucide-arrow-r\
+ight\x22\x0a  xmlns=\x22h\
+ttp://www.w3.org\
+/2000/svg\x22\x0a  wid\
+th=\x2224\x22\x0a  height\
+=\x2224\x22\x0a  viewBox=\
+\x220 0 24 24\x22\x0a  fi\
+ll=\x22none\x22\x0a  stro\
+ke=\x22currentColor\
+\x22\x0a  stroke-width\
+=\x222\x22\x0a  stroke-li\
+necap=\x22round\x22\x0a  \
+stroke-linejoin=\
+\x22round\x22\x0a>\x0a  <pat\
+h d=\x22M5 12h14\x22 /\
+>\x0a  <path d=\x22m12\
+ 5 7 7-7 7\x22 />\x0a<\
+/svg>\x0a\
 \x00\x00\x01\x9d\
 <\
 !-- @license luc\
@@ -88637,40 +83684,434 @@ e x1=\x2221\x22 x2=\x2216\
 ne x1=\x228\x22 x2=\x2214\
 \x22 y1=\x2211\x22 y2=\x2211\
 \x22 />\x0a</svg>\x0a\
-\x00\x00\x01\xf2\
+\x00\x00\x01W\
 <\
 !-- @license luc\
 ide-static v1.48\
 .0 - ISC -->\x0a<sv\
 g\x0a  class=\x22lucid\
-e lucide-layout-\
-grid\x22\x0a  xmlns=\x22h\
-ttp://www.w3.org\
-/2000/svg\x22\x0a  wid\
-th=\x2224\x22\x0a  height\
-=\x2224\x22\x0a  viewBox=\
-\x220 0 24 24\x22\x0a  fi\
-ll=\x22none\x22\x0a  stro\
-ke=\x22currentColor\
-\x22\x0a  stroke-width\
-=\x222\x22\x0a  stroke-li\
-necap=\x22round\x22\x0a  \
-stroke-linejoin=\
-\x22round\x22\x0a>\x0a  <rec\
-t width=\x227\x22 heig\
-ht=\x227\x22 x=\x223\x22 y=\x22\
-3\x22 rx=\x221\x22 />\x0a  <\
-rect width=\x227\x22 h\
-eight=\x227\x22 x=\x2214\x22\
- y=\x223\x22 rx=\x221\x22 />\
-\x0a  <rect width=\x22\
-7\x22 height=\x227\x22 x=\
-\x2214\x22 y=\x2214\x22 rx=\x22\
-1\x22 />\x0a  <rect wi\
-dth=\x227\x22 height=\x22\
-7\x22 x=\x223\x22 y=\x2214\x22 \
-rx=\x221\x22 />\x0a</svg>\
+e lucide-arrow-l\
+eft\x22\x0a  xmlns=\x22ht\
+tp://www.w3.org/\
+2000/svg\x22\x0a  widt\
+h=\x2224\x22\x0a  height=\
+\x2224\x22\x0a  viewBox=\x22\
+0 0 24 24\x22\x0a  fil\
+l=\x22none\x22\x0a  strok\
+e=\x22currentColor\x22\
+\x0a  stroke-width=\
+\x222\x22\x0a  stroke-lin\
+ecap=\x22round\x22\x0a  s\
+troke-linejoin=\x22\
+round\x22\x0a>\x0a  <path\
+ d=\x22m12 19-7-7 7\
+-7\x22 />\x0a  <path d\
+=\x22M19 12H5\x22 />\x0a<\
+/svg>\x0a\
+\x00\x00\x01\x18\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><rect x=\x229\x22 \
+y=\x223\x22 width=\x2211\x22\
+ height=\x2218\x22 rx=\
+\x222\x22/><path d=\x22M5\
+ 4v16\x22 stroke-da\
+sharray=\x222 3\x22/><\
+/svg>\x0d\x0a\
+\x00\x00\x01B\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><rect x=\x223\x22 \
+y=\x223\x22 width=\x2218\x22\
+ height=\x2218\x22 rx=\
+\x222\x22/><path d=\x22M7\
+ 8h4M7 12h4M7 16\
+h10\x22/><rect x=\x221\
+3.5\x22 y=\x227\x22 width\
+=\x224\x22 height=\x225\x22 \
+rx=\x22.5\x22/></svg>\x0d\
 \x0a\
+\x00\x00\x00\xfe\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><path d=\x22M10\
+ 3h11v11\x22/><path\
+ d=\x22M9 8h7v7\x22/><\
+path d=\x22M16 8 6 \
+18\x22/></svg>\x0d\x0a\
+\x00\x00\x01\x19\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><rect x=\x224\x22 \
+y=\x223\x22 width=\x2211\x22\
+ height=\x2218\x22 rx=\
+\x222\x22/><path d=\x22M1\
+9 4v16\x22 stroke-d\
+asharray=\x222 3\x22/>\
+</svg>\x0d\x0a\
+\x00\x00\x01\x87\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><path d=\x22M6 \
+22a2 2 0 0 1-2-2\
+V4a2 2 0 0 1 2-2\
+h8a2.4 2.4 0 0 1\
+ 1.704.706l3.588\
+ 3.588A2.4 2.4 0\
+ 0 1 20 8v12a2 2\
+ 0 0 1-2 2z\x22/><p\
+ath d=\x22M14 2v5a1\
+ 1 0 0 0 1 1h5\x22/\
+><path d=\x22M9 15h\
+6M12 18v-6\x22 stro\
+ke=\x22#008a1a\x22/></\
+svg>\x0d\x0a\
+\x00\x00\x00\xfe\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><path d=\x22M3 \
+10v11h11\x22/><path\
+ d=\x22M8 9v7h7\x22/><\
+path d=\x22M8 16 18\
+ 6\x22/></svg>\x0d\x0a\
+\x00\x00\x01\x1c\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><rect x=\x222\x22 \
+y=\x224\x22 width=\x2220\x22\
+ height=\x2216\x22 rx=\
+\x222\x22/><path d=\x22M1\
+2 4v16M5.5 9h3M5\
+.5 12h3M5.5 15h3\
+\x22/></svg>\x0d\x0a\
+\x00\x00\x01\x01\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><path d=\x22M21\
+ 10v11H10\x22/><pat\
+h d=\x22M16 9v7h-7\x22\
+/><path d=\x22M16 1\
+6 6 6\x22/></svg>\x0d\x0a\
+\
+\x00\x00\x00\xee\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><rect x=\x226\x22 \
+y=\x223\x22 width=\x2212\x22\
+ height=\x2218\x22 rx=\
+\x222\x22/></svg>\x0d\x0a\
+\x00\x00\x01h\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><rect x=\x223\x22 \
+y=\x223\x22 width=\x2218\x22\
+ height=\x2218\x22 rx=\
+\x222\x22/><rect x=\x226\x22\
+ y=\x226\x22 width=\x227\x22\
+ height=\x228\x22 rx=\x22\
+1\x22 stroke-dashar\
+ray=\x221.5 2.5\x22/><\
+rect x=\x2210\x22 y=\x229\
+\x22 width=\x227\x22 heig\
+ht=\x228\x22 rx=\x221\x22/><\
+/svg>\x0d\x0a\
+\x00\x00\x013\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><rect x=\x223\x22 \
+y=\x223\x22 width=\x2218\x22\
+ height=\x2218\x22 rx=\
+\x222\x22/><rect x=\x227.\
+5\x22 y=\x227.5\x22 width\
+=\x229\x22 height=\x229\x22 \
+stroke-dasharray\
+=\x222 2.5\x22/></svg>\
+\x0d\x0a\
+\x00\x00\x00\xfe\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><path d=\x22M3 \
+14V3h11\x22/><path \
+d=\x22M8 15V8h7\x22/><\
+path d=\x22m8 8 10 \
+10\x22/></svg>\x0d\x0a\
+\x00\x00\x01:\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><rect x=\x223\x22 \
+y=\x223\x22 width=\x2218\x22\
+ height=\x2218\x22 rx=\
+\x222\x22 stroke-dasha\
+rray=\x222 2.5\x22/><r\
+ect x=\x227.5\x22 y=\x227\
+.5\x22 width=\x229\x22 he\
+ight=\x229\x22 rx=\x221\x22/\
+></svg>\x0d\x0a\
+\x00\x00\x01\x17\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><path d=\x22m2 \
+6 3 3-3 3\x22 strok\
+e=\x22#008a1a\x22/><re\
+ct width=\x2213\x22 he\
+ight=\x227\x22 x=\x228\x22 y\
+=\x2211\x22 rx=\x221\x22/></\
+svg>\x0d\x0a\
+\x00\x00\x01\x18\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><rect width=\
+\x2213\x22 height=\x227\x22 \
+x=\x223\x22 y=\x226\x22 rx=\x22\
+1\x22/><path d=\x22m22\
+ 18-3-3 3-3\x22 str\
+oke=\x22#008a1a\x22/><\
+/svg>\x0d\x0a\
+\x00\x00\x01\x1f\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><rect x=\x222\x22 \
+y=\x224\x22 width=\x2220\x22\
+ height=\x2216\x22 rx=\
+\x222\x22/><path d=\x22M1\
+2 4v16M15.5 9h3M\
+15.5 12h3M15.5 1\
+5h3\x22/></svg>\x0d\x0a\
+\x00\x00\x01\xe5\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><path d=\x22M4 \
+9 11 4l9 2-2 14-\
+12-3z\x22/><circle \
+cx=\x224\x22 cy=\x229\x22 r=\
+\x221.5\x22 fill=\x22curr\
+entColor\x22/><circ\
+le cx=\x2211\x22 cy=\x224\
+\x22 r=\x221.5\x22 fill=\x22\
+currentColor\x22/><\
+circle cx=\x2220\x22 c\
+y=\x226\x22 r=\x221.5\x22 fi\
+ll=\x22currentColor\
+\x22/><circle cx=\x221\
+8\x22 cy=\x2220\x22 r=\x221.\
+5\x22 fill=\x22current\
+Color\x22/><circle \
+cx=\x226\x22 cy=\x2217\x22 r\
+=\x221.5\x22 fill=\x22cur\
+rentColor\x22/></sv\
+g>\x0d\x0a\
+\x00\x00\x01\x11\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><circle cx=\x22\
+12\x22 cy=\x2212\x22 r=\x227\
+\x22/><circle cx=\x221\
+2\x22 cy=\x2212\x22 r=\x222.\
+5\x22 fill=\x22current\
+Color\x22/></svg>\x0d\x0a\
+\
+\x00\x00\x01<\
+<\
+svg xmlns=\x22http:\
+//www.w3.org/200\
+0/svg\x22 width=\x2224\
+\x22 height=\x2224\x22 vi\
+ewBox=\x220 0 24 24\
+\x22 fill=\x22none\x22 st\
+roke=\x22currentCol\
+or\x22 stroke-width\
+=\x222\x22 stroke-line\
+cap=\x22round\x22 stro\
+ke-linejoin=\x22rou\
+nd\x22><rect x=\x223\x22 \
+y=\x223\x22 width=\x2218\x22\
+ height=\x2218\x22 rx=\
+\x222\x22/><path d=\x22M3\
+ 9.5c3-2 6-2 9 0\
+s6 2 9 0M3 15c3-\
+2 6-2 9 0s6 2 9 \
+0M9 3v18M15 3v18\
+\x22/></svg>\x0d\x0a\
 "
 
 qt_resource_name = b"\
@@ -88694,10 +84135,6 @@ qt_resource_name = b"\
 \x0a\xfc;\xbc\
 \x00f\
 \x00o\x00n\x00t\x00-\x00i\x00c\x00o\x00n\x00s\x00.\x00x\x00m\x00l\
-\x00\x09\
-\x06V\x80|\
-\x00i\
-\x00c\x00o\x00n\x00s\x00.\x00x\x00m\x00l\
 \x00\x05\
 \x00pZ\xc2\
 \x00i\
@@ -88720,428 +84157,39 @@ qt_resource_name = b"\
 \x00I\
 \x00n\x00t\x00e\x00r\x00-\x00S\x00e\x00m\x00i\x00B\x00o\x00l\x00d\x00.\x00t\x00t\
 \x00f\
-\x00\x17\
-\x03\xcb_\xa7\
-\x00s\
-\x00t\x00o\x00c\x00k\x00-\x00g\x00r\x00a\x00v\x00i\x00t\x00y\x00-\x00n\x00o\x00r\
-\x00t\x00h\x00.\x00s\x00v\x00g\
-\x00\x14\
-\x0c\xfd*\xc7\
-\x00r\
-\x00i\x00g\x00h\x00t\x00_\x00p\x00a\x00g\x00e\x00_\x00t\x00h\x00u\x00m\x00b\x00.\
-\x00s\x00v\x00g\
-\x00\x08\
-\x04\xb2UG\
-\x00u\
-\x00n\x00d\x00o\x00.\x00s\x00v\x00g\
-\x00\x15\
-\x0f\x01}\x87\
-\x00t\
-\x00r\x00i\x00a\x00n\x00g\x00l\x00e\x00-\x00u\x00p\x00-\x00a\x00r\x00r\x00o\x00w\
-\x00.\x00s\x00v\x00g\
-\x00\x19\
-\x09kK\xa7\
-\x00l\
-\x00e\x00f\x00t\x00_\x00p\x00a\x00g\x00e\x00_\x00p\x00l\x00u\x00s\x00_\x00o\x00f\
-\x00f\x00c\x00u\x00t\x00.\x00s\x00v\x00g\
-\x00\x08\
-\x02\x8cT'\
-\x00p\
-\x00l\x00a\x00y\x00.\x00s\x00v\x00g\
-\x00\x10\
-\x09\x1c\xc7\x07\
-\x00s\
-\x00t\x00o\x00c\x00k\x00-\x00c\x00e\x00n\x00t\x00e\x00r\x00.\x00s\x00v\x00g\
-\x00\x10\
-\x0f&\xee\x07\
-\x00s\
-\x00t\x00o\x00p\x00-\x00p\x00r\x00e\x00s\x00s\x00e\x00d\x00.\x00s\x00v\x00g\
-\x00\x15\
-\x081Q'\
-\x00d\
-\x00i\x00m\x00i\x00n\x00i\x00s\x00h\x00i\x00n\x00g\x00-\x00g\x00l\x00a\x00s\x00s\
-\x00.\x00s\x00v\x00g\
-\x00\x10\
-\x05\xcdK\xe7\
-\x00e\
-\x00y\x00e\x00-\x00d\x00i\x00s\x00a\x00b\x00l\x00e\x00d\x00.\x00s\x00v\x00g\
-\x00\x17\
-\x06\xf4y\xa7\
-\x00s\
-\x00t\x00o\x00c\x00k\x00-\x00g\x00r\x00a\x00v\x00i\x00t\x00y\x00-\x00s\x00o\x00u\
-\x00t\x00h\x00.\x00s\x00v\x00g\
-\x00\x10\
-\x01%\x89\xa7\
-\x00p\
-\x00l\x00a\x00y\x00-\x00p\x00r\x00e\x00s\x00s\x00e\x00d\x00.\x00s\x00v\x00g\
-\x00\x10\
-\x0e\xd7.\xc7\
-\x00s\
-\x00t\x00o\x00p\x00-\x00h\x00o\x00v\x00e\x00r\x00e\x00d\x00.\x00s\x00v\x00g\
-\x00\x16\
-\x01\x02\xab\x87\
-\x00s\
-\x00t\x00o\x00c\x00k\x00-\x00g\x00r\x00a\x00v\x00i\x00t\x00y\x00-\x00w\x00e\x00s\
-\x00t\x00.\x00s\x00v\x00g\
-\x00\x1c\
-\x0ey\xd9\xc7\
-\x00s\
-\x00t\x00o\x00c\x00k\x00-\x00g\x00r\x00a\x00v\x00i\x00t\x00y\x00-\x00s\x00o\x00u\
-\x00t\x00h\x00-\x00e\x00a\x00s\x00t\x00.\x00s\x00v\x00g\
-\x00\x19\
-\x083\x83\xe7\
-\x00r\
-\x00e\x00c\x00t\x00a\x00n\x00g\x00u\x00l\x00a\x00r\x00-\x00z\x00o\x00n\x00e\x00-\
-\x00m\x00o\x00d\x00e\x00.\x00s\x00v\x00g\
-\x00\x15\
-\x05\xf5<\xc7\
-\x00m\
-\x00u\x00l\x00t\x00i\x00-\x00c\x00o\x00l\x00u\x00m\x00n\x00-\x00v\x00i\x00e\x00w\
-\x00.\x00s\x00v\x00g\
-\x00\x17\
-\x09\x97\xf5\x87\
-\x00c\
-\x00h\x00e\x00c\x00k\x00-\x00m\x00a\x00r\x00k\x00-\x00d\x00i\x00s\x00a\x00b\x00l\
-\x00e\x00d\x00.\x00s\x00v\x00g\
-\x00\x10\
-\x00\xf6\x15g\
-\x00b\
-\x00i\x00g\x00-\x00u\x00p\x00-\x00a\x00r\x00r\x00o\x00w\x00.\x00s\x00v\x00g\
-\x00\x0d\
-\x0a\x10\x97\xc7\
-\x00t\
-\x00w\x00o\x00_\x00p\x00a\x00g\x00e\x00s\x00.\x00s\x00v\x00g\
-\x00\x13\
-\x01u\x0a\xc7\
-\x00l\
-\x00e\x00f\x00t\x00_\x00p\x00a\x00g\x00e\x00_\x00t\x00h\x00u\x00m\x00b\x00.\x00s\
-\x00v\x00g\
-\x00\x06\
-\x07;\x9f\xa5\
-\x00l\
-\x00u\x00c\x00i\x00d\x00e\
-\x00\x13\
-\x01q\x0bG\
-\x00b\
-\x00i\x00g\x00-\x00r\x00i\x00g\x00h\x00t\x00-\x00a\x00r\x00r\x00o\x00w\x00.\x00s\
-\x00v\x00g\
-\x00\x14\
-\x0f\xa5\xe0\xc7\
-\x00m\
-\x00a\x00g\x00n\x00i\x00f\x00y\x00i\x00n\x00g\x00-\x00g\x00l\x00a\x00s\x00s\x00.\
-\x00s\x00v\x00g\
-\x00\x17\
-\x0cF1\xe7\
-\x00p\
-\x00o\x00l\x00y\x00g\x00o\x00n\x00a\x00l\x00-\x00z\x00o\x00n\x00e\x00-\x00m\x00o\
-\x00d\x00e\x00.\x00s\x00v\x00g\
-\x00\x12\
-\x0e\x96\xa5\x07\
-\x00b\
-\x00i\x00g\x00-\x00d\x00o\x00w\x00n\x00-\x00a\x00r\x00r\x00o\x00w\x00.\x00s\x00v\
-\x00g\
-\x00\x0a\
-\x08J\xc4\x07\
-\x00e\
-\x00x\x00p\x00a\x00n\x00d\x00.\x00s\x00v\x00g\
-\x00\x08\
-\x0bcU\x87\
-\x00s\
-\x00t\x00o\x00p\x00.\x00s\x00v\x00g\
-\x00\x10\
-\x00\xd4Ig\
-\x00p\
-\x00l\x00a\x00y\x00-\x00h\x00o\x00v\x00e\x00r\x00e\x00d\x00.\x00s\x00v\x00g\
-\x00\x13\
-\x0dF\xc8\x07\
-\x00l\
-\x00a\x00s\x00s\x00o\x00-\x00z\x00o\x00n\x00e\x00-\x00m\x00o\x00d\x00e\x00.\x00s\
-\x00v\x00g\
-\x00\x0e\
-\x06\x01\xb8\xc7\
-\x00c\
-\x00h\x00e\x00c\x00k\x00-\x00m\x00a\x00r\x00k\x00.\x00s\x00v\x00g\
-\x00 \
-\x08\x01\x15'\
-\x00s\
-\x00i\x00x\x00-\x00s\x00p\x00o\x00k\x00e\x00d\x00-\x00a\x00s\x00t\x00e\x00r\x00i\
-\x00s\x00k\x00-\x00d\x00i\x00s\x00a\x00b\x00l\x00e\x00d\x00.\x00s\x00v\x00g\
 \x00\x06\
 \x06\xac\xab]\
 \x00c\
 \x00u\x00s\x00t\x00o\x00m\
-\x00\x17\
-\x06\xc1\x14G\
-\x00o\
-\x00b\x00j\x00e\x00c\x00t\x00-\x00r\x00o\x00t\x00a\x00t\x00e\x00-\x00r\x00i\x00g\
-\x00h\x00t\x00.\x00s\x00v\x00g\
-\x00\x17\
-\x0b\x81\xbd\x07\
-\x00s\
-\x00t\x00o\x00c\x00k\x00-\x00v\x00c\x00h\x00a\x00i\x00n\x00-\x00b\x00r\x00o\x00k\
-\x00e\x00n\x00.\x00s\x00v\x00g\
-\x00\x08\
-\x00(Wg\
-\x00f\
-\x00i\x00l\x00e\x00.\x00s\x00v\x00g\
-\x00\x13\
-\x08p\x89\xc7\
-\x00c\
-\x00h\x00e\x00c\x00k\x00b\x00o\x00x\x00-\x00s\x00t\x00y\x00l\x00e\x00d\x00.\x00s\
-\x00v\x00g\
-\x00\x1c\
-\x0e\xde=\x07\
-\x00s\
-\x00t\x00o\x00c\x00k\x00-\x00g\x00r\x00a\x00v\x00i\x00t\x00y\x00-\x00n\x00o\x00r\
-\x00t\x00h\x00-\x00e\x00a\x00s\x00t\x00.\x00s\x00v\x00g\
-\x00\x0a\
-\x0a\xc8\xf6\x87\
-\x00f\
-\x00o\x00l\x00d\x00e\x00r\x00.\x00s\x00v\x00g\
-\x00\x17\
-\x04~Y\x07\
-\x00t\
-\x00r\x00i\x00a\x00n\x00g\x00l\x00e\x00-\x00d\x00o\x00w\x00n\x00-\x00a\x00r\x00r\
-\x00o\x00w\x00.\x00s\x00v\x00g\
-\x00\x12\
-\x04\xfa\xbbg\
-\x00b\
-\x00i\x00g\x00-\x00l\x00e\x00f\x00t\x00-\x00a\x00r\x00r\x00o\x00w\x00.\x00s\x00v\
-\x00g\
-\x00\x19\
-\x05\x8e-\x87\
-\x00r\
-\x00i\x00g\x00h\x00t\x00-\x00a\x00r\x00r\x00o\x00w\x00-\x00i\x00n\x00s\x00c\x00r\
-\x00i\x00b\x00e\x00d\x00.\x00s\x00v\x00g\
-\x00\x0f\
-\x0f\x17|g\
-\x00i\
-\x00n\x00s\x00e\x00r\x00t\x00-\x00h\x00e\x00r\x00e\x00.\x00s\x00v\x00g\
-\x00\x16\
-\x00d7g\
-\x00o\
-\x00b\x00j\x00e\x00c\x00t\x00-\x00r\x00o\x00t\x00a\x00t\x00e\x00-\x00l\x00e\x00f\
-\x00t\x00.\x00s\x00v\x00g\
-\x00\x07\
-\x0c\xf8Z\x07\
-\x00e\
-\x00y\x00e\x00.\x00s\x00v\x00g\
-\x00\x0b\
-\x08c\xed\xc7\
-\x00u\
-\x00n\x00t\x00r\x00a\x00s\x00h\x00.\x00s\x00v\x00g\
-\x00\x1c\
-\x0a\xde3\xc7\
-\x00s\
-\x00t\x00o\x00c\x00k\x00-\x00g\x00r\x00a\x00v\x00i\x00t\x00y\x00-\x00n\x00o\x00r\
-\x00t\x00h\x00-\x00w\x00e\x00s\x00t\x00.\x00s\x00v\x00g\
-\x00\x0c\
-\x0a\xdc?\xc7\
-\x00c\
-\x00o\x00l\x00l\x00a\x00p\x00s\x00e\x00.\x00s\x00v\x00g\
-\x00\x16\
-\x0f\xe7\x9fG\
-\x00s\
-\x00i\x00n\x00g\x00l\x00e\x00-\x00c\x00o\x00l\x00u\x00m\x00n\x00-\x00v\x00i\x00e\
-\x00w\x00.\x00s\x00v\x00g\
-\x00\x17\
-\x0d\x834g\
-\x00s\
-\x00i\x00x\x00-\x00s\x00p\x00o\x00k\x00e\x00d\x00-\x00a\x00s\x00t\x00e\x00r\x00i\
-\x00s\x00k\x00.\x00s\x00v\x00g\
-\x00\x15\
-\x06\xf8\xbb\xe7\
-\x00s\
-\x00i\x00n\x00g\x00l\x00e\x00_\x00p\x00a\x00g\x00e\x00_\x00u\x00n\x00c\x00u\x00t\
-\x00.\x00s\x00v\x00g\
-\x00\x12\
-\x0a\x9e\xacg\
-\x00r\
-\x00i\x00g\x00h\x00t\x00-\x00p\x00o\x00i\x00n\x00t\x00i\x00n\x00g\x00.\x00s\x00v\
-\x00g\
-\x00\x0e\
-\x0b\x11\xd2\xe7\
-\x00u\
-\x00s\x00e\x00r\x00-\x00t\x00r\x00a\x00s\x00h\x00.\x00s\x00v\x00g\
-\x00\x1c\
-\x01\xa8z\x87\
-\x00d\
-\x00e\x00s\x00c\x00e\x00n\x00d\x00i\x00n\x00g\x00_\x00s\x00o\x00r\x00t\x00i\x00n\
-\x00g\x00_\x00o\x00r\x00d\x00e\x00r\x00.\x00s\x00v\x00g\
-\x00\x1b\
-\x01\xd2:\x87\
-\x00a\
-\x00s\x00c\x00e\x00n\x00d\x00i\x00n\x00g\x00_\x00s\x00o\x00r\x00t\x00i\x00n\x00g\
-\x00_\x00o\x00r\x00d\x00e\x00r\x00.\x00s\x00v\x00g\
-\x00\x0b\
-\x0e@K\xe7\
-\x00t\
-\x00r\x00a\x00s\x00h\x00e\x00d\x00.\x00s\x00v\x00g\
-\x00\x1a\
-\x02{4g\
-\x00r\
-\x00i\x00g\x00h\x00t\x00_\x00p\x00a\x00g\x00e\x00_\x00p\x00l\x00u\x00s\x00_\x00o\
-\x00f\x00f\x00c\x00u\x00t\x00.\x00s\x00v\x00g\
-\x00\x14\
-\x08\xa8\x11'\
+\x00\x06\
+\x07;\x9f\xa5\
 \x00l\
-\x00a\x00y\x00o\x00u\x00t\x00_\x00t\x00y\x00p\x00e\x00_\x00a\x00u\x00t\x00o\x00.\
-\x00s\x00v\x00g\
-\x00\x11\
-\x05\xa2*G\
-\x00i\
-\x00n\x00s\x00e\x00r\x00t\x00-\x00b\x00e\x00f\x00o\x00r\x00e\x00.\x00s\x00v\x00g\
-\
-\x00\x10\
-\x04Vdg\
-\x00s\
-\x00t\x00o\x00c\x00k\x00-\x00v\x00c\x00h\x00a\x00i\x00n\x00.\x00s\x00v\x00g\
-\x00\x10\
-\x03\xf7#\x07\
-\x00i\
-\x00n\x00s\x00e\x00r\x00t\x00-\x00a\x00f\x00t\x00e\x00r\x00.\x00s\x00v\x00g\
-\x00\x09\
-\x05\xc6\xb2\xc7\
-\x00m\
-\x00i\x00n\x00u\x00s\x00.\x00s\x00v\x00g\
-\x00\x1c\
-\x0ay\xd7\x07\
-\x00s\
-\x00t\x00o\x00c\x00k\x00-\x00g\x00r\x00a\x00v\x00i\x00t\x00y\x00-\x00s\x00o\x00u\
-\x00t\x00h\x00-\x00w\x00e\x00s\x00t\x00.\x00s\x00v\x00g\
-\x00\x18\
-\x03?*g\
-\x00l\
-\x00e\x00f\x00t\x00-\x00a\x00r\x00r\x00o\x00w\x00-\x00i\x00n\x00s\x00c\x00r\x00i\
-\x00b\x00e\x00d\x00.\x00s\x00v\x00g\
-\x00\x16\
-\x05\x02\xa5G\
-\x00s\
-\x00t\x00o\x00c\x00k\x00-\x00g\x00r\x00a\x00v\x00i\x00t\x00y\x00-\x00e\x00a\x00s\
-\x00t\x00.\x00s\x00v\x00g\
+\x00u\x00c\x00i\x00d\x00e\
 \x00\x0f\
-\x0a\x10\xb5'\
-\x00a\
-\x00q\x00u\x00a\x00-\x00s\x00p\x00h\x00e\x00r\x00e\x00.\x00s\x00v\x00g\
+\x08.wG\
+\x00l\
+\x00a\x00y\x00o\x00u\x00t\x00-\x00g\x00r\x00i\x00d\x00.\x00s\x00v\x00g\
 \x00\x08\
 \x03\xc6T'\
 \x00p\
 \x00l\x00u\x00s\x00.\x00s\x00v\x00g\
-\x00\x10\
-\x07\xd1|G\
-\x00a\
-\x00l\x00i\x00g\x00n\x00_\x00b\x00o\x00t\x00t\x00o\x00m\x00.\x00s\x00v\x00g\
 \x00\x0a\
-\x08\x9e\x03g\
-\x00d\
-\x00e\x00w\x00a\x00r\x00p\x00.\x00s\x00v\x00g\
-\x00\x0f\
-\x0ck[\x87\
-\x00l\
-\x00a\x00y\x00o\x00u\x00t\x00_\x00a\x00u\x00t\x00o\x00.\x00s\x00v\x00g\
-\x00\x15\
-\x0e\xb9K\xe7\
-\x00p\
-\x00a\x00g\x00e\x00_\x00o\x00f\x00f\x00c\x00u\x00t\x00_\x00r\x00i\x00g\x00h\x00t\
-\x00.\x00s\x00v\x00g\
-\x00\x11\
-\x03&%\xa7\
-\x00d\
-\x00e\x00s\x00p\x00e\x00c\x00k\x00l\x00e\x00_\x00o\x00f\x00f\x00.\x00s\x00v\x00g\
-\
-\x00\x0c\
-\x07\xa4\xecg\
-\x00p\
-\x00a\x00g\x00e\x00_\x00b\x00o\x00x\x00.\x00s\x00v\x00g\
-\x00\x14\
-\x04\x89*\x07\
-\x00d\
-\x00e\x00s\x00p\x00e\x00c\x00k\x00l\x00e\x00_\x00n\x00o\x00r\x00m\x00a\x00l\x00.\
-\x00s\x00v\x00g\
-\x00\x16\
-\x02\x13\xc6'\
-\x00a\
-\x00l\x00i\x00g\x00n\x00_\x00b\x00o\x00t\x00t\x00o\x00m\x00_\x00r\x00i\x00g\x00h\
-\x00t\x00.\x00s\x00v\x00g\
-\x00\x18\
-\x06\xfa/G\
-\x00d\
-\x00e\x00s\x00p\x00e\x00c\x00k\x00l\x00e\x00_\x00a\x00g\x00g\x00r\x00e\x00s\x00s\
-\x00i\x00v\x00e\x00.\x00s\x00v\x00g\
-\x00\x15\
-\x03)\x0aG\
-\x00a\
-\x00l\x00i\x00g\x00n\x00_\x00b\x00o\x00t\x00t\x00o\x00m\x00_\x00l\x00e\x00f\x00t\
-\x00.\x00s\x00v\x00g\
-\x00\x10\
-\x06T\x19\x87\
-\x00a\
-\x00l\x00i\x00g\x00n\x00_\x00c\x00e\x00n\x00t\x00e\x00r\x00.\x00s\x00v\x00g\
-\x00\x0d\
-\x0b<\x93\xa7\
-\x00a\
-\x00l\x00i\x00g\x00n\x00_\x00t\x00o\x00p\x00.\x00s\x00v\x00g\
-\x00\x0a\
-\x0b-\x8aG\
-\x00h\
-\x00a\x00n\x00d\x00l\x00e\x00.\x00s\x00v\x00g\
-\x00\x16\
-\x07* \xa7\
-\x00d\
-\x00e\x00s\x00p\x00e\x00c\x00k\x00l\x00e\x00_\x00c\x00a\x00u\x00t\x00i\x00o\x00u\
-\x00s\x00.\x00s\x00v\x00g\
-\x00\x09\
-\x0e\xb7\xb2\xc7\
-\x00m\
-\x00i\x00x\x00e\x00d\x00.\x00s\x00v\x00g\
-\x00\x0f\
-\x0e\x14\xde\x07\
+\x00Ee\xe7\
 \x00s\
-\x00i\x00n\x00g\x00l\x00e\x00_\x00p\x00a\x00g\x00e\x00.\x00s\x00v\x00g\
-\x00\x12\
-\x0c\xb0\xef\xa7\
+\x00h\x00r\x00i\x00n\x00k\x00.\x00s\x00v\x00g\
+\x00\x0b\
+\x00\x19I'\
 \x00a\
-\x00l\x00i\x00g\x00n\x00_\x00t\x00o\x00p\x00_\x00l\x00e\x00f\x00t\x00.\x00s\x00v\
-\x00g\
-\x00\x0e\
-\x0e+\xcc\x87\
+\x00r\x00c\x00h\x00i\x00v\x00e\x00.\x00s\x00v\x00g\
+\x00\x16\
+\x08l\xba\xa7\
 \x00a\
-\x00l\x00i\x00g\x00n\x00_\x00l\x00e\x00f\x00t\x00.\x00s\x00v\x00g\
+\x00r\x00r\x00o\x00w\x00-\x00d\x00o\x00w\x00n\x00-\x00t\x00o\x00-\x00l\x00i\x00n\
+\x00e\x00.\x00s\x00v\x00g\
 \x00\x0f\
-\x03\xc0l\xc7\
-\x00r\
-\x00i\x00g\x00h\x00t\x00_\x00t\x00h\x00u\x00m\x00b\x00.\x00s\x00v\x00g\
-\x00\x0e\
-\x0f\x81\x93\x87\
-\x00l\
-\x00e\x00f\x00t\x00_\x00t\x00h\x00u\x00m\x00b\x00.\x00s\x00v\x00g\
-\x00\x12\
-\x02\xa5Y\xe7\
-\x00a\
-\x00l\x00i\x00g\x00n\x00_\x00o\x00r\x00i\x00g\x00i\x00n\x00a\x00l\x00.\x00s\x00v\
-\x00g\
-\x00\x0f\
-\x022G\xe7\
+\x0a&\xfb\xa7\
 \x00c\
-\x00o\x00n\x00t\x00e\x00n\x00t\x00_\x00b\x00o\x00x\x00.\x00s\x00v\x00g\
-\x00\x14\
-\x0d\xe3\xb2\x87\
-\x00p\
-\x00a\x00g\x00e\x00_\x00o\x00f\x00f\x00c\x00u\x00t\x00_\x00l\x00e\x00f\x00t\x00.\
-\x00s\x00v\x00g\
-\x00\x0f\
-\x02>+\x87\
-\x00a\
-\x00l\x00i\x00g\x00n\x00_\x00r\x00i\x00g\x00h\x00t\x00.\x00s\x00v\x00g\
-\x00\x13\
-\x0b\x8c\x19\xc7\
-\x00a\
-\x00l\x00i\x00g\x00n\x00_\x00t\x00o\x00p\x00_\x00r\x00i\x00g\x00h\x00t\x00.\x00s\
-\x00v\x00g\
-\x00\x0c\
-\x04\xb9\xee'\
-\x00p\
-\x00e\x00n\x00t\x00a\x00g\x00o\x00n\x00.\x00s\x00v\x00g\
+\x00i\x00r\x00c\x00l\x00e\x00-\x00s\x00t\x00o\x00p\x00.\x00s\x00v\x00g\
 \x00\x14\
 \x09\xcfC\x07\
 \x00s\
@@ -89152,171 +84200,6 @@ qt_resource_name = b"\
 \x00s\
 \x00q\x00u\x00a\x00r\x00e\x00-\x00a\x00r\x00r\x00o\x00w\x00-\x00r\x00i\x00g\x00h\
 \x00t\x00.\x00s\x00v\x00g\
-\x00\x0f\
-\x04\x88\x11'\
-\x00p\
-\x00a\x00n\x00e\x00l\x00-\x00r\x00i\x00g\x00h\x00t\x00.\x00s\x00v\x00g\
-\x00\x13\
-\x0f\x16\xc9'\
-\x00a\
-\x00r\x00r\x00o\x00w\x00-\x00d\x00o\x00w\x00n\x00-\x00l\x00e\x00f\x00t\x00.\x00s\
-\x00v\x00g\
-\x00\x1c\
-\x0b\xe5\xc2\x87\
-\x00b\
-\x00e\x00t\x00w\x00e\x00e\x00n\x00-\x00h\x00o\x00r\x00i\x00z\x00o\x00n\x00t\x00a\
-\x00l\x00-\x00s\x00t\x00a\x00r\x00t\x00.\x00s\x00v\x00g\
-\x00\x0f\
-\x0e\xc4\xab\x87\
-\x00l\
-\x00i\x00s\x00t\x00-\x00c\x00h\x00e\x00c\x00k\x00s\x00.\x00s\x00v\x00g\
-\x00\x0e\
-\x0b@\xa7'\
-\x00p\
-\x00a\x00n\x00e\x00l\x00-\x00l\x00e\x00f\x00t\x00.\x00s\x00v\x00g\
-\x00\x0b\
-\x0bM_G\
-\x00p\
-\x00a\x00l\x00e\x00t\x00t\x00e\x00.\x00s\x00v\x00g\
-\x00\x10\
-\x0e\x17\x06\x87\
-\x00c\
-\x00h\x00e\x00v\x00r\x00o\x00n\x00-\x00d\x00o\x00w\x00n\x00.\x00s\x00v\x00g\
-\x00\x14\
-\x07o\xa7\xe7\
-\x00r\
-\x00o\x00t\x00a\x00t\x00e\x00-\x00c\x00w\x00-\x00s\x00q\x00u\x00a\x00r\x00e\x00.\
-\x00s\x00v\x00g\
-\x00\x0e\
-\x07\x881\xe7\
-\x00f\
-\x00i\x00l\x00e\x00-\x00i\x00m\x00a\x00g\x00e\x00.\x00s\x00v\x00g\
-\x00\x0a\
-\x0e\x0b:G\
-\x00l\
-\x00i\x00n\x00k\x00-\x002\x00.\x00s\x00v\x00g\
-\x00\x11\
-\x0f\xda%\xc7\
-\x00s\
-\x00q\x00u\x00a\x00r\x00e\x00-\x00d\x00a\x00s\x00h\x00e\x00d\x00.\x00s\x00v\x00g\
-\
-\x00\x0e\
-\x0as\x00'\
-\x00c\
-\x00i\x00r\x00c\x00l\x00e\x00-\x00d\x00o\x00t\x00.\x00s\x00v\x00g\
-\x00\x0a\
-\x08\x8b\x0b\xa7\
-\x00s\
-\x00q\x00u\x00a\x00r\x00e\x00.\x00s\x00v\x00g\
-\x00\x0e\
-\x09Xl\x87\
-\x00c\
-\x00h\x00e\x00v\x00r\x00o\x00n\x00-\x00u\x00p\x00.\x00s\x00v\x00g\
-\x00\x0b\
-\x05\x10\xaaG\
-\x00e\
-\x00y\x00e\x00-\x00o\x00f\x00f\x00.\x00s\x00v\x00g\
-\x00\x0e\
-\x06\x0c\x07\x87\
-\x00a\
-\x00r\x00r\x00o\x00w\x00-\x00d\x00o\x00w\x00n\x00.\x00s\x00v\x00g\
-\x00\x08\
-\x06\xc8TG\
-\x00m\
-\x00o\x00v\x00e\x00.\x00s\x00v\x00g\
-\x00\x07\
-\x00\xd7\xa3\xd5\
-\x00L\
-\x00I\x00C\x00E\x00N\x00S\x00E\
-\x00\x15\
-\x0aq\xc4\xe7\
-\x00c\
-\x00i\x00r\x00c\x00l\x00e\x00-\x00a\x00r\x00r\x00o\x00w\x00-\x00l\x00e\x00f\x00t\
-\x00.\x00s\x00v\x00g\
-\x00\x08\
-\x09\x81U\xe7\
-\x00s\
-\x00c\x00a\x00n\x00.\x00s\x00v\x00g\
-\x00\x05\
-\x00{Z\xc7\
-\x00x\
-\x00.\x00s\x00v\x00g\
-\x00\x07\
-\x0bgZ\x07\
-\x00d\
-\x00o\x00t\x00.\x00s\x00v\x00g\
-\x00\x09\
-\x0a\xa2\xbf\xc7\
-\x00l\
-\x00a\x00s\x00s\x00o\x00.\x00s\x00v\x00g\
-\x00\x12\
-\x0eW\x91\x87\
-\x00a\
-\x00r\x00r\x00o\x00w\x00-\x00u\x00p\x00-\x00r\x00i\x00g\x00h\x00t\x00.\x00s\x00v\
-\x00g\
-\x00\x0c\
-\x07g\xb4\xc7\
-\x00g\
-\x00r\x00i\x00d\x00-\x003\x00x\x003\x00.\x00s\x00v\x00g\
-\x00\x11\
-\x0e\x92xG\
-\x00c\
-\x00h\x00e\x00v\x00r\x00o\x00n\x00-\x00r\x00i\x00g\x00h\x00t\x00.\x00s\x00v\x00g\
-\
-\x00\x0e\
-\x05UL\x07\
-\x00l\
-\x00i\x00n\x00k\x00-\x002\x00-\x00o\x00f\x00f\x00.\x00s\x00v\x00g\
-\x00\x0d\
-\x04\x8a\x93\xa7\
-\x00b\
-\x00o\x00o\x00k\x00-\x00o\x00p\x00e\x00n\x00.\x00s\x00v\x00g\
-\x00\x17\
-\x0c\xb9&\x07\
-\x00a\
-\x00r\x00r\x00o\x00w\x00-\x00r\x00i\x00g\x00h\x00t\x00-\x00t\x00o\x00-\x00l\x00i\
-\x00n\x00e\x00.\x00s\x00v\x00g\
-\x00\x12\
-\x0ePBg\
-\x00a\
-\x00r\x00r\x00o\x00w\x00-\x00d\x00o\x00w\x00n\x00-\x000\x00-\x001\x00.\x00s\x00v\
-\x00g\
-\x00\x11\
-\x0e\xed_'\
-\x00a\
-\x00r\x00r\x00o\x00w\x00-\x00u\x00p\x00-\x00l\x00e\x00f\x00t\x00.\x00s\x00v\x00g\
-\
-\x00\x0f\
-\x0f\x22iG\
-\x00a\
-\x00r\x00r\x00o\x00w\x00-\x00r\x00i\x00g\x00h\x00t\x00.\x00s\x00v\x00g\
-\x00\x0e\
-\x08\xfa8\xa7\
-\x00a\
-\x00r\x00r\x00o\x00w\x00-\x00l\x00e\x00f\x00t\x00.\x00s\x00v\x00g\
-\x00\x0a\
-\x00Ee\xe7\
-\x00s\
-\x00h\x00r\x00i\x00n\x00k\x00.\x00s\x00v\x00g\
-\x00\x16\
-\x0a\xc9\xbag\
-\x00r\
-\x00e\x00c\x00t\x00a\x00n\x00g\x00l\x00e\x00-\x00v\x00e\x00r\x00t\x00i\x00c\x00a\
-\x00l\x00.\x00s\x00v\x00g\
-\x00\x16\
-\x08l\xba\xa7\
-\x00a\
-\x00r\x00r\x00o\x00w\x00-\x00d\x00o\x00w\x00n\x00-\x00t\x00o\x00-\x00l\x00i\x00n\
-\x00e\x00.\x00s\x00v\x00g\
-\x00\x0f\
-\x0a&\xfb\xa7\
-\x00c\
-\x00i\x00r\x00c\x00l\x00e\x00-\x00s\x00t\x00o\x00p\x00.\x00s\x00v\x00g\
-\x00\x1a\
-\x0e\xc4(\xa7\
-\x00b\
-\x00e\x00t\x00w\x00e\x00e\x00n\x00-\x00h\x00o\x00r\x00i\x00z\x00o\x00n\x00t\x00a\
-\x00l\x00-\x00e\x00n\x00d\x00.\x00s\x00v\x00g\
 \x00\x12\
 \x01OB\x07\
 \x00a\
@@ -89331,25 +84214,53 @@ qt_resource_name = b"\
 \x0b=\xcd\x87\
 \x00p\
 \x00a\x00i\x00n\x00t\x00-\x00b\x00u\x00c\x00k\x00e\x00t\x00.\x00s\x00v\x00g\
-\x00\x14\
-\x01\xefq\xa7\
-\x00a\
-\x00r\x00r\x00o\x00w\x00-\x00d\x00o\x00w\x00n\x00-\x00r\x00i\x00g\x00h\x00t\x00.\
-\x00s\x00v\x00g\
+\x00\x08\
+\x02\x8cT'\
+\x00p\
+\x00l\x00a\x00y\x00.\x00s\x00v\x00g\
+\x00\x0f\
+\x0e\xc4\xab\x87\
+\x00l\
+\x00i\x00s\x00t\x00-\x00c\x00h\x00e\x00c\x00k\x00s\x00.\x00s\x00v\x00g\
+\x00\x08\
+\x00(Wg\
+\x00f\
+\x00i\x00l\x00e\x00.\x00s\x00v\x00g\
 \x00\x11\
 \x0a\x81^\xc7\
 \x00w\
 \x00a\x00n\x00d\x00-\x00s\x00p\x00a\x00r\x00k\x00l\x00e\x00s\x00.\x00s\x00v\x00g\
 \
-\x00\x1b\
-\x07\xd94'\
-\x00s\
-\x00q\x00u\x00a\x00r\x00e\x00-\x00s\x00p\x00l\x00i\x00t\x00-\x00h\x00o\x00r\x00i\
-\x00z\x00o\x00n\x00t\x00a\x00l\x00.\x00s\x00v\x00g\
+\x00\x0a\
+\x0a\xc8\xf6\x87\
+\x00f\
+\x00o\x00l\x00d\x00e\x00r\x00.\x00s\x00v\x00g\
+\x00\x0b\
+\x0bM_G\
+\x00p\
+\x00a\x00l\x00e\x00t\x00t\x00e\x00.\x00s\x00v\x00g\
+\x00\x10\
+\x0e\x17\x06\x87\
+\x00c\
+\x00h\x00e\x00v\x00r\x00o\x00n\x00-\x00d\x00o\x00w\x00n\x00.\x00s\x00v\x00g\
+\x00\x14\
+\x07o\xa7\xe7\
+\x00r\
+\x00o\x00t\x00a\x00t\x00e\x00-\x00c\x00w\x00-\x00s\x00q\x00u\x00a\x00r\x00e\x00.\
+\x00s\x00v\x00g\
+\x00\x0a\
+\x0e\x0b:G\
+\x00l\
+\x00i\x00n\x00k\x00-\x002\x00.\x00s\x00v\x00g\
 \x00\x0c\
 \x05\xeb\xed\xc7\
 \x00c\
 \x00o\x00n\x00t\x00r\x00a\x00s\x00t\x00.\x00s\x00v\x00g\
+\x00\x11\
+\x0f\xda%\xc7\
+\x00s\
+\x00q\x00u\x00a\x00r\x00e\x00-\x00d\x00a\x00s\x00h\x00e\x00d\x00.\x00s\x00v\x00g\
+\
 \x00\x0b\
 \x03\x03\x96\xc7\
 \x00z\
@@ -89358,15 +84269,36 @@ qt_resource_name = b"\
 \x09\xd0w\x87\
 \x00a\
 \x00r\x00r\x00o\x00w\x00-\x00u\x00p\x00.\x00s\x00v\x00g\
+\x00\x07\
+\x0c\xf8Z\x07\
+\x00e\
+\x00y\x00e\x00.\x00s\x00v\x00g\
+\x00\x0e\
+\x09Xl\x87\
+\x00c\
+\x00h\x00e\x00v\x00r\x00o\x00n\x00-\x00u\x00p\x00.\x00s\x00v\x00g\
+\x00\x0b\
+\x05\x10\xaaG\
+\x00e\
+\x00y\x00e\x00-\x00o\x00f\x00f\x00.\x00s\x00v\x00g\
+\x00\x0e\
+\x06\x0c\x07\x87\
+\x00a\
+\x00r\x00r\x00o\x00w\x00-\x00d\x00o\x00w\x00n\x00.\x00s\x00v\x00g\
+\x00\x07\
+\x00\xd7\xa3\xd5\
+\x00L\
+\x00I\x00C\x00E\x00N\x00S\x00E\
+\x00\x15\
+\x0aq\xc4\xe7\
+\x00c\
+\x00i\x00r\x00c\x00l\x00e\x00-\x00a\x00r\x00r\x00o\x00w\x00-\x00l\x00e\x00f\x00t\
+\x00.\x00s\x00v\x00g\
 \x00\x13\
 \x042\x0f\xc7\
 \x00a\
 \x00r\x00c\x00h\x00i\x00v\x00e\x00-\x00r\x00e\x00s\x00t\x00o\x00r\x00e\x00.\x00s\
 \x00v\x00g\
-\x00\x0d\
-\x09\xc3S\x87\
-\x00f\
-\x00i\x00l\x00e\x00-\x00p\x00l\x00u\x00s\x00.\x00s\x00v\x00g\
 \x00\x09\
 \x07\xd8\xba\xa7\
 \x00i\
@@ -89376,13 +84308,9 @@ qt_resource_name = b"\
 \x00u\
 \x00n\x00d\x00o\x00-\x002\x00.\x00s\x00v\x00g\
 \x00\x09\
-\x0b\x9e\x89\x07\
-\x00c\
-\x00h\x00e\x00c\x00k\x00.\x00s\x00v\x00g\
-\x00\x0d\
-\x02\xc2\xd3\xc7\
-\x00c\
-\x00o\x00l\x00u\x00m\x00n\x00s\x00-\x002\x00.\x00s\x00v\x00g\
+\x0a\xa2\xbf\xc7\
+\x00l\
+\x00a\x00s\x00s\x00o\x00.\x00s\x00v\x00g\
 \x00\x16\
 \x07\x9e-\x07\
 \x00c\
@@ -89392,20 +84320,42 @@ qt_resource_name = b"\
 \x0b\xf2K\xe7\
 \x00t\
 \x00r\x00a\x00s\x00h\x00-\x002\x00.\x00s\x00v\x00g\
-\x00\x15\
-\x06\xc0FG\
-\x00t\
-\x00e\x00x\x00t\x00-\x00c\x00u\x00r\x00s\x00o\x00r\x00-\x00i\x00n\x00p\x00u\x00t\
-\x00.\x00s\x00v\x00g\
 \x00\x16\
 \x0c\x17qg\
 \x00a\
 \x00r\x00r\x00o\x00w\x00-\x00l\x00e\x00f\x00t\x00-\x00t\x00o\x00-\x00l\x00i\x00n\
 \x00e\x00.\x00s\x00v\x00g\
+\x00\x11\
+\x0e\x92xG\
+\x00c\
+\x00h\x00e\x00v\x00r\x00o\x00n\x00-\x00r\x00i\x00g\x00h\x00t\x00.\x00s\x00v\x00g\
+\
 \x00\x0a\
 \x06\x0dw\x07\
 \x00r\
 \x00o\x00w\x00s\x00-\x003\x00.\x00s\x00v\x00g\
+\x00\x0e\
+\x05UL\x07\
+\x00l\
+\x00i\x00n\x00k\x00-\x002\x00-\x00o\x00f\x00f\x00.\x00s\x00v\x00g\
+\x00\x09\
+\x05\xc6\xb2\xc7\
+\x00m\
+\x00i\x00n\x00u\x00s\x00.\x00s\x00v\x00g\
+\x00\x0d\
+\x04\x8a\x93\xa7\
+\x00b\
+\x00o\x00o\x00k\x00-\x00o\x00p\x00e\x00n\x00.\x00s\x00v\x00g\
+\x00\x17\
+\x0c\xb9&\x07\
+\x00a\
+\x00r\x00r\x00o\x00w\x00-\x00r\x00i\x00g\x00h\x00t\x00-\x00t\x00o\x00-\x00l\x00i\
+\x00n\x00e\x00.\x00s\x00v\x00g\
+\x00\x12\
+\x0ePBg\
+\x00a\
+\x00r\x00r\x00o\x00w\x00-\x00d\x00o\x00w\x00n\x00-\x000\x00-\x001\x00.\x00s\x00v\
+\x00g\
 \x00\x0c\
 \x0d\x8b\x03\xe7\
 \x00a\
@@ -89415,369 +84365,271 @@ qt_resource_name = b"\
 \x00r\
 \x00o\x00t\x00a\x00t\x00e\x00-\x00c\x00c\x00w\x00-\x00s\x00q\x00u\x00a\x00r\x00e\
 \x00.\x00s\x00v\x00g\
+\x00\x0f\
+\x0f\x22iG\
+\x00a\
+\x00r\x00r\x00o\x00w\x00-\x00r\x00i\x00g\x00h\x00t\x00.\x00s\x00v\x00g\
 \x00\x0c\
 \x06\xeb\x9ag\
 \x00z\
 \x00o\x00o\x00m\x00-\x00o\x00u\x00t\x00.\x00s\x00v\x00g\
+\x00\x0e\
+\x08\xfa8\xa7\
+\x00a\
+\x00r\x00r\x00o\x00w\x00-\x00l\x00e\x00f\x00t\x00.\x00s\x00v\x00g\
+\x00 \
+\x00\xaa\xe0\x87\
+\x00s\
+\x00p\x00l\x00i\x00t\x00-\x00r\x00i\x00g\x00h\x00t\x00-\x00p\x00a\x00g\x00e\x00-\
+\x00p\x00l\x00u\x00s\x00-\x00o\x00f\x00f\x00c\x00u\x00t\x00.\x00s\x00v\x00g\
+\x00\x15\
+\x09\xb5\xfe\xc7\
+\x00c\
+\x00o\x00l\x00o\x00u\x00r\x00-\x00m\x00o\x00d\x00e\x00-\x00m\x00i\x00x\x00e\x00d\
+\x00.\x00s\x00v\x00g\
+\x00\x14\
+\x0ej\xb8\xe7\
+\x00a\
+\x00l\x00i\x00g\x00n\x00-\x00n\x00o\x00r\x00t\x00h\x00-\x00e\x00a\x00s\x00t\x00.\
+\x00s\x00v\x00g\
+\x00\x1f\
+\x0f\x95#\xe7\
+\x00s\
+\x00p\x00l\x00i\x00t\x00-\x00l\x00e\x00f\x00t\x00-\x00p\x00a\x00g\x00e\x00-\x00p\
+\x00l\x00u\x00s\x00-\x00o\x00f\x00f\x00c\x00u\x00t\x00.\x00s\x00v\x00g\
 \x00\x0f\
-\x08.wG\
-\x00l\
-\x00a\x00y\x00o\x00u\x00t\x00-\x00g\x00r\x00i\x00d\x00.\x00s\x00v\x00g\
+\x0f\x17|g\
+\x00i\
+\x00n\x00s\x00e\x00r\x00t\x00-\x00h\x00e\x00r\x00e\x00.\x00s\x00v\x00g\
+\x00\x14\
+\x0a\xcaU\xe7\
+\x00a\
+\x00l\x00i\x00g\x00n\x00-\x00s\x00o\x00u\x00t\x00h\x00-\x00w\x00e\x00s\x00t\x00.\
+\x00s\x00v\x00g\
+\x00\x14\
+\x08\xff\x93G\
+\x00s\
+\x00p\x00r\x00e\x00a\x00d\x00-\x00h\x00a\x00l\x00f\x00-\x00l\x00e\x00f\x00t\x00.\
+\x00s\x00v\x00g\
+\x00\x14\
+\x0e\xca['\
+\x00a\
+\x00l\x00i\x00g\x00n\x00-\x00s\x00o\x00u\x00t\x00h\x00-\x00e\x00a\x00s\x00t\x00.\
+\x00s\x00v\x00g\
+\x00\x16\
+\x07`\xba\xe7\
+\x00s\
+\x00p\x00l\x00i\x00t\x00-\x00s\x00i\x00n\x00g\x00l\x00e\x00-\x00u\x00n\x00c\x00u\
+\x00t\x00.\x00s\x00v\x00g\
+\x00\x17\
+\x04\xe9.\xa7\
+\x00a\
+\x00l\x00i\x00g\x00n\x00-\x00k\x00e\x00e\x00p\x00-\x00o\x00r\x00i\x00g\x00i\x00n\
+\x00a\x00l\x00.\x00s\x00v\x00g\
+\x00\x0f\
+\x022]'\
+\x00c\
+\x00o\x00n\x00t\x00e\x00n\x00t\x00-\x00b\x00o\x00x\x00.\x00s\x00v\x00g\
+\x00\x14\
+\x0aj\xb6'\
+\x00a\
+\x00l\x00i\x00g\x00n\x00-\x00n\x00o\x00r\x00t\x00h\x00-\x00w\x00e\x00s\x00t\x00.\
+\x00s\x00v\x00g\
+\x00\x0c\
+\x07\xa4\xea\xa7\
+\x00p\
+\x00a\x00g\x00e\x00-\x00b\x00o\x00x\x00.\x00s\x00v\x00g\
+\x00\x11\
+\x05\xa2*G\
+\x00i\
+\x00n\x00s\x00e\x00r\x00t\x00-\x00b\x00e\x00f\x00o\x00r\x00e\x00.\x00s\x00v\x00g\
+\
+\x00\x10\
+\x03\xf7#\x07\
+\x00i\
+\x00n\x00s\x00e\x00r\x00t\x00-\x00a\x00f\x00t\x00e\x00r\x00.\x00s\x00v\x00g\
+\x00\x15\
+\x0f{\xd7G\
+\x00s\
+\x00p\x00r\x00e\x00a\x00d\x00-\x00h\x00a\x00l\x00f\x00-\x00r\x00i\x00g\x00h\x00t\
+\x00.\x00s\x00v\x00g\
+\x00\x10\
+\x0f\x0eD\x07\
+\x00z\
+\x00o\x00n\x00e\x00-\x00p\x00o\x00l\x00y\x00g\x00o\x00n\x00.\x00s\x00v\x00g\
+\x00\x0f\
+\x04b<G\
+\x00d\
+\x00r\x00a\x00g\x00-\x00h\x00a\x00n\x00d\x00l\x00e\x00.\x00s\x00v\x00g\
+\x00\x0f\
+\x03\xe4\x96'\
+\x00d\
+\x00e\x00w\x00a\x00r\x00p\x00-\x00g\x00r\x00i\x00d\x00.\x00s\x00v\x00g\
 "
 
 qt_resource_struct = b"\
-\x00\x00\x00\x00\x00\x02\x00\x00\x00\x06\x00\x00\x00\x01\
+\x00\x00\x00\x00\x00\x02\x00\x00\x00\x05\x00\x00\x00\x01\
 \x00\x00\x00\x00\x00\x00\x00\x00\
-\x00\x00\x00,\x00\x02\x00\x00\x00\x01\x00\x00\x00\xab\
+\x00\x00\x00,\x00\x02\x00\x00\x00\x01\x00\x00\x00L\
 \x00\x00\x00\x00\x00\x00\x00\x00\
-\x00\x00\x00\x00\x00\x02\x00\x00\x00C\x00\x00\x00\x07\
+\x00\x00\x00\x00\x00\x02\x00\x00\x00\x02\x00\x00\x00\x06\
 \x00\x00\x00\x00\x00\x00\x00\x00\
-\x00\x00\x00x\x00\x01\x00\x00\x00\x01\x00\x00\xebC\
-\x00\x00\x01\xa1'5\xc3\x87\
 \x00\x00\x00<\x00\x00\x00\x00\x00\x01\x00\x00O\x1b\
-\x00\x00\x01\xa1'5\xc40\
+\x00\x00\x01\x97\x9c\xc5\x9a\xd6\
 \x00\x00\x00\x10\x00\x00\x00\x00\x00\x01\x00\x00\x00\x00\
-\x00\x00\x01\xa1'5\xc44\
+\x00\x00\x01\x97\x9c\xc5\x9a\xd7\
 \x00\x00\x00V\x00\x00\x00\x00\x00\x01\x00\x00\xea\xa1\
-\x00\x00\x01\xa1'5\xc3\x85\
-\x00\x00\x06\xf0\x00\x00\x00\x00\x00\x01\x00\x14u\x19\
-\x00\x00\x01\xa1'5\xc3\xbe\
-\x00\x00\x08D\x00\x00\x00\x00\x00\x01\x00\x14\x89L\
-\x00\x00\x01\xa1'5\xc3\xe5\
-\x00\x00\x05\xbc\x00\x00\x00\x00\x00\x01\x00\x14[\xc9\
-\x00\x00\x01\xa1'5\xc3\xea\
-\x00\x00\x04P\x00\x00\x00\x00\x00\x01\x00\x14Cw\
-\x00\x00\x01\xa1'5\xc3\x9e\
-\x00\x00\x03D\x00\x00\x00\x00\x00\x01\x00\x145\xe7\
-\x00\x00\x01\xa1'5\xc3l\
-\x00\x00\x02\xf8\x00\x00\x00\x00\x00\x01\x00\x140\x93\
-\x00\x00\x01\xa1'5\xc3\xeb\
-\x00\x00\x04\xd4\x00\x00\x00\x00\x00\x01\x00\x14N\xcf\
-\x00\x00\x01\xa1'5\xc3\x9a\
-\x00\x00\x04\x96\x00\x00\x00\x00\x00\x01\x00\x14J\xde\
-\x00\x00\x01\xa1'5\xc3\xdc\
-\x00\x00\x09\xe4\x00\x00\x00\x00\x00\x01\x00\x14\xb3M\
-\x00\x00\x01\xa1'5\xc3\xae\
-\x00\x00\x0a\x22\x00\x00\x00\x00\x00\x01\x00\x14\xb5~\
-\x00\x00\x01\xa1'5\xc3\x8a\
-\x00\x00\x0az\x00\x00\x00\x00\x00\x01\x00\x14\xbe0\
-\x00\x00\x01\xa1'5\xc3\xfe\
-\x00\x00\x02\x0c\x00\x00\x00\x00\x00\x01\x00\x14\x1dr\
-\x00\x00\x01\xa1'5\xc3\xed\
-\x00\x00\x0b\xac\x00\x00\x00\x00\x00\x01\x00\x14\xd8\x98\
-\x00\x00\x01\xa1'5\xc3\xd5\
-\x00\x00\x0c8\x00\x00\x00\x00\x00\x01\x00\x14\xe9z\
-\x00\x00\x01\xa1'5\xc3\xef\
-\x00\x00\x01,\x00\x00\x00\x00\x00\x01\x00\x14\x0d\x8d\
-\x00\x00\x01\xa1'5\xc4\x14\
-\x00\x00\x0b0\x00\x00\x00\x00\x00\x01\x00\x14\xd0\x82\
-\x00\x00\x01\xa1'5\xc3\xc4\
-\x00\x00\x0b\x0a\x00\x00\x00\x00\x00\x01\x00\x14\xc8\xd6\
-\x00\x00\x01\xa1'5\xc3v\
-\x00\x00\x07\x8a\x00\x00\x00\x00\x00\x01\x00\x14}G\
-\x00\x00\x01\xa1'5\xc3\x90\
-\x00\x00\x01\x8e\x00\x00\x00\x00\x00\x01\x00\x14\x13\x87\
-\x00\x00\x01\xa1'5\xc3\xa0\
-\x00\x00\x07\xbe\x00\x00\x00\x00\x00\x01\x00\x14~\xdc\
-\x00\x00\x01\xa1'5\xc3\x95\
-\x00\x00\x0b\xe2\x00\x00\x00\x00\x00\x01\x00\x14\xdf`\
-\x00\x00\x01\xa1'5\xc4\x0d\
-\x00\x00\x07\xe8\x00\x00\x00\x00\x00\x01\x00\x14\x80\x90\
-\x00\x00\x01\xa1'5\xc3\xf9\
-\x00\x00\x0a\xe2\x00\x00\x00\x00\x00\x01\x00\x14\xc5\xb1\
-\x00\x00\x01\xa1'5\xc3\xc9\
-\x00\x00\x0bV\x00\x00\x00\x00\x00\x01\x00\x14\xd3\xa0\
-\x00\x00\x01\xa1'5\xc3\xe0\
-\x00\x00\x02\x9e\x00\x00\x00\x00\x00\x01\x00\x14(d\
-\x00\x00\x01\xa1'5\xc3\xb5\
-\x00\x00\x03\xec\x00\x00\x00\x00\x00\x01\x00\x14;\xb2\
-\x00\x00\x01\xa1'5\xc3\xe2\
-\x00\x00\x06\x0e\x00\x00\x00\x00\x00\x01\x00\x14c\xe3\
-\x00\x00\x01\xa1'5\xc3\xa4\
-\x00\x00\x06v\x00\x02\x00\x00\x00\x1a\x00\x00\x00\x91\
+\x00\x00\x01\x97\x9c\xc5\x9a\xe4\
+\x00\x00\x01\x14\x00\x02\x00\x00\x00\x13\x00\x00\x009\
 \x00\x00\x00\x00\x00\x00\x00\x00\
-\x00\x00\x06\x88\x00\x00\x00\x00\x00\x01\x00\x14k\xef\
-\x00\x00\x01\xa1'5\xc3\xe9\
-\x00\x00\x02\xc4\x00\x00\x00\x00\x00\x01\x00\x14.\xa5\
-\x00\x00\x01\xa1'5\xc4\x1d\
-\x00\x00\x09h\x00\x00\x00\x00\x00\x01\x00\x14\xa1U\
-\x00\x00\x01\xa1'5\xc4\x03\
-\x00\x00\x04\xc2\x00\x02\x00\x00\x00G\x00\x00\x00J\
+\x00\x00\x01&\x00\x02\x00\x00\x001\x00\x00\x00\x08\
 \x00\x00\x00\x00\x00\x00\x00\x00\
-\x00\x00\x060\x00\x00\x00\x00\x00\x01\x00\x14h\xef\
-\x00\x00\x01\xa1'5\xc4\x08\
-\x00\x00\x02n\x00\x00\x00\x00\x00\x01\x00\x14$\x8d\
-\x00\x00\x01\xa1'5\xc3\xb1\
-\x00\x00\x03\xb4\x00\x00\x00\x00\x00\x01\x00\x149\xd2\
-\x00\x00\x01\xa1'5\xc3\xf4\
-\x00\x00\x05\x8c\x00\x00\x00\x00\x00\x01\x00\x14XK\
-\x00\x00\x01\xa1'5\xc3\xb4\
-\x00\x00\x08\x8a\x00\x00\x00\x00\x00\x01\x00\x14\x91\xc0\
-\x00\x00\x01\xa1'5\xc3\xa3\
-\x00\x00\x07\x06\x00\x00\x00\x00\x00\x01\x00\x14v\xbe\
-\x00\x00\x01\xa1'5\xc3\xa8\
-\x00\x00\x0a\xb4\x00\x00\x00\x00\x00\x01\x00\x14\xc3\x18\
-\x00\x00\x01\xa1'5\xc3\xd3\
-\x00\x00\x02\x22\x00\x00\x00\x00\x00\x01\x00\x14\x1e\xf8\
-\x00\x00\x01\xa1'5\xc4\x0c\
-\x00\x00\x01\xd4\x00\x00\x00\x00\x00\x01\x00\x14\x18u\
-\x00\x00\x01\xa1'5\xc3\xd9\
-\x00\x00\x04\x1c\x00\x00\x00\x00\x00\x01\x00\x14=\xd2\
-\x00\x00\x01\xa1'5\xc3\xa1\
-\x00\x00\x04v\x00\x00\x00\x00\x00\x01\x00\x14E+\
-\x00\x00\x01\xa1'5\xc3\x97\
-\x00\x00\x0c\x14\x00\x00\x00\x00\x00\x01\x00\x14\xe1N\
-\x00\x00\x01\xa1'5\xc3\x89\
-\x00\x00\x0bn\x00\x00\x00\x00\x00\x01\x00\x14\xd6\x9d\
-\x00\x00\x01\xa1'5\xc4\x1a\
-\x00\x00\x09\x98\x00\x00\x00\x00\x00\x01\x00\x14\xa4\xf8\
-\x00\x00\x01\xa1'5\xc3\xfd\
-\x00\x00\x07p\x00\x00\x00\x00\x00\x01\x00\x14{\x8d\
-\x00\x00\x01\xa1'5\xc3\xc2\
-\x00\x00\x08\xe4\x00\x00\x00\x00\x00\x01\x00\x14\x9b\xcd\
-\x00\x00\x01\xa1'5\xc3\xac\
-\x00\x00\x08\xa6\x00\x00\x00\x00\x00\x01\x00\x14\x99\xd7\
-\x00\x00\x01\xa1'5\xc4\x13\
-\x00\x00\x09\xc2\x00\x00\x00\x00\x00\x01\x00\x14\xa9\xa8\
-\x00\x00\x01\xa1'5\xc3\xa5\
-\x00\x00\x05\xa6\x00\x00\x00\x00\x00\x01\x00\x14Y\xeb\
-\x00\x00\x01\xa1'5\xc3\x86\
-\x00\x00\x06\xbc\x00\x00\x00\x00\x00\x01\x00\x14n\xbf\
-\x00\x00\x01\xa1'5\xc3q\
-\x00\x00\x05.\x00\x00\x00\x00\x00\x01\x00\x14Tv\
-\x00\x00\x01\xa1'5\xc3\xf1\
-\x00\x00\x08v\x00\x00\x00\x00\x00\x01\x00\x14\x8c\x1a\
-\x00\x00\x01\xa1'5\xc3\xbc\
-\x00\x00\x01`\x00\x00\x00\x00\x00\x01\x00\x14\x0f{\
-\x00\x00\x01\xa1'5\xc4\x00\
-\x00\x00\x05\xe2\x00\x00\x00\x00\x00\x01\x00\x14^~\
-\x00\x00\x01\xa1'5\xc3\xd0\
-\x00\x00\x094\x00\x00\x00\x00\x00\x01\x00\x14\x9f'\
-\x00\x00\x01\xa1'5\xc4\x0b\
-\x00\x00\x0a^\x00\x00\x00\x00\x00\x01\x00\x14\xb7\xab\
-\x00\x00\x01\xa1'5\xc3\x8a\
-\x00\x00\x03v\x00\x00\x00\x00\x00\x01\x00\x147\xd5\
-\x00\x00\x01\xa1'5\xc4\x18\
-\x00\x00\x05b\x00\x00\x00\x00\x00\x01\x00\x14V\x98\
-\x00\x00\x01\xa1'5\xc3\x8f\
-\x00\x00\x03\x1e\x00\x00\x00\x00\x00\x01\x00\x142\xf7\
-\x00\x00\x01\xa1'5\xc3z\
-\x00\x00\x072\x00\x00\x00\x00\x00\x01\x00\x14y\x95\
-\x00\x00\x01\xa1'5\xc4\x11\
-\x00\x00\x01\xa4\x00\x00\x00\x00\x00\x01\x00\x14\x16\xdd\
-\x00\x00\x01\xa1'5\xc3\x94\
-\x00\x00\x08 \x00\x00\x00\x00\x00\x01\x00\x14\x87a\
-\x00\x00\x01\xa1'5\xc3\xcc\
-\x00\x00\x02H\x00\x00\x00\x00\x00\x01\x00\x14!\xbd\
-\x00\x00\x01\xa1'5\xc3\x82\
-\x00\x00\x05\x00\x00\x00\x00\x00\x00\x01\x00\x14P\x82\
-\x00\x00\x01\xa1'5\xc3\xdf\
-\x00\x00\x09\x02\x00\x00\x00\x00\x00\x01\x00\x14\x9d]\
-\x00\x00\x01\xa1'5\xc4\x02\
-\x00\x00\x06\xf0\x00\x00\x00\x00\x00\x01\x00\x15eJ\
-\x00\x00\x01\xa1.\xc3\x14{\
-\x00\x00\x15\x06\x00\x00\x00\x00\x00\x01\x00\x15V\x0c\
-\x00\x00\x01\xa1.\xc3\x156\
-\x00\x00\x13L\x00\x00\x00\x00\x00\x01\x00\x15B\x9a\
-\x00\x00\x01\xa1.\xc3\x15\xa1\
-\x00\x00\x16\x0c\x00\x00\x00\x00\x00\x01\x00\x15_\xae\
-\x00\x00\x01\xa1.\xc3\x14\x1b\
-\x00\x00\x12\xf2\x00\x00\x00\x00\x00\x01\x00\x152\xcc\
-\x00\x00\x01\xa1.\xc3\x84\x1c\
-\x00\x00\x15\xe2\x00\x00\x00\x00\x00\x01\x00\x15]\xe9\
-\x00\x00\x01\xa1.\xc3\x13\xc5\
-\x00\x00\x16`\x00\x00\x00\x00\x00\x01\x00\x15c\xeb\
-\x00\x00\x01\xa1.\xc3\x13\xd9\
-\x00\x00\x17\xae\x00\x00\x00\x00\x00\x01\x00\x15x\xb2\
-\x00\x00\x01\xa1.\xc3\x15\x80\
-\x00\x00\x02\x0c\x00\x00\x00\x00\x00\x01\x00\x15\x17V\
-\x00\x00\x01\xa1.\xc3\x14\xf9\
-\x00\x00\x17\xe0\x00\x00\x00\x00\x00\x01\x00\x15{w\
-\x00\x00\x01\xa1.\xc3\x14c\
-\x00\x00\x17\x10\x00\x00\x00\x00\x00\x01\x00\x15nH\
-\x00\x00\x01\xa1.\xc3\x15\xaf\
-\x00\x00\x0c8\x00\x00\x00\x00\x00\x01\x00\x15\x0eG\
-\x00\x00\x01\xa1.\xc3\x15\x00\
-\x00\x00\x17J\x00\x00\x00\x00\x00\x01\x00\x15s \
-\x00\x00\x01\xa1.\xc3\x13\x93\
-\x00\x00\x10\x98\x00\x00\x00\x00\x00\x01\x00\x15\x14\x85\
-\x00\x00\x01\xa1.\xc3\x14\xed\
-\x00\x00\x14\x1a\x00\x00\x00\x00\x00\x01\x00\x15L\xe2\
-\x00\x00\x01\xa1.\xc3\x141\
-\x00\x00\x10\x1a\x00\x00\x00\x00\x00\x01\x00\x15\x0f\x96\
-\x00\x00\x01\xa1.\xc3\x14\xf3\
-\x00\x00\x12\x9e\x00\x00\x00\x00\x00\x01\x00\x15-e\
-\x00\x00\x01\xa1.\xc3\x14v\
-\x00\x00\x13\xf8\x00\x00\x00\x00\x00\x01\x00\x15K \
-\x00\x00\x01\xa1.\xc3\x14\xbd\
-\x00\x00\x0bV\x00\x00\x00\x00\x00\x01\x00\x15\x85a\
-\x00\x00\x01\xa1.\xc3\x14\xc9\
-\x00\x00\x16\xf2\x00\x00\x00\x00\x00\x01\x00\x15l\xd8\
-\x00\x00\x01\xa1.\xc3\x14g\
-\x00\x00\x12\xba\x00\x00\x00\x00\x00\x01\x00\x15/\xaf\
-\x00\x00\x01\xa1.\xc3\x13\xa4\
-\x00\x00\x18\xb0\x00\x00\x00\x00\x00\x01\x00\x15\x83\xdc\
-\x00\x00\x01\xa1.\xc3\x15 \
-\x00\x00\x18N\x00\x00\x00\x00\x00\x01\x00\x15\x80E\
-\x00\x00\x01\xa1.\xc3\x15j\
-\x00\x00\x12\xdc\x00\x00\x00\x00\x00\x01\x00\x151\x0a\
-\x00\x00\x01\xa1.\xc3\x14\xd0\
-\x00\x00\x19\x18\x00\x00\x00\x00\x00\x01\x00\x15\x89\xd7\
-\x00\x00\x01\xa1.\xc3\x15\xbc\
-\x00\x00\x13\xb2\x00\x00\x00\x00\x00\x01\x00\x15H%\
-\x00\x00\x01\xa1.\xc3\x14\x9a\
-\x00\x00\x11\xae\x00\x00\x00\x00\x00\x01\x00\x15!v\
-\x00\x00\x01\xa1.\xc3\x15\x17\
-\x00\x00\x11\xdc\x00\x00\x00\x00\x00\x01\x00\x15#-\
-\x00\x00\x01\xa1.\xc3\x14\x82\
-\x00\x00\x18\x00\x00\x00\x00\x00\x00\x01\x00\x15|\xe8\
-\x00\x00\x01\xa1.\xc3\x14Q\
-\x00\x00\x17\x96\x00\x00\x00\x00\x00\x01\x00\x15v\xfc\
-\x00\x00\x01\xa1.\xc3\x14\xa3\
-\x00\x00\x16\xb6\x00\x00\x00\x00\x00\x01\x00\x15k\x1e\
-\x00\x00\x01\xa1.\xc3\x15b\
-\x00\x00\x18\xe8\x00\x00\x00\x00\x00\x01\x00\x15\x88\x1e\
-\x00\x00\x01\xa1.\xc3\x15\x0f\
-\x00\x00\x196\x00\x00\x00\x00\x00\x01\x00\x15\x8bx\
-\x00\x00\x01\xa1.\xc3\x14\xb2\
-\x00\x00\x15R\x00\x00\x00\x00\x00\x01\x00\x15Y:\
-\x00\x00\x01\xa1.\xc3\x13\xe2\
-\x00\x00\x12b\x00\x00\x00\x00\x00\x01\x00\x15*\xcc\
-\x00\x00\x01\xa1.\xc3\x15>\
-\x00\x00\x14\xe4\x00\x00\x00\x00\x00\x01\x00\x15T\xb1\
-\x00\x00\x01\xa1.\xc3\x13\xe9\
-\x00\x00\x12|\x00\x00\x00\x00\x00\x01\x00\x15,\x22\
-\x00\x00\x01\xa1.\xc3\x14F\
-\x00\x00\x136\x00\x00\x00\x00\x00\x01\x00\x15@\xdd\
-\x00\x00\x01\xa1.\xc3\x15+\
-\x00\x00\x17v\x00\x00\x00\x00\x00\x01\x00\x15u\x03\
-\x00\x00\x01\xa1.\xc3\x14\x8c\
-\x00\x00\x108\x00\x00\x00\x00\x00\x01\x00\x15\x11S\
-\x00\x00\x01\xa1.\xc3\x15S\
-\x00\x00\x17,\x00\x00\x00\x00\x00\x01\x00\x15p\x12\
-\x00\x00\x01\xa1.\xc3\x14\x05\
-\x00\x00\x15\x84\x00\x00\x00\x00\x00\x01\x00\x15Z\xb4\
-\x00\x00\x01\xa1.\xc3\x14]\
-\x00\x00\x13\x06\x00\x00\x00\x00\x00\x01\x00\x15?X\
-\x00\x00\x01\xa1.\xc3\x14K\
-\x00\x00\x12@\x00\x00\x00\x00\x00\x01\x00\x15)`\
-\x00\x00\x01\xa1.\xc3\x14W\
-\x00\x00\x16\x8e\x00\x00\x00\x00\x00\x01\x00\x15g\x0e\
-\x00\x00\x01\xa1.\xc3\x15\x8f\
-\x00\x00\x13p\x00\x00\x00\x00\x00\x01\x00\x15E+\
-\x00\x00\x01\xa1.\xc3\x14\xab\
-\x00\x00\x07p\x00\x00\x00\x00\x00\x01\x00\x15iw\
-\x00\x00\x01\xa1.\xc3\x14\x92\
-\x00\x00\x15 \x00\x00\x00\x00\x00\x01\x00\x15W\xd8\
-\x00\x00\x01\xa1.\xc3\x15\x06\
-\x00\x00\x16:\x00\x00\x00\x00\x00\x01\x00\x15a&\
-\x00\x00\x01\xa1.\xc3\x14\xd7\
-\x00\x00\x11J\x00\x00\x00\x00\x00\x01\x00\x15\x1c5\
-\x00\x00\x01\xa1.\xc3\x14\xe6\
-\x00\x00\x11l\x00\x00\x00\x00\x00\x01\x00\x15\x1d\xa6\
-\x00\x00\x01\xa1.\xc3\x14\xde\
-\x00\x00\x13\x5c\x00\x00\x00\x00\x00\x01\x00\x15C\xea\
-\x00\x00\x01\xa1.\xc3\x14l\
-\x00\x00\x17\xc8\x00\x00\x00\x00\x00\x01\x00\x15z8\
-\x00\x00\x01\xa1.\xc3\x146\
-\x00\x00\x10\xe8\x00\x00\x00\x00\x00\x01\x00\x15\x18\xd7\
-\x00\x00\x01\xa1.\xc3\x14,\
-\x00\x00\x182\x00\x00\x00\x00\x00\x01\x00\x15~n\
-\x00\x00\x01\xa1.\xc3\x15v\
-\x00\x00\x18~\x00\x00\x00\x00\x00\x01\x00\x15\x82c\
-\x00\x00\x01\xa1.\xc3\x13\xf0\
-\x00\x00\x14:\x00\x00\x00\x00\x00\x01\x00\x15N\xb9\
-\x00\x00\x01\xa1.\xc3\x13\xfe\
-\x00\x00\x10f\x00\x00\x00\x00\x00\x01\x00\x15\x12\xee\
-\x00\x00\x01\xa1.\xc3\x15I\
-\x00\x00\x08v\x00\x00\x00\x00\x00\x01\x00\x15qj\
-\x00\x00\x01\xa1.\xc3\x14p\
-\x00\x00\x18\xca\x00\x00\x00\x00\x00\x01\x00\x15\x86\x99\
-\x00\x00\x01\xa1.\xc3\x14!\
-\x00\x00\x11\xfe\x00\x00\x00\x00\x00\x01\x00\x15%Y\
-\x00\x00\x01\xa1.\xc3\x14\xb7\
-\x00\x00\x11\x88\x00\x00\x00\x00\x00\x01\x00\x15 3\
-\x00\x00\x01\xa1.\xc3\x14;\
-\x00\x00\x14n\x00\x00\x00\x00\x00\x01\x00\x15P5\
-\x00\x00\x01\xa1.\xc3\x13\xb0\
-\x00\x00\x13\x88\x00\x00\x00\x00\x00\x01\x00\x15F\xc8\
-\x00\x00\x01\xa1.\xc3\x14\x12\
-\x00\x00\x13\xd0\x00\x00\x00\x00\x00\x01\x00\x15I\xdb\
-\x00\x00\x01\xa1.\xc3\x14@\
-\x00\x00\x15\xa8\x00\x00\x00\x00\x00\x01\x00\x15\x5c1\
-\x00\x00\x01\xa1.\xc3\x14&\
-\x00\x00\x11&\x00\x00\x00\x00\x00\x01\x00\x15\x1a\x8f\
-\x00\x00\x01\xa1.\xc3\x14\xc4\
-\x00\x00\x14\x98\x00\x00\x00\x00\x00\x01\x00\x15Q\xfa\
-\x00\x00\x01\xa1.\xc3\x14\x0c\
-\x00\x00\x10\xbc\x00\x00\x00\x00\x00\x01\x00\x15\x15\xf8\
-\x00\x00\x01\xa1.\xc3\x13\xd0\
-\x00\x00\x14\xc0\x00\x00\x00\x00\x00\x01\x00\x15SV\
-\x00\x00\x01\xa1.\xc3\x13\xf7\
-\x00\x00\x12\x18\x00\x00\x00\x00\x00\x01\x00\x15&\xf4\
-\x00\x00\x01\xa1.\xc3\x15[\
-\x00\x00\x0dV\x00\x00\x00\x00\x00\x01\x00\x14\xf7*\
-\x00\x00\x01\xa1.\xc3\x8b\x0e\
-\x00\x00\x0fx\x00\x00\x00\x00\x00\x01\x00\x15\x09\x85\
-\x00\x00\x01\xa1.\xc3\x15\xda\
-\x00\x00\x0f\xca\x00\x00\x00\x00\x00\x01\x00\x15\x0b\xd9\
-\x00\x00\x01\xa1.\xc3\x8a\xe3\
-\x00\x00\x0fN\x00\x00\x00\x00\x00\x01\x00\x15\x08\x19\
-\x00\x00\x01\xa1.\xc3\x15\xf1\
-\x00\x00\x0c\xe2\x00\x00\x00\x00\x00\x01\x00\x14\xf2\xaa\
-\x00\x00\x01\xa1.\xc3\x15\xe0\
-\x00\x00\x0d\xbe\x00\x00\x00\x00\x00\x01\x00\x14\xf9\x85\
-\x00\x00\x01\xa1.\xc3\x8a\xed\
-\x00\x00\x0f\x08\x00\x00\x00\x00\x00\x01\x00\x15\x05\xd6\
-\x00\x00\x01\xa1.\xc3\x15\xd5\
-\x00\x00\x0d(\x00\x00\x00\x00\x00\x01\x00\x14\xf5\xf1\
-\x00\x00\x01\xa1.\xc3\x15\xe5\
-\x00\x00\x0d\xee\x00\x00\x00\x00\x00\x01\x00\x14\xfa\xbb\
-\x00\x00\x01\xa1.\xc3\x8a\xd7\
-\x00\x00\x0d\x88\x00\x00\x00\x00\x00\x01\x00\x14\xf8a\
-\x00\x00\x01\xa1.\xc3\x15\xe8\
-\x00\x00\x0eN\x00\x00\x00\x00\x00\x01\x00\x14\xfe@\
-\x00\x00\x01\xa1.\xc3\x15\xe2\
-\x00\x00\x0d\x0a\x00\x00\x00\x00\x00\x01\x00\x14\xf4\xb3\
-\x00\x00\x01\xa1.\xc3\x15\xdd\
-\x00\x00\x0cN\x00\x00\x00\x00\x00\x01\x00\x14\xee\x0a\
-\x00\x00\x01\xa1.\xc3\x8b\x05\
-\x00\x00\x0ct\x00\x00\x00\x00\x00\x01\x00\x14\xefB\
-\x00\x00\x01\xa1.\xc3\x15\xdf\
-\x00\x00\x04v\x00\x00\x00\x00\x00\x01\x00\x15\x04\x85\
-\x00\x00\x01\xa1.\xc3\x15\xce\
-\x00\x00\x0e4\x00\x00\x00\x00\x00\x01\x00\x14\xfd+\
-\x00\x00\x01\xa1.\xc3\x15\xd7\
-\x00\x00\x0e\x14\x00\x00\x00\x00\x00\x01\x00\x14\xfb\xf4\
-\x00\x00\x01\xa1.\xc3\x8a\x9d\
-\x00\x00\x0f\xee\x00\x00\x00\x00\x00\x01\x00\x15\x0d\x11\
-\x00\x00\x01\xa1.\xc3\x8a\xb2\
-\x00\x00\x0c\x8e\x00\x00\x00\x00\x00\x01\x00\x14\xf0\x82\
-\x00\x00\x01\xa1.\xc3\x15\xcf\
-\x00\x00\x0e\xbc\x00\x00\x00\x00\x00\x01\x00\x15\x02\x19\
-\x00\x00\x01\xa1.\xc3\x8a\x91\
-\x00\x00\x0f\x9c\x00\x00\x00\x00\x00\x01\x00\x15\x0a\xbc\
-\x00\x00\x01\xa1.\xc3\x15\xcd\
-\x00\x00\x0e\x98\x00\x00\x00\x00\x00\x01\x00\x15\x01'\
-\x00\x00\x01\xa1.\xc3\x15\xc8\
-\x00\x00\x0e\xe6\x00\x00\x00\x00\x00\x01\x00\x15\x03N\
-\x00\x00\x01\xa1.\xc3\x8a\xc2\
-\x00\x00\x0e\x80\x00\x00\x00\x00\x00\x01\x00\x14\xff\xe1\
-\x00\x00\x01\xa1.\xc3\x15\xed\
-\x00\x00\x0c\xb2\x00\x00\x00\x00\x00\x01\x00\x14\xf1\x8e\
-\x00\x00\x01\xa1.\xc3\x15\xcb\
-\x00\x00\x0f,\x00\x00\x00\x00\x00\x01\x00\x15\x06\xf9\
-\x00\x00\x01\xa1.\xc3\x15\xd3\
-\x00\x00\x00\x90\x00\x02\x00\x00\x00\x04\x00\x00\x00\xac\
+\x00\x00\x01\x8c\x00\x00\x00\x00\x00\x01\x00\x14\x0f\x88\
+\x00\x00\x01\xa1/\x91\x15R\
+\x00\x00\x03\x16\x00\x00\x00\x00\x00\x01\x00\x14 \x80\
+\x00\x00\x01\xa1/\x91\x16R\
+\x00\x00\x01r\x00\x00\x00\x00\x00\x01\x00\x14\x0d\xbc\
+\x00\x00\x01\xa1/\x91\x15\x88\
+\x00\x00\x02\x88\x00\x00\x00\x00\x00\x01\x00\x14\x19\x1c\
+\x00\x00\x01\xa1/\x91\x15\xd2\
+\x00\x00\x04\xec\x00\x00\x00\x00\x00\x01\x00\x14;\x12\
+\x00\x00\x01\xa1/\x91\x15\x92\
+\x00\x00\x02^\x00\x00\x00\x00\x00\x01\x00\x14\x17W\
+\x00\x00\x01\xa1/\x91\x16\x17\
+\x00\x00\x05t\x00\x00\x00\x00\x00\x01\x00\x14L\xbc\
+\x00\x00\x01\xa1/\x91\x16\x03\
+\x00\x00\x02\xdc\x00\x00\x00\x00\x00\x01\x00\x14\x1dY\
+\x00\x00\x01\xa1/\x91\x15\xf6\
+\x00\x00\x04>\x00\x00\x00\x00\x00\x01\x00\x141R\
+\x00\x00\x01\xa1/\x91\x16\x1c\
+\x00\x00\x01\x5c\x00\x00\x00\x00\x00\x01\x00\x14\x0cm\
+\x00\x00\x01\xa1/\x91\x15~\
+\x00\x00\x050\x00\x00\x00\x00\x00\x01\x00\x14I#\
+\x00\x00\x01\xa1/\x91\x16*\
+\x00\x00\x06\xa2\x00\x00\x00\x00\x00\x01\x00\x14Zy\
+\x00\x00\x01\xa1/\x91\x15\xa4\
+\x00\x00\x04\xae\x00\x00\x00\x00\x00\x01\x00\x147m\
+\x00\x00\x01\xa1/\x91\x15l\
+\x00\x00\x06h\x00\x00\x00\x00\x00\x01\x00\x14W\x7f\
+\x00\x00\x01\xa1/\x91\x15p\
+\x00\x00\x06\x8a\x00\x00\x00\x00\x00\x01\x00\x14YA\
+\x00\x00\x01\xa1/\x91\x16\x0d\
+\x00\x00\x03\xf8\x00\x00\x00\x00\x00\x01\x00\x14-v\
+\x00\x00\x01\xa1/\x91\x16G\
+\x00\x00\x04\xca\x00\x00\x00\x00\x00\x01\x00\x149\xb7\
+\x00\x00\x01\xa1/\x91\x15\xb8\
+\x00\x00\x06N\x00\x00\x00\x00\x00\x01\x00\x14U\xfa\
+\x00\x00\x01\xa1/\x91\x16W\
+\x00\x00\x07\x92\x00\x00\x00\x00\x00\x01\x00\x14d*\
+\x00\x00\x01\xa1/\x91\x15\xe0\
+\x00\x00\x03\xb0\x00\x00\x00\x00\x00\x01\x00\x14*$\
+\x00\x00\x01\xa1/\x91\x15\xca\
+\x00\x00\x05\xa6\x00\x00\x00\x00\x00\x01\x00\x14O\xdf\
+\x00\x00\x01\xa1/\x91\x15h\
+\x00\x00\x05\x5c\x00\x00\x00\x00\x00\x01\x00\x14K\x06\
+\x00\x00\x01\xa1/\x91\x16%\
+\x00\x00\x07>\x00\x00\x00\x00\x00\x01\x00\x14a\x16\
+\x00\x00\x01\xa1/\x91\x15\x82\
+\x00\x00\x018\x00\x00\x00\x00\x00\x01\x00\x14\x0aw\
+\x00\x00\x01\xa1/\x91\x15\xd9\
+\x00\x00\x01\xa8\x00\x00\x00\x00\x00\x01\x00\x14\x11.\
+\x00\x00\x01\xa1/\x91\x16!\
+\x00\x00\x07\xb0\x00\x00\x00\x00\x00\x01\x00\x14e\xcb\
+\x00\x00\x01\xa1/\x91\x15X\
+\x00\x00\x04\x8c\x00\x00\x00\x00\x00\x01\x00\x146*\
+\x00\x00\x01\xa1/\x91\x16\x11\
+\x00\x00\x01\xfe\x00\x00\x00\x00\x00\x01\x00\x14\x14%\
+\x00\x00\x01\xa1/\x91\x15\xfd\
+\x00\x00\x04Z\x00\x00\x00\x00\x00\x01\x00\x143\x1c\
+\x00\x00\x01\xa1/\x91\x15\x9d\
+\x00\x00\x01\xda\x00\x00\x00\x00\x00\x01\x00\x14\x12\xa8\
+\x00\x00\x01\xa1/\x91\x15\xc3\
+\x00\x00\x05\x00\x00\x00\x00\x00\x00\x01\x00\x14G\x9e\
+\x00\x00\x01\xa1/\x91\x15\xe7\
+\x00\x00\x03,\x00\x00\x00\x00\x00\x01\x00\x14\x22D\
+\x00\x00\x01\xa1/\x91\x15\x8e\
+\x00\x00\x05\x8e\x00\x00\x00\x00\x00\x01\x00\x14NB\
+\x00\x00\x01\xa1/\x91\x16L\
+\x00\x00\x03T\x00\x00\x00\x00\x00\x01\x00\x14$\xad\
+\x00\x00\x01\xa1/\x91\x16C\
+\x00\x00\x02\xb6\x00\x00\x00\x00\x00\x01\x00\x14\x1a\x94\
+\x00\x00\x01\xa1/\x91\x15y\
+\x00\x00\x03n\x00\x00\x00\x00\x00\x01\x00\x14&T\
+\x00\x00\x01\xa1/\x91\x15\xed\
+\x00\x00\x05\xd8\x00\x00\x00\x00\x00\x01\x00\x14Qe\
+\x00\x00\x01\xa1/\x91\x15\xb0\
+\x00\x00\x05\xf4\x00\x00\x00\x00\x00\x01\x00\x14S<\
+\x00\x00\x01\xa1/\x91\x165\
+\x00\x00\x06\xc2\x00\x00\x00\x00\x00\x01\x00\x14\x5cP\
+\x00\x00\x01\xa1/\x91\x15\x98\
+\x00\x00\x02,\x00\x00\x00\x00\x00\x01\x00\x14\x15\xc0\
+\x00\x00\x01\xa1/\x91\x16:\
+\x00\x00\x04x\x00\x00\x00\x00\x00\x01\x00\x144t\
+\x00\x00\x01\xa1/\x91\x15\xab\
+\x00\x00\x07 \x00\x00\x00\x00\x00\x01\x00\x14_\x91\
+\x00\x00\x01\xa1/\x91\x160\
+\x00\x00\x03\xde\x00\x00\x00\x00\x00\x01\x00\x14+\xdb\
+\x00\x00\x01\xa1/\x91\x16\x07\
+\x00\x00\x03\x8a\x00\x00\x00\x00\x00\x01\x00\x14(\xe1\
+\x00\x00\x01\xa1/\x91\x15_\
+\x00\x00\x06\xf6\x00\x00\x00\x00\x00\x01\x00\x14]\xcc\
+\x00\x00\x01\xa1/\x91\x15\xbd\
+\x00\x00\x06&\x00\x00\x00\x00\x00\x01\x00\x14T\xb5\
+\x00\x00\x01\xa1/\x91\x15b\
+\x00\x00\x02\xf2\x00\x00\x00\x00\x00\x01\x00\x14\x1e\xda\
+\x00\x00\x01\xa1/\x91\x15u\
+\x00\x00\x07n\x00\x00\x00\x00\x00\x01\x00\x14b\xcf\
+\x00\x00\x01\xa1/\x91\x15[\
+\x00\x00\x04\x16\x00\x00\x00\x00\x00\x01\x00\x14.\xe6\
+\x00\x00\x01\xa1/\x91\x16=\
+\x00\x00\x07\xd2\x00\x00\x00\x00\x00\x01\x00\x14g&\
+\x00\x00\x01\xa1/\x91\x16\xf7\
+\x00\x00\x09\xce\x00\x00\x00\x00\x00\x01\x00\x14r\xb7\
+\x00\x00\x01\xa1/\x91\x16\xd3\
+\x00\x00\x0b\x06\x00\x00\x00\x00\x00\x01\x00\x14|\x86\
+\x00\x00\x01\xa1/\x91\x16\xf2\
+\x00\x00\x0af\x00\x00\x00\x00\x00\x01\x00\x14wI\
+\x00\x00\x01\xa1/\x91\x16\xed\
+\x00\x00\x0a\xe2\x00\x00\x00\x00\x00\x01\x00\x14{q\
+\x00\x00\x01\xa1/\x91\x16\xd8\
+\x00\x00\x09\x9a\x00\x00\x00\x00\x00\x01\x00\x14qK\
+\x00\x00\x01\xa1/\x91\x16\xea\
+\x00\x00\x0a>\x00\x00\x00\x00\x00\x01\x00\x14v.\
+\x00\x00\x01\xa1/\x91\x16\xb5\
+\x00\x00\x09h\x00\x00\x00\x00\x00\x01\x00\x14pY\
+\x00\x00\x01\xa1/\x91\x16\xb1\
+\x00\x00\x0a \x00\x00\x00\x00\x00\x01\x00\x14t\xf0\
+\x00\x00\x01\xa1/\x91\x16\xc6\
+\x00\x00\x09\x0c\x00\x00\x00\x00\x00\x01\x00\x14n4\
+\x00\x00\x01\xa1/\x91\x16\xdf\
+\x00\x00\x08\x18\x00\x00\x00\x00\x00\x01\x00\x14hB\
+\x00\x00\x01\xa1/\x91\x16\xcb\
+\x00\x00\x09\xf2\x00\x00\x00\x00\x00\x01\x00\x14s\xee\
+\x00\x00\x01\xa1/\x91\x16\xc0\
+\x00\x00\x08\xde\x00\x00\x00\x00\x00\x01\x00\x14m2\
+\x00\x00\x01\xa1/\x91\x16\xa6\
+\x00\x00\x08H\x00\x00\x00\x00\x00\x01\x00\x14i\x88\
+\x00\x00\x01\xa1/\x91\x16\xa1\
+\x00\x00\x09:\x00\x00\x00\x00\x00\x01\x00\x14oT\
+\x00\x00\x01\xa1/\x91\x16\xce\
+\x00\x00\x0a\xbc\x00\x00\x00\x00\x00\x01\x00\x14y\x88\
+\x00\x00\x01\xa1/\x91\x16\xfc\
+\x00\x00\x08\xba\x00\x00\x00\x00\x00\x01\x00\x14k\xa7\
+\x00\x00\x01\xa1/\x91\x16\xbc\
+\x00\x00\x0a\x8c\x00\x00\x00\x00\x00\x01\x00\x14xe\
+\x00\x00\x01\xa1/\x91\x16\xac\
+\x00\x00\x08v\x00\x00\x00\x00\x00\x01\x00\x14j\x8a\
+\x00\x00\x01\xa1/\x91\x16\xe4\
+\x00\x00\x00x\x00\x02\x00\x00\x00\x04\x00\x00\x00M\
 \x00\x00\x00\x00\x00\x00\x00\x00\
-\x00\x00\x00\xc6\x00\x00\x00\x00\x00\x01\x00\x07L\xcd\
-\x00\x00\x01\xa1.\xc2\xb8\xb2\
-\x00\x00\x01\x02\x00\x00\x00\x00\x00\x01\x00\x0d\xa5\xe9\
-\x00\x00\x01\xa1.\xc2\xb8\xc4\
-\x00\x00\x00\xa0\x00\x00\x00\x00\x00\x01\x00\x00\xee\xb5\
-\x00\x00\x01\xa1.\xc2\xb8\xb7\
-\x00\x00\x00\xda\x00\x00\x00\x00\x00\x01\x00\x07]\xed\
-\x00\x00\x01\xa1.\xc2\xb8\xbe\
+\x00\x00\x00\xae\x00\x00\x00\x00\x00\x01\x00\x07I[\
+\x00\x00\x01\xa1.\xf8\xc3b\
+\x00\x00\x00\xea\x00\x00\x00\x00\x00\x01\x00\x0d\xa2\xd3\
+\x00\x00\x01\xa1.\xf8\xc3a\
+\x00\x00\x00\x88\x00\x00\x00\x00\x00\x01\x00\x00\xebC\
+\x00\x00\x01\xa1.\xf8\xc3Y\
+\x00\x00\x00\xc2\x00\x00\x00\x00\x00\x01\x00\x07Z\xd7\
+\x00\x00\x01\xa1.\xf8\xc3\x5c\
 "
 
 def qInitResources():
