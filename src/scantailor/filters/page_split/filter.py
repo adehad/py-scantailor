@@ -197,20 +197,25 @@ class Filter:
         split_x: float,
         width: float,
         height: float,
+        rotation_degrees: int = 0,
     ) -> Params:
         """Set a manual split line for two-page layout.
 
         Args:
             page_id: The page to update.
             split_x: X coordinate of the split line.
-            width: Image width.
-            height: Image height.
+            width: Width of the oriented image.
+            height: Height of the oriented image.
+            rotation_degrees: Orthogonal rotation applied to the image; recorded
+                with the layout so processing keeps it.
 
         Returns:
             The updated Params.
         """
         layout = PageLayout.two_pages(width, height, split_x)
-        params = self._with_manual_layout_of_type(page_id, layout, LayoutType.TWO_PAGES)
+        params = self._with_manual_layout_of_type(
+            page_id, layout, LayoutType.TWO_PAGES, rotation_degrees
+        )
         self._settings.set_params(page_id, params)
         return params
 
@@ -221,6 +226,7 @@ class Filter:
         right_x: float,
         width: float,
         height: float,
+        rotation_degrees: int = 0,
     ) -> Params:
         """Set manual cutter lines for single-page-cut layout.
 
@@ -228,27 +234,57 @@ class Filter:
             page_id: The page to update.
             left_x: X coordinate of the left cutter.
             right_x: X coordinate of the right cutter.
-            width: Image width.
-            height: Image height.
+            width: Width of the oriented image.
+            height: Height of the oriented image.
+            rotation_degrees: Orthogonal rotation applied to the image; recorded
+                with the layout so processing keeps it.
 
         Returns:
             The updated Params.
         """
         layout = PageLayout.single_page_cut(width, height, left_x, right_x)
         params = self._with_manual_layout_of_type(
-            page_id, layout, LayoutType.PAGE_PLUS_OFFCUT
+            page_id, layout, LayoutType.PAGE_PLUS_OFFCUT, rotation_degrees
         )
         self._settings.set_params(page_id, params)
         return params
 
+    def set_manual_layout(
+        self, page_id: "PageId", layout: PageLayout, rotation_degrees: int = 0
+    ) -> Params:
+        """Store a layout placed by hand, keeping the page's requested type.
+
+        Args:
+            page_id: The page to update.
+            layout: The layout as edited; its outline is the oriented image.
+            rotation_degrees: Orthogonal rotation applied to the image.
+
+        Returns:
+            The updated Params.
+        """
+        params = self.get_params(page_id)
+        stored = params.with_manual_layout(layout).model_copy(
+            update={
+                "dependencies": _dependencies_for(
+                    params.dependencies, layout, params.layout_type, rotation_degrees
+                )
+            }
+        )
+        self._settings.set_params(page_id, stored)
+        return stored
+
     def _with_manual_layout_of_type(
-        self, page_id: "PageId", layout: PageLayout, layout_type: LayoutType
+        self,
+        page_id: "PageId",
+        layout: PageLayout,
+        layout_type: LayoutType,
+        rotation_degrees: int,
     ) -> Params:
         """Params holding a hand-placed layout, recorded as made for its own type."""
         params = self.get_params(page_id)
-        dependencies = params.dependencies
-        if not dependencies.is_null():
-            dependencies = dependencies.model_copy(update={"layout_type": layout_type})
+        dependencies = _dependencies_for(
+            params.dependencies, layout, layout_type, rotation_degrees
+        )
         return (
             params.with_manual_layout(layout)
             .with_layout_type(layout_type)
@@ -320,8 +356,8 @@ class Filter:
             update={
                 "layout_type": adapted_type,
                 "page_layout": layout,
-                "dependencies": old.dependencies.model_copy(
-                    update={"layout_type": adapted_type}
+                "dependencies": _dependencies_for(
+                    old.dependencies, layout, adapted_type, 0
                 ),
             }
         )
@@ -425,6 +461,28 @@ class Filter:
         if params.page_layout is None:
             return 1
         return params.page_layout.num_sub_pages
+
+
+def _dependencies_for(
+    stored: Dependencies,
+    layout: PageLayout,
+    layout_type: LayoutType,
+    rotation_degrees: int,
+) -> Dependencies:
+    """Dependencies of a layout that was not detected from pixels.
+
+    Known dependencies keep their image size and rotation. Unknown ones are
+    taken from the layout's outline, because a layout stored without them is
+    thrown away on the next processing.
+    """
+    if not stored.is_null():
+        return stored.model_copy(update={"layout_type": layout_type})
+    _x, _y, width, height = layout.outline
+    return Dependencies(
+        image_size=(round(width), round(height)),
+        rotation_degrees=rotation_degrees,
+        layout_type=layout_type,
+    )
 
 
 _LAYOUT_TYPES = {
