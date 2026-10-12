@@ -141,10 +141,10 @@ class OptionsWidget(QWidget):
             page_id: The page ID to edit.
         """
         self._current_page_id = page_id
-        self._update_ui()
+        self.refresh()
 
-    def _update_ui(self) -> None:
-        """Update the UI to reflect current page settings."""
+    def refresh(self) -> None:
+        """Show the stored settings of the current page, e.g. a detected angle."""
         if self._current_page_id is None:
             return
 
@@ -156,8 +156,9 @@ class OptionsWidget(QWidget):
             self._auto_btn.setChecked(params.is_auto())
             self._manual_btn.setChecked(params.is_manual())
 
-            # Update angle spinbox
-            self._angle_spinbox.setValue(params.deskew_angle_deg)
+            # Setting an equal value would rewrite the text the user is typing.
+            if self._angle_spinbox.value() != params.deskew_angle_deg:
+                self._angle_spinbox.setValue(params.deskew_angle_deg)
 
             # Enable/disable spinbox based on mode
             self._angle_spinbox.setEnabled(params.is_manual())
@@ -171,7 +172,7 @@ class OptionsWidget(QWidget):
 
         self._filter.clear_detection(self._current_page_id)
 
-        self._update_ui()
+        self.refresh()
         self.angle_changed.emit(
             self._current_page_id,
             self._filter.get_deskew_angle(self._current_page_id),
@@ -187,7 +188,7 @@ class OptionsWidget(QWidget):
         new_params = params.with_manual_angle(params.deskew_angle_deg)
         self._filter.settings.set_params(self._current_page_id, new_params)
 
-        self._update_ui()
+        self.refresh()
         self.angle_changed.emit(
             self._current_page_id, new_params.deskew_angle_deg, True
         )
