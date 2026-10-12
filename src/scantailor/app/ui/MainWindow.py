@@ -31,6 +31,7 @@ from scantailor.app.ui.dialogs.pdf_import import DEFAULT_IMPORT_DPI, PdfImportDi
 from scantailor.app.ui.dialogs.pdf_progress import PdfProgressDialog
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
 from scantailor.app.ui.dialogs.relinking import RelinkingDialog
+from scantailor.app.ui.dialogs.split_mode import SplitModeDialog
 from scantailor.app.ui.page_renderer import PageRenderer, render_thumbnail
 from scantailor.app.ui.panels.new_open_project import NewOpenProjectPanel
 from scantailor.app.ui.pdf_worker import (
@@ -67,6 +68,7 @@ from scantailor.core.relinker import Relinker, image_directories
 from scantailor.core.stage_params import apply_stage_params, collect_stage_params
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.output.params import ApplyGroup
+from scantailor.filters.page_split.layout_type import LayoutType
 
 PROJECT_SUFFIX = ".ScanTailor"
 APP_TITLE = "ScanTailor Advanced"
@@ -647,6 +649,10 @@ class MainWindowManager:
         panels.set_dpi_overrides(self._dpi_overrides)
         panels.settings_changed.connect(self._on_settings_edited)
         self._connect_apply_requests(panels)
+        if panels.stage == FilterStage.PAGE_SPLIT:
+            cast(Any, panels.options).page_count_requested.connect(
+                self._on_page_count_requested
+            )
         self.optionsFrameLayout.addWidget(panels.options)
         self.imageFrameLayout.addWidget(panels.view)
         self.imageFrameLayout.setCurrentWidget(panels.view)
@@ -691,6 +697,18 @@ class MainWindowManager:
             self.thumbnails.set_current_page(target)
         if target != previous:
             self._show_current_page()
+
+    def _on_page_count_requested(self, image_id: ImageId, count: int) -> None:
+        """Give an image the page count its chosen layout type implies.
+
+        Args:
+            image_id (ImageId): The image whose layout type was chosen.
+            count (int): 1 or 2.
+        """
+        project = self.project
+        if project is not None and propagation.set_page_count(project, image_id, count):
+            self.modified = True
+            self._refresh_page_list()
 
     def _discard_panels(self) -> None:
         """Remove the widgets of the stage that is being left."""
@@ -862,6 +880,7 @@ class MainWindowManager:
         options = cast(Any, panels.options)
         requests: dict[FilterStage, list[tuple[str, str]]] = {
             FilterStage.FIX_ORIENTATION: [("apply_to_requested", "")],
+            FilterStage.PAGE_SPLIT: [("change_requested", "")],
             FilterStage.DESKEW: [("apply_to_requested", "")],
             FilterStage.SELECT_CONTENT: [("apply_to_requested", "")],
             FilterStage.PAGE_LAYOUT: [
@@ -895,6 +914,8 @@ class MainWindowManager:
         page = self._current_page
         if page is None or self.batch_runner.is_running:
             return False
+        if stage == FilterStage.PAGE_SPLIT:
+            return self._show_split_mode_dialog(page)
         option_labels = (
             {key: self.ui.tr(label) for key, label in _SELECT_CONTENT_OPTIONS.items()}
             if stage == FilterStage.SELECT_CONTENT
@@ -924,6 +945,48 @@ class MainWindowManager:
         )
         return True
 
+    def _show_split_mode_dialog(self, page: PageId) -> bool:
+        """Ask how pages are split and which pages get that, then apply it.
+
+        Unlike the other apply dialogs the current page is a target too, because
+        this is also where its own layout type is chosen.
+
+        Args:
+            page (PageId): The current page.
+
+        Returns:
+            bool: True if the choice was applied to at least one page.
+        """
+        params = self.stages.page_split_filter.get_params(page)
+        if params.page_layout is None:
+            return False
+        dialog = SplitModeDialog(
+            self.ui,
+            page,
+            self.pages(),
+            set(self.selectedPages()),
+            params.layout_type,
+            params.page_layout.to_layout_type(),
+        )
+        chosen: list[tuple[set[PageId], LayoutType, bool]] = []
+        dialog.settings_accepted.connect(
+            lambda pages, layout_type, apply_cut: chosen.append(
+                (pages, layout_type, apply_cut)
+            )
+        )
+        dialog.exec()
+        dialog.deleteLater()
+        if not chosen or not chosen[0][0]:
+            return False
+        targets, layout_type, apply_cut = chosen[0]
+        self.apply_to_pages(
+            FilterStage.PAGE_SPLIT,
+            [candidate for candidate in self.pages() if candidate in targets],
+            layout_type=layout_type,
+            apply_cut=apply_cut,
+        )
+        return True
+
     def _apply_dialog_title(self, stage: FilterStage, part: str) -> str:
         """Return the title of the apply dialog for a stage and settings part."""
         if stage == FilterStage.OUTPUT and part:
@@ -942,6 +1005,8 @@ class MainWindowManager:
         part: str = "",
         content_box: bool = True,
         page_box: bool = True,
+        layout_type: LayoutType = LayoutType.AUTO_LAYOUT_TYPE,
+        apply_cut: bool = False,
     ) -> None:
         """Copy the current page's settings of ``stage`` to other pages.
 
@@ -951,6 +1016,9 @@ class MainWindowManager:
             part (str): For Page Layout, ``"margins"`` or ``"alignment"``.
             content_box (bool): Select Content: copy a manual content box.
             page_box (bool): Select Content: copy a manual page box.
+            layout_type (LayoutType): Page Split: the layout type to request.
+            apply_cut (bool): Page Split: also copy the cutter lines, adapted to
+                each target.
         """
         source = self._current_page
         if source is None or not targets:
@@ -959,6 +1027,15 @@ class MainWindowManager:
         match stage:
             case FilterStage.FIX_ORIENTATION:
                 propagation.apply_orientation(stages, source, targets)
+            case FilterStage.PAGE_SPLIT:
+                propagation.apply_page_split(
+                    stages, source, targets, layout_type, apply_cut=apply_cut
+                )
+                images = list(dict.fromkeys(target.image_id for target in targets))
+                if self.project is not None and propagation.adopt_requested_page_counts(
+                    self.project, stages, images
+                ):
+                    self._refresh_page_list()
             case FilterStage.DESKEW:
                 propagation.apply_deskew(stages, source, targets)
             case FilterStage.SELECT_CONTENT:
@@ -979,7 +1056,10 @@ class MainWindowManager:
                 return
         self.modified = True
         self._invalidate_thumbnails(None if len(targets) > 1 else targets[0])
-        self._request_render()
+        if stage == FilterStage.PAGE_SPLIT:
+            self._show_current_page()
+        else:
+            self._request_render()
 
     def _batch_pages(self) -> list[PageId]:
         """Return the pages a batch processes: the current page and those after it."""

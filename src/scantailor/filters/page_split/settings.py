@@ -15,8 +15,8 @@ from .params import Params
 class Settings:
     """Storage for per-page page split parameters.
 
-    This class maintains a mapping from PageId to Params for the page split
-    filter, allowing different pages to have different split settings.
+    The layout belongs to the image, not to one half of it, so both sub-pages
+    of an image share one record.
     """
 
     def __init__(self) -> None:
@@ -24,6 +24,10 @@ class Settings:
         self._lock = threading.Lock()
         self._params: dict[PageId, Params] = {}
         self._default_layout_type: LayoutType = LayoutType.AUTO_LAYOUT_TYPE
+
+    @staticmethod
+    def _key(page_id: "PageId") -> PageId:
+        return PageId(image_id=page_id.image_id)
 
     def get_params(self, page_id: "PageId") -> Params:
         """Get parameters for a page.
@@ -35,7 +39,7 @@ class Settings:
             The stored parameters or default if not set.
         """
         with self._lock:
-            params = self._params.get(page_id)
+            params = self._params.get(self._key(page_id))
             default_layout_type = self._default_layout_type
         if params is None:
             return Params(layout_type=default_layout_type)
@@ -49,7 +53,7 @@ class Settings:
             params: The parameters to store.
         """
         with self._lock:
-            self._params[page_id] = params
+            self._params[self._key(page_id)] = params
 
     def is_params_set(self, page_id: "PageId") -> bool:
         """Check if parameters have been explicitly set for a page.
@@ -61,7 +65,7 @@ class Settings:
             True if parameters have been set, False otherwise.
         """
         with self._lock:
-            return page_id in self._params
+            return self._key(page_id) in self._params
 
     def clear_params(self, page_id: "PageId") -> None:
         """Clear parameters for a page, reverting to defaults.
@@ -70,7 +74,7 @@ class Settings:
             page_id: The page to clear.
         """
         with self._lock:
-            self._params.pop(page_id, None)
+            self._params.pop(self._key(page_id), None)
 
     def get_default_layout_type(self) -> LayoutType:
         """Get the default layout type for new pages."""
@@ -95,7 +99,7 @@ class Settings:
         """
         with self._lock:
             for page_id in page_ids:
-                self._params[page_id] = params
+                self._params[self._key(page_id)] = params
 
     def clear_all(self) -> None:
         """Clear all stored parameters and restore the default layout type."""

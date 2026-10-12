@@ -257,7 +257,7 @@ def test_manual_two_page_split_survives_when_nothing_upstream_changed() -> None:
     assert layout.get_split_line_x() == MANUAL_SPLIT_X
 
 
-def test_apply_auto_page_split_to_other_pages_clears_their_layout() -> None:
+def test_apply_layout_type_without_cutters_leaves_other_pages_to_detect() -> None:
     sequence = StageSequence()
     source = _page(SubPage.LEFT_PAGE)
     target = PageId(image_id=ImageId(file_path=Path("other.tiff")))
@@ -265,7 +265,7 @@ def test_apply_auto_page_split_to_other_pages_clears_their_layout() -> None:
     split.set_layout_type(source, LayoutType.TWO_PAGES)
     _run_to(_spread(), source, sequence, FilterStage.PAGE_SPLIT)
 
-    split.apply_to_pages([target], split.get_params(source))
+    split.apply_layout_type(source, [target], LayoutType.TWO_PAGES, apply_cut=False)
 
     copied = split.get_params(target)
     assert copied.layout_type is LayoutType.TWO_PAGES

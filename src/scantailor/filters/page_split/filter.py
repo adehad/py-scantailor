@@ -15,6 +15,7 @@ from scantailor.core.models import PageId
 from .dependencies import Dependencies
 from .layout_type import LayoutType
 from .page_layout import PageLayout, PageLayoutType
+from .page_layout_adapter import adapt_page_layout, correct_page_layout_type
 from .params import Params
 from .settings import Settings
 from .split_finder import SplitResult, detect_split
@@ -97,7 +98,10 @@ class Filter:
         return self.get_params(page_id).layout_type
 
     def set_layout_type(self, page_id: "PageId", layout_type: LayoutType) -> Params:
-        """Set the layout type for a page.
+        """Request a layout type for a page.
+
+        A stored layout of another type is dropped so that the next run detects
+        a layout of the requested type; any other stored layout is kept.
 
         Args:
             page_id: The page to update.
@@ -106,7 +110,36 @@ class Filter:
         Returns:
             The updated Params.
         """
-        params = self.get_params(page_id).with_layout_type(layout_type)
+        params = self.get_params(page_id)
+        if params.page_layout is not None and _conflicts(
+            layout_type, params.page_layout
+        ):
+            params = Params(layout_type=layout_type)
+        else:
+            params = params.with_layout_type(layout_type)
+        self._settings.set_params(page_id, params)
+        return params
+
+    def retype_layout(self, page_id: "PageId", layout_type: LayoutType) -> Params:
+        """Change the type of the stored layout in place, keeping its cutters.
+
+        For a single uncut page or for two pages when the split line was placed
+        by hand, where detecting again would throw the line away.
+
+        Args:
+            page_id: The page to update.
+            layout_type: The single-page or two-page type to switch to.
+
+        Returns:
+            The updated Params; only the type is requested when no layout is stored.
+        """
+        params = self.get_params(page_id)
+        if params.page_layout is None:
+            return self.set_layout_type(page_id, layout_type)
+        layout = params.page_layout.with_type(_LAYOUT_TYPES[layout_type])
+        params = params.model_copy(
+            update={"layout_type": layout_type, "page_layout": layout}
+        )
         self._settings.set_params(page_id, params)
         return params
 
@@ -233,19 +266,65 @@ class Filter:
         params = Params(layout_type=LayoutType.AUTO_LAYOUT_TYPE)
         self._settings.set_params(page_id, params)
 
-    def apply_to_pages(self, page_ids: list["PageId"], params: Params) -> None:
-        """Apply parameters to multiple pages.
+    def apply_layout_type(
+        self,
+        source: "PageId",
+        targets: list["PageId"],
+        layout_type: LayoutType,
+        *,
+        apply_cut: bool,
+    ) -> None:
+        """Give pages a layout type, optionally with the source page's cutters.
 
-        An automatic split line is not copied: each target keeps the layout
-        type and detects its own layout.
+        With ``apply_cut`` the source's layout goes to every target that has one,
+        adapted to that target's own outline rather than copied as coordinates.
+        A target without a layout receives the source's layout as it is and
+        adapts it when it is processed.
 
         Args:
-            page_ids: List of pages to set parameters for.
-            params: The parameters to apply.
+            source: The page whose layout is copied.
+            targets: The pages that receive the layout type.
+            layout_type: The type to request; ``AUTO_LAYOUT_TYPE`` makes every
+                target detect its own layout.
+            apply_cut: Copy the source's cutters, except for ``AUTO_LAYOUT_TYPE``
+                and ``SINGLE_PAGE_UNCUT`` which have none to copy.
         """
-        if params.is_auto():
-            params = Params(layout_type=params.layout_type)
-        self._settings.apply_params_to_pages(page_ids, params)
+        source_params = self.get_params(source)
+        copy_layout = (
+            apply_cut
+            and layout_type
+            not in (LayoutType.AUTO_LAYOUT_TYPE, LayoutType.SINGLE_PAGE_UNCUT)
+            and source_params.page_layout is not None
+        )
+        for target in targets:
+            old = self.get_params(target)
+            self.set_layout_type(target, layout_type)
+            if copy_layout:
+                self._settings.set_params(
+                    target, self._with_copied_layout(source_params, old, layout_type)
+                )
+
+    @staticmethod
+    def _with_copied_layout(
+        source: Params, old: Params, layout_type: LayoutType
+    ) -> Params:
+        """Params of a target after the source's layout was applied to it."""
+        assert source.page_layout is not None
+        if old.page_layout is None:
+            if _conflicts(layout_type, source.page_layout):
+                return Params(layout_type=layout_type)
+            return source.model_copy(update={"layout_type": layout_type})
+        layout = adapt_page_layout(source.page_layout, old.page_layout.outline)
+        adapted_type = layout.to_layout_type()
+        return source.model_copy(
+            update={
+                "layout_type": adapted_type,
+                "page_layout": layout,
+                "dependencies": old.dependencies.model_copy(
+                    update={"layout_type": adapted_type}
+                ),
+            }
+        )
 
     @staticmethod
     def _dependencies_of(
@@ -257,38 +336,6 @@ class Filter:
             rotation_degrees=rotation_degrees,
             layout_type=layout_type,
         )
-
-    def needs_detection(
-        self,
-        page_id: "PageId",
-        image_shape: tuple[int, ...],
-        rotation_degrees: int = 0,
-    ) -> bool:
-        """Tell whether the stored layout is missing or stale.
-
-        Args:
-            page_id: The page to check.
-            image_shape: Shape of the oriented image.
-            rotation_degrees: Orthogonal rotation applied to that image.
-
-        Returns:
-            True if the layout must be detected again.
-        """
-        params = self.get_params(page_id)
-        if params.page_layout is None:
-            return True
-        current = self._dependencies_of(
-            params.layout_type, image_shape, rotation_degrees
-        )
-        if not params.dependencies.is_compatible_with(
-            current, manual_split_line=params.is_manual()
-        ):
-            return True
-        required = {
-            LayoutType.TWO_PAGES: PageLayoutType.TWO_PAGES,
-            LayoutType.PAGE_PLUS_OFFCUT: PageLayoutType.SINGLE_PAGE_CUT,
-        }.get(params.layout_type)
-        return required is not None and params.page_layout.layout_type != required
 
     def clear_detection(self, page_id: "PageId") -> None:
         """Forget the layout and split line mode but keep the requested type.
@@ -308,11 +355,13 @@ class Filter:
         dpi: float = 300.0,
         rotation_degrees: int = 0,
     ) -> Params:
-        """Detect the page layout unless a valid one is stored.
+        """Make the stored layout fit the image, detecting only when it must.
 
-        A stored layout is kept while its dependencies still hold. When the
-        requested type became a single uncut page the layout is reduced to it
-        without detection.
+        A stored layout is kept while its dependencies hold. When the image size
+        or rotation changed, or the requested type differs from the one the
+        layout was made for, a layout of an explicitly requested type is adapted
+        to the new outline; only an automatic request detects again. A layout of
+        another type than the requested one, or none, is detected.
 
         Args:
             image: The oriented image to process.
@@ -323,32 +372,45 @@ class Filter:
         Returns:
             The updated parameters.
         """
-        if self.needs_detection(page_id, image.shape, rotation_degrees):
-            self.detect_split(
-                image, page_id, dpi=dpi, rotation_degrees=rotation_degrees
-            )
-            return self.get_params(page_id)
-
         params = self.get_params(page_id)
         layout = params.page_layout
-        if (
-            params.layout_type == LayoutType.SINGLE_PAGE_UNCUT
-            and layout is not None
-            and layout.layout_type != PageLayoutType.SINGLE_PAGE_UNCUT
+        requested = params.layout_type
+        if layout is None or _conflicts(requested, layout):
+            return self._detect(image, page_id, dpi, rotation_degrees)
+
+        current = self._dependencies_of(requested, image.shape, rotation_degrees)
+        if params.dependencies.is_compatible_with(
+            current, manual_split_line=params.is_manual()
         ):
-            x, y, width, height = layout.outline
-            params = params.with_page_layout(
-                PageLayout.single_page_uncut(width, height, x, y),
-                params.split_line_mode,
-            ).model_copy(
-                update={
-                    "dependencies": params.dependencies.model_copy(
-                        update={"layout_type": LayoutType.SINGLE_PAGE_UNCUT}
-                    )
-                }
-            )
-            self._settings.set_params(page_id, params)
+            new_layout = correct_page_layout_type(layout)
+            if new_layout.layout_type == layout.layout_type:
+                return params
+        elif requested == LayoutType.AUTO_LAYOUT_TYPE:
+            return self._detect(image, page_id, dpi, rotation_degrees)
+        else:
+            height, width = image.shape[:2]
+            outline = (0.0, 0.0, float(width), float(height))
+            new_layout = adapt_page_layout(layout, outline)
+
+        new_type = new_layout.to_layout_type()
+        params = Params(
+            layout_type=new_type,
+            page_layout=new_layout,
+            split_line_mode=params.split_line_mode,
+            dependencies=current.model_copy(update={"layout_type": new_type}),
+        )
+        self._settings.set_params(page_id, params)
         return params
+
+    def _detect(
+        self,
+        image: NDArray[np.uint8],
+        page_id: "PageId",
+        dpi: float,
+        rotation_degrees: int,
+    ) -> Params:
+        self.detect_split(image, page_id, dpi=dpi, rotation_degrees=rotation_degrees)
+        return self.get_params(page_id)
 
     def get_sub_page_count(self, page_id: "PageId") -> int:
         """Get the number of sub-pages for an image.
@@ -363,3 +425,18 @@ class Filter:
         if params.page_layout is None:
             return 1
         return params.page_layout.num_sub_pages
+
+
+_LAYOUT_TYPES = {
+    LayoutType.SINGLE_PAGE_UNCUT: PageLayoutType.SINGLE_PAGE_UNCUT,
+    LayoutType.PAGE_PLUS_OFFCUT: PageLayoutType.SINGLE_PAGE_CUT,
+    LayoutType.TWO_PAGES: PageLayoutType.TWO_PAGES,
+}
+
+
+def _conflicts(requested: LayoutType, layout: PageLayout) -> bool:
+    """Whether a layout cannot satisfy a request; any layout satisfies auto."""
+    return (
+        requested != LayoutType.AUTO_LAYOUT_TYPE
+        and _LAYOUT_TYPES[requested] != layout.layout_type
+    )
