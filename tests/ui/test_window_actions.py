@@ -18,7 +18,8 @@ from scantailor.core.project import ImageMetadata
 from scantailor.core.propagation import ApplyScope
 from scantailor.core.settings import ApplicationSettings
 from scantailor.core.stage_sequence import FilterStage
-from scantailor.filters.output.params import ApplyGroup
+from scantailor.filters.output.dewarping_options import DewarpingMode
+from scantailor.filters.output.params import ApplyGroup, DistortionModelSpec
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
 from scantailor.filters.page_split.dependencies import (
     Dependencies as SplitDependencies,
@@ -74,13 +75,13 @@ def _count_renders(
 ) -> list[PageId]:
     """Record every page render, from the main view and from thumbnails alike."""
     rendered: list[PageId] = []
-    real_render = page_renderer.render_page
+    real_render = page_renderer.render_page_with_model
 
     def spy(page_id, sequence, end_stage, dpi_overrides=None):
         rendered.append(page_id)
         return real_render(page_id, sequence, end_stage)
 
-    monkeypatch.setattr(page_renderer, "render_page", spy)
+    monkeypatch.setattr(page_renderer, "render_page_with_model", spy)
     return rendered
 
 
@@ -92,6 +93,83 @@ def settled_window(
     project_window.renderer.wait_for_done()
     qtbot.wait(50)
     return project_window
+
+
+class TestGeneratedDistortionModel:
+    """A model that a render built is kept in the page's output parameters."""
+
+    @staticmethod
+    def _edges() -> DistortionModelSpec:
+        return DistortionModelSpec(
+            top=((0.0, 10.0), (50.0, 5.0), (100.0, 10.0)),
+            bottom=((0.0, 90.0), (50.0, 85.0), (100.0, 90.0)),
+        )
+
+    def _set_mode(self, window: MainWindowManager, mode: DewarpingMode) -> PageId:
+        page = window.pages()[0]
+        output = window.stages.output_filter
+        params = output.get_params(page)
+        output.set_params(page, params.with_dewarping(params.dewarping.with_mode(mode)))
+        return page
+
+    def test_a_model_from_the_renderer_is_stored_and_marks_the_project_modified(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        page = self._set_mode(window, DewarpingMode.AUTO)
+        window.modified = False
+
+        window.renderer.distortion_model_found.emit(page, self._edges())
+
+        stored = window.stages.output_filter.get_params(page)
+        assert stored.distortion_model == self._edges()
+        assert window.modified
+
+    def test_a_model_for_a_page_switched_to_manual_meanwhile_is_dropped(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        page = self._set_mode(window, DewarpingMode.MANUAL)
+        window.modified = False
+
+        window.renderer.distortion_model_found.emit(page, self._edges())
+
+        stored = window.stages.output_filter.get_params(page)
+        assert not stored.distortion_model.is_defined()
+        assert not window.modified
+
+
+class TestBatchScope:
+    """A batch covers every page in display order, wherever the current page is."""
+
+    @pytest.mark.parametrize("order_index", [0, 1, 2])
+    def test_batch_covers_all_pages_from_the_last_page_in_any_order(
+        self,
+        settled_window: MainWindowManager,
+        monkeypatch: pytest.MonkeyPatch,
+        order_index: int,
+    ):
+        window = settled_window
+        window.thumbnails.set_order(order_index)
+        window.goLastPage()
+        started: list[list] = []
+        monkeypatch.setattr(window, "_start_batch", started.append)
+
+        window.startBatchProcessing()
+
+        assert started == [window.thumbnails.pages()]
+        assert len(started[0]) == len(window.pages())
+
+    def test_starting_a_batch_turns_the_focus_button_on(
+        self, settled_window: MainWindowManager, monkeypatch: pytest.MonkeyPatch
+    ):
+        window = settled_window
+        window.focusButton.setChecked(False)
+        monkeypatch.setattr(window, "_start_batch", lambda _pages: None)
+
+        window.startBatchProcessing()
+
+        assert window.focusButton.isChecked()
 
 
 class TestBatchProcessing:
@@ -147,7 +225,7 @@ class TestBatchProcessing:
         assert project_window.filterOptions.isEnabled()
         assert project_window.modified
 
-    def test_batch_starts_from_the_current_page(
+    def test_batch_covers_every_page_even_when_started_from_the_second(
         self, qtbot: QtBot, project_window: MainWindowManager, monkeypatch
     ):
         seen: list[Sequence[PageId]] = []
@@ -162,7 +240,7 @@ class TestBatchProcessing:
         with qtbot.waitSignal(project_window.batch_runner.finished, timeout=10_000):
             project_window.startBatchProcessing()
 
-        assert seen == [project_window.pages()[1:]]
+        assert seen == [project_window.pages()]
 
     def test_thumbnails_are_invalidated_for_each_finished_page(
         self, qtbot: QtBot, project_window: MainWindowManager, monkeypatch
@@ -755,7 +833,7 @@ class TestReloadAndIndicator:
         def explode(*_args, **_kwargs):
             raise RuntimeError("boom")
 
-        monkeypatch.setattr(page_renderer, "render_page", explode)
+        monkeypatch.setattr(page_renderer, "render_page_with_model", explode)
 
         with qtbot.waitSignal(window.renderer.render_failed, timeout=RENDER_TIMEOUT_MS):
             window.reloadCurrentPage()
@@ -883,13 +961,13 @@ class TestDetectedPageCounts:
         self, qtbot: QtBot, settled_window: MainWindowManager, monkeypatch
     ):
         window = settled_window
-        real_render = page_renderer.render_page
+        real_render = page_renderer.render_page_with_model
 
         def detecting_render(page_id, sequence, end_stage, dpi_overrides=None):
             _store_detected_spreads(window, [page_id.image_id])
             return real_render(page_id, sequence, end_stage)
 
-        monkeypatch.setattr(page_renderer, "render_page", detecting_render)
+        monkeypatch.setattr(page_renderer, "render_page_with_model", detecting_render)
         first = window.pages()[0]
         assert len(window.pages()) == 3
 

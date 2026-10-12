@@ -1,5 +1,7 @@
 """Select Content filter implementation."""
 
+from collections.abc import Sequence
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -10,6 +12,26 @@ from .content_finder import ContentDetectionResult, find_content_box, find_page_
 from .detection import ContentDetectionMode, PageDetectionMode
 from .params import Params
 from .settings import Settings
+
+_OUTLINE_TOLERANCE_PX = 1e-3
+
+
+def _outline_moved(
+    stored: Sequence[tuple[float, float]], current: Sequence[tuple[float, float]]
+) -> bool:
+    """Whether the page outline differs from the one the boxes were made for."""
+    if not stored:
+        return False
+    if len(stored) != len(current):
+        return True
+    return not np.allclose(stored, current, atol=_OUTLINE_TOLERANCE_PX)
+
+
+def _moved_with_page(content: ContentBox, old: PageBox, new: PageBox) -> ContentBox:
+    """Translate a content box by how far the page box's centre moved."""
+    dx = (new.x + new.width / 2) - (old.x + old.width / 2)
+    dy = (new.y + new.height / 2) - (old.y + old.height / 2)
+    return content.model_copy(update={"x": content.x + dx, "y": content.y + dy})
 
 
 class Filter:
@@ -132,10 +154,14 @@ class Filter:
         page_id: PageId,
         dpi: float = 300.0,
         outside: NDArray[np.bool_] | None = None,
+        page_outline: Sequence[tuple[float, float]] | None = None,
     ) -> Params:
         """Process an image to detect content and page boundaries.
 
         Respects detection modes - only runs auto-detection when mode is AUTO.
+        A manual content box follows the page box when the page outline moved
+        since the boxes were made: it is translated by the shift of the page
+        box's centre.
 
         Args:
             image: Grayscale or color image.
@@ -143,12 +169,19 @@ class Filter:
             dpi: Image resolution.
             outside: Mask of the pixels of ``image`` that have no source pixel
                 behind them; content detection treats them as shadow.
+            page_outline: Outline of the page in the coordinates of ``image``;
+                remembered so that a later change of it can be told.
 
         Returns:
             Updated parameters with detected/stored boxes.
         """
         params = self.get_params(page_id)
         h, w = image.shape[:2]
+        old_page_box = params.page_box
+        outline = [] if page_outline is None else list(page_outline)
+        outline_moved = _outline_moved(
+            params.dependencies.rotated_page_outline, outline
+        )
 
         # Handle page detection
         if params.is_page_auto():
@@ -158,6 +191,16 @@ class Filter:
             page_box = PageBox.from_image_size(w, h)
             params = params.with_page_box(page_box, PageDetectionMode.DISABLED)
             self.set_params(page_id, params)
+
+        if (
+            outline_moved
+            and params.is_content_manual()
+            and not params.content_box.is_empty()
+            and not old_page_box.is_empty()
+            and not params.page_box.is_empty()
+        ):
+            moved = _moved_with_page(params.content_box, old_page_box, params.page_box)
+            params = params.with_content_box(moved)
 
         # Handle content detection
         if params.is_content_auto():
@@ -182,7 +225,19 @@ class Filter:
         content_size_mm = PhysicalSize.from_pixels(
             params.content_box.width, params.content_box.height, dpi
         )
-        params = params.model_copy(update={"content_size_mm": content_size_mm})
+        params = params.model_copy(
+            update={
+                "content_size_mm": content_size_mm,
+                "dependencies": params.dependencies.model_copy(
+                    update={
+                        "content_detection_mode": params.content_detection_mode,
+                        "page_detection_mode": params.page_detection_mode,
+                        "fine_tune_corners": params.fine_tune_corners,
+                        "rotated_page_outline": outline,
+                    }
+                ),
+            }
+        )
 
         self.set_params(page_id, params)
         return params

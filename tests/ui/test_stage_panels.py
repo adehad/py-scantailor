@@ -139,13 +139,13 @@ def test_editing_an_option_rerenders_the_current_page(
     _render_current_page(qtbot, project_window)
     wait_for_thumbnails(project_window)
     stages_run: list[FilterStage] = []
-    real_render = page_renderer.render_page
+    real_render = page_renderer.render_page_with_model
 
     def spy(page_id, sequence, end_stage, dpi_overrides=None):
         stages_run.append(end_stage)
         return real_render(page_id, sequence, end_stage)
 
-    monkeypatch.setattr(page_renderer, "render_page", spy)
+    monkeypatch.setattr(page_renderer, "render_page_with_model", spy)
     spin_box = _options_container(project_window).findChild(QtWidgets.QDoubleSpinBox)
 
     with qtbot.waitSignal(
@@ -272,7 +272,7 @@ def test_an_unexpected_render_error_is_reported_as_a_failure(
     def explode(*_args, **_kwargs):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(page_renderer, "render_page", explode)
+    monkeypatch.setattr(page_renderer, "render_page_with_model", explode)
 
     with qtbot.waitSignal(
         project_window.renderer.render_failed, timeout=RENDER_TIMEOUT_MS

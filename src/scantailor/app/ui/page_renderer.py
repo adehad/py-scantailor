@@ -13,8 +13,15 @@ from scantailor.core.image_io import ImageLoadError
 from scantailor.core.models import PageId
 from scantailor.core.page_source import FALLBACK_DPI, DpiOverrides, load_page
 from scantailor.core.stage_sequence import FilterStage, StageSequence
+from scantailor.filters.output.params import DistortionModelSpec
 
-__all__ = ["FALLBACK_DPI", "PageRenderer", "render_page", "render_thumbnail"]
+__all__ = [
+    "FALLBACK_DPI",
+    "PageRenderer",
+    "render_page",
+    "render_page_with_model",
+    "render_thumbnail",
+]
 
 _MAX_THREADS = 2
 
@@ -40,12 +47,39 @@ def render_page(
     Raises:
         ImageLoadError: If the source image cannot be decoded.
     """
+    return render_page_with_model(page_id, sequence, end_stage, dpi_overrides)[0]
+
+
+def render_page_with_model(
+    page_id: PageId,
+    sequence: StageSequence,
+    end_stage: FilterStage,
+    dpi_overrides: DpiOverrides | None = None,
+) -> tuple[NDArray[np.uint8], DistortionModelSpec | None]:
+    """Render a page like ``render_page`` and return the dewarping model it built.
+
+    Args:
+        page_id (PageId): Page to render.
+        sequence (StageSequence): Stages holding the page's parameters; only read.
+        end_stage (FilterStage): Last stage to run.
+        dpi_overrides (DpiOverrides | None): Project resolutions that win over
+            the image file's.
+
+    Returns:
+        tuple[NDArray[np.uint8], DistortionModelSpec | None]: The display image
+            and the page edges automatic or marginal dewarping found, or None
+            when the render built no model. The caller stores the model.
+
+    Raises:
+        ImageLoadError: If the source image cannot be decoded.
+    """
     page = load_page(page_id.image_id, dpi_overrides)
     options = pipeline.PipelineOptions(end_stage=end_stage, dpi=page.horizontal_dpi())
-    image = pipeline.process_page(page.pixels, page_id, sequence, options).image
+    result = pipeline.process_page(page.pixels, page_id, sequence, options)
+    image = result.image
     if image.ndim == 3 and image.shape[2] == 3:
-        return np.ascontiguousarray(image[:, :, ::-1])
-    return image
+        image = np.ascontiguousarray(image[:, :, ::-1])
+    return image, result.distortion_model
 
 
 def render_thumbnail(
@@ -102,6 +136,7 @@ def _render(
 
 class _RenderSignals(QtCore.QObject):
     done = QtCore.Signal(int, object, object)
+    model_found = QtCore.Signal(int, object, object)
     failed = QtCore.Signal(int, object, str)
 
 
@@ -132,7 +167,7 @@ class _RenderTask(QtCore.QRunnable):
         if self.cancelled.is_set():
             return
         try:
-            image = _render(
+            image, model = render_page_with_model(
                 self._page_id, self._sequence, self._stage, self._dpi_overrides
             )
         except Exception as error:
@@ -143,6 +178,8 @@ class _RenderTask(QtCore.QRunnable):
                 self._signals.failed.emit(self._generation, self._page_id, str(error))
             return
         if not self.cancelled.is_set():
+            if model is not None:
+                self._signals.model_found.emit(self._generation, self._page_id, model)
             self._signals.done.emit(self._generation, self._page_id, image)
 
 
@@ -155,9 +192,13 @@ class PageRenderer(QtCore.QObject):
     Signals:
         render_done: A render finished. Args: page_id (PageId), image (ndarray).
         render_failed: A render failed. Args: page_id (PageId), message (str).
+        distortion_model_found: A render built a dewarping model, emitted just
+            before ``render_done``. Args: page_id (PageId), model
+            (DistortionModelSpec).
     """
 
     render_done = QtCore.Signal(object, object)
+    distortion_model_found = QtCore.Signal(object, object)
     render_failed = QtCore.Signal(object, str)
 
     def __init__(self, parent: QtCore.QObject | None = None) -> None:
@@ -171,6 +212,7 @@ class PageRenderer(QtCore.QObject):
         self._pool.setMaxThreadCount(_MAX_THREADS)
         self._signals = _RenderSignals(self)
         self._signals.done.connect(self._on_done)
+        self._signals.model_found.connect(self._on_model_found)
         self._signals.failed.connect(self._on_failed)
         self._generation = 0
         self._task: _RenderTask | None = None
@@ -220,6 +262,13 @@ class PageRenderer(QtCore.QObject):
     def _on_done(self, generation: int, page_id: PageId, image: object) -> None:
         if generation == self._generation:
             self.render_done.emit(page_id, image)
+
+    @QtCore.Slot(int, object, object)
+    def _on_model_found(
+        self, generation: int, page_id: PageId, model: DistortionModelSpec
+    ) -> None:
+        if generation == self._generation:
+            self.distortion_model_found.emit(page_id, model)
 
     @QtCore.Slot(int, object, str)
     def _on_failed(self, generation: int, page_id: PageId, message: str) -> None:

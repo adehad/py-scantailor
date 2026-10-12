@@ -13,8 +13,9 @@ from scantailor.core.models import Dpi, PageId
 from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode
 from .despeckle import DespeckleLevel
+from .dewarping_options import DewarpingMode
 from .generator import OutputResult, generate_output
-from .params import Params
+from .params import DistortionModelSpec, Params
 from .settings import Settings
 
 
@@ -108,6 +109,31 @@ class Filter:
         params = self.get_params(page_id).with_output_dpi(dpi)
         self._settings.set_params(page_id, params)
         return params
+
+    def store_distortion_model(
+        self, page_id: "PageId", model: DistortionModelSpec
+    ) -> bool:
+        """Keep the edges that automatic or marginal dewarping found for a page.
+
+        Stored models are what a switch to manual dewarping starts from and what
+        a saved project keeps. A page whose mode has meanwhile changed is left
+        alone, as its model is no longer the one that was generated.
+
+        Args:
+            page_id (PageId): The page the model was generated for.
+            model (DistortionModelSpec): Edges in the page's source coordinates.
+
+        Returns:
+            bool: True if the stored parameters changed.
+        """
+        params = self.get_params(page_id)
+        generated_modes = (DewarpingMode.AUTO, DewarpingMode.MARGINAL)
+        if params.dewarping.mode not in generated_modes:
+            return False
+        if params.distortion_model == model:
+            return False
+        self._settings.set_params(page_id, params.with_distortion_model(model))
+        return True
 
     def get_color_mode(self, page_id: "PageId") -> ColorMode:
         """Get the color mode for a page.
