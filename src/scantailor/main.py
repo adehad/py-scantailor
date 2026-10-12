@@ -4,6 +4,7 @@ from PySide6 import QtCore, QtWidgets
 
 from .app._ui import resources_rc
 from .app.ui.MainWindow import MainWindowManager
+from .app.ui.theme import apply_theme
 from .translations import load_translation
 
 assert resources_rc, "The import ensures we load in the resources for the rest of Qt."
@@ -20,6 +21,7 @@ def main() -> int:
     """Run main  UI application."""
     setup_qcore()
     app = QtWidgets.QApplication([])
+    apply_theme(app)
     load_translation(app)
     main_window = MainWindowManager()
     main_window.show()

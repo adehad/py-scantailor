@@ -8,6 +8,7 @@ from PySide6.QtCore import QSettings, Signal
 from PySide6.QtGui import QCursor
 
 from scantailor.app.ui import load_ui_widget
+from scantailor.app.ui.icons import icon
 from scantailor.app.ui.utils import get_cwidget
 
 _UI_FOLDER = Path(__file__).parent
@@ -66,17 +67,8 @@ class SystemLoadWidget(QtWidgets.QWidget):
         self._slider.setMaximum(self._max_threads)
         self._slider.setTracking(True)
 
-        # Set icons (using standard icons as fallback)
-        style = self.style()
-        if style:
-            minus_icon = style.standardIcon(
-                QtWidgets.QStyle.StandardPixmap.SP_ArrowLeft
-            )
-            plus_icon = style.standardIcon(
-                QtWidgets.QStyle.StandardPixmap.SP_ArrowRight
-            )
-            self._minus_btn.setIcon(minus_icon)
-            self._plus_btn.setIcon(plus_icon)
+        self._minus_btn.setIcon(icon("minus"))
+        self._plus_btn.setIcon(icon("plus"))
 
         self._update_button_states()
 
