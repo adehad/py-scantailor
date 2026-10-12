@@ -7,7 +7,6 @@ import pytest
 
 from scantailor.core.settings import (
     ApplicationSettings,
-    ColorScheme,
     DeviationSettings,
     ThumbnailSize,
     TiffCompression,
@@ -27,20 +26,6 @@ def reset_singleton() -> None:
     ApplicationSettings.reset_instance()
     yield
     ApplicationSettings.reset_instance()
-
-
-class TestColorScheme:
-    """Tests for ColorScheme enum."""
-
-    def test_values(self) -> None:
-        """ColorScheme has expected values."""
-        assert ColorScheme.DARK.value == "dark"
-        assert ColorScheme.LIGHT.value == "light"
-
-    def test_string_enum(self) -> None:
-        """ColorScheme is a string enum."""
-        assert str(ColorScheme.DARK) == "ColorScheme.DARK"
-        assert ColorScheme.DARK == "dark"
 
 
 class TestUnits:
@@ -113,7 +98,6 @@ class TestApplicationSettings:
 
         # Display settings
         assert settings.opengl_enabled is False
-        assert settings.color_scheme == ColorScheme.DARK
         assert settings.units == Units.MILLIMETERS
 
         # Project settings
@@ -148,13 +132,13 @@ class TestApplicationSettings:
     def test_custom_values(self, reset_singleton: None) -> None:
         """Can create with custom values."""
         settings = ApplicationSettings(
-            color_scheme=ColorScheme.LIGHT,
+            language="de",
             units=Units.INCHES,
             auto_save_project=True,
             tiff_bw_compression=TiffCompression.LZW,
         )
 
-        assert settings.color_scheme == ColorScheme.LIGHT
+        assert settings.language == "de"
         assert settings.units == Units.INCHES
         assert settings.auto_save_project is True
         assert settings.tiff_bw_compression == TiffCompression.LZW
@@ -181,7 +165,7 @@ class TestApplicationSettings:
 
         # Create and save settings
         settings = ApplicationSettings(
-            color_scheme=ColorScheme.LIGHT,
+            language="de",
             units=Units.INCHES,
             auto_save_project=True,
             current_profile="Custom",
@@ -194,7 +178,7 @@ class TestApplicationSettings:
         # Load settings
         loaded = ApplicationSettings.load()
 
-        assert loaded.color_scheme == ColorScheme.LIGHT
+        assert loaded.language == "de"
         assert loaded.units == Units.INCHES
         assert loaded.auto_save_project is True
         assert loaded.current_profile == "Custom"
@@ -210,7 +194,6 @@ class TestApplicationSettings:
 
         # Load returns defaults
         settings = ApplicationSettings.load()
-        assert settings.color_scheme == ColorScheme.DARK
         assert settings.auto_save_project is False
 
     def test_load_corrupted_file_returns_defaults(
@@ -224,7 +207,9 @@ class TestApplicationSettings:
 
         # Load returns defaults
         settings = ApplicationSettings.load()
-        assert settings.color_scheme == ColorScheme.DARK
+
+        assert settings.units == Units.MILLIMETERS
+        assert settings.language == "en"
 
     def test_singleton_pattern(
         self, temp_config_path: Path, reset_singleton: None
@@ -258,8 +243,8 @@ class TestApplicationSettings:
         settings = ApplicationSettings()
 
         # Valid assignment works
-        settings.color_scheme = ColorScheme.LIGHT
-        assert settings.color_scheme == ColorScheme.LIGHT
+        settings.language = "de"
+        assert settings.language == "de"
 
         # Invalid assignment raises
         with pytest.raises(ValueError):
@@ -268,21 +253,21 @@ class TestApplicationSettings:
     def test_json_serialization(self, reset_singleton: None) -> None:
         """Settings serialize to JSON correctly."""
         settings = ApplicationSettings(
-            color_scheme=ColorScheme.LIGHT,
+            language="de",
             deskew_deviation=DeviationSettings(coefficient=2.0, threshold=0.5),
         )
 
         json_str = settings.model_dump_json()
         data = json.loads(json_str)
 
-        assert data["color_scheme"] == "light"
+        assert data["language"] == "de"
         assert data["deskew_deviation"]["coefficient"] == 2.0
         assert data["deskew_deviation"]["threshold"] == 0.5
 
     def test_json_deserialization(self, reset_singleton: None) -> None:
         """Settings deserialize from JSON correctly."""
         json_data = {
-            "color_scheme": "light",
+            "language": "de",
             "units": "in",
             "auto_save_project": True,
             "tiff_bw_compression": 5,  # LZW
@@ -290,18 +275,18 @@ class TestApplicationSettings:
 
         settings = ApplicationSettings.model_validate(json_data)
 
-        assert settings.color_scheme == ColorScheme.LIGHT
+        assert settings.language == "de"
         assert settings.units == Units.INCHES
         assert settings.auto_save_project is True
         assert settings.tiff_bw_compression == TiffCompression.LZW
 
     def test_partial_json_uses_defaults(self, reset_singleton: None) -> None:
         """Partial JSON uses defaults for missing fields."""
-        json_data = {"color_scheme": "light"}
+        json_data = {"language": "de"}
 
         settings = ApplicationSettings.model_validate(json_data)
 
-        assert settings.color_scheme == ColorScheme.LIGHT
+        assert settings.language == "de"
         # Other values are defaults
         assert settings.units == Units.MILLIMETERS
         assert settings.auto_save_project is False

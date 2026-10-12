@@ -13,6 +13,7 @@ from scantailor.app.ui.utils import get_cwidget
 from scantailor.core.filename_ordering import sort_smart
 
 _UI_FOLDER = Path(__file__).parent
+_MIN_VISIBLE_ROWS = 12
 
 
 class ProjectFilesDialog(QtWidgets.QDialog):
@@ -58,6 +59,7 @@ class ProjectFilesDialog(QtWidgets.QDialog):
         self.ui = load_ui_widget(_UI_FOLDER / "ProjectFilesDialog.ui", self)
         embed_ui(self, self.ui)
         self._setup_widgets()
+        self._reserve_list_rows()
         self._populate_lists()
         self._connect_signals()
 
@@ -124,6 +126,15 @@ class ProjectFilesDialog(QtWidgets.QDialog):
 
         self._add_to_project_btn.setIcon(icon("circle-arrow-right"))
         self._remove_from_project_btn.setIcon(icon("circle-arrow-left"))
+
+    def _reserve_list_rows(self) -> None:
+        """Make both lists show ``_MIN_VISIBLE_ROWS`` rows at the default size."""
+        for view in (self._off_project_list, self._in_project_list):
+            row_height = view.fontMetrics().height() + 2 * view.frameWidth() + 4
+            view.setMinimumHeight(
+                _MIN_VISIBLE_ROWS * row_height + 2 * view.frameWidth()
+            )
+        self.resize(self.sizeHint().expandedTo(self.size()))
 
     def _populate_lists(self) -> None:
         """Populate the file lists."""
