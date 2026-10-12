@@ -77,6 +77,16 @@
     </widget>
    </item>
    <item>
+    <widget class="QCheckBox" name="eraseOutputFiles">
+     <property name="text">
+      <string>Remove output files too</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
     <spacer name="verticalSpacer">
      <property name="orientation">
       <enum>Qt::Vertical</enum>
