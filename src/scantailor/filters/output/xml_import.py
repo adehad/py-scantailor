@@ -187,15 +187,16 @@ def _read_binarization(element: ET.Element | None) -> BinarizationOptions:
     """Read a ``<bw>`` element.
 
     C++ drives every local method with the single Sauvola coefficient; the edge
-    methods differ only in which of the two edge-div weights get it.
+    methods differ only in which of the two edge-div weights read it.
     """
     if element is None:
         return BinarizationOptions()
     coef = _clamp(attr_float(element, "sauvolaCoef"), 0.0, 1.0)
     method_name = attr_text(element, "binarizationMethod")
+    edge_defaults = BinarizationOptions()
     edge_weights = {
-        "edgeplus": (coef, 0.0),
-        "blurdiv": (0.0, coef),
+        "edgeplus": (coef, edge_defaults.edge_div_kbd),
+        "blurdiv": (edge_defaults.edge_div_kep, coef),
         "edgediv": (coef, coef),
     }
     method = {
@@ -205,14 +206,13 @@ def _read_binarization(element: ET.Element | None) -> BinarizationOptions:
         "window": BinarizationMethod.WINDOW,
         "bradley": BinarizationMethod.BRADLEY,
         "grad": BinarizationMethod.GRAD,
+        "edgeplus": BinarizationMethod.EDGEPLUS,
+        "blurdiv": BinarizationMethod.BLURDIV,
+        "edgediv": BinarizationMethod.EDGEDIV,
     }.get(method_name, BinarizationMethod.OTSU)
-    kep, kbd = (
-        BinarizationOptions().edge_div_kep,
-        BinarizationOptions().edge_div_kbd,
+    kep, kbd = edge_weights.get(
+        method_name, (edge_defaults.edge_div_kep, edge_defaults.edge_div_kbd)
     )
-    if method_name in edge_weights:
-        method = BinarizationMethod.EDGEDIV
-        kep, kbd = edge_weights[method_name]
     return BinarizationOptions(
         method=method,
         threshold_adjustment=int(_clamp(attr_int(element, "thresholdAdj"), -100, 100)),

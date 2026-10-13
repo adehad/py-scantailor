@@ -118,8 +118,8 @@ class TestShowingAModel:
     def test_the_grid_is_painted_for_a_valid_model(self, view: DewarpingImageView):
         view.set_distortion_model(CURVED, 2.0)
 
-        assert view._grid is not None
-        assert view._grid.shape == (
+        assert view.grid() is not None
+        assert view.grid().shape == (
             DewarpingImageView.GRID_LINES,
             DewarpingImageView.GRID_LINES,
             2,

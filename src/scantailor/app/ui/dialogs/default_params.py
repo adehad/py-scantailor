@@ -60,8 +60,6 @@ _MM_PER_UNIT = {Units.MILLIMETERS: 1.0, Units.CENTIMETERS: 10.0, Units.INCHES: 2
 _UNIT_LABEL = {Units.MILLIMETERS: "mm", Units.CENTIMETERS: "cm", Units.INCHES: "in"}
 _ROTATION_INDICATOR_SIZE = 32
 _CUSTOM_DPI = 200
-# Binarization methods the Python output filter has no implementation of.
-_UNSUPPORTED_METHODS = ("EdgePlus", "BlurDiv")
 _DEPTH_STEPS_PER_UNIT = 10
 _DESPECKLE_LEVELS = (
     DespeckleLevel.CAUTIOUS,
@@ -98,8 +96,8 @@ _METHODS = {
     "Wolf": BinarizationMethod.WOLF,
     "Bradley": BinarizationMethod.BRADLEY,
     "Grad": BinarizationMethod.GRAD,
-    "EdgePlus": None,
-    "BlurDiv": None,
+    "EdgePlus": BinarizationMethod.EDGEPLUS,
+    "BlurDiv": BinarizationMethod.BLURDIV,
     "EdgeDiv": BinarizationMethod.EDGEDIV,
 }
 
@@ -173,9 +171,6 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         methods = self._w(QtWidgets.QComboBox, "thresholdMethodBox")
         for name in _METHODS:
             methods.addItem(name, name)
-            if name in _UNSUPPORTED_METHODS:
-                item = methods.model().item(methods.count() - 1)  # type: ignore[attr-defined]
-                item.setEnabled(False)
 
         shapes = self._w(QtWidgets.QComboBox, "pictureShapeSelector")
         shapes.addItem("Off", PictureShape.OFF)

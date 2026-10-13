@@ -19,6 +19,8 @@ class BinarizationMethod(Enum):
     BRADLEY: Bradley's method - simple local adaptive thresholding.
     GRAD: Gradient snip - local mean blended with a page level taken where the
         contrast is.
+    EDGEPLUS: Edge division with the edge enhancement term only.
+    BLURDIV: Edge division with the blur division term only.
     EDGEDIV: Edge division method - edge enhancement with illumination normalization.
     """
 
@@ -29,6 +31,8 @@ class BinarizationMethod(Enum):
     WINDOW = "window"
     BRADLEY = "bradley"
     GRAD = "grad"
+    EDGEPLUS = "edgeplus"
+    BLURDIV = "blurdiv"
     EDGEDIV = "edgediv"
 
     @classmethod
@@ -83,10 +87,10 @@ class BinarizationOptions(BaseModel):
             too.
         bradley_coef: Bradley's k coefficient (0.0-1.0). Higher values make
             it easier for pixels to be classified as foreground (black).
-        edge_div_kep: EdgeDiv edge enhancement weight (0.0-1.0).
-            Higher = more edge enhancement.
-        edge_div_kbd: EdgeDiv blur division weight (0.0-1.0).
-            Higher = more illumination normalization.
+        edge_div_kep: Edge enhancement weight (0.0-1.0), read by EdgePlus and
+            EdgeDiv. Higher = more edge enhancement.
+        edge_div_kbd: Blur division weight (0.0-1.0), read by BlurDiv and
+            EdgeDiv. Higher = more illumination normalization.
         normalize_illumination: Normalize illumination before binarization.
         savitzky_golay_smoothing: Smooth the gray image before binarization.
         morphological_smoothing: Apply morphological smoothing after binarization.
