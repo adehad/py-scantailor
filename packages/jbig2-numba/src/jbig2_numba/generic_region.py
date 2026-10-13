@@ -38,11 +38,14 @@ def as_bilevel(image: np.ndarray) -> np.ndarray:
         np.ndarray: New ``bool`` array, ``True`` where the pixel is black.
 
     Raises:
-        TypeError: If ``image`` is not a NumPy array of dtype ``bool`` or ``uint8``.
+        TypeError: If ``image`` is not a NumPy array of dtype ``bool`` or ``uint8``,
+            or is a masked array, whose mask would otherwise be ignored.
         ValueError: If ``image`` is not 2-D or has a zero-length axis.
     """
     if not isinstance(image, np.ndarray):
         raise TypeError(f"image must be a numpy array, got {type(image).__name__}")
+    if isinstance(image, np.ma.MaskedArray):
+        raise TypeError("masked arrays are not supported; fill the mask first")
     if image.dtype not in (np.bool_, np.uint8):
         raise TypeError(f"image dtype must be bool or uint8, got {image.dtype}")
     if image.ndim != 2:
