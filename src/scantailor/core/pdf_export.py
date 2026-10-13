@@ -7,10 +7,11 @@ stored losslessly as JBIG2 or CCITT G4, grey and colour pages as JPEG.
 from __future__ import annotations
 
 import io
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Event
 from typing import Any, Literal
 
 import cv2
@@ -20,13 +21,15 @@ from jbig2_numba import encode_pdf_stream
 from numpy.typing import NDArray
 from PIL import Image
 
-from scantailor.core.batch import map_pool
+from scantailor.core.pdf_outline import carry_outline_and_labels
+from scantailor.core.pdf_pool import PdfCancelled, map_pool_progress
 from scantailor.core.text_layer import TextLayer
 
 PDF_POINTS_PER_INCH = 72.0
 BilevelCodec = Literal["jbig2", "g4"]
 PageSource = NDArray[Any] | str | Path
 PageInput = tuple[PageSource, "float | tuple[float, float]"]
+ExportProgress = Callable[[int, int, str], None]
 
 
 def export_pdf(
@@ -38,6 +41,9 @@ def export_pdf(
     text_layers: Sequence[TextLayer | None] | None = None,
     executor: ProcessPoolExecutor | None = None,
     max_workers: int | None = None,
+    cancel: Event | None = None,
+    on_progress: ExportProgress | None = None,
+    outline_source: str | Path | None = None,
 ) -> None:
     """Write pages to one PDF.
 
@@ -55,8 +61,17 @@ def export_pdf(
             workers load and encode the page images; this process assembles the
             PDF in page order. Pages are encoded in this process when None.
         max_workers (int | None): Size of ``executor``.
+        cancel (Event | None): Setting it stops the export before the next page
+            is encoded or added, and before the file is written.
+        on_progress (ExportProgress | None): Called as ``(done, total, phase)``
+            from the calling thread: per encoded page on a pool ("Encoding
+            pages"), per page added ("Writing PDF"), then once more, with
+            ``done == total``, before the file is saved ("Saving PDF").
+        outline_source (str | Path | None): A PDF whose bookmarks and page
+            labels are copied when it has as many pages as this export.
 
     Raises:
+        PdfCancelled: If ``cancel`` was set.
         ValueError: On an unknown codec, a mismatched ``text_layers`` length, a
             non-positive dpi or an image that cannot be read or has an unsupported
             shape.
@@ -70,16 +85,46 @@ def export_pdf(
         _EncodeJob(source, *_dpi_pair(dpi), bilevel_codec, colour_quality)
         for source, dpi in pages
     ]
+    total = len(jobs)
+
+    def report(done: int, phase: str) -> None:
+        if on_progress is not None:
+            on_progress(done, total, phase)
+
+    def check_cancel() -> None:
+        if cancel is not None and cancel.is_set():
+            raise PdfCancelled
+
+    encoded_count = 0
+
+    def page_encoded(_index: int, _job: _EncodeJob, _page: EncodedPage) -> None:
+        nonlocal encoded_count
+        encoded_count += 1
+        report(encoded_count, "Encoding pages")
+
     if executor is None:
         encoded: Iterable[EncodedPage] = (_encode_page(job) for job in jobs)
     else:
-        encoded = map_pool(_encode_page, jobs, executor, max_workers)
+        encoded = map_pool_progress(
+            _encode_page,
+            jobs,
+            executor,
+            max_workers,
+            cancel=cancel,
+            on_done=page_encoded,
+        )
 
     pdf = pikepdf.Pdf.new()
     for index, page in enumerate(encoded):
+        check_cancel()
         text = text_layers[index] if text_layers is not None else None
         _add_page(pdf, page, text)
+        report(index + 1, "Writing PDF")
+    check_cancel()
+    if outline_source is not None:
+        carry_outline_and_labels(Path(outline_source), pdf)
 
+    report(total, "Saving PDF")
     pdf.save(
         str(out_path),
         object_stream_mode=pikepdf.ObjectStreamMode.generate,

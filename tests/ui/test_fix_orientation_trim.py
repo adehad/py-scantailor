@@ -166,6 +166,18 @@ class TestEditing:
         assert all(spin.value() == 0 for spin in _spins(widget).values())
         assert filter_.get_trim(IMAGE) == ImageTrim(enabled=True)
 
+    def test_reset_restores_the_maximums_the_other_margins_had_taken(
+        self, widget: OptionsWidget
+    ):
+        _child(widget, QtWidgets.QCheckBox, "trimEnabledCheck").setChecked(True)
+        spins = _spins(widget)
+        spins["Right"].setValue(100)
+        assert spins["Left"].maximum() < 268
+
+        _child(widget, QtWidgets.QPushButton, "resetTrimBtn").click()
+
+        assert spins["Left"].maximum() == 268
+
     def test_get_current_trim_reports_what_the_controls_show(
         self, widget: OptionsWidget
     ):

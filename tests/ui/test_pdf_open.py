@@ -12,6 +12,7 @@ from scantailor.app.ui import pdf_worker
 from scantailor.app.ui.dialogs.pdf_import import PdfImportDialog
 from scantailor.app.ui.MainWindow import MainWindowManager
 from scantailor.app.ui.pdf_worker import SOURCE_FILE_NAME, PdfSource
+from scantailor.core.pdf_pool import PdfCancelled
 
 if TYPE_CHECKING:
     from conftest import FileDialogStub
@@ -133,14 +134,18 @@ def test_cancelling_a_running_import_discards_the_pages(
     release = threading.Event()
 
     def slow_import(
-        pdf_path: Path, out_dir: Path, dpi: int, **_kwargs: object
+        pdf_path: Path,
+        out_dir: Path,
+        dpi: int,
+        *,
+        cancel: threading.Event,
+        **_kwargs: object,
     ) -> list[Path]:
-        out_dir.mkdir(parents=True, exist_ok=True)
-        page = out_dir / "page_0001.png"
-        page.write_bytes(b"png")
         started.set()
         assert release.wait(20)
-        return [page]
+        if cancel.is_set():
+            raise PdfCancelled
+        return []
 
     monkeypatch.setattr("scantailor.app.ui.pdf_worker.import_pdf", slow_import)
     file_dialogs.open_file = str(source_pdf)

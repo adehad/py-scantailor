@@ -15,6 +15,7 @@ from typing import Any, Literal, Self
 from pydantic import BaseModel, Field
 
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
+from scantailor.core.pdf_source import PdfSource
 
 LayoutDirection = Literal["LTR", "RTL"]
 
@@ -145,6 +146,19 @@ class StageParamsEntry(BaseModel):
     params: dict[str, Any]
 
 
+class PageTextGeometry(BaseModel):
+    """How one output page relates to its source page, for carrying text over.
+
+    Args:
+        page (PageId): The page.
+        geometry (dict[str, Any]): A ``text_layer.TextGeometry`` dumped as JSON
+            data; kept as data so that loading a project needs no PDF library.
+    """
+
+    page: PageId
+    geometry: dict[str, Any]
+
+
 class OutputFileLabel(BaseModel):
     """The number that tells apart source files sharing a file name.
 
@@ -204,6 +218,10 @@ class Project(BaseModel):
             back to (see ``core.stage_params.collect_stage_defaults``).
         output_file_labels (list[OutputFileLabel]): Labels that keep output file
             names stable; see ``batch.output_file_names``.
+        pdf_source (PdfSource | None): The PDF the pages were rendered from.
+        text_geometry (list[PageTextGeometry]): Geometry of pages written by a
+            batch, so that their source text can be carried over in a later
+            session.
     """
 
     version: int = 1
@@ -214,6 +232,8 @@ class Project(BaseModel):
     stage_params: dict[str, list[StageParamsEntry]] = Field(default_factory=dict)
     stage_defaults: dict[str, Any] = Field(default_factory=dict)
     output_file_labels: list[OutputFileLabel] = Field(default_factory=list)
+    pdf_source: PdfSource | None = None
+    text_geometry: list[PageTextGeometry] = Field(default_factory=list)
 
     def get_pages(self) -> list[PageId]:
         """Get all page IDs in the project, respecting layout direction.
@@ -392,7 +412,27 @@ class Project(BaseModel):
                 ]
             )
         }
+        self.text_geometry = [
+            entry for entry in self.text_geometry if entry.page in survivors
+        ]
         return doomed
+
+    def set_text_geometry(self, page: PageId, geometry: dict[str, Any]) -> None:
+        """Remember how a page's output relates to its source page.
+
+        Args:
+            page (PageId): The page.
+            geometry (dict[str, Any]): A ``TextGeometry`` dumped as JSON data.
+        """
+        kept = [entry for entry in self.text_geometry if entry.page != page]
+        self.text_geometry = [*kept, PageTextGeometry(page=page, geometry=geometry)]
+
+    def text_geometry_of(self, page: PageId) -> dict[str, Any] | None:
+        """Return the geometry stored for a page, or None."""
+        return next(
+            (entry.geometry for entry in self.text_geometry if entry.page == page),
+            None,
+        )
 
     def image_ids(self) -> list[ImageId]:
         """Return the id of every image in the project."""
@@ -433,6 +473,10 @@ class Project(BaseModel):
         self.output_file_labels = [
             OutputFileLabel(file_path=remap(entry.file_path), label=entry.label)
             for entry in self.output_file_labels
+        ]
+        self.text_geometry = [
+            PageTextGeometry(page=remap_page(entry.page), geometry=entry.geometry)
+            for entry in self.text_geometry
         ]
         self.stage_params = {
             stage: [
@@ -566,6 +610,10 @@ def _path_holders(data: dict[str, Any]) -> Iterator[tuple[dict[str, Any], str]]:
     yield data, "output_directory"
     image_ids = [info.get("id") for info in _dicts(data.get("images"))]
     pages = [data.get("selected_page")]
+    pages.extend(entry.get("page") for entry in _dicts(data.get("text_geometry")))
+    pdf_source = data.get("pdf_source")
+    if isinstance(pdf_source, dict):
+        yield pdf_source, "pdf_path"
     stage_params = data.get("stage_params")
     if isinstance(stage_params, dict):
         for entries in stage_params.values():

@@ -17,8 +17,9 @@ from pdf_helpers import (  # noqa: F401
 from PySide6 import QtWidgets
 from pytestqt.qtbot import QtBot
 
-from scantailor.app.ui.dialogs.pdf_export import PdfExportDialog
+from scantailor.app.ui.dialogs.pdf_export import PdfExportDialog, PdfExportOptions
 from scantailor.app.ui.MainWindow import MainWindowManager
+from scantailor.core.text_layer import TextGeometry
 
 
 class _Dialogs:
@@ -364,3 +365,50 @@ def test_export_refuses_to_overwrite_its_own_source_pdf(
         export_pdf_pages(request, lambda *_: None, threading.Event())
 
     assert source_pdf.read_bytes() == before
+
+
+def test_export_in_a_later_session_carries_text_from_the_stored_geometry(
+    qtbot: QtBot,
+    pdf_window: MainWindowManager,  # noqa: F811
+    respond: Callable[..., None],
+    source_pdf: Path,  # noqa: F811
+):
+    write_processed_outputs(pdf_window)
+    project = pdf_window.project
+    assert project is not None
+    for page, info in pdf_window._render_info.items():
+        project.set_text_geometry(
+            page,
+            TextGeometry.of(info.transformation, info.output_dpi).model_dump(
+                mode="json"
+            ),
+        )
+    pdf_window._render_info.clear()
+
+    _export(qtbot, pdf_window, respond, _Dialogs())
+
+    out = source_pdf.parent / "book_processed.pdf"
+    assert pdf_window.last_pdf_export is not None
+    assert pdf_window.last_pdf_export.text_pages == len(PAGE_WORDS)
+    assert PAGE_WORDS[0] in page_text(out, 0)
+
+
+def test_export_without_text_still_guards_the_source_pdf(
+    pdf_window: MainWindowManager,  # noqa: F811
+    source_pdf: Path,  # noqa: F811
+):
+    write_processed_outputs(pdf_window)
+    project = pdf_window.project
+    assert project is not None
+    files = {
+        page: source_pdf.parent / f"{n}.tif"
+        for n, page in enumerate(project.get_pages())
+    }
+    options = PdfExportOptions(
+        out_path=source_pdf, bilevel_codec="jbig2", jpeg_quality=85, carry_text=False
+    )
+
+    request = pdf_window._pdf_export_request(files, options)
+
+    assert request.source is not None
+    assert request.carry_text is False

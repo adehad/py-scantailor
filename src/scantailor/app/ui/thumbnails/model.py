@@ -91,6 +91,7 @@ class _RenderSignals(QObject):
     """Carries worker results to the GUI thread through a queued connection."""
 
     finished = Signal(object, object)  # ThumbnailKey, QImage | None
+    skipped = Signal(object)  # ThumbnailKey
 
 
 class _RenderTask(QRunnable):
@@ -101,8 +102,10 @@ class _RenderTask(QRunnable):
         cache: ThumbnailCache,
         max_size: QSize,
         signals: _RenderSignals,
+        is_wanted: Callable[[ThumbnailKey], bool],
     ) -> None:
         super().__init__()
+        self._is_wanted = is_wanted
         self._key = key
         self._renderer = renderer
         self._cache = cache
@@ -110,6 +113,9 @@ class _RenderTask(QRunnable):
         self._signals = signals
 
     def run(self) -> None:
+        if not self._is_wanted(self._key):
+            self._signals.skipped.emit(self._key)
+            return
         image = self._cache.load_from_disk(self._key)
         if image is None:
             try:
@@ -172,6 +178,7 @@ class ThumbnailModel(QAbstractListModel):
         self._pool.setMaxThreadCount(thread_count)
         self._signals = _RenderSignals(self)
         self._signals.finished.connect(self._on_render_finished)
+        self._signals.skipped.connect(self._on_render_skipped)
 
     @property
     def cache(self) -> ThumbnailCache:
@@ -322,7 +329,12 @@ class ThumbnailModel(QAbstractListModel):
             self._in_flight.add(key)
             self._pool.start(
                 _RenderTask(
-                    key, self._renderer, self._cache, self._render_size, self._signals
+                    key,
+                    self._renderer,
+                    self._cache,
+                    self._render_size,
+                    self._signals,
+                    self._is_wanted,
                 )
             )
         return image
@@ -331,6 +343,13 @@ class ThumbnailModel(QAbstractListModel):
         digest = self._params_hash(page, self._stage) if self._params_hash else 0
         size = self._render_size
         return ThumbnailKey(page, self._stage, digest, (size.width(), size.height()))
+
+    def _is_wanted(self, key: ThumbnailKey) -> bool:
+        """Tell a queued task whether its stage is still the one being shown."""
+        return key.stage == self._stage
+
+    def _on_render_skipped(self, key: ThumbnailKey) -> None:
+        self._in_flight.discard(key)
 
     def _on_render_finished(self, key: ThumbnailKey, image: QImage | None) -> None:
         self._in_flight.discard(key)
