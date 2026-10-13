@@ -37,6 +37,7 @@ def view(qtbot: QtBot) -> PageLayoutImageView:
             IMAGE_WIDTH, IMAGE_HEIGHT, Dpi.uniform(300)
         ),
     )
+    widget.set_margin_links(left_right=False, top_bottom=False)
     widget.set_mm_per_pixel(MM_X, MM_Y)
     middle = INNER.adjusted(-MARGIN, -MARGIN, MARGIN, MARGIN)
     widget.set_rectangles(INNER, middle, middle.adjusted(-SOFT, -SOFT, SOFT, SOFT))
@@ -333,6 +334,7 @@ class TestSharedState:
     def test_pressing_the_link_button_links_the_view(self, qtbot, view):
         options = page_layout_options.OptionsWidget(Filter())
         qtbot.addWidget(options)
+        options.state.left_right_linked = False
         view.set_state(options.state)
         link = options.findChild(QtCore.QObject, "leftRightLink")
         assert link is not None
@@ -390,6 +392,57 @@ class TestSharedState:
         old.left_right_linked = True
 
         assert reported == []
+
+
+class TestLinkPersistence:
+    def test_both_pairs_start_linked_when_the_user_never_chose(self):
+        state = PageLayoutState()
+
+        assert state.left_right_linked
+        assert state.top_bottom_linked
+
+    def test_a_pair_the_user_unlinked_stays_unlinked_in_the_next_session(self, qtbot):
+        options = page_layout_options.OptionsWidget(Filter())
+        qtbot.addWidget(options)
+        link = options.findChild(QtCore.QObject, "leftRightLink")
+        assert link is not None
+
+        link.click()
+
+        assert not options.state.left_right_linked
+        later = PageLayoutState()
+        assert not later.left_right_linked
+        assert later.top_bottom_linked
+
+    def test_each_pair_is_stored_under_its_upstream_key(self, qtbot):
+        options = page_layout_options.OptionsWidget(Filter())
+        qtbot.addWidget(options)
+        top_bottom = options.findChild(QtCore.QObject, "topBottomLink")
+        assert top_bottom is not None
+
+        top_bottom.click()
+
+        settings = QtCore.QSettings()
+        assert settings.value("margins/topBottomLinked", type=bool) is False
+        assert not settings.contains("margins/leftRightLinked")
+
+    def test_a_pair_released_by_unequal_margins_is_not_stored_as_unlinked(self, qtbot):
+        from scantailor.core.models import ImageId, PageId
+
+        widget = page_layout_options.OptionsWidget(Filter())
+        qtbot.addWidget(widget)
+        page = PageId(image_id=ImageId(file_path="a.png"))
+        widget._filter.set_params(
+            page,
+            widget._filter.get_params(page).with_margins(
+                Margins(left=10, right=12, top=5, bottom=5)
+            ),
+        )
+
+        widget.set_current_page(page)
+
+        assert not widget.state.left_right_linked
+        assert PageLayoutState().left_right_linked
 
 
 class TestGuides:

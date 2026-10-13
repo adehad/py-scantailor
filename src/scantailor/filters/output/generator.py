@@ -45,7 +45,6 @@ from scantailor.imageproc.posterizer import posterize
 from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode
 from .color_options import ColorCommonOptions, FillingColor
-from .despeckle import DespeckleLevel
 from .dewarping_options import DewarpingMode
 from .mixed import (
     PictureLayers,
@@ -506,8 +505,8 @@ def _generate_binary_output(
 
     # Despeckling stays the last step that changes which pixels are ink.
     source = binary.copy() if keep_despeckle_source else None
-    if params.despeckle_level.is_enabled():
-        binary = _despeckle(binary, params.despeckle_level, params.output_dpi)
+    if params.despeckle_strength > 0.0:
+        binary = _despeckle(binary, params.despeckle_strength, params.output_dpi)
 
     if color_page is not None:
         result = _colored_binary_output(color_page, binary, params, render, layout)
@@ -694,9 +693,9 @@ def _generate_mixed_output(
         ink = raw_ink
         if keep_despeckle_source:
             source = np.where(raw_ink & text_region, 0, 255).astype(np.uint8)
-        if params.despeckle_level.is_enabled():
+        if params.despeckle_strength > 0.0:
             speckled = np.where(ink, 0, 255).astype(np.uint8)
-            ink = _despeckle(speckled, params.despeckle_level, dpi) == 0
+            ink = _despeckle(speckled, params.despeckle_strength, dpi) == 0
         result = _compose_text(
             layer, ink, text_region, params, render, layout, dpi_pair
         )
@@ -1026,22 +1025,23 @@ def _binarize(
 
 def _despeckle(
     binary: NDArray[np.uint8],
-    level: DespeckleLevel,
+    strength: float,
     dpi: Dpi,
 ) -> NDArray[np.uint8]:
     """Remove small noise components that are not near text.
 
     Args:
         binary (NDArray[np.uint8]): Binary image, 0 is ink. Not modified.
-        level (DespeckleLevel): Despeckle level.
+        strength (float): Despeckle strength, 0 for off; 1, 2 and 3 are the
+            cautious, normal and aggressive presets.
         dpi (Dpi): Resolution of ``binary``; the smaller axis sets the thresholds.
 
     Returns:
         NDArray[np.uint8]: Despeckled binary image.
     """
-    if not level.is_enabled():
+    if strength <= 0.0:
         return binary
-    return despeckle_image(binary, min(dpi.horizontal, dpi.vertical), level.to_factor())
+    return despeckle_image(binary, min(dpi.horizontal, dpi.vertical), strength)
 
 
 def _morphological_smooth(binary: NDArray[np.uint8]) -> NDArray[np.uint8]:
