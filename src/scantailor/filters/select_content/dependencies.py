@@ -9,12 +9,17 @@ class Dependencies(BaseModel):
     """Tracks dependencies that affect content/page detection.
 
     When any of these change, the cached results need to be recomputed.
+
+    ``view_transform`` is not a dependency: it is the 3x3 matrix from the
+    source image's pixels to the view the boxes are expressed in, kept so that
+    a hand-drawn box can be carried into a changed view. Empty when unknown.
     """
 
     content_detection_mode: ContentDetectionMode = ContentDetectionMode.AUTO
     page_detection_mode: PageDetectionMode = PageDetectionMode.DISABLED
     fine_tune_corners: bool = False
     rotated_page_outline: list[tuple[float, float]] = []
+    view_transform: list[list[float]] = []
 
     def needs_content_update(self, other: "Dependencies") -> bool:
         """Check if content box needs to be recomputed.

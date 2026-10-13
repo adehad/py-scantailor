@@ -17,6 +17,14 @@ class TestDependencies:
         assert deps.page_detection_mode == PageDetectionMode.DISABLED
         assert deps.fine_tune_corners is False
         assert deps.rotated_page_outline == []
+        assert deps.view_transform == []
+
+    def test_a_different_view_transform_alone_calls_for_no_update(self):
+        """The view the boxes were drawn in is remembered, not depended on."""
+        deps1 = Dependencies(view_transform=[[1, 0, -30], [0, 1, 0], [0, 0, 1]])
+        deps2 = Dependencies(view_transform=[[1, 0, -70], [0, 1, 0], [0, 0, 1]])
+
+        assert deps1.is_compatible_with(deps2)
 
     def test_needs_content_update_mode_change(self):
         """Content update needed when mode changes."""
