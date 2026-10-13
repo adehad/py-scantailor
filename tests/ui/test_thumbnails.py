@@ -443,3 +443,35 @@ class TestThumbnailCache:
     def test_disk_miss_without_directory(self) -> None:
         cache = ThumbnailCache()
         assert cache.load_from_disk(self.key(1)) is None
+
+
+def test_queued_renders_of_a_stage_that_is_no_longer_shown_are_skipped(
+    qtbot: QtBot, project: Project
+) -> None:
+    from scantailor.app.ui.thumbnails.model import ThumbnailModel
+
+    started = threading.Event()
+    release = threading.Event()
+    calls: list[tuple[PageId, str]] = []
+
+    def blocking(page: PageId, stage: str) -> QImage:
+        calls.append((page, stage))
+        started.set()
+        release.wait(5)
+        image = QImage(40, 60, QImage.Format.Format_RGB32)
+        image.fill(QColor("steelblue"))
+        return image
+
+    model = ThumbnailModel(blocking, thread_count=1)
+    model.set_project(project)
+    model.set_stage("page_split")
+    for row in range(model.rowCount()):
+        model.data(model.index(row), Qt.ItemDataRole.DecorationRole)
+    assert started.wait(5)
+
+    model.set_stage("output")
+    release.set()
+    model.wait_for_idle()
+    qtbot.wait(50)
+
+    assert [stage for _page, stage in calls] == ["page_split"]

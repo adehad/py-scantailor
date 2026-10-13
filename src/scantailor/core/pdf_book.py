@@ -1,7 +1,8 @@
 """Rebuild a scanned PDF: import its pages, process them, export a new PDF.
 
 The source PDF's text layer, when it has one, is carried onto the processed
-pages as invisible text.
+pages as invisible text, and its bookmarks and page labels when every page
+was exported.
 """
 
 import time
@@ -140,6 +141,7 @@ def rebuild_pdf(
                     Dpi.uniform(dpi),
                     info.output_dpi,
                     dewarped=info.was_dewarped,
+                    dewarp=info.dewarp,
                 )
                 for page in exported
                 if (info := batch.render_info.get(page)) is not None
@@ -161,6 +163,7 @@ def rebuild_pdf(
             text_layers=layers if carry_text else None,
             executor=pool,
             max_workers=workers,
+            outline_source=pdf_path,
         )
     clock.stop()
     result.pages_exported = len(exported)

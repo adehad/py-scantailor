@@ -37,6 +37,14 @@ SHOT_NAMES = (
     "stage5_margins_apply",
     "stage6_output_options",
     "stage6_output_guides",
+    "stage6_output_edge_methods",
+    "stage6_output_picture_shape",
+    "stage6_tab_picture_zones",
+    "stage6_tab_fill_zones",
+    "stage6_tab_dewarping",
+    "stage6_tab_despeckling",
+    "stage6_zone_menu",
+    "stage6_zone_properties",
     "thumbnails_sorting",
     "tools_menu",
     "settings",
@@ -167,9 +175,16 @@ def _capture(scheme: str, out_dir: Path) -> None:
     app = QtWidgets.QApplication(sys.argv[:1])
     from scantailor.app._ui import resources_rc
     from scantailor.app.ui import MainWindow as mw
+    from scantailor.app.ui.image_views.output import ImageViewTab
     from scantailor.app.ui.theme import apply_theme
     from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
     from scantailor.core.stage_sequence import FilterStage
+    from scantailor.core.zones import (
+        FillZoneProperties,
+        PictureLayer,
+        PictureZoneProperties,
+    )
+    from scantailor.filters.output.params import FillZoneSpec, PictureZoneSpec
 
     apply_theme(app)
     resources_rc.qInitResources()
@@ -291,6 +306,27 @@ def _capture(scheme: str, out_dir: Path) -> None:
         enable.setChecked(False)
         finish_render()
 
+    def add_sample_zones() -> None:
+        """Give the current page a picture zone and a fill zone, and render it."""
+        page = manager.current_page
+        output_filter = manager.stages.output_filter
+        picture = PictureZoneSpec(
+            points=((300.0, 420.0), (900.0, 420.0), (900.0, 780.0), (300.0, 780.0)),
+            properties=PictureZoneProperties(layer=PictureLayer.PAINTER2),
+        )
+        fill = FillZoneSpec(
+            points=((300.0, 900.0), (900.0, 900.0), (900.0, 1100.0), (300.0, 1100.0)),
+            properties=FillZoneProperties(color=(255, 240, 200)),
+        )
+        output_filter.set_params(
+            page,
+            output_filter.get_params(page)
+            .with_picture_zones((picture,))
+            .with_fill_zones((fill,)),
+        )
+        manager._on_settings_edited()
+        finish_render()
+
     manager.current_page = manager.pages()[0]
     for index in range(1, 6):
         show_stage(index)
@@ -336,6 +372,54 @@ def _capture(scheme: str, out_dir: Path) -> None:
     pump(0.5)
     save(manager.ui, "stage6_output_guides")
     output_view.set_guides_shown(False)
+
+    def reveal(widget: QtWidgets.QWidget) -> None:
+        """Scroll the options panel until ``widget`` shows."""
+        area = widget.parentWidget()
+        while area is not None and not isinstance(area, QtWidgets.QScrollArea):
+            area = area.parentWidget()
+        if area is not None:
+            area.ensureWidgetVisible(widget)
+        pump(0.3)
+
+    method.setCurrentIndex(method.findText("EdgePlus"))
+    finish_render()
+    reveal(options_child(QtWidgets.QWidget, "binarizationGroup"))
+    save(manager.ui, "stage6_output_edge_methods")
+    method.setCurrentIndex(previous_method)
+    finish_render()
+
+    mode_button = options_child(QtWidgets.QAbstractButton, "mixedBtn")
+    mode_button.click()
+    finish_render()
+    reveal(options_child(QtWidgets.QWidget, "pictureShapeOptions"))
+    save(manager.ui, "stage6_output_picture_shape")
+    options_child(QtWidgets.QAbstractButton, "bwBtn").click()
+    finish_render()
+
+    add_sample_zones()
+    for tab_name, shot in (
+        ("PICTURE_ZONES", "stage6_tab_picture_zones"),
+        ("FILL_ZONES", "stage6_tab_fill_zones"),
+        ("DEWARPING", "stage6_tab_dewarping"),
+        ("DESPECKLING", "stage6_tab_despeckling"),
+    ):
+        output_view.set_current_tab(ImageViewTab[tab_name])
+        pump(3.0)
+        save(manager.ui, shot)
+
+    output_view.set_current_tab(ImageViewTab.PICTURE_ZONES)
+    pump(0.5)
+    zone_centre = output_view.zones()[0].polygon.boundingRect().center()
+    inverse, _ = output_view._widget_to_virtual.inverted()
+    zone_pos = inverse.map(zone_centre)
+    menu = output_view.build_context_menu(zone_pos)
+    menu.popup(output_view.viewport().mapToGlobal(zone_pos.toPoint()))
+    pump(0.5)
+    save(menu, "stage6_zone_menu")
+    menu.hide()
+    in_modal("stage6_zone_properties", lambda: output_view.edit_zone_properties(0))
+    output_view.set_current_tab(ImageViewTab.OUTPUT)
 
     manager.sortOptions.setCurrentIndex(1)
     manager.pauseSortingBtn.setChecked(True)

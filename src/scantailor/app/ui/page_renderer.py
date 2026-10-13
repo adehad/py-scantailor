@@ -1,6 +1,7 @@
 """Background rendering of a page up to a filter stage."""
 
 import threading
+from collections.abc import Callable
 
 import cv2
 import numpy as np
@@ -8,10 +9,12 @@ from loguru import logger
 from numpy.typing import NDArray
 from PySide6 import QtCore, QtGui
 
+from scantailor.app.ui.source_cache import SourceCache
 from scantailor.core import pipeline
 from scantailor.core.image_io import ImageLoadError
 from scantailor.core.models import PageId
 from scantailor.core.page_source import FALLBACK_DPI, DpiOverrides, load_page
+from scantailor.core.pipeline import OutputExtras
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.output.params import DistortionModelSpec
 
@@ -23,7 +26,12 @@ __all__ = [
     "render_thumbnail",
 ]
 
-_MAX_THREADS = 2
+# One more than the pool needs for the render the user waits for: a render that
+# was superseded cannot be interrupted and keeps its thread until it returns.
+_MAX_THREADS = 3
+
+# Longest a thumbnail worker waits for the render the user is waiting for.
+THUMBNAIL_YIELD_SECONDS = 30.0
 
 
 def render_page(
@@ -55,6 +63,12 @@ def render_page_with_model(
     sequence: StageSequence,
     end_stage: FilterStage,
     dpi_overrides: DpiOverrides | None = None,
+    *,
+    sources: SourceCache | None = None,
+    keep_source: bool = True,
+    pixels: bool = True,
+    on_extras: Callable[[OutputExtras], None] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> tuple[NDArray[np.uint8], DistortionModelSpec | None]:
     """Render a page like ``render_page`` and return the dewarping model it built.
 
@@ -64,6 +78,17 @@ def render_page_with_model(
         end_stage (FilterStage): Last stage to run.
         dpi_overrides (DpiOverrides | None): Project resolutions that win over
             the image file's.
+        sources (SourceCache | None): Where to take the decoded source from, so
+            that it is decoded once for everyone; decoded here when None.
+        keep_source (bool): Whether a source decoded for this render stays in
+            ``sources``. False for pages that are not the one on screen.
+        pixels (bool): False when the caller does not draw the rendered image,
+            which then comes back as an empty array without being converted.
+        on_extras (Callable[[OutputExtras], None] | None): Called with the
+            pictures the Output view's tabs show, when the render reaches the
+            Output stage; they are not produced without it.
+        should_cancel (Callable[[], bool] | None): Asked between stages; True
+            stops the render with ``pipeline.PipelineCancelled``.
 
     Returns:
         tuple[NDArray[np.uint8], DistortionModelSpec | None]: The display image
@@ -73,10 +98,22 @@ def render_page_with_model(
     Raises:
         ImageLoadError: If the source image cannot be decoded.
     """
-    page = load_page(page_id.image_id, dpi_overrides)
-    options = pipeline.PipelineOptions(end_stage=end_stage, dpi=page.horizontal_dpi())
+    if sources is None:
+        page = load_page(page_id.image_id, dpi_overrides)
+    else:
+        page = sources.load(page_id.image_id, dpi_overrides, keep=keep_source)
+    options = pipeline.PipelineOptions(
+        end_stage=end_stage,
+        dpi=page.horizontal_dpi(),
+        keep_output_extras=on_extras is not None,
+        should_cancel=should_cancel,
+    )
     result = pipeline.process_page(page.pixels, page_id, sequence, options)
+    if on_extras is not None and result.output_extras is not None:
+        on_extras(result.output_extras)
     image = result.image
+    if not pixels:
+        return np.empty((0, 0), dtype=np.uint8), result.distortion_model
     if image.ndim == 3 and image.shape[2] == 3:
         image = np.ascontiguousarray(image[:, :, ::-1])
     return image, result.distortion_model
@@ -88,6 +125,7 @@ def render_thumbnail(
     end_stage: FilterStage,
     max_size: QtCore.QSize,
     dpi_overrides: DpiOverrides | None = None,
+    sources: SourceCache | None = None,
 ) -> QtGui.QImage:
     """Render a page up to ``end_stage`` and shrink it to fit ``max_size``.
 
@@ -100,6 +138,8 @@ def render_thumbnail(
         max_size (QtCore.QSize): Bounding size of the result.
         dpi_overrides (DpiOverrides | None): Project resolutions that win over
             the image file's.
+        sources (SourceCache | None): Decoded sources to reuse when the page is
+            in it; a page decoded here is not added to it.
 
     Returns:
         QtGui.QImage: Detached image, 8-bit gray or RGB888.
@@ -107,7 +147,14 @@ def render_thumbnail(
     Raises:
         ImageLoadError: If the source image cannot be decoded.
     """
-    image = _render(page_id, sequence, end_stage, dpi_overrides)
+    image = render_page_with_model(
+        page_id,
+        sequence,
+        end_stage,
+        dpi_overrides,
+        sources=sources,
+        keep_source=False,
+    )[0]
     height, width = image.shape[:2]
     scale = min(max_size.width() / width, max_size.height() / height, 1.0)
     if scale < 1.0:
@@ -125,18 +172,10 @@ def render_thumbnail(
     ).copy()
 
 
-def _render(
-    page_id: PageId,
-    sequence: StageSequence,
-    end_stage: FilterStage,
-    dpi_overrides: DpiOverrides | None,
-) -> NDArray[np.uint8]:
-    return render_page(page_id, sequence, end_stage, dpi_overrides)
-
-
 class _RenderSignals(QtCore.QObject):
     done = QtCore.Signal(int, object, object)
     model_found = QtCore.Signal(int, object, object)
+    extras_found = QtCore.Signal(int, object, object)
     failed = QtCore.Signal(int, object, str)
 
 
@@ -151,6 +190,10 @@ class _RenderTask(QtCore.QRunnable):
         stage: FilterStage,
         dpi_overrides: DpiOverrides | None,
         signals: _RenderSignals,
+        sources: SourceCache,
+        pixels: bool,
+        finished: Callable[["_RenderTask"], None],
+        extras: bool = False,
     ) -> None:
         super().__init__()
         self.setAutoDelete(True)
@@ -161,15 +204,37 @@ class _RenderTask(QtCore.QRunnable):
         self._stage = stage
         self._dpi_overrides = dpi_overrides
         self._signals = signals
+        self._sources = sources
+        self._pixels = pixels
+        self._finished = finished
+        self._extras = extras
 
     def run(self) -> None:
         """Render on a pool thread and report unless cancelled."""
-        if self.cancelled.is_set():
-            return
+        try:
+            if not self.cancelled.is_set():
+                self._render_and_report()
+        finally:
+            self._finished(self)
+
+    def _report_extras(self, extras: OutputExtras) -> None:
+        if not self.cancelled.is_set():
+            self._signals.extras_found.emit(self._generation, self._page_id, extras)
+
+    def _render_and_report(self) -> None:
         try:
             image, model = render_page_with_model(
-                self._page_id, self._sequence, self._stage, self._dpi_overrides
+                self._page_id,
+                self._sequence,
+                self._stage,
+                self._dpi_overrides,
+                sources=self._sources,
+                pixels=self._pixels,
+                on_extras=self._report_extras if self._extras else None,
+                should_cancel=self.cancelled.is_set,
             )
+        except pipeline.PipelineCancelled:
+            return
         except Exception as error:
             logger.opt(exception=not isinstance(error, ImageLoadError)).warning(
                 f"Cannot render {self._page_id}: {error}"
@@ -189,15 +254,22 @@ class PageRenderer(QtCore.QObject):
     Only the latest request is reported: requesting again cancels the previous
     one, whose result is dropped even if it is already running.
 
+    Pages are decoded through ``sources``, which the stage panels share, so one
+    decode serves every stage and render of a page.
+
     Signals:
         render_done: A render finished. Args: page_id (PageId), image (ndarray).
         render_failed: A render failed. Args: page_id (PageId), message (str).
         distortion_model_found: A render built a dewarping model, emitted just
             before ``render_done``. Args: page_id (PageId), model
             (DistortionModelSpec).
+        output_extras_found: A render asked for the pictures of the Output
+            view's tabs and made them, emitted just before ``render_done``.
+            Args: page_id (PageId), extras (OutputExtras).
     """
 
     render_done = QtCore.Signal(object, object)
+    output_extras_found = QtCore.Signal(object, object)
     distortion_model_found = QtCore.Signal(object, object)
     render_failed = QtCore.Signal(object, str)
 
@@ -213,9 +285,19 @@ class PageRenderer(QtCore.QObject):
         self._signals = _RenderSignals(self)
         self._signals.done.connect(self._on_done)
         self._signals.model_found.connect(self._on_model_found)
+        self._signals.extras_found.connect(self._on_extras_found)
         self._signals.failed.connect(self._on_failed)
         self._generation = 0
+        self._sources = SourceCache()
+        self._state = threading.Lock()
         self._task: _RenderTask | None = None
+        self._idle = threading.Event()
+        self._idle.set()
+
+    @property
+    def sources(self) -> SourceCache:
+        """The decoded sources this renderer works from."""
+        return self._sources
 
     def request(
         self,
@@ -223,6 +305,8 @@ class PageRenderer(QtCore.QObject):
         sequence: StageSequence,
         stage: FilterStage,
         dpi_overrides: DpiOverrides | None = None,
+        pixels: bool = True,
+        extras: bool = False,
     ) -> None:
         """Start rendering a page, cancelling any render still pending.
 
@@ -232,20 +316,57 @@ class PageRenderer(QtCore.QObject):
             stage (FilterStage): Last stage to run.
             dpi_overrides (DpiOverrides | None): Snapshot of the project's
                 resolutions, read on the worker thread; do not mutate it.
+            pixels (bool): False when the image of the render is not drawn, as
+                for the stages whose views show the source; ``render_done`` then
+                carries an empty array.
+            extras (bool): True to also report the pictures of the Output
+                view's tabs through ``output_extras_found``.
         """
         self.cancel()
         task = _RenderTask(
-            self._generation, page_id, sequence, stage, dpi_overrides, self._signals
+            self._generation,
+            page_id,
+            sequence,
+            stage,
+            dpi_overrides,
+            self._signals,
+            self._sources,
+            pixels,
+            self._on_task_finished,
+            extras,
         )
-        self._task = task
+        with self._state:
+            self._task = task
+            self._idle.clear()
         self._pool.start(task)
 
     def cancel(self) -> None:
         """Drop the pending render, if any."""
-        if self._task is not None:
-            self._task.cancelled.set()
-            self._task = None
+        with self._state:
+            task, self._task = self._task, None
+            self._idle.set()
+        if task is not None:
+            task.cancelled.set()
         self._generation += 1
+
+    def wait_until_idle(self, timeout: float = THUMBNAIL_YIELD_SECONDS) -> bool:
+        """Block until no render that the user waits for is running.
+
+        For worker threads whose own work can wait, such as thumbnails, so that
+        the page on screen gets the processors first.
+
+        Args:
+            timeout (float): Longest wait in seconds.
+
+        Returns:
+            bool: False if the timeout expired first.
+        """
+        return self._idle.wait(timeout)
+
+    def _on_task_finished(self, task: _RenderTask) -> None:
+        with self._state:
+            if task is self._task:
+                self._idle.set()
 
     def wait_for_done(self, timeout_ms: int = -1) -> bool:
         """Block until every started render has returned.
@@ -269,6 +390,13 @@ class PageRenderer(QtCore.QObject):
     ) -> None:
         if generation == self._generation:
             self.distortion_model_found.emit(page_id, model)
+
+    @QtCore.Slot(int, object, object)
+    def _on_extras_found(
+        self, generation: int, page_id: PageId, extras: OutputExtras
+    ) -> None:
+        if generation == self._generation:
+            self.output_extras_found.emit(page_id, extras)
 
     @QtCore.Slot(int, object, str)
     def _on_failed(self, generation: int, page_id: PageId, message: str) -> None:

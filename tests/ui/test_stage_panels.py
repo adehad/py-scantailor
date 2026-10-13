@@ -141,9 +141,9 @@ def test_editing_an_option_rerenders_the_current_page(
     stages_run: list[FilterStage] = []
     real_render = page_renderer.render_page_with_model
 
-    def spy(page_id, sequence, end_stage, dpi_overrides=None):
+    def spy(page_id, sequence, end_stage, dpi_overrides=None, **kwargs):
         stages_run.append(end_stage)
-        return real_render(page_id, sequence, end_stage)
+        return real_render(page_id, sequence, end_stage, **kwargs)
 
     monkeypatch.setattr(page_renderer, "render_page_with_model", spy)
     spin_box = _options_container(project_window).findChild(QtWidgets.QDoubleSpinBox)

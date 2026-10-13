@@ -77,9 +77,9 @@ def _count_renders(
     rendered: list[PageId] = []
     real_render = page_renderer.render_page_with_model
 
-    def spy(page_id, sequence, end_stage, dpi_overrides=None):
+    def spy(page_id, sequence, end_stage, dpi_overrides=None, **kwargs):
         rendered.append(page_id)
-        return real_render(page_id, sequence, end_stage)
+        return real_render(page_id, sequence, end_stage, **kwargs)
 
     monkeypatch.setattr(page_renderer, "render_page_with_model", spy)
     return rendered
@@ -963,9 +963,11 @@ class TestDetectedPageCounts:
         window = settled_window
         real_render = page_renderer.render_page_with_model
 
-        def detecting_render(page_id, sequence, end_stage, dpi_overrides=None):
+        def detecting_render(
+            page_id, sequence, end_stage, dpi_overrides=None, **kwargs
+        ):
             _store_detected_spreads(window, [page_id.image_id])
-            return real_render(page_id, sequence, end_stage)
+            return real_render(page_id, sequence, end_stage, **kwargs)
 
         monkeypatch.setattr(page_renderer, "render_page_with_model", detecting_render)
         first = window.pages()[0]
