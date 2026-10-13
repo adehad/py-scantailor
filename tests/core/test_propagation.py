@@ -30,6 +30,7 @@ from scantailor.core.propagation import (
 from scantailor.core.stage_sequence import StageSequence
 from scantailor.filters.deskew.dependencies import Dependencies as DeskewDependencies
 from scantailor.filters.deskew.params import Params as DeskewParams
+from scantailor.filters.fix_orientation.image_trim import ImageTrim
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.params import ApplyGroup
 from scantailor.filters.output.params import Params as OutputParams
@@ -366,6 +367,17 @@ class TestApplyFunctions:
             assert stages.fix_orientation_filter.get_rotation(
                 target.image_id
             ) == OrthogonalRotation(degrees=270)
+
+    def test_orientation_copies_the_trim_with_the_rotation(self):
+        stages = StageSequence()
+        source, *targets = _pages(3)
+        trim = ImageTrim(enabled=True, left=5, top=6, right=7, bottom=8)
+        stages.fix_orientation_filter.set_trim(source.image_id, trim)
+
+        apply_orientation(stages, source, targets)
+
+        for target in targets:
+            assert stages.fix_orientation_filter.get_trim(target.image_id) == trim
 
     def test_manual_deskew_angle_is_copied(self):
         stages = StageSequence()

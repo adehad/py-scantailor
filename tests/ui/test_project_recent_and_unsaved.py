@@ -23,7 +23,7 @@ DESKEW_ANGLE = 1.5
 
 
 def _write_project(page_images: PageImages, project_file: pathlib.Path) -> pathlib.Path:
-    project = Project(output_directory=project_file.parent / "out")
+    project = Project(output_directory=project_file.parent)
     for path in page_images.paths:
         for image_id, metadata in list_image_pages(path):
             project.add_image(image_id, metadata)
