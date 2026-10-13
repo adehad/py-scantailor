@@ -44,13 +44,13 @@ from scantailor.core.project import (
 from scantailor.core.settings import ApplicationSettings, TiffCompressions
 from scantailor.core.stage_params import (
     STAGE_KEYS,
+    apply_stage_defaults,
     apply_stage_params,
+    collect_stage_defaults,
     collect_stage_params,
 )
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation
-from scantailor.filters.output.color_mode import ColorMode
-from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.output.generator import applied_post_deskew_angle
 from scantailor.filters.output.params import DistortionModelSpec
 from scantailor.filters.output.params import Params as OutputParams
@@ -60,8 +60,6 @@ from scantailor.filters.output.split_output import (
     ORIGINAL_BACKGROUND_DIR,
     write_split_images,
 )
-from scantailor.filters.page_layout.params import ContentSize
-from scantailor.filters.page_split.layout_type import LayoutType
 
 DEFAULT_DPI = 300.0
 
@@ -93,6 +91,9 @@ class RenderInfo:
             found, to be stored in the page's parameters; None if none was built.
         dewarp: How the page was dewarped, for placing its text; None when it
             was not dewarped or no model is known.
+        post_deskew_angle: The rotation the worker measured after dewarping, to
+            be stored in the page's parameters; None when the page was not
+            dewarped.
     """
 
     transformation: ImageTransformation
@@ -100,6 +101,7 @@ class RenderInfo:
     was_dewarped: bool
     distortion_model: DistortionModelSpec | None = None
     dewarp: DewarpSpec | None = None
+    post_deskew_angle: float | None = None
 
 
 @dataclass(frozen=True)
@@ -448,58 +450,6 @@ def _describe(error: BaseException) -> str:
     return f"{type(error).__name__}: {error}"
 
 
-def collect_stage_defaults(stages: StageSequence) -> StageDefaultsData:
-    """Read the project-wide defaults that unset pages fall back to.
-
-    Returns:
-        StageDefaultsData: JSON-compatible values for ``apply_stage_defaults``.
-    """
-    output = stages.output_filter.settings
-    select_content = stages.select_content_filter.settings
-    frozen = stages.page_layout_filter.settings.get_frozen_aggregate_hard_size_mm()
-    return {
-        "page_split_layout_type": (
-            stages.page_split_filter.settings.get_default_layout_type().value
-        ),
-        "output_dpi": output.get_default_dpi().model_dump(mode="json"),
-        "output_color_mode": output.get_default_color_mode().value,
-        "output_despeckle_level": output.get_default_despeckle_level().value,
-        "page_detection_box": list(select_content.get_page_detection_box()),
-        "page_detection_tolerance": select_content.get_page_detection_tolerance(),
-        "deskew_auto_oblique": stages.deskew_filter.auto_oblique_default,
-        "deskew_content_based": stages.deskew_filter.content_based,
-        "page_layout_frozen_aggregate_size": (
-            None if frozen is None else frozen.model_dump(mode="json")
-        ),
-    }
-
-
-def apply_stage_defaults(stages: StageSequence, defaults: StageDefaultsData) -> None:
-    """Install defaults read by ``collect_stage_defaults`` into fresh stages."""
-    stages.page_split_filter.settings.set_default_layout_type(
-        LayoutType(defaults["page_split_layout_type"])
-    )
-    output = stages.output_filter.settings
-    output.set_default_dpi(Dpi.model_validate(defaults["output_dpi"]))
-    output.set_default_color_mode(ColorMode(defaults["output_color_mode"]))
-    output.set_default_despeckle_level(
-        DespeckleLevel(defaults["output_despeckle_level"])
-    )
-    select_content = stages.select_content_filter.settings
-    select_content.set_page_detection_box(*defaults["page_detection_box"])
-    select_content.set_page_detection_tolerance(defaults["page_detection_tolerance"])
-    stages.deskew_filter.auto_oblique_default = bool(
-        defaults.get("deskew_auto_oblique", False)
-    )
-    stages.deskew_filter.content_based = bool(
-        defaults.get("deskew_content_based", True)
-    )
-    if (frozen := defaults.get("page_layout_frozen_aggregate_size")) is not None:
-        stages.page_layout_filter.settings.restore_frozen_aggregate_hard_size_mm(
-            ContentSize.model_validate(frozen)
-        )
-
-
 def _dump_entries(entries: dict[str, list[StageParamsEntry]]) -> StageParamsData:
     return {
         key: [entry.model_dump(mode="json") for entry in stage_entries]
@@ -693,8 +643,17 @@ def _render_page(job: _PageJob) -> tuple[Path, RenderInfo]:
         _dewarp_spec(rendered, stages.output_filter.get_params(job.page))
         if was_dewarped
         else None,
+        post_deskew_angle=_measured_post_deskew_angle(rendered)
+        if was_dewarped
+        else None,
     )
     return job.output_path, info
+
+
+def _measured_post_deskew_angle(rendered: PipelineResult) -> float | None:
+    """Return the post-dewarp rotation the pipeline measured, if it reported one."""
+    angle = rendered.metadata.get("OUTPUT", {}).get("post_deskew_angle")
+    return None if angle is None else float(angle)
 
 
 def _dewarp_spec(rendered: PipelineResult, params: OutputParams) -> DewarpSpec | None:
@@ -774,6 +733,10 @@ def run_batch(
                 if event.info.distortion_model is not None:
                     stages.output_filter.store_distortion_model(
                         event.page, event.info.distortion_model
+                    )
+                if event.info.post_deskew_angle is not None:
+                    stages.output_filter.settings.set_post_deskew_angle(
+                        event.page, event.info.post_deskew_angle
                     )
         elif isinstance(event, PageFailed):
             result.failed[event.page] = event.error
