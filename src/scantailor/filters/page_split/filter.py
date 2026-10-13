@@ -173,7 +173,7 @@ class Filter:
                 recorded so a later rotation change invalidates the result.
 
         Returns:
-            SplitResult with detected layout and confidence.
+            SplitResult with the detected layout.
         """
         params = self.get_params(page_id)
         layout_type = params.layout_type
