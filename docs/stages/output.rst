@@ -107,6 +107,10 @@ it only vertically, or **Shift** to move it only horizontally.
 .. screenshot:: stage6_tab_fill_zones
    :alt: The Fill Zones tab with a fill zone drawn over the page
 
+The **Fill Zones** tab shows the output image, so on a dewarped page the zones are
+drawn and edited on the dewarped page and stored in page coordinates. If the
+dewarping model cannot be used, they are drawn on the undewarped page.
+
 The **Dewarping** tab shows the page as it is before dewarping, with the distortion
 grid over it. Drag the corners and edges of the grid as you would those of a zone;
 editing the grid of a page whose dewarping is **Auto** or **Marginal** makes it

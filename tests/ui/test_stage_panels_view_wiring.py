@@ -5,21 +5,28 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from PySide6 import QtCore
+from PySide6 import QtCore, QtGui
 from pytestqt.qtbot import QtBot
 
-from scantailor.app.ui.image_views.output import ImageViewTab, OutputImageView
+from scantailor.app.ui.image_views.output import (
+    ImageViewTab,
+    OutputImageView,
+    ViewZone,
+    ZoneKind,
+)
 from scantailor.app.ui.image_views.page_layout import PageLayoutImageView
 from scantailor.app.ui.image_views.page_split import PageSplitImageView
 from scantailor.app.ui.image_views.select_content import SelectContentImageView
-from scantailor.app.ui.stage_panels import StagePanels, _Source
+from scantailor.app.ui.stage_panels import StagePanels, _fill_zone_mapper, _Source
 from scantailor.core.content_mask import ContentMask
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 from scantailor.core.pipeline import OutputExtras
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation
+from scantailor.core.zones import FillZoneProperties
 from scantailor.filters.output.dewarping_options import DewarpingMode
-from scantailor.filters.output.params import DistortionModelSpec
+from scantailor.filters.output.params import DistortionModelSpec, FillZoneSpec
+from scantailor.filters.output.params import Params as OutputParams
 from scantailor.filters.page_layout.guide import Guide as StoredGuide
 from scantailor.filters.page_split.page_layout import PageLayout
 
@@ -133,35 +140,20 @@ class TestFillZonesTabPicture:
         panels._feed_output_tabs(view, filter_.get_params(PAGE), xform, np.ones(2))
         return view
 
-    def test_with_dewarping_the_fill_zone_tab_shows_the_page_before_dewarping(self):
+    @pytest.mark.parametrize(
+        "mode", [DewarpingMode.OFF, DewarpingMode.AUTO, DewarpingMode.MANUAL]
+    )
+    def test_the_fill_zone_tab_shows_the_output_whether_or_not_it_is_dewarped(
+        self, mode
+    ):
         panels = _panels(FilterStage.OUTPUT)
 
-        view = self._feed(panels, DewarpingMode.AUTO)
-
-        assert ImageViewTab.FILL_ZONES in view._tab_images
-        view.set_current_tab(ImageViewTab.FILL_ZONES)
-        assert view.image is not None
-        assert view.image.pixelColor(5, 5).red() == 100
-
-    def test_without_dewarping_it_shows_the_output(self):
-        panels = _panels(FilterStage.OUTPUT)
-
-        view = self._feed(panels, DewarpingMode.OFF)
+        view = self._feed(panels, mode)
 
         assert ImageViewTab.FILL_ZONES not in view._tab_images
         view.set_current_tab(ImageViewTab.FILL_ZONES)
         assert view.image is not None
         assert view.image.pixelColor(5, 5).red() == 200
-
-    def test_turning_dewarping_off_again_goes_back_to_the_output(self):
-        panels = _panels(FilterStage.OUTPUT)
-        view = self._feed(panels, DewarpingMode.MANUAL)
-        assert ImageViewTab.FILL_ZONES in view._tab_images
-
-        panels._fed_extras = None
-        self._feed(panels, DewarpingMode.OFF)
-
-        assert ImageViewTab.FILL_ZONES not in view._tab_images
 
     def test_a_new_page_drops_the_fill_zone_picture(self):
         panels = _panels(FilterStage.OUTPUT)
@@ -170,6 +162,99 @@ class TestFillZonesTabPicture:
         panels._clear_overlays()
 
         assert ImageViewTab.FILL_ZONES not in view._tab_images
+
+
+class TestFillZonesOnDewarpedOutput:
+    """Zones are stored on the page and drawn on the output, as upstream does."""
+
+    PAGE_POLYGON = ((20.0, 30.0), (40.0, 30.0), (40.0, 50.0), (20.0, 50.0))
+
+    @staticmethod
+    def _params(mode: DewarpingMode, model: DistortionModelSpec = MODEL):
+        params = OutputParams().with_distortion_model(model)
+        return params.with_dewarping(params.dewarping.with_mode(mode))
+
+    @staticmethod
+    def _xform() -> ImageTransformation:
+        return ImageTransformation.from_size(WIDTH, HEIGHT, Dpi.uniform(300))
+
+    def _mapper(self, mode: DewarpingMode = DewarpingMode.MANUAL):
+        output = np.zeros((HEIGHT, WIDTH), dtype=np.uint8)
+        return _fill_zone_mapper(self._params(mode), self._xform(), np.ones(2), output)
+
+    @pytest.mark.parametrize(
+        ("mode", "model"),
+        [
+            (DewarpingMode.OFF, MODEL),
+            (DewarpingMode.MANUAL, DistortionModelSpec()),
+        ],
+    )
+    def test_there_is_no_mapper_without_dewarping_or_a_model(self, mode, model):
+        output = np.zeros((HEIGHT, WIDTH), dtype=np.uint8)
+
+        mapper = _fill_zone_mapper(
+            self._params(mode, model), self._xform(), np.ones(2), output
+        )
+
+        assert mapper is None
+
+    def test_a_dewarped_page_gets_a_mapper(self):
+        assert self._mapper() is not None
+
+    def test_a_fill_zone_is_drawn_where_the_dewarp_puts_the_page_polygon(self):
+        mapper = self._mapper()
+        assert mapper is not None
+        spec = FillZoneSpec(
+            points=self.PAGE_POLYGON, properties=FillZoneProperties(color=(0, 0, 0))
+        )
+
+        zone = StagePanels._view_zone(
+            spec, ZoneKind.FILL, self._xform(), np.ones(2), mapper
+        )
+
+        shown = np.array([[p.x(), p.y()] for p in zone.polygon.toList()])
+        assert shown == pytest.approx(
+            mapper.to_dewarped(np.array(self.PAGE_POLYGON)), abs=1e-6
+        )
+        assert not shown == pytest.approx(np.array(self.PAGE_POLYGON), abs=0.5)
+
+    def test_a_fill_zone_without_a_mapper_stays_on_the_page(self):
+        spec = FillZoneSpec(
+            points=self.PAGE_POLYGON, properties=FillZoneProperties(color=(0, 0, 0))
+        )
+
+        zone = StagePanels._view_zone(spec, ZoneKind.FILL, self._xform(), np.ones(2))
+
+        shown = np.array([[p.x(), p.y()] for p in zone.polygon.toList()])
+        assert shown == pytest.approx(np.array(self.PAGE_POLYGON), abs=1e-6)
+
+    def test_a_zone_edited_on_the_output_is_stored_on_the_page(self):
+        panels = _panels(FilterStage.OUTPUT)
+        mapper = self._mapper()
+        assert mapper is not None
+        panels._output_transformation = self._xform()
+        panels._output_scale = np.ones(2)
+        panels._fill_zone_mapper = mapper
+        view = panels.view
+        assert isinstance(view, OutputImageView)
+        shown = mapper.to_dewarped(np.array(self.PAGE_POLYGON))
+        view.set_zones(
+            [
+                ViewZone(
+                    ZoneKind.FILL,
+                    QtGui.QPolygonF([QtCore.QPointF(x, y) for x, y in shown]),
+                    (0, 0, 0),
+                    FillZoneProperties(color=(0, 0, 0)),
+                )
+            ]
+        )
+
+        panels._on_zones_changed()
+
+        (stored,) = panels.sequence.output_filter.get_params(PAGE).fill_zones
+        assert np.array(stored.points) == pytest.approx(
+            np.array(self.PAGE_POLYGON), abs=0.1
+        )
 
 
 class TestPageSplit:
