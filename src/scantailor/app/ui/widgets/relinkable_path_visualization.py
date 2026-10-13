@@ -290,7 +290,8 @@ class RelinkablePathVisualization(QWidget):
 
         # Stick highlighting during signal emission
         for i in range(component_idx + 1):
-            widget = self._layout.itemAt(i).widget()
+            item = self._layout.itemAt(i)
+            widget = item.widget() if item is not None else None
             if widget:
                 widget.setProperty("stickHighlight", True)
 
@@ -301,6 +302,7 @@ class RelinkablePathVisualization(QWidget):
 
         # Clear stick highlighting
         for i in range(component_idx + 1):
-            widget = self._layout.itemAt(i).widget()
+            item = self._layout.itemAt(i)
+            widget = item.widget() if item is not None else None
             if widget:
                 widget.setProperty("stickHighlight", False)

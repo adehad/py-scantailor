@@ -3,6 +3,7 @@
 import threading
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from pdf_helpers import (  # noqa: F401
@@ -20,6 +21,9 @@ from pytestqt.qtbot import QtBot
 from scantailor.app.ui.dialogs.pdf_export import PdfExportDialog, PdfExportOptions
 from scantailor.app.ui.MainWindow import MainWindowManager
 from scantailor.core.text_layer import TextGeometry
+
+if TYPE_CHECKING:
+    from conftest import FileDialogStub
 
 
 class _Dialogs:
@@ -337,6 +341,36 @@ def test_pdf_round_trip_through_a_real_batch_keeps_pages_and_text(
     out = source_pdf.parent / "book_processed.pdf"
     assert page_count(out) == len(PAGE_WORDS)
     assert image_filters(out) == ["/JBIG2Decode"] * len(PAGE_WORDS)
+    for index, word in enumerate(PAGE_WORDS):
+        assert word in page_text(out, index)
+
+
+@pytest.mark.slow
+def test_pages_batched_in_an_earlier_session_still_export_with_their_text(
+    qtbot: QtBot,
+    pdf_window: MainWindowManager,  # noqa: F811
+    respond: Callable[..., None],
+    file_dialogs: "FileDialogStub",
+    source_pdf: Path,  # noqa: F811
+    tmp_path: Path,
+):
+    pdf_window.goFirstPage()
+    with qtbot.waitSignal(pdf_window.batch_runner.finished, timeout=240000):
+        pdf_window.startBatchProcessing()
+    project_file = tmp_path / "book.ScanTailor"
+    file_dialogs.save_file = str(project_file)
+    assert pdf_window.save_project_as()
+    pdf_window.closeProject()
+
+    assert pdf_window.open_project_file(project_file)
+
+    project = pdf_window.project
+    assert project is not None
+    assert all(project.text_geometry_of(page) for page in project.get_pages())
+    _export(qtbot, pdf_window, respond, _Dialogs())
+    assert pdf_window.last_pdf_export is not None
+    assert pdf_window.last_pdf_export.text_pages == len(PAGE_WORDS)
+    out = source_pdf.parent / "book_processed.pdf"
     for index, word in enumerate(PAGE_WORDS):
         assert word in page_text(out, index)
 

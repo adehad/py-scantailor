@@ -59,18 +59,6 @@ class ImageMetadata(BaseModel):
             and self.vertical_dpi_status() != DpiStatus.UNDEFINED
         )
 
-    def has_plausible_dpi(self) -> bool:
-        """Check that both DPI values are usable for processing.
-
-        Unlike ``is_dpi_ok`` this also rejects values that are defined but out
-        of range for the image size, which is when the user should be asked to
-        correct them.
-        """
-        return (
-            self.horizontal_dpi_status() == DpiStatus.OK
-            and self.vertical_dpi_status() == DpiStatus.OK
-        )
-
     def horizontal_dpi_status(self) -> DpiStatus:
         """Check the status of horizontal DPI."""
         return self._dpi_status(self.width, self.dpi.horizontal)
@@ -416,6 +404,32 @@ class Project(BaseModel):
             entry for entry in self.text_geometry if entry.page in survivors
         ]
         return doomed
+
+    def restore_removed_half(self, image_id: ImageId) -> list[PageId]:
+        """Bring back the half of a split image that was removed.
+
+        Args:
+            image_id (ImageId): The image whose removed half returns.
+
+        Returns:
+            list[PageId]: The pages of the image afterwards, in display order;
+                empty if the image is unknown or has no removed half.
+        """
+        for position, info in enumerate(self.images):
+            if info.id != image_id:
+                continue
+            if not (info.left_half_removed or info.right_half_removed):
+                return []
+            restored = info.model_copy(
+                update={
+                    "num_sub_pages": 2,
+                    "left_half_removed": False,
+                    "right_half_removed": False,
+                }
+            )
+            self.images[position] = restored
+            return self._pages_of_image(restored)
+        return []
 
     def set_text_geometry(self, page: PageId, geometry: dict[str, Any]) -> None:
         """Remember how a page's output relates to its source page.

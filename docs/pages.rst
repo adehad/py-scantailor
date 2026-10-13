@@ -10,6 +10,19 @@ left stops the list from reordering itself while thumbnails refresh and shows th
 pages in the order of the project; press it again to resume the chosen order.
 Pausing keeps the selection and the current page.
 
+Each stage offers its own orders. Split Pages orders by split type, Deskew by
+decreasing deviation of the angle, Select Content and Margins by width, height and
+deviation, and Output by completeness; Fix Orientation has no choice. The button
+above the list reverses the chosen order. Pages that the shown stage has not
+processed yet are listed last by size and deviation orders.
+
+.. screenshot:: thumbnails_incomplete
+   :alt: Thumbnails of pages the stage has not processed, marked with a question mark
+
+A page that the shown stage has not processed yet is marked with a question mark,
+because its thumbnail is only a guess until the stage has run. Output counts a page
+as done once a batch has written it.
+
 Selecting several pages
 -----------------------
 

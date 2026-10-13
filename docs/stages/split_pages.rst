@@ -9,6 +9,29 @@ buttons choose a single page, a single page with an offcut, or two pages. The la
 under them reads **Auto detected** until you change the layout yourself with
 **Change ...**.
 
+The split lines
+===============
+
+.. screenshot:: stage2_split_pages_tilted
+   :alt: Split Pages with a tilted split line and a handle at each end
+
+A split line has a round handle at each end. Drag a handle to tilt the line, for a
+spread whose spine is not upright; drag the line itself to move it without changing
+its tilt. A line cannot cross its neighbour or leave the image. The tint on each
+side of the line shows where each page ends, so a tilted line cuts the page along
+the tilt in the output as well.
+
+Removed halves
+==============
+
+.. screenshot:: stage2_split_pages_removed_half
+   :alt: A split page whose left half was removed, tinted red with a trash button
+
+When one half of a split image was removed from the project, the view shows that
+half tinted red with a button on it. Click the button to bring the half back; the
+status bar tells what it does while the pointer is over it. The restored page comes
+back with the settings of its image and the thumbnail list shows both halves again.
+
 Layouts and project files
 ==========================
 
