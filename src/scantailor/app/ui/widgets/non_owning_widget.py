@@ -1,37 +1,26 @@
-"""Non-owning widget that doesn't delete its children.
-
-A QWidget that calls setParent(None) on its children instead of deleting them.
-This is useful for container widgets where the children may be managed elsewhere.
-"""
+"""Container widget whose children outlive it."""
 
 from PySide6.QtWidgets import QWidget
 
 
 class NonOwningWidget(QWidget):
-    """A QWidget that doesn't delete its children when destroyed.
+    """A QWidget that hands its child widgets back instead of deleting them.
 
-    Instead of deleting child widgets, this widget calls setParent(None) on them,
-    allowing the children to be managed elsewhere or continue to exist.
-
-    This is useful for dynamic layouts where widgets are frequently moved between
-    different containers.
+    Qt deletes children inside the C++ destructor, before any Python hook can
+    run, so this cannot intercept a parent that is destroyed implicitly. It
+    releases the children when the container is disposed of with ``deleteLater``
+    or ``release_children``, which is how dynamic layouts that move widgets
+    between containers dispose of one.
     """
 
-    def __init__(self, parent: QWidget | None = None) -> None:
-        """Initialize the non-owning widget.
+    def release_children(self) -> None:
+        """Unparent every direct child widget so deleting the container spares it."""
+        for child in self.findChildren(QWidget):
+            if child.parent() is self:
+                child.hide()
+                child.setParent(None)
 
-        Args:
-            parent: Parent widget.
-        """
-        super().__init__(parent)
-
-    def __del__(self) -> None:
-        """Clean up by unparenting children instead of deleting them."""
-        try:
-            # Unparent all child widgets before this widget is destroyed
-            for child in self.findChildren(QWidget):
-                if child.parent() is self:
-                    child.setParent(None)
-        except (RuntimeError, AttributeError):
-            # Widget may already be deleted in C++ layer
-            pass
+    def deleteLater(self) -> None:
+        """Release the children, then schedule this widget for deletion."""
+        self.release_children()
+        super().deleteLater()

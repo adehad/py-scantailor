@@ -59,24 +59,34 @@ class TestGenerateOutput:
         assert result.is_binary is False
         np.testing.assert_array_equal(result.image, image)
 
-    def test_white_on_black_inversion(self):
-        """White on black mode inverts output."""
-        image = np.full((100, 100), 200, dtype=np.uint8)
+    def test_white_on_black_keeps_the_polarity_of_the_input(self):
+        """White-on-black pages come out with white ink, black-on-white with black."""
+        dark_ink_page = np.full((100, 100), 200, dtype=np.uint8)
+        dark_ink_page[20:30, 10:90] = 40
+        dark_ink_page[50:60, 10:60] = 40
+        light_ink_page = 255 - dark_ink_page
+        # Smoothing rounds the bar corners, so only the bar interiors and clear
+        # paper are compared.
+        ink_core = np.zeros(dark_ink_page.shape, dtype=bool)
+        ink_core[22:28, 15:85] = True
+        ink_core[52:58, 15:55] = True
+        paper = np.zeros(dark_ink_page.shape, dtype=bool)
+        paper[:15] = paper[35:45] = paper[70:] = True
 
-        params = Params(
-            color_mode=ColorMode.BLACK_AND_WHITE,
-            black_on_white=True,
+        result_bow = generate_output(
+            dark_ink_page,
+            Params(color_mode=ColorMode.BLACK_AND_WHITE, black_on_white=True),
         )
-        result_bow = generate_output(image, params)
-
-        params_wob = Params(
-            color_mode=ColorMode.BLACK_AND_WHITE,
-            black_on_white=False,
+        result_wob = generate_output(
+            light_ink_page,
+            Params(color_mode=ColorMode.BLACK_AND_WHITE, black_on_white=False),
         )
-        result_wob = generate_output(image, params_wob)
 
-        # Results should be inverted relative to each other
-        np.testing.assert_array_equal(result_bow.image, 255 - result_wob.image)
+        assert (result_bow.image[ink_core] == 0).all()
+        assert (result_bow.image[paper] == 255).all()
+        assert (result_wob.image[ink_core] == 255).all()
+        assert (result_wob.image[paper] == 0).all()
+        np.testing.assert_array_equal(result_wob.image, 255 - result_bow.image)
 
     def test_otsu_binarization(self):
         """Otsu binarization produces binary output."""

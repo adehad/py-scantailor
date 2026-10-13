@@ -770,14 +770,14 @@ def render_transformed(
 
 
 def _whiten_outside(image: NDArray[np.uint8], area: NDArray[np.float64]) -> None:
-    """Paint white everything outside a convex polygon, in place.
+    """Paint white everything outside a polygon, in place.
 
     Margins can reach past the pre-crop area, where the source holds pixels of
     a neighbouring page that must not show through.
 
     Args:
         image: Array to modify; the polygon is in its pixel-corner coordinates.
-        area: (N, 2) convex polygon.
+        area: (N, 2) polygon, convex or not.
     """
     height, width = image.shape[:2]
     lo, hi = area.min(axis=0), area.max(axis=0)
@@ -796,9 +796,9 @@ def _whiten_outside(image: NDArray[np.uint8], area: NDArray[np.float64]) -> None
         return
 
     inside = np.zeros((height, width), dtype=np.uint8)
-    # fillConvexPoly takes pixel-centre coordinates in fixed point.
+    # fillPoly takes pixel-centre coordinates in fixed point.
     centre_coords = np.round((area - 0.5) * (1 << _FILL_SHIFT_BITS)).astype(np.int32)
-    cv2.fillConvexPoly(inside, centre_coords, 1, shift=_FILL_SHIFT_BITS)
+    cv2.fillPoly(inside, [centre_coords], 1, shift=_FILL_SHIFT_BITS)
     image[inside == 0] = _WHITE
 
 
