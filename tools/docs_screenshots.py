@@ -16,6 +16,10 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+# Read when loguru is first imported, in this process and in the spawned batch
+# workers that inherit the environment.
+os.environ.setdefault("LOGURU_LEVEL", "WARNING")
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = REPO_ROOT / "docs" / "_generated" / "screenshots"
 SCHEMES = ("light", "dark")
@@ -35,6 +39,12 @@ SHOT_NAMES = (
     "stage1_fix_orientation_trim",
     "stage3_deskew_oblique",
     "stage5_margins_apply",
+    "stage2_split_pages_tilted",
+    "stage2_split_pages_removed_half",
+    "stage5_margins_guides",
+    "thumbnails_incomplete",
+    "stage6_tab_picture_mask",
+    "status_tip",
     "stage6_output_options",
     "stage6_output_guides",
     "stage6_output_edge_methods",
@@ -156,7 +166,7 @@ def _capture(scheme: str, out_dir: Path) -> None:
     """
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
     os.environ["SCANTAILOR_THEME"] = scheme
-    from PySide6 import QtCore, QtWidgets
+    from PySide6 import QtCore, QtTest, QtWidgets
 
     settings_dir = tempfile.mkdtemp(prefix="st-docs-settings-")
     work_dir = Path(tempfile.mkdtemp(prefix="st-docs-work-"))
@@ -175,9 +185,11 @@ def _capture(scheme: str, out_dir: Path) -> None:
     app = QtWidgets.QApplication(sys.argv[:1])
     from scantailor.app._ui import resources_rc
     from scantailor.app.ui import MainWindow as mw
-    from scantailor.app.ui.image_views.output import ImageViewTab
+    from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
+    from scantailor.app.ui.image_views.output import ImageViewTab, OutputImageView
     from scantailor.app.ui.theme import apply_theme
     from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
+    from scantailor.core.models import SubPage
     from scantailor.core.stage_sequence import FilterStage
     from scantailor.core.zones import (
         FillZoneProperties,
@@ -185,6 +197,8 @@ def _capture(scheme: str, out_dir: Path) -> None:
         PictureZoneProperties,
     )
     from scantailor.filters.output.params import FillZoneSpec, PictureZoneSpec
+    from scantailor.filters.page_layout.guide import Guide
+    from scantailor.filters.page_split.page_layout import PageLayout, PageLayoutType
 
     apply_theme(app)
     resources_rc.qInitResources()
@@ -210,7 +224,9 @@ def _capture(scheme: str, out_dir: Path) -> None:
     def save(widget: QtWidgets.QWidget, name: str) -> None:
         widget.grab().save(str(shots / f"{name}.png"))
 
-    def in_modal(name: str, trigger: Callable[[], object]) -> None:
+    def in_modal(
+        name: str, trigger: Callable[[], object], *, accept: bool = False
+    ) -> None:
         """Run ``trigger`` (which blocks in a dialog), grab that dialog, close it."""
 
         def shoot() -> None:
@@ -220,7 +236,10 @@ def _capture(scheme: str, out_dir: Path) -> None:
                 return
             pump(0.5)
             save(dialog, name)
-            dialog.reject()
+            if accept:
+                dialog.accept()
+            else:
+                dialog.reject()
 
         QtCore.QTimer.singleShot(300, shoot)
         trigger()
@@ -240,48 +259,45 @@ def _capture(scheme: str, out_dir: Path) -> None:
             str(shots / f"{name}.png")
         )
 
-    manager = mw.MainWindowManager()
-    manager.settings.setValue(mw._LAST_INPUT_DIR_KEY, str(sample_dir))
+    (work_dir / "out").mkdir()
+
+    def project_files_dialog(parent: QtWidgets.QWidget) -> ProjectFilesDialog:
+        return ProjectFilesDialog(
+            input_dir=sample_dir,
+            output_dir=work_dir / "out",
+            project_files=sample_page_names(),
+            parent=parent,
+        )
+
+    manager = mw.MainWindowManager(project_files_dialog_factory=project_files_dialog)
     manager.ui.resize(*_WINDOW_SIZE)
     manager.ui.show()
     pump(1.0)
     save(manager.ui, "welcome")
 
-    def fill_new_project() -> None:
-        dialog = app.activeModalWidget()
-        if dialog is None:
-            QtCore.QTimer.singleShot(100, fill_new_project)
-            return
-        model = dialog._off_project_list.model()
-        selection = dialog._off_project_list.selectionModel()
-        listed = model.stringList()
-        for row, name in enumerate(listed):
-            if name in sample_page_names():
-                selection.select(model.index(row), selection.SelectionFlag.Select)
-        dialog._add_selected_to_project()
-        dialog._output_dir_line.setText(str(work_dir / "out"))
-        pump(0.3)
-        save(dialog, "new_project")
-        dialog.accept()
-
-    (work_dir / "out").mkdir()
-    QtCore.QTimer.singleShot(300, fill_new_project)
-    manager.actionNewProject.trigger()
+    in_modal("new_project", manager.actionNewProject.trigger, accept=True)
     pump_until(lambda: len(manager.pages()) == _PAGE_COUNT, 30.0, "the project")
 
-    def show_stage(index: int, name: str | None = None, settle_s: float = 1.5) -> None:
+    def visit_stage(index: int, settle_s: float = 1.5) -> None:
         getattr(manager, f"switchFilter{index}")()
         pump(0.5)
         pump_until(
-            lambda: not manager._render_pending, _RENDER_TIMEOUT_S, "the page render"
+            lambda: not manager.render_pending,
+            _RENDER_TIMEOUT_S,
+            "the page render",
         )
         pump(settle_s)
+
+    def show_stage(index: int, name: str | None = None, settle_s: float = 1.5) -> None:
+        visit_stage(index, settle_s)
         save(manager.ui, name or STAGE_SHOTS[index - 1])
 
     def finish_render() -> None:
         pump(0.5)
         pump_until(
-            lambda: not manager._render_pending, _RENDER_TIMEOUT_S, "the page render"
+            lambda: not manager.render_pending,
+            _RENDER_TIMEOUT_S,
+            "the page render",
         )
         pump(1.5)
 
@@ -306,8 +322,17 @@ def _capture(scheme: str, out_dir: Path) -> None:
         enable.setChecked(False)
         finish_render()
 
+    def output_view() -> OutputImageView:
+        view = manager.imageFrameLayout.currentWidget()
+        assert isinstance(view, OutputImageView)
+        return view
+
     def add_sample_zones() -> None:
-        """Give the current page a picture zone and a fill zone, and render it."""
+        """Give the current page a picture zone and a fill zone, and render it.
+
+        Leaving the Output stage and coming back renders the page again with the
+        stored zones.
+        """
         page = manager.current_page
         output_filter = manager.stages.output_filter
         picture = PictureZoneSpec(
@@ -324,14 +349,63 @@ def _capture(scheme: str, out_dir: Path) -> None:
             .with_picture_zones((picture,))
             .with_fill_zones((fill,)),
         )
-        manager._on_settings_edited()
-        finish_render()
+        visit_stage(5)
+        visit_stage(6)
+
+    def capture_split_and_guides() -> None:
+        """Tilt a split line, drop one half of an image, and place two guides."""
+        first = manager.pages()[0]
+        split_filter = manager.stages.page_split_filter
+        layout = split_filter.get_page_layout(first)
+        assert layout is not None
+        x, y, width, height = layout.outline
+        line = ((x + width * 0.45, y), (x + width * 0.55, y + height))
+        tilted = PageLayout(
+            outline=layout.outline,
+            layout_type=PageLayoutType.TWO_PAGES,
+            cutter1=line,
+            cutter2=line,
+        )
+        split_filter.set_manual_layout(first, tilted)
+        manager.current_page = first
+        visit_stage(3)
+        show_stage(2, "stage2_split_pages_tilted")
+
+        project = manager.project
+        last = manager.pages()[-1]
+        position = next(
+            n for n, info in enumerate(project.images) if info.id == last.image_id
+        )
+        project.images[position] = project.images[position].model_copy(
+            update={"num_sub_pages": 1, "left_half_removed": True}
+        )
+        manager._refresh_page_list(last)
+        manager.current_page = manager.pages()[-1]
+        split_filter.set_manual_layout(manager.current_page, tilted)
+        visit_stage(3)
+        show_stage(2, "stage2_split_pages_removed_half")
+        manager._on_unremove_page_requested(manager.current_page)
+        assert manager.current_page.sub_page in (SubPage.LEFT_PAGE, SubPage.RIGHT_PAGE)
+
+        layout_settings = manager.stages.page_layout_filter.settings
+        layout_settings.set_guides(
+            [
+                Guide(position_mm=-30.0, is_horizontal=False),
+                Guide(position_mm=40.0, is_horizontal=True),
+            ]
+        )
+        layout_settings.set_middle_rect_shown(True)
+        manager.current_page = manager.pages()[1]
+        visit_stage(4)
+        show_stage(5, "stage5_margins_guides")
 
     manager.current_page = manager.pages()[0]
     for index in range(1, 6):
         show_stage(index)
         if index == 1:
             capture_trim()
+        if index == 3:
+            save_sorting_panel("thumbnails_incomplete")
         if index == 5:
             in_modal(
                 "stage5_margins_apply",
@@ -367,11 +441,10 @@ def _capture(scheme: str, out_dir: Path) -> None:
     method.setCurrentIndex(previous_method)
     finish_render()
 
-    output_view = manager._panels.view
-    output_view.set_guides_shown(True)
+    output_view().set_guides_shown(True)
     pump(0.5)
     save(manager.ui, "stage6_output_guides")
-    output_view.set_guides_shown(False)
+    output_view().set_guides_shown(False)
 
     def reveal(widget: QtWidgets.QWidget) -> None:
         """Scroll the options panel until ``widget`` shows."""
@@ -398,28 +471,41 @@ def _capture(scheme: str, out_dir: Path) -> None:
     finish_render()
 
     add_sample_zones()
+    view = output_view()
     for tab_name, shot in (
         ("PICTURE_ZONES", "stage6_tab_picture_zones"),
         ("FILL_ZONES", "stage6_tab_fill_zones"),
         ("DEWARPING", "stage6_tab_dewarping"),
         ("DESPECKLING", "stage6_tab_despeckling"),
     ):
-        output_view.set_current_tab(ImageViewTab[tab_name])
+        view.set_current_tab(ImageViewTab[tab_name])
         pump(3.0)
         save(manager.ui, shot)
 
-    output_view.set_current_tab(ImageViewTab.PICTURE_ZONES)
+    view.set_current_tab(ImageViewTab.PICTURE_ZONES)
     pump(0.5)
-    zone_centre = output_view.zones()[0].polygon.boundingRect().center()
-    inverse, _ = output_view._widget_to_virtual.inverted()
-    zone_pos = inverse.map(zone_centre)
-    menu = output_view.build_context_menu(zone_pos)
-    menu.popup(output_view.viewport().mapToGlobal(zone_pos.toPoint()))
+    zone_centre = view.zones()[0].polygon.boundingRect().center()
+    zone_pos = view.virtual_to_widget_point(zone_centre)
+    menu = view.build_context_menu(zone_pos)
+    menu.popup(view.viewport().mapToGlobal(zone_pos.toPoint()))
     pump(0.5)
     save(menu, "stage6_zone_menu")
     menu.hide()
-    in_modal("stage6_zone_properties", lambda: output_view.edit_zone_properties(0))
-    output_view.set_current_tab(ImageViewTab.OUTPUT)
+    in_modal("stage6_zone_properties", lambda: view.edit_zone_properties(0))
+
+    QtTest.QTest.mouseMove(view.viewport(), zone_pos.toPoint())
+    pump(0.5)
+    save(manager.ui, "status_tip")
+
+    options_child(QtWidgets.QAbstractButton, "mixedBtn").click()
+    finish_render()
+    view = output_view()
+    view.set_current_tab(ImageViewTab.PICTURE_ZONES)
+    pump(1.0)
+    save(manager.ui, "stage6_tab_picture_mask")
+    options_child(QtWidgets.QAbstractButton, "bwBtn").click()
+    finish_render()
+    output_view().set_current_tab(ImageViewTab.OUTPUT)
 
     manager.sortOptions.setCurrentIndex(1)
     manager.pauseSortingBtn.setChecked(True)
@@ -438,6 +524,8 @@ def _capture(scheme: str, out_dir: Path) -> None:
     manager.stages.deskew_filter.set_manual_oblique(manager.current_page, 2.0)
     show_stage(3, "stage3_deskew_oblique", settle_s=6.0)
     manager.stages.deskew_filter.set_manual_oblique(manager.current_page, 0.0)
+
+    capture_split_and_guides()
 
     in_modal("settings", manager.actionSettings.trigger)
     in_modal("default_parameters", manager.actionDefaults.trigger)
