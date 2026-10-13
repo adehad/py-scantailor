@@ -88,3 +88,38 @@ def test_a_drag_announces_each_step_but_renders_once_on_release(qtbot: QtBot):
     panel.slider.setSliderDown(False)
     assert panel.levels == [DespeckleLevel.AGGRESSIVE]
     assert panel.changed == [PAGE]
+
+
+def test_a_stored_in_between_strength_shows_its_nearest_step_and_names_itself(
+    qtbot: QtBot,
+):
+    panel = _Panel(qtbot)
+    panel.filter.set_params(
+        PAGE, panel.filter.get_params(PAGE).with_despeckle_factor(2.3)
+    )
+
+    panel.widget.set_current_page(PAGE)
+
+    assert panel.slider.value() == 2
+    assert "2.3" in panel.slider.toolTip()
+    assert panel.filter.get_params(PAGE).despeckle_strength == 2.3
+
+
+def test_a_strength_on_a_step_has_no_tooltip_note(qtbot: QtBot):
+    panel = _Panel(qtbot)
+
+    assert panel.slider.toolTip() == ""
+
+
+def test_picking_a_step_replaces_a_stored_in_between_strength(qtbot: QtBot):
+    panel = _Panel(qtbot)
+    panel.filter.set_params(
+        PAGE, panel.filter.get_params(PAGE).with_despeckle_factor(2.3)
+    )
+    panel.widget.set_current_page(PAGE)
+
+    panel.slider.setValue(3)
+
+    stored = panel.filter.get_params(PAGE)
+    assert stored.despeckle_strength == 3.0
+    assert stored.despeckle_factor is None

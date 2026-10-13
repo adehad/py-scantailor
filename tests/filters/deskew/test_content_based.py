@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from scantailor.core.models import ImageId, PageId, SubPage
+from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 from scantailor.filters.deskew.filter import Filter
 from scantailor.filters.deskew.settings import Settings
 from scantailor.filters.deskew.top_edge import find_skew_from_top_edge
@@ -26,6 +26,30 @@ def book_scan(
     edge = edge_row + np.tan(math.radians(edge_degrees)) * (columns - width / 2)
     rows = np.arange(height)[:, None]
     return np.where(rows < edge[None, :], 0, 255).astype(np.uint8)
+
+
+class TestTopEdgeWithShadowCleanup:
+    def test_a_thick_dark_surround_is_still_found_when_a_resolution_is_given(self):
+        scan = book_scan(2.0, height=1200, width=2480, edge_row=100)
+        filter_ = Filter()
+        filter_.content_based = False
+
+        result = filter_.detect_skew(
+            scan, PAGE, store_result=False, dpi=Dpi.uniform(300)
+        )
+
+        assert result.is_confident()
+        assert result.angle == pytest.approx(2.0, abs=0.3)
+
+    def test_the_cleanup_still_applies_to_content_based_detection(self):
+        scan = book_scan(2.0, height=1200, width=2480, edge_row=100)
+        filter_ = Filter()
+
+        cleaned = filter_.detect_skew(
+            scan, PAGE, store_result=False, dpi=Dpi.uniform(300)
+        )
+
+        assert cleaned.angle != pytest.approx(2.0, abs=0.3)
 
 
 class TestTopEdgeDetection:

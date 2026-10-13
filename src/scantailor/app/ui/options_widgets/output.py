@@ -130,6 +130,13 @@ def _despeckle_step(level: DespeckleLevel) -> int:
     return next(i for i, (lvl, _label) in enumerate(_DESPECKLE_LEVELS) if lvl is level)
 
 
+def _despeckle_tooltip(strength: float) -> str:
+    """Name the strength when it lies between the steps the slider offers."""
+    if strength in {level.to_factor() for level, _label in _DESPECKLE_LEVELS}:
+        return ""
+    return f"Strength {strength:g}, from a project that stores values between the steps"
+
+
 def _exclusive_button(
     group: QButtonGroup, layout: QBoxLayout, name: str, text: str, index: int
 ) -> QPushButton:
@@ -1127,7 +1134,10 @@ class OptionsWidget(QWidget):
     def _show_despeckle_and_dewarping(self, params: Params) -> None:
         threshold = params.needs_binarization()
         self._despeckle_group.setVisible(threshold and not self._dewarping_tab_active)
-        self._despeckle_slider.setValue(_despeckle_step(params.despeckle_level))
+        self._despeckle_slider.setValue(
+            _despeckle_step(DespeckleLevel.nearest(params.despeckle_strength))
+        )
+        self._despeckle_slider.setToolTip(_despeckle_tooltip(params.despeckle_strength))
 
         dewarping = params.dewarping
         self._dewarp_buttons[dewarping.mode].setChecked(True)
