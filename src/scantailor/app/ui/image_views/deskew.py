@@ -57,6 +57,9 @@ class DeskewImageView(ImageViewBase):
     manual_oblique_angle_set = Signal(float)
 
     wheel_zoom_at_center = True
+    default_status_tip = (
+        "Use Ctrl+Wheel to rotate or Ctrl+Shift+Wheel for finer rotation."
+    )
 
     MAX_ROTATION_DEG = 45.0
     MAX_ROTATION_SIN = math.sin(math.radians(MAX_ROTATION_DEG))
@@ -96,10 +99,6 @@ class DeskewImageView(ImageViewBase):
             action.setShortcut(QtGui.QKeySequence(key))
             action.triggered.connect(lambda _checked=False, s=step: self._rotate_by(s))
             self.addAction(action)
-
-        self.setStatusTip(
-            "Use Ctrl+Wheel to rotate or Ctrl+Shift+Wheel for finer rotation."
-        )
 
     def set_image(
         self,
@@ -439,6 +438,16 @@ class DeskewImageView(ImageViewBase):
         rel_x = max(-radius, min(radius, pos.x() - square.center().x()))
         angle = math.degrees(math.asin(rel_x / radius))
         return angle if handle == self.ROTATION_HANDLES else -angle
+
+    def _status_tip_at(
+        self, widget_pos: QPointF, modifiers: Qt.KeyboardModifier
+    ) -> str:
+        handle = self._handle_at(widget_pos)
+        if handle < 0:
+            return ""
+        if handle < self.ROTATION_HANDLES:
+            return "Drag this handle to rotate the image."
+        return "Drag this handle to adjust oblique (shear)."
 
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
         """Pick up a handle.

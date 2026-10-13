@@ -23,6 +23,10 @@ from scantailor.dewarping.page_dewarper import dewarper_from_polylines
 from scantailor.filters.output.params import DistortionModelSpec
 from scantailor.math.spline import XSpline
 
+_END_POINT_TIP = "This point can be dragged. Hold Ctrl or Shift to drag along axes."
+_POINT_TIP = "Drag this point or delete it by pressing D key."
+_CURVE_TIP = "Click to create a new control point."
+
 
 class DewarpEditor:
     """State and interaction of the manual dewarping grid.
@@ -229,6 +233,34 @@ class DewarpEditor:
                     return edge, index
         return None
 
+    def status_tip_at(self, widget_pos: QPointF) -> str:
+        """Return the hint for what lies under a widget position.
+
+        Args:
+            widget_pos (QPointF): Position in the host's viewport.
+
+        Returns:
+            str: The hint; empty when there is nothing to edit there.
+        """
+        if not self._controls[0]:
+            return ""
+        handle = self._handle_at(widget_pos)
+        if handle is not None:
+            edge, index = handle
+            is_end = index in (0, len(self._controls[edge]) - 1)
+            return _END_POINT_TIP if is_end else _POINT_TIP
+        to_widget = self._host.image_to_widget()
+        for polyline in self._edges:
+            for start, end in pairwise(polyline):
+                _nearest, distance = nearest_on_segment(
+                    widget_pos,
+                    to_widget.map(QPointF(*start)),
+                    to_widget.map(QPointF(*end)),
+                )
+                if distance <= self.HIT_RADIUS:
+                    return _CURVE_TIP
+        return ""
+
     def _insert_at(self, widget_pos: QPointF) -> tuple[int, int] | None:
         """Add a control point on the edge near a widget position, if any."""
         to_widget = self._host.image_to_widget()
@@ -286,12 +318,45 @@ class DewarpEditor:
             return False
         edge, index = self._dragged
         point = self._host.widget_to_image().map(event.position())
-        if self._controls[edge][index] != point:
-            self._controls[edge][index] = point
+        points = self._controls[edge]
+        if index in (0, len(points) - 1):
+            shifted = self._shifted_edge(
+                points, points[index], point, event.modifiers()
+            )
+            if shifted is not None:
+                self._controls[edge] = shifted
+                self._drag_changed = True
+                self._rebuild()
+                event.accept()
+                return True
+        if points[index] != point:
+            points[index] = point
             self._drag_changed = True
             self._rebuild()
         event.accept()
         return True
+
+    @staticmethod
+    def _shifted_edge(
+        points: list[QPointF],
+        grabbed: QPointF,
+        target: QPointF,
+        modifiers: Qt.KeyboardModifier,
+    ) -> list[QPointF] | None:
+        """Move a whole edge along one axis while an end is dragged with a key held.
+
+        Shift moves it along x and Ctrl along y.
+
+        Returns:
+            list[QPointF] | None: The moved points; None when neither key is held.
+        """
+        along_x = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+        along_y = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
+        if not along_x and not along_y:
+            return None
+        shift = target - grabbed
+        offset = QPointF(shift.x(), 0.0) if along_x else QPointF(0.0, shift.y())
+        return [point + offset for point in points]
 
     def mouse_release(self, event: QtGui.QMouseEvent) -> bool:
         """Drop the control point and report the new model.

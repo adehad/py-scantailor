@@ -17,7 +17,7 @@ from PySide6.QtCore import (
     Qt,
     Signal,
 )
-from PySide6.QtGui import QMouseEvent, QPainter, QPalette, QPen
+from PySide6.QtGui import QMouseEvent, QPainter, QPainterPath, QPalette, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -32,8 +32,11 @@ from PySide6.QtWidgets import (
 )
 
 from scantailor.app.ui.icons import icon
+from scantailor.app.ui.theme.tokens import view_color
 from scantailor.app.ui.thumbnails.cache import ThumbnailCache
 from scantailor.app.ui.thumbnails.model import (
+    IncompletenessProvider,
+    IncompleteRole,
     IsCurrentRole,
     PageOrderOption,
     PageRole,
@@ -43,9 +46,14 @@ from scantailor.app.ui.thumbnails.model import (
     order_by_height,
     order_by_width,
 )
+from scantailor.app.ui.thumbnails.stage_orders import (
+    completeness_provider,
+    stage_orders_provider,
+)
 from scantailor.core.models import PageId
 from scantailor.core.project import Project
 from scantailor.core.settings import ApplicationSettings
+from scantailor.core.stage_sequence import StageSequence
 
 _PADDING = 6
 _CAPTION_HEIGHT = 18
@@ -53,6 +61,43 @@ _CURRENT_BORDER = 2
 _FRAME_MARGIN = 3
 _FRAME_RADIUS = 4
 _CAPTION_PX = 11
+# Fraction of the picture the question mark of an incomplete page fills.
+_QUESTION_MARK_FILL = 0.9
+_QUESTION_MARK_ALPHA = 160
+_QUESTION_MARK_PEN = 2
+
+
+def _question_mark() -> QPainterPath:
+    """Return the question mark outline, in its own units with y pointing down."""
+    path = QPainterPath()
+    path.moveTo(4.42188, -2.40625)
+    for control1, control2, end in (
+        ((4.42188, -3.20312), (4.51562, -3.32812), (5.23438, -3.84375)),
+        ((6.34375, -4.625), (6.67188, -5.15625), (6.67188, -6.17188)),
+        ((6.67188, -7.79688), (5.4375, -8.92188), (3.6875, -8.92188)),
+        ((2.65625, -8.92188), (1.84375, -8.5625), (1.32812, -7.85938)),
+        ((0.9375, -7.32812), (0.78125, -6.75), (0.765625, -5.76562)),
+    ):
+        path.cubicTo(*control1, *control2, *end)
+    path.lineTo(2.40625, -5.76562)
+    path.lineTo(2.40625, -5.79688)
+    for control1, control2, end in (
+        ((2.34375, -6.76562), (2.92188, -7.51562), (3.71875, -7.51562)),
+        ((4.4375, -7.51562), (4.98438, -6.90625), (4.98438, -6.125)),
+        ((4.98438, -5.59375), (4.82812, -5.35938), (4.125, -4.78125)),
+        ((3.17188, -3.96875), (2.90625, -3.4375), (2.9375, -2.40625)),
+    ):
+        path.cubicTo(*control1, *control2, *end)
+    path.lineTo(4.42188, -2.40625)
+    path.moveTo(4.625, -1.75)
+    path.lineTo(2.8125, -1.75)
+    path.lineTo(2.8125, 0.0)
+    path.lineTo(4.625, 0.0)
+    path.lineTo(4.625, -1.75)
+    return path
+
+
+_QUESTION_MARK = _question_mark()
 
 
 class ThumbnailDelegate(QStyledItemDelegate):
@@ -130,6 +175,8 @@ class ThumbnailDelegate(QStyledItemDelegate):
             target = QRect(QPoint(0, 0), size)
             target.moveCenter(picture_area.center())
             painter.drawImage(target, image)
+        if index.data(IncompleteRole):
+            self._paint_question_mark(painter, picture_area)
 
         # The caption lies below the inset selection fill, on the plain background.
         painter.setPen(palette.text().color())
@@ -161,6 +208,27 @@ class ThumbnailDelegate(QStyledItemDelegate):
                 _FRAME_RADIUS,
                 _FRAME_RADIUS,
             )
+        painter.restore()
+
+    @staticmethod
+    def _paint_question_mark(painter: QPainter, area: QRect) -> None:
+        """Draw the mark that says the page has no result at this stage yet."""
+        bounds = _QUESTION_MARK.boundingRect()
+        scale = min(
+            area.width() * _QUESTION_MARK_FILL / bounds.width(),
+            area.height() * _QUESTION_MARK_FILL / bounds.height(),
+        )
+        color = view_color("split_offcut")
+        color.setAlpha(_QUESTION_MARK_ALPHA)
+        painter.save()
+        painter.translate(area.center())
+        painter.scale(scale, scale)
+        painter.translate(-bounds.center())
+        pen = QPen(color, _QUESTION_MARK_PEN)
+        pen.setCosmetic(True)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawPath(_QUESTION_MARK)
         painter.restore()
 
 
@@ -292,6 +360,8 @@ class ThumbnailListWidget(QWidget):
         remove_pages_requested (list): "Remove from project ..." was chosen; the
             selected pages, in display order.
         insert_here_requested (): "Insert here ..." was chosen in the empty area.
+        orders_changed (): The sort options were replaced, as the shown stage
+            has others.
     """
 
     page_selected = Signal(object)
@@ -300,6 +370,7 @@ class ThumbnailListWidget(QWidget):
     insert_after_requested = Signal(object)
     remove_pages_requested = Signal(object)
     insert_here_requested = Signal()
+    orders_changed = Signal()
 
     def __init__(
         self,
@@ -328,12 +399,14 @@ class ThumbnailListWidget(QWidget):
             parent=self,
         )
         self._model.set_stage(stage)
-        self._orders = [
+        self._default_orders = [
             natural_order(),
             order_by_width(),
             order_by_height(),
             *extra_orders,
         ]
+        self._orders = list(self._default_orders)
+        self._stage_orders: Callable[[str], Sequence[PageOrderOption]] | None = None
         self._restoring = False
         self._sorting_paused = False
         self._follow_current = True
@@ -531,6 +604,8 @@ class ThumbnailListWidget(QWidget):
             stage (str): Stage key passed to the renderer.
         """
         self._model.set_stage(stage)
+        if self._stage_orders is not None:
+            self.set_orders(self._stage_orders(stage))
 
     def invalidate(self, page: PageId | None = None) -> None:
         """Refresh previews after stage parameters changed.
@@ -616,6 +691,74 @@ class ThumbnailListWidget(QWidget):
         """
         self._order_combo.setCurrentIndex(index)
 
+    def order_names(self) -> list[str]:
+        """Return the names of the sort options on offer, in order."""
+        return [order.name for order in self._orders]
+
+    def set_orders(self, orders: Sequence[PageOrderOption] | None) -> None:
+        """Replace the sort options and go back to the first of them.
+
+        Args:
+            orders (Sequence[PageOrderOption] | None): The options; None for the
+                built-in ones. Empty leaves the pages in natural order.
+        """
+        self._orders = list(self._default_orders if orders is None else orders)
+        self._order_combo.blockSignals(True)
+        self._order_combo.clear()
+        for order in self._orders:
+            self._order_combo.addItem(order.name)
+        self._order_combo.blockSignals(False)
+        self._apply_order()
+        self.orders_changed.emit()
+
+    def set_stage_orders_provider(
+        self, provider: Callable[[str], Sequence[PageOrderOption]] | None
+    ) -> None:
+        """Offer the sort options of whichever stage is shown.
+
+        Args:
+            provider (Callable[[str], Sequence[PageOrderOption]] | None): Returns
+                the options of a stage key; None goes back to the same options
+                for every stage.
+        """
+        self._stage_orders = provider
+        self.set_orders(None if provider is None else provider(self._model.stage))
+
+    def set_incompleteness_provider(
+        self, provider: IncompletenessProvider | None
+    ) -> None:
+        """Choose how pages with no result at the shown stage are found.
+
+        Args:
+            provider (IncompletenessProvider | None): The check; None marks no
+                page.
+        """
+        self._model.set_incompleteness_provider(provider)
+
+    def bind_stage_sequence(self, sequence: StageSequence) -> None:
+        """Take the sort options and incomplete pages from a project's stages.
+
+        Args:
+            sequence (StageSequence): The stages, whose settings are only read.
+        """
+        self.set_incompleteness_provider(completeness_provider(sequence))
+        self.set_stage_orders_provider(stage_orders_provider(sequence))
+
+    @property
+    def sort_reversed(self) -> bool:
+        """Whether the pages are in the opposite of the chosen order."""
+        return self._model.reversed_order
+
+    def set_sort_reversed(self, reverse: bool) -> None:
+        """Put the pages in the opposite of the chosen order, or back.
+
+        Args:
+            reverse (bool): True for the opposite order.
+        """
+        if reverse == self._model.reversed_order:
+            return
+        self._apply_order(reverse)
+
     def select_pages(self, pages: Sequence[PageId]) -> None:
         """Add pages to the selection without changing the current page.
 
@@ -647,17 +790,18 @@ class ThumbnailListWidget(QWidget):
     def _on_order_chosen(self, option_index: int) -> None:
         self._apply_order()
 
-    def _apply_order(self) -> None:
-        order = (
-            natural_order()
-            if self._sorting_paused
-            else self._orders[self._order_combo.currentIndex()]
-        )
+    def _current_order(self) -> PageOrderOption:
+        index = self._order_combo.currentIndex()
+        if self._sorting_paused or not 0 <= index < len(self._orders):
+            return natural_order()
+        return self._orders[index]
+
+    def _apply_order(self, reverse: bool | None = None) -> None:
         selected = self.selected_pages()
         current = self._model.current_page
         self._restoring = True
         try:
-            self._model.set_order(order)
+            self._model.set_order(self._current_order(), reverse)
             self._restore(selected, current)
         finally:
             self._restoring = False

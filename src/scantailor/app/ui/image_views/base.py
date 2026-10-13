@@ -19,9 +19,27 @@ import numpy as np
 from numpy.typing import NDArray
 from PySide6 import QtGui, QtWidgets
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QImage, QPainter, QPainterPath, QPixmap, QPolygonF, QTransform
+from PySide6.QtGui import (
+    QImage,
+    QPainter,
+    QPainterPath,
+    QPixmap,
+    QPolygonF,
+    QStatusTipEvent,
+    QTransform,
+)
 
 from scantailor.core.transformation import ImageTransformation
+
+DEFAULT_STATUS_TIP = (
+    "Use the mouse wheel or +/- to zoom.  When zoomed, dragging is possible."
+)
+PAN_STATUS_TIP = "Unrestricted dragging is possible by holding down the Shift key."
+_MODIFIER_OF_KEY: dict[int, Qt.KeyboardModifier] = {
+    Qt.Key.Key_Shift.value: Qt.KeyboardModifier.ShiftModifier,
+    Qt.Key.Key_Control.value: Qt.KeyboardModifier.ControlModifier,
+    Qt.Key.Key_Alt.value: Qt.KeyboardModifier.AltModifier,
+}
 
 
 class Edge(IntFlag):
@@ -112,16 +130,22 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
     Signals:
         zoom_changed: The zoom level changed (float zoom_level).
         transform_changed: The virtual-to-widget transform changed.
+        status_tip_changed: The hint for what the pointer is over changed (str).
+            It is also sent to the window's status bar.
     """
 
     zoom_changed = Signal(float)
     transform_changed = Signal()
+    status_tip_changed = Signal(str)
 
     MIN_ZOOM = 0.1
     MAX_ZOOM = 10.0
     ZOOM_STEP = 2 ** (1 / 6)  # Zoom factor of one +/- key press
     WHEEL_ZOOM_STEP = 2**0.25  # Zoom factor of one wheel notch (15 degrees)
     wheel_zoom_at_center = False  # Zoom about the view centre, not the cursor
+    default_status_tip = (
+        DEFAULT_STATUS_TIP  # Shown while nothing under the pointer has a hint
+    )
     HQ_TRANSFORM_DELAY_MS = 150  # Idle time before drawing the full-size image
     DOWNSCALED_MAX_SIZE = 1024
 
@@ -155,6 +179,8 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
         viewport.setBackgroundRole(QtGui.QPalette.ColorRole.Dark)
         viewport.setAutoFillBackground(True)
         viewport.setMouseTracking(True)
+        viewport.setStatusTip(self.default_status_tip)
+        self._status_tip = self.default_status_tip
 
         self._image: QImage | None = None
         self._pixmap: QPixmap | None = None
@@ -179,7 +205,7 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
         self._virtual_focal_point = QPointF()
 
         self._panning = False
-        self._last_mouse_pos = QPointF()
+        self._last_mouse_pos = QPointF(-1, -1)
         self._syncing_scroll_bars = False
 
         self._hq_timer = QTimer(self)
@@ -537,6 +563,48 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
             painter.drawPixmap(0, 0, self._pixmap)
         painter.restore()
 
+    def set_status_tip(self, tip: str) -> None:
+        """Show a hint in the window's status bar.
+
+        Args:
+            tip (str): The hint; the default one when empty.
+        """
+        tip = tip or self.default_status_tip
+        if tip == self._status_tip:
+            return
+        self._status_tip = tip
+        viewport = self.viewport()
+        assert viewport is not None
+        viewport.setStatusTip(tip)
+        QtWidgets.QApplication.sendEvent(viewport, QStatusTipEvent(tip))
+        self.status_tip_changed.emit(tip)
+
+    @property
+    def status_tip_text(self) -> str:
+        """The hint currently offered for the status bar."""
+        return self._status_tip
+
+    def _status_tip_at(
+        self, widget_pos: QPointF, modifiers: Qt.KeyboardModifier
+    ) -> str:
+        """Return the hint for what lies under a widget position.
+
+        Subclasses override this; an empty string means the default hint.
+
+        Args:
+            widget_pos (QPointF): Pointer position in widget coordinates.
+            modifiers (Qt.KeyboardModifier): Keys held, which can change what a
+                drag would do.
+
+        Returns:
+            str: The hint.
+        """
+        return ""
+
+    def _refresh_status_tip(self, modifiers: Qt.KeyboardModifier) -> None:
+        """Show the hint for the last pointer position with other keys held."""
+        self.set_status_tip(self._status_tip_at(self._last_mouse_pos, modifiers))
+
     def _paint_overlay(self, painter: QPainter) -> None:
         """Draw graphics on top of the image; subclasses override this.
 
@@ -566,6 +634,7 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
             self._panning = True
             self._last_mouse_pos = event.position()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            self.set_status_tip(PAN_STATUS_TIP)
             event.accept()
         else:
             super().mousePressEvent(event)
@@ -582,6 +651,9 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
         ):
             self._panning = False
             self.setCursor(Qt.CursorShape.ArrowCursor)
+            self.set_status_tip(
+                self._status_tip_at(event.position(), event.modifiers())
+            )
             event.accept()
         else:
             super().mouseReleaseEvent(event)
@@ -599,6 +671,10 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
             self._update_widget_transform()
             event.accept()
         else:
+            self._last_mouse_pos = event.position()
+            self.set_status_tip(
+                self._status_tip_at(event.position(), event.modifiers())
+            )
             super().mouseMoveEvent(event)
 
     def wheelEvent(self, event: QtGui.QWheelEvent) -> None:
@@ -624,6 +700,8 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
             event (QtGui.QKeyEvent): The key event.
         """
         key = event.key()
+        if key in _MODIFIER_OF_KEY:
+            self._refresh_status_tip(event.modifiers())
         if key in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
             self.zoom_in()
         elif key == Qt.Key.Key_Minus:
@@ -636,6 +714,18 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
             super().keyPressEvent(event)
             return
         event.accept()
+
+    def keyReleaseEvent(self, event: QtGui.QKeyEvent) -> None:
+        """Update the hint when a modifier key is let go.
+
+        Args:
+            event (QtGui.QKeyEvent): The key event.
+        """
+        released = _MODIFIER_OF_KEY.get(event.key())
+        if released is not None:
+            # Some platforms still list the key that was let go.
+            self._refresh_status_tip(event.modifiers() & ~released)
+        super().keyReleaseEvent(event)
 
     def virtual_to_widget_point(self, point: QPointF) -> QPointF:
         """Convert a point from virtual to widget coordinates.
