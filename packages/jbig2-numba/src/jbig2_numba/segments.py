@@ -16,6 +16,7 @@ from jbig2_numba.generic_region import TEMPLATE0_AT_PIXELS, as_bilevel, encode_g
 FILE_ID = bytes((0x97, 0x4A, 0x42, 0x32, 0x0D, 0x0A, 0x1A, 0x0A))
 
 _METRES_PER_INCH = 0.0254
+_UNKNOWN_DATA_LENGTH = 0xFFFFFFFF
 
 
 class SegmentType(IntEnum):
@@ -38,7 +39,13 @@ def segment_header(number: int, segment_type: SegmentType, page: int, data_lengt
 
     Returns:
         bytes: Encoded segment header.
+
+    Raises:
+        ValueError: If ``data_length`` does not fit the 32-bit length field.
+            0xFFFFFFFF is excluded because it marks an unknown length.
     """
+    if not 0 <= data_length < _UNKNOWN_DATA_LENGTH:
+        raise ValueError(f"segment data of {data_length} bytes does not fit a 32-bit length field")
     # 7.2.3: bit 6 clear selects a one-byte page association field.
     flags = int(segment_type) & 0x3F
     if page > 0xFF:
