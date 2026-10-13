@@ -65,7 +65,7 @@ def import_pdf_pages(
         cancel (threading.Event): Set to stop and discard the result.
 
     Returns:
-        ImportedPdf: The images and their mapping, which is also saved in ``out_dir``.
+        ImportedPdf: The images and their mapping, which the project stores.
 
     Raises:
         PdfCancelled: If ``cancel`` was set.
@@ -88,7 +88,6 @@ def import_pdf_pages(
         dpi=dpi,
         pages={image.name: index for index, image in enumerate(images)},
     )
-    source.save(out_dir)
     return ImportedPdf(source, images)
 
 

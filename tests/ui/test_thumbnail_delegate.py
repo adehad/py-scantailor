@@ -17,16 +17,24 @@ THUMBNAIL = QtCore.QSize(60, 80)
 TOLERANCE = 3
 
 
+PICTURE_COLOUR = QtGui.QColor("#808080")
+
+
 def _paint_cell(
-    tokens: Tokens, *, selected: bool, current: bool
+    tokens: Tokens, *, selected: bool, current: bool, rendered: bool = True
 ) -> tuple[QtGui.QImage, QtGui.QPalette, QtCore.QRect]:
-    """Paint one cell of a one-row model on the window background."""
+    """Paint one cell of a one-row model on the window background.
+
+    A cell that is not ``rendered`` has no picture yet, as while the thumbnail
+    is still being produced.
+    """
     palette = build_palette(tokens)
     model = QtGui.QStandardItemModel()
     item = QtGui.QStandardItem("Page 12")
-    picture = QtGui.QImage(60, 80, QtGui.QImage.Format.Format_RGB32)
-    picture.fill(QtGui.QColor("#808080"))
-    item.setData(picture, QtCore.Qt.ItemDataRole.DecorationRole)
+    if rendered:
+        picture = QtGui.QImage(60, 80, QtGui.QImage.Format.Format_RGB32)
+        picture.fill(PICTURE_COLOUR)
+        item.setData(picture, QtCore.Qt.ItemDataRole.DecorationRole)
     item.setData(current, IsCurrentRole)
     model.appendRow(item)
 
@@ -91,6 +99,51 @@ def test_unselected_cell_leaves_the_background_untouched(
     sample = image.pixelColor(_PADDING - 1, _PADDING + THUMBNAIL.height() // 2)
 
     assert _distance(sample, window) <= TOLERANCE
+
+
+def test_rendered_cell_draws_its_picture_inside_the_frame(
+    qapp: QtWidgets.QApplication, tokens: Tokens
+):
+    image, palette, _cell = _paint_cell(tokens, selected=False, current=False)
+    window = palette.color(QtGui.QPalette.ColorRole.Window)
+    centre = image.pixelColor(
+        _PADDING + THUMBNAIL.width() // 2, _PADDING + THUMBNAIL.height() // 2
+    )
+    corner = image.pixelColor(_PADDING + 2, _PADDING + 2)
+    outside = image.pixelColor(_PADDING - 3, _PADDING + THUMBNAIL.height() // 2)
+
+    assert _distance(centre, PICTURE_COLOUR) <= TOLERANCE
+    assert _distance(corner, PICTURE_COLOUR) <= TOLERANCE
+    assert _distance(outside, window) <= TOLERANCE
+
+
+def test_cell_without_a_picture_shows_an_empty_outline_and_no_picture(
+    qapp: QtWidgets.QApplication, tokens: Tokens
+):
+    image, palette, _cell = _paint_cell(
+        tokens, selected=False, current=False, rendered=False
+    )
+    window = palette.color(QtGui.QPalette.ColorRole.Window)
+    middle = _PADDING + THUMBNAIL.height() // 2
+    centre = image.pixelColor(_PADDING + THUMBNAIL.width() // 2, middle)
+    outline = [image.pixelColor(x, middle) for x in (_PADDING - 1, _PADDING)]
+
+    assert _distance(centre, window) <= TOLERANCE
+    assert max(_distance(c, window) for c in outline) > TOLERANCE
+
+
+def test_cell_without_a_picture_still_marks_the_current_page(
+    qapp: QtWidgets.QApplication, tokens: Tokens
+):
+    image, palette, _cell = _paint_cell(
+        tokens, selected=True, current=True, rendered=False
+    )
+    accent = palette.color(QtGui.QPalette.ColorRole.Accent)
+    middle = _PADDING + THUMBNAIL.height() // 2
+
+    on_frame = image.pixelColor(_PADDING - _FRAME_MARGIN - 1, middle)
+
+    assert _distance(on_frame, accent) <= TOLERANCE
 
 
 def test_current_page_gets_an_accent_frame_around_the_selection_fill(
