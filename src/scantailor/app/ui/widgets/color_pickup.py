@@ -16,6 +16,20 @@ _BITS_PER_CHANNEL = 8
 _CHANNELS = 3
 
 
+def _spread_bits_table(channel: int) -> NDArray[np.uint32]:
+    """Map each channel value to its bits at their places in the mixed value."""
+    values = np.arange(1 << _BITS_PER_CHANNEL, dtype=np.uint32)
+    spread = np.zeros_like(values)
+    for bit in range(_BITS_PER_CHANNEL):
+        source = _BITS_PER_CHANNEL - 1 - bit
+        target = 3 * (_BITS_PER_CHANNEL - bit) - 1 - channel
+        spread |= ((values >> source) & 1) << target
+    return spread
+
+
+_SPREAD_BITS = tuple(_spread_bits_table(channel) for channel in range(_CHANNELS))
+
+
 def bit_mix(rgb: NDArray[np.uint8]) -> NDArray[np.uint32]:
     """Interleave the bits of the colour channels, most significant first.
 
@@ -31,14 +45,10 @@ def bit_mix(rgb: NDArray[np.uint8]) -> NDArray[np.uint32]:
         NDArray[np.uint32]: One 24 bit value per colour, with the red bit of
             each triple first.
     """
-    channels = rgb.astype(np.uint32)
-    mixed = np.zeros(rgb.shape[:-1], dtype=np.uint32)
-    for bit in range(_BITS_PER_CHANNEL):
-        source = _BITS_PER_CHANNEL - 1 - bit
-        for channel in range(_CHANNELS):
-            target = 3 * (_BITS_PER_CHANNEL - bit) - 1 - channel
-            mixed |= ((channels[..., channel] >> source) & 1) << target
-    return mixed
+    red, green, blue = (
+        _SPREAD_BITS[channel][rgb[..., channel]] for channel in range(3)
+    )
+    return red | green | blue
 
 
 def bit_unmix(mixed: int) -> tuple[int, int, int]:
