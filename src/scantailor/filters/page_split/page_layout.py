@@ -199,16 +199,14 @@ class PageLayout(BaseModel):
         if split_x is None:
             return None
 
-        x, y, _w, h = self.outline
-        return np.array(
-            [
-                [x, y],
-                [split_x, y],
-                [split_x, y + h],
-                [x, y + h],
-            ],
-            dtype=np.float64,
-        )
+        assert self.cutter1 is not None
+        if _is_vertical(self.cutter1):
+            x, y, _w, h = self.outline
+            return np.array(
+                [[x, y], [split_x, y], [split_x, y + h], [x, y + h]],
+                dtype=np.float64,
+            )
+        return _keep_side(self.get_outline_polygon(), self.cutter1, keep_left=True)
 
     def get_right_page_outline(self) -> NDArray[np.floating] | None:
         """Get the outline of the right page for TWO_PAGES layout.
@@ -223,17 +221,15 @@ class PageLayout(BaseModel):
         if split_x is None:
             return None
 
-        x, y, w, h = self.outline
-        right_edge = x + w
-        return np.array(
-            [
-                [split_x, y],
-                [right_edge, y],
-                [right_edge, y + h],
-                [split_x, y + h],
-            ],
-            dtype=np.float64,
-        )
+        assert self.cutter1 is not None
+        if _is_vertical(self.cutter1):
+            x, y, w, h = self.outline
+            right_edge = x + w
+            return np.array(
+                [[split_x, y], [right_edge, y], [right_edge, y + h], [split_x, y + h]],
+                dtype=np.float64,
+            )
+        return _keep_side(self.get_outline_polygon(), self.cutter1, keep_left=False)
 
     def get_single_page_outline(self) -> NDArray[np.floating] | None:
         """Get the outline for single page layouts.
@@ -254,23 +250,19 @@ class PageLayout(BaseModel):
         if self.cutter1 is None or self.cutter2 is None:
             return self.get_outline_polygon()
 
-        x, y, w, h = self.outline
-        left_x = (self.cutter1[0][0] + self.cutter1[1][0]) / 2
-        right_x = (self.cutter2[0][0] + self.cutter2[1][0]) / 2
+        left_line, right_line = self.cutter1, self.cutter2
+        if _mid_x(left_line) > _mid_x(right_line):
+            left_line, right_line = right_line, left_line
 
-        # Ensure left < right
-        if left_x > right_x:
-            left_x, right_x = right_x, left_x
-
-        return np.array(
-            [
-                [left_x, y],
-                [right_x, y],
-                [right_x, y + h],
-                [left_x, y + h],
-            ],
-            dtype=np.float64,
-        )
+        if _is_vertical(left_line) and _is_vertical(right_line):
+            x, y, w, h = self.outline
+            left_x, right_x = _mid_x(left_line), _mid_x(right_line)
+            return np.array(
+                [[left_x, y], [right_x, y], [right_x, y + h], [left_x, y + h]],
+                dtype=np.float64,
+            )
+        between = _keep_side(self.get_outline_polygon(), left_line, keep_left=False)
+        return _keep_side(between, right_line, keep_left=True)
 
     def get_page_outline(self, sub_page: "SubPage") -> NDArray[np.floating] | None:
         """Get the outline for a specific sub-page.
@@ -362,3 +354,50 @@ class PageLayout(BaseModel):
             cutter1=left_line,
             cutter2=right_line,
         )
+
+
+Line = tuple[tuple[float, float], tuple[float, float]]
+
+
+def _mid_x(line: Line) -> float:
+    return (line[0][0] + line[1][0]) / 2
+
+
+def _is_vertical(line: Line) -> bool:
+    return line[0][0] == line[1][0]
+
+
+def _keep_side(
+    polygon: NDArray[np.floating], line: Line, *, keep_left: bool
+) -> NDArray[np.floating]:
+    """Clip a polygon to the side of the infinite ``line`` that is left or right of it.
+
+    Left and right are judged along the horizontal, so the line must not be
+    horizontal; a horizontal line leaves the polygon unchanged.
+
+    Args:
+        polygon (NDArray[np.floating]): Vertices as an (N, 2) array.
+        line (Line): Two points on the cutter.
+        keep_left (bool): Keep the part with smaller x at each y.
+
+    Returns:
+        NDArray[np.floating]: The clipped polygon; empty if nothing is left.
+    """
+    (x1, y1), (x2, y2) = line
+    if y1 == y2:
+        return polygon
+    sign = -1.0 if keep_left else 1.0
+
+    def offset(point: NDArray[np.floating]) -> float:
+        line_x = x1 + (x2 - x1) * (point[1] - y1) / (y2 - y1)
+        return sign * (point[0] - line_x)
+
+    kept: list[NDArray[np.floating]] = []
+    for current, following in zip(polygon, np.roll(polygon, -1, axis=0)):
+        before, after = offset(current), offset(following)
+        if before >= 0:
+            kept.append(current)
+        if (before >= 0) != (after >= 0):
+            along = before / (before - after)
+            kept.append(current + along * (following - current))
+    return np.array(kept, dtype=np.float64).reshape(-1, 2)

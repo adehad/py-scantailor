@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from scantailor.app.ui import icons
 from scantailor.app.ui.icons import icon
+from scantailor.app.ui.image_views.page_layout_state import PageLayoutState
 from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 from scantailor.core.models import Dpi, Margins, PageId
@@ -85,6 +86,7 @@ class OptionsWidget(QWidget):
         filter_: Filter,
         parent: QWidget | None = None,
         units_provider: UnitsProvider | None = None,
+        state: PageLayoutState | None = None,
     ) -> None:
         """Initialize the options widget.
 
@@ -93,6 +95,8 @@ class OptionsWidget(QWidget):
             parent: The parent widget.
             units_provider: Source of the unit margins are shown in; the
                 application-wide one when None.
+            state: Margin link and guide state to share with the image view; a
+                private one when None.
         """
         super().__init__(parent)
 
@@ -104,8 +108,7 @@ class OptionsWidget(QWidget):
         self._source_dpi = Dpi()
         self._current_page_id: PageId | None = None
         self._updating = False  # Prevent signal loops
-        self._link_top_bottom = False
-        self._link_left_right = False
+        self._state = state or PageLayoutState(self)
 
         self._setup_ui()
         self._connect_signals()
@@ -395,6 +398,8 @@ class OptionsWidget(QWidget):
             )
         self._top_bottom_link.toggled.connect(self._on_top_bottom_link_changed)
         self._left_right_link.toggled.connect(self._on_left_right_link_changed)
+        self._state.links_changed.connect(self._show_links)
+        self._show_links()
         self._apply_margins_btn.clicked.connect(self.apply_margins_requested.emit)
         self._fix_dpi_btn.clicked.connect(self.fix_dpi_requested.emit)
         self._source_dpi_combo.activated.connect(self._on_source_dpi_preset_chosen)
@@ -412,6 +417,21 @@ class OptionsWidget(QWidget):
         self._apply_alignment_btn.clicked.connect(self.apply_alignment_requested.emit)
         self._match_size_to_all_btn.clicked.connect(self._on_match_size_to_all)
         self._freeze_aggregate_check.clicked.connect(self._on_freeze_aggregate_toggled)
+
+    @property
+    def state(self) -> PageLayoutState:
+        """The margin link and guide state shared with the image view."""
+        return self._state
+
+    def _show_links(self) -> None:
+        """Make the link buttons show the shared state."""
+        for button, linked in (
+            (self._top_bottom_link, self._state.top_bottom_linked),
+            (self._left_right_link, self._state.left_right_linked),
+        ):
+            button.blockSignals(True)
+            button.setChecked(linked)
+            button.blockSignals(False)
 
     def set_current_page(self, page_id: PageId) -> None:
         """Set the current page being edited.
@@ -615,6 +635,7 @@ class OptionsWidget(QWidget):
             self._auto_margins_check.setChecked(params.auto_margins)
             self._margins_mm = params.hard_margins_mm
             self._apply_units()
+            self._release_unequal_links()
 
             # Enable/disable spinboxes based on auto margins
             spinboxes_enabled = not params.auto_margins
@@ -640,6 +661,13 @@ class OptionsWidget(QWidget):
             self._update_alignment_buttons(alignment)
         finally:
             self._updating = False
+
+    def _release_unequal_links(self) -> None:
+        """Unlink a pair whose displayed values differ, as they cannot move together."""
+        if self._left_spinbox.value() != self._right_spinbox.value():
+            self._state.left_right_linked = False
+        if self._top_spinbox.value() != self._bottom_spinbox.value():
+            self._state.top_bottom_linked = False
 
     def _get_h_mode_index(self, mode: HorizontalAlignment) -> int:
         """Get combo box index for horizontal alignment mode."""
@@ -720,7 +748,9 @@ class OptionsWidget(QWidget):
             return
 
         vertical = side in ("top", "bottom")
-        linked = self._link_top_bottom if vertical else self._link_left_right
+        linked = (
+            self._state.top_bottom_linked if vertical else self._state.left_right_linked
+        )
         spin_boxes = self._spin_boxes()
         sides = [side, _OPPOSITE_SIDE[side]] if linked else [side]
         value = spin_boxes[side].value()
@@ -743,11 +773,11 @@ class OptionsWidget(QWidget):
 
     def _on_top_bottom_link_changed(self, checked: bool) -> None:
         """Handle top/bottom link button change."""
-        self._link_top_bottom = checked
+        self._state.top_bottom_linked = checked
 
     def _on_left_right_link_changed(self, checked: bool) -> None:
         """Handle left/right link button change."""
-        self._link_left_right = checked
+        self._state.left_right_linked = checked
 
     def _on_match_size_changed(self, checked: bool) -> None:
         """Handle match size checkbox change."""

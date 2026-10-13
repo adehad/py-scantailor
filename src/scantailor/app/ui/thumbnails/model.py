@@ -1,7 +1,7 @@
 """List model that renders page thumbnails lazily on a worker pool."""
 
-from collections.abc import Callable, Hashable
-from dataclasses import dataclass
+from collections.abc import Callable, Hashable, Sequence
+from dataclasses import dataclass, replace
 from typing import Any
 
 from loguru import logger
@@ -27,6 +27,10 @@ ThumbnailRenderer = Callable[[PageId, str], QImage]
 
 PageRole = Qt.ItemDataRole.UserRole
 IsCurrentRole = Qt.ItemDataRole.UserRole + 1
+IncompleteRole = Qt.ItemDataRole.UserRole + 2
+
+IncompletenessProvider = Callable[[PageId, str], bool]
+"""Tells whether a page has no usable result at a stage yet."""
 
 
 @dataclass(frozen=True)
@@ -39,28 +43,35 @@ class PageEntry:
             two-page image, 0 when the image size is unknown.
         height (int): Source height in pixels, 0 when unknown.
         position (int): Index in the project's natural order.
+        incomplete (bool): The page has no usable result at the shown stage; the
+            list marks it with a question mark.
     """
 
     page: PageId
     width: int
     height: int
     position: int
+    incomplete: bool = False
 
 
 @dataclass(frozen=True)
 class PageOrderOption:
     """A named way of ordering the thumbnails.
 
-    Orders that need stage results (C++ "decreasing deviation", "split type",
-    completeness) are not built in; callers can supply them as extra options.
+    Orders that need stage results (deviation, split type, completeness) are
+    built by ``stage_orders`` for the shown stage.
 
     Args:
         name (str): Text shown in the sort combo box.
         key (Callable[[PageEntry], Any]): Sort key. Ties keep natural order.
+        prepare (Callable[[Sequence[PageEntry]], None] | None): Called with every
+            entry, in natural order, before the keys are read, for orders whose
+            key depends on all pages such as a deviation from the mean.
     """
 
     name: str
     key: Callable[[PageEntry], Any]
+    prepare: Callable[[Sequence[PageEntry]], None] | None = None
 
 
 def _unknown_last(size: Callable[[PageEntry], int]) -> Callable[[PageEntry], Any]:
@@ -146,6 +157,8 @@ class ThumbnailModel(QAbstractListModel):
         params_hash (Callable[[PageId, str], Hashable] | None): Digest of the
             parameters that affect a page's preview at a stage. Evaluated on
             the GUI thread whenever a thumbnail is requested.
+        is_incomplete (IncompletenessProvider | None): Tells whether a page has
+            no usable result at a stage. Evaluated on the GUI thread.
         render_size (QSize | None): Rendered images are scaled to fit this, the
             resolution thumbnails are kept at; defaults to 160x160.
         thread_count (int): Worker threads.
@@ -160,12 +173,15 @@ class ThumbnailModel(QAbstractListModel):
         render_size: QSize | None = None,
         thread_count: int = 2,
         parent: QObject | None = None,
+        is_incomplete: IncompletenessProvider | None = None,
     ) -> None:
         """Initialise; arguments are described on the class."""
         super().__init__(parent)
         self._renderer = renderer
         self._cache = cache if cache is not None else ThumbnailCache()
         self._params_hash = params_hash
+        self._is_incomplete = is_incomplete
+        self._reversed = False
         self._render_size = render_size or QSize(160, 160)
         self._entries: list[PageEntry] = []
         self._rows: dict[PageId, int] = {}
@@ -229,19 +245,54 @@ class ThumbnailModel(QAbstractListModel):
         self._entries = _entries_for(project) if project is not None else []
         self._current = None
         self._failed.clear()
+        self._mark_incomplete_pages()
         self._sort_entries()
         self.endResetModel()
 
-    def set_order(self, order: PageOrderOption) -> None:
+    def set_order(self, order: PageOrderOption, reverse: bool | None = None) -> None:
         """Reorder the rows.
 
         Args:
             order (PageOrderOption): The order to apply.
+            reverse (bool | None): Put the rows in the opposite order; keeps the
+                current direction when None.
         """
         self.beginResetModel()
         self._order = order
+        if reverse is not None:
+            self._reversed = reverse
         self._sort_entries()
         self.endResetModel()
+
+    @property
+    def reversed_order(self) -> bool:
+        """Whether the rows are in the opposite of the chosen order."""
+        return self._reversed
+
+    def set_incompleteness_provider(
+        self, provider: IncompletenessProvider | None
+    ) -> None:
+        """Choose how pages without a result at the shown stage are found.
+
+        Args:
+            provider (IncompletenessProvider | None): The check, or None to
+                treat every page as complete.
+        """
+        self._is_incomplete = provider
+        self.refresh()
+
+    def refresh(self, page: PageId | None = None) -> None:
+        """Look again at which pages are incomplete and keep the rows in order.
+
+        Rows move without a reset, so selection and current page stay.
+
+        Args:
+            page (PageId | None): The only page to look at again, or None for all.
+        """
+        changed = self._mark_incomplete_pages(page)
+        for entry_page in changed:
+            self._emit_changed(entry_page, [IncompleteRole])
+        self._resort()
 
     def set_stage(self, stage: str) -> None:
         """Switch the stage whose previews are shown.
@@ -252,6 +303,8 @@ class ThumbnailModel(QAbstractListModel):
         if stage == self._stage:
             return
         self._stage = stage
+        self._mark_incomplete_pages()
+        self._resort()
         self.invalidate()
 
     def set_current_page(self, page: PageId | None) -> None:
@@ -274,6 +327,7 @@ class ThumbnailModel(QAbstractListModel):
             page (PageId | None): The page to refresh, or None for all.
         """
         self._failed.clear()
+        self.refresh(page)
         if page is not None:
             self._emit_changed(page, [Qt.ItemDataRole.DecorationRole])
         elif self._entries:
@@ -318,6 +372,8 @@ class ThumbnailModel(QAbstractListModel):
             return page
         if role == IsCurrentRole:
             return page == self._current
+        if role == IncompleteRole:
+            return self._entries[index.row()].incomplete
         if role == Qt.ItemDataRole.DecorationRole:
             return self._thumbnail(page)
         return None
@@ -364,9 +420,49 @@ class ThumbnailModel(QAbstractListModel):
         if row >= 0:
             self.dataChanged.emit(self.index(row), self.index(row), roles)
 
+    def _mark_incomplete_pages(self, page: PageId | None = None) -> list[PageId]:
+        """Update the incomplete flag of the entries; return the pages that changed."""
+        provider, stage = self._is_incomplete, self._stage
+        changed: list[PageId] = []
+        for row, entry in enumerate(self._entries):
+            if page is not None and entry.page != page:
+                continue
+            incomplete = provider(entry.page, stage) if provider is not None else False
+            if incomplete != entry.incomplete:
+                self._entries[row] = replace(entry, incomplete=incomplete)
+                changed.append(entry.page)
+        return changed
+
+    def _ordered(self) -> list[PageEntry]:
+        """Return the entries in the chosen order; ties keep natural order."""
+        ordered = sorted(self._entries, key=lambda entry: entry.position)
+        if self._order.prepare is not None:
+            self._order.prepare(ordered)
+        ordered.sort(key=self._order.key, reverse=self._reversed)
+        return ordered
+
     def _sort_entries(self) -> None:
-        self._entries.sort(key=self._order.key)
+        self._entries = self._ordered()
         self._rows = {entry.page: row for row, entry in enumerate(self._entries)}
+
+    def _resort(self) -> None:
+        """Move rows to where the chosen order puts them, keeping selections."""
+        ordered = self._ordered()
+        if [entry.page for entry in ordered] == [e.page for e in self._entries]:
+            self._entries = ordered
+            return
+        self.layoutAboutToBeChanged.emit()
+        old_pages = [
+            (index, self._entries[index.row()].page)
+            for index in self.persistentIndexList()
+        ]
+        self._entries = ordered
+        self._rows = {entry.page: row for row, entry in enumerate(self._entries)}
+        self.changePersistentIndexList(
+            [index for index, _page in old_pages],
+            [self.index(self._rows[page]) for _index, page in old_pages],
+        )
+        self.layoutChanged.emit()
 
 
 def page_label(page: PageId) -> str:
