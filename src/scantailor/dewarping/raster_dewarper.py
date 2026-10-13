@@ -12,6 +12,7 @@ from enum import Enum
 
 import cv2
 import numpy as np
+from numba import njit
 from numpy.typing import NDArray
 
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
@@ -175,11 +176,10 @@ def compute_dewarp_maps(
     left, top, right, bottom = model_domain
     if right <= left or bottom <= top:
         raise ValueError("model_domain must have positive width and height")
-    map_x, map_y = _compute_dewarp_maps(
-        dewarper, dst_size[0], dst_size[1], left, top, right, bottom
-    )
     # The grids address pixel corners; cv2.remap addresses pixel centres.
-    return map_x - np.float32(0.5), map_y - np.float32(0.5)
+    return _compute_dewarp_maps(
+        dewarper, dst_size[0], dst_size[1], left, top, right, bottom, shift=0.5
+    )
 
 
 def output_model_domain(
@@ -233,6 +233,7 @@ def _compute_dewarp_maps(
     top: float,
     right: float,
     bottom: float,
+    shift: float = 0.0,
 ) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
     """Compute the coordinate mapping grids for cv2.remap.
 
@@ -247,6 +248,7 @@ def _compute_dewarp_maps(
         top: Top model domain bound.
         right: Right model domain bound.
         bottom: Bottom model domain bound.
+        shift: Subtracted from every coordinate after conversion to float32.
 
     Returns:
         Tuple of (map_x, map_y) arrays for cv2.remap.
@@ -261,16 +263,58 @@ def _compute_dewarp_maps(
     directions = generatrices.end - generatrices.start
     homographies = generatrices.pln2img_1d
 
-    # Rows broadcast against columns: (dst_height, 1) with (dst_width,).
-    model_y = (top + (np.arange(dst_height) + 0.5) * y_scale)[:, None]
-    num = homographies[:, 0, 0] * model_y + homographies[:, 0, 1]
-    denom = homographies[:, 1, 0] * model_y + homographies[:, 1, 1]
-    degenerate = np.abs(denom) < 1e-10
-    img_t = np.where(degenerate, 0.5, num / np.where(degenerate, 1.0, denom))
+    columns = np.ascontiguousarray(
+        np.column_stack(
+            [
+                starts[:, 0],
+                starts[:, 1],
+                directions[:, 0],
+                directions[:, 1],
+                homographies[:, 0, 0],
+                homographies[:, 0, 1],
+                homographies[:, 1, 0],
+                homographies[:, 1, 1],
+            ]
+        ).T,
+        dtype=np.float64,
+    )
+    map_x = np.empty((dst_height, dst_width), dtype=np.float32)
+    map_y = np.empty((dst_height, dst_width), dtype=np.float32)
+    _fill_maps(columns, top, y_scale, np.float32(shift), map_x, map_y)
+    return map_x, map_y
 
-    map_x = starts[:, 0] + img_t * directions[:, 0]
-    map_y = starts[:, 1] + img_t * directions[:, 1]
-    return map_x.astype(np.float32), map_y.astype(np.float32)
+
+@njit(cache=True)
+def _fill_maps(
+    columns: NDArray[np.float64],
+    top: float,
+    y_scale: float,
+    shift: np.float32,
+    map_x: NDArray[np.float32],
+    map_y: NDArray[np.float32],
+) -> None:
+    """Fill the maps row by row from the per-column generatrix constants.
+
+    ``columns`` rows are the generatrix start x and y, its direction x and y
+    and the four entries of its 1-D homography. A degenerate homography
+    (denominator near zero) maps to the middle of the generatrix.
+    """
+    height, width = map_x.shape
+    for row in range(height):
+        model_y = top + (row + 0.5) * y_scale
+        for col in range(width):
+            numerator = columns[4, col] * model_y + columns[5, col]
+            denominator = columns[6, col] * model_y + columns[7, col]
+            if abs(denominator) < 1e-10:
+                along = 0.5
+            else:
+                along = numerator / denominator
+            map_x[row, col] = (
+                np.float32(columns[0, col] + along * columns[2, col]) - shift
+            )
+            map_y[row, col] = (
+                np.float32(columns[1, col] + along * columns[3, col]) - shift
+            )
 
 
 def compute_dewarped_size(

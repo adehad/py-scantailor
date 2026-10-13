@@ -8,14 +8,15 @@ from collections.abc import Sequence
 
 import cv2
 import numpy as np
+from numba import njit
 from numpy.typing import NDArray
 from skimage.morphology import reconstruction
 
 from scantailor.imageproc.polynomial_line import fit_polynomial_lines
-from scantailor.imageproc.polynomial_surface import PolynomialSurface
+from scantailor.imageproc.polynomial_surface import PolynomialSurface, _axis_basis
 
-# Longest side of the working image. Fitting at this size is cheap and the
-# background is smooth, so nothing is lost by rendering the surface at full size.
+# Longest side of the working image. Fitting at this size is cheap; the surface
+# is then evaluated exactly at every pixel of the page.
 _WORKING_SIZE = 300
 # Height of the vertical opening that removes letter remnants. Chosen for the
 # working size above.
@@ -32,6 +33,10 @@ _MIN_LINE_COVERAGE_DIVISOR = 4
 
 SURFACE_HOR_DEGREE = 8
 SURFACE_VERT_DEGREE = 5
+
+# Rows of the page whose background is evaluated and applied together; small
+# enough that the float64 intermediate stays in the CPU cache.
+_BAND_ROWS = 32
 
 
 def _fill_dark_holes(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
@@ -179,6 +184,33 @@ def estimate_background(
     )
 
 
+def _normalisation_table() -> NDArray[np.uint8]:
+    """Return ``table[background, gray]``, the normalised level for each pair."""
+    bg = np.arange(256, dtype=np.uint32)[:, None]
+    src = np.arange(256, dtype=np.uint32)[None, :]
+    scaled = np.minimum((src * 255 + bg // 2) // np.maximum(bg, 1), 255)
+    return np.where(bg.astype(np.int32) - src.astype(np.int32) < 1, 255, scaled).astype(
+        np.uint8
+    )
+
+
+_NORMALISATION_TABLE = _normalisation_table()
+
+
+@njit(cache=True)
+def _apply_table(
+    gray: NDArray[np.uint8],
+    background: NDArray[np.uint8],
+    table: NDArray[np.uint8],
+    out: NDArray[np.uint8],
+) -> None:
+    flat_gray = gray.reshape(-1)
+    flat_background = background.reshape(-1)
+    flat_out = out.reshape(-1)
+    for i in range(flat_gray.size):
+        flat_out[i] = table[flat_background[i], flat_gray[i]]
+
+
 def raise_above_background(
     gray: NDArray[np.uint8],
     background: NDArray[np.uint8],
@@ -195,13 +227,29 @@ def raise_above_background(
     Returns:
         NDArray[np.uint8]: Normalised image.
     """
-    src = gray.astype(np.uint32)
-    bg = background.astype(np.uint32)
-    scaled = (src * 255 + bg // 2) // np.maximum(bg, 1)
-    scaled = np.minimum(scaled, 255)
-    return np.where(bg.astype(np.int32) - src.astype(np.int32) < 1, 255, scaled).astype(
-        np.uint8
+    out = np.empty(gray.shape, dtype=np.uint8)
+    _apply_table(
+        np.ascontiguousarray(gray),
+        np.ascontiguousarray(background),
+        _NORMALISATION_TABLE,
+        out,
     )
+    return out
+
+
+def _render_band(
+    left_factor: NDArray[np.float64],
+    hor_basis_t: NDArray[np.float64],
+    start: int,
+    stop: int,
+) -> NDArray[np.uint8]:
+    """Evaluate rows ``start:stop`` of a surface, rounded as ``render`` rounds."""
+    values = left_factor[start:stop] @ hor_basis_t
+    values *= 255.0
+    values += 0.5
+    np.floor(values, out=values)
+    np.clip(values, 0, 255, out=values)
+    return values.astype(np.uint8)
 
 
 def normalize_illumination_gray(
@@ -219,5 +267,20 @@ def normalize_illumination_gray(
         NDArray[np.uint8]: New array of the same shape in which the estimated
         paper colour is mapped to 255.
     """
-    background = estimate_background(gray, area_to_consider).render(gray.shape)
-    return raise_above_background(gray, background)
+    surface = estimate_background(gray, area_to_consider)
+    height, width = gray.shape
+    # Bands give the same values as ``surface.render`` without its full-page
+    # float64 temporaries.
+    left_factor = _axis_basis(height, surface.vert_degree) @ surface.coeffs
+    hor_basis_t = np.ascontiguousarray(_axis_basis(width, surface.hor_degree).T)
+    gray = np.ascontiguousarray(gray)
+    out = np.empty(gray.shape, dtype=np.uint8)
+    for start in range(0, height, _BAND_ROWS):
+        stop = min(start + _BAND_ROWS, height)
+        _apply_table(
+            gray[start:stop],
+            _render_band(left_factor, hor_basis_t, start, stop),
+            _NORMALISATION_TABLE,
+            out[start:stop],
+        )
+    return out
