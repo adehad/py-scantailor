@@ -53,12 +53,44 @@ class TestTopEdgeDetection:
         assert result.angle == 0.0
         assert result.is_confident()
 
-    def test_a_page_without_a_dark_surround_reads_as_straight(self):
-        # The first window of white rows already ends the search in every column.
-        result = find_skew_from_top_edge(sheared_page(0.0)[:, :])
+    def test_a_page_without_a_dark_surround_has_no_confident_result(self):
+        # Every column is light from its first row, so no surround ends anywhere.
+        result = find_skew_from_top_edge(sheared_page(0.0))
 
         assert result.angle == 0.0
+        assert not result.is_confident()
+
+    def test_a_surround_that_does_not_reach_the_top_is_not_an_edge(self):
+        # Ink that starts below a light strip could as well be a line of text.
+        scan = book_scan(3.0)
+        scan[:8, :] = 255
+
+        assert not find_skew_from_top_edge(scan).is_confident()
+
+    def test_one_light_row_at_the_very_top_is_tolerated(self):
+        scan = book_scan(3.0)
+        scan[0, :] = 255
+
+        result = find_skew_from_top_edge(scan)
+
         assert result.is_confident()
+        assert result.angle == pytest.approx(3.0, abs=0.3)
+
+    def test_the_edge_row_is_the_last_row_of_the_first_light_window(self):
+        from scantailor.filters.deskew.top_edge import _edge_row
+
+        scan = book_scan(0.0, edge_row=60)
+
+        # Rows 59, 60, 61 are the first three with at most one ink pixel.
+        assert _edge_row(scan[:200, 400] == 0) == 61
+
+    def test_a_column_that_is_light_from_its_first_row_has_no_edge(self):
+        from scantailor.filters.deskew.top_edge import _edge_row
+
+        column = np.zeros(200, dtype=bool)
+        column[100:] = True
+
+        assert _edge_row(column) is None
 
     def test_an_image_that_is_all_ink_in_the_search_band_has_no_edge(self):
         result = find_skew_from_top_edge(np.zeros((600, 800), dtype=np.uint8))
@@ -114,6 +146,15 @@ class TestFilterModes:
         assert edge.detect_skew(scan, PAGE, store_result=False).angle == (
             pytest.approx(3.0, abs=0.3)
         )
+
+    def test_a_page_without_a_dark_surround_falls_back_to_its_content(self):
+        filter_ = Filter()
+        filter_.content_based = False
+
+        result = filter_.detect_skew(sheared_page(0.0), PAGE, store_result=False)
+        content = Filter().detect_skew(sheared_page(0.0), PAGE, store_result=False)
+
+        assert result == content
 
     def test_a_weak_top_edge_result_stores_no_rotation(self):
         filter_ = Filter()
