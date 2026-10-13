@@ -1,13 +1,18 @@
 """Fix Orientation filter implementation.
 
-This filter applies orthogonal rotations (0, 90, 180, 270 degrees) to images.
-The rotation is stored as metadata and applied during rendering/output.
+This filter applies orthogonal rotations (0, 90, 180, 270 degrees) to images and
+can trim the edges of each image by hand. Both are stored as metadata; the
+rotation is applied to the pixels and the trim is the first crop of the
+transformation that later stages build on.
 """
+
+from collections.abc import Iterable
 
 import numpy as np
 from numpy.typing import NDArray
 
 from scantailor.core.models import ImageId, OrthogonalRotation, PageId
+from scantailor.filters.fix_orientation.image_trim import ImageTrim
 from scantailor.filters.fix_orientation.settings import Settings
 from scantailor.imageproc.geometry import rotate_orthogonal
 
@@ -122,6 +127,57 @@ class Filter:
             rotation: The rotation to apply.
         """
         self._settings.apply_rotation_to_pages(page_ids, rotation)
+
+    def get_trim(self, image_id: ImageId) -> ImageTrim:
+        """Get the manual trim of an image.
+
+        Args:
+            image_id (ImageId): The image to look up.
+
+        Returns:
+            ImageTrim: The stored trim; disabled if none is set.
+        """
+        return self._settings.get_trim(image_id)
+
+    def set_trim(self, image_id: ImageId, trim: ImageTrim) -> None:
+        """Set the manual trim of an image; a disabled trim removes it.
+
+        Args:
+            image_id (ImageId): The image to trim.
+            trim (ImageTrim): The trim to store.
+        """
+        self._settings.set_trim(image_id, trim)
+
+    def trim_crop_area(
+        self, image_id: ImageId, oriented_size: tuple[int, int]
+    ) -> NDArray[np.float64] | None:
+        """Get the trimmed region of an image in oriented pixels.
+
+        Args:
+            image_id (ImageId): The image to look up.
+            oriented_size (tuple[int, int]): Width and height of the image
+                after Fix Orientation's rotation.
+
+        Returns:
+            NDArray[np.float64] | None: Four corners, shape (4, 2); None when the
+            image has no enabled trim.
+        """
+        return self.get_trim(image_id).crop_area(
+            self.get_rotation(image_id), oriented_size
+        )
+
+    def apply_current_to_pages(
+        self, source: ImageId, targets: Iterable[PageId]
+    ) -> None:
+        """Copy the rotation and the trim of one image to the images of pages.
+
+        Args:
+            source (ImageId): The image whose settings are copied.
+            targets (Iterable[PageId]): The pages that receive them.
+        """
+        pages = list(targets)
+        self._settings.apply_rotation_to_pages(pages, self.get_rotation(source))
+        self._settings.apply_trim_to_pages(pages, self.get_trim(source))
 
     def process_image(
         self, image: NDArray[np.uint8], image_id: ImageId
