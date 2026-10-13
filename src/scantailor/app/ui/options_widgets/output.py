@@ -35,6 +35,7 @@ from scantailor.app.ui.theme.fonts import CAPTION_PX
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 from scantailor.app.ui.widgets.ticked_slider import TickedSlider
 from scantailor.core.models import Dpi, PageId
+from scantailor.dewarping.auto_model import DewarpMetrics
 from scantailor.filters.output.binarization import BinarizationMethod
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.color_options import FillingColor
@@ -247,6 +248,7 @@ class OptionsWidget(QWidget):
         self._updating = False  # Prevent signal loops
         self._dewarping_tab_active = False
         self._despeckle_tab_active = False
+        self._dewarp_metrics: DewarpMetrics | None = None
         self._apply_buttons: dict[ApplyGroup, QPushButton] = {}
         self._pending_page_id: PageId | None = None
         self._reload_timer = QTimer(self)
@@ -687,6 +689,26 @@ class OptionsWidget(QWidget):
         self._dewarp_off_btn.setChecked(True)
         dewarp_layout.addLayout(btn_layout)
 
+        self._min_span_row = QWidget()
+        self._min_span_row.setObjectName("dewarpMinSpanRow")
+        span_layout = QHBoxLayout(self._min_span_row)
+        span_layout.setContentsMargins(0, 0, 0, 0)
+        span_layout.addWidget(QLabel("Minimum span (%):"))
+        self._min_span_spinbox = _spin_box("dewarpMinSpanSB", 0, 100)
+        self._min_span_spinbox.setToolTip(
+            "Leave the page as it is when the curves found lie closer together "
+            "than this share of the content height"
+        )
+        span_layout.addWidget(self._min_span_spinbox)
+        span_layout.addItem(_spacer())
+        dewarp_layout.addWidget(self._min_span_row)
+
+        self._dewarp_metrics_label = QLabel()
+        self._dewarp_metrics_label.setObjectName("dewarpMetricsLabel")
+        self._dewarp_metrics_label.setWordWrap(True)
+        self._dewarp_metrics_label.setVisible(False)
+        dewarp_layout.addWidget(self._dewarp_metrics_label)
+
         self._post_deskew_check = _check_box(
             "postDeskewCB", "Post-deskew", "Apply additional deskewing after dewarping"
         )
@@ -835,6 +857,7 @@ class OptionsWidget(QWidget):
         self._despeckle_slider.sliderReleased.connect(self._commit_despeckle)
 
         self._dewarp_button_group.buttonClicked.connect(self._on_dewarping_changed)
+        self._min_span_spinbox.valueChanged.connect(self._on_min_span_changed)
         self._post_deskew_check.toggled.connect(self._on_post_deskew_changed)
         self._depth_slider.valueChanged.connect(self._on_depth_changed)
         self._depth_slider.sliderReleased.connect(self._commit_depth)
@@ -856,6 +879,8 @@ class OptionsWidget(QWidget):
         """
         if self._pending_page_id not in (None, page_id):
             self.flush_pending_reload()
+        if page_id != self._current_page_id:
+            self._dewarp_metrics = None
         self._current_page_id = page_id
         self._update_ui()
 
@@ -888,6 +913,16 @@ class OptionsWidget(QWidget):
             active (bool): True while the despeckling tab shows.
         """
         self._despeckle_tab_active = active
+
+    def set_dewarp_metrics(self, metrics: DewarpMetrics | None) -> None:
+        """Show what automatic dewarping found when the current page rendered.
+
+        Args:
+            metrics (DewarpMetrics | None): The render's findings; None when the
+                page was not dewarped automatically or has not rendered yet.
+        """
+        self._dewarp_metrics = metrics
+        self._show_dewarp_metrics()
 
     def set_distortion_model(self, model: DistortionModelSpec) -> None:
         """Store a manually edited distortion model for the current page.
@@ -1141,9 +1176,11 @@ class OptionsWidget(QWidget):
 
         dewarping = params.dewarping
         self._dewarp_buttons[dewarping.mode].setChecked(True)
+        self._min_span_row.setVisible(dewarping.is_auto())
+        self._min_span_spinbox.setValue(params.dewarp_min_span_percent)
+        self._show_dewarp_metrics()
         self._post_deskew_check.setChecked(dewarping.post_deskew)
         self._post_deskew_check.setEnabled(dewarping.is_enabled())
-        self._dewarping_group.setVisible(not self._dewarping_tab_active)
 
         self._depth_group.setVisible(self._dewarping_tab_active)
         self._depth_slider.setValue(
@@ -1243,6 +1280,15 @@ class OptionsWidget(QWidget):
         self._edit(
             lambda p: p.with_dewarping(p.dewarping.with_mode(mode)), refresh=True
         )
+
+    def _show_dewarp_metrics(self) -> None:
+        metrics = self._dewarp_metrics
+        label = self._dewarp_metrics_label
+        label.setText("" if metrics is None else metrics.describe())
+        label.setVisible(metrics is not None and self._dewarp_auto_btn.isChecked())
+
+    def _on_min_span_changed(self, value: int) -> None:
+        self._edit(lambda p: p.with_dewarp_min_span_percent(value), delayed=True)
 
     def _on_post_deskew_changed(self, checked: bool) -> None:
         self._edit(lambda p: p.with_dewarping(p.dewarping.with_post_deskew(checked)))

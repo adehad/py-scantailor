@@ -17,6 +17,7 @@ from scantailor.core.zones import (
     Zone,
     ZoneSpline,
 )
+from scantailor.dewarping import DEFAULT_MIN_SPAN_PERCENT
 
 from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode
@@ -54,7 +55,7 @@ _GROUP_FIELDS: dict[ApplyGroup, tuple[str, ...]] = {
     ApplyGroup.SPLITTING: ("splitting",),
     ApplyGroup.BINARIZATION: ("binarization",),
     ApplyGroup.DESPECKLE: ("despeckle_level", "despeckle_factor"),
-    ApplyGroup.DEWARPING: ("dewarping",),
+    ApplyGroup.DEWARPING: ("dewarping", "dewarp_min_span_percent"),
     ApplyGroup.DEPTH_PERCEPTION: ("depth_perception",),
 }
 
@@ -140,6 +141,9 @@ class Params(BaseModel):
             and 0.5 to 3.5 otherwise; None when the named level says it.
         black_on_white: True for black text on white background.
         dewarping: Dewarping options for curved page correction.
+        dewarp_min_span_percent: Automatic dewarping refuses a model whose
+            top and bottom curves lie closer together than this share of the
+            content height, in percent, and leaves the page as it is.
         color_common: Options shared by the grayscale and colour output paths.
         picture_shape: Automatic picture detection for mixed output.
         depth_perception: Distance from the camera to the plane through the
@@ -165,6 +169,7 @@ class Params(BaseModel):
     )
     black_on_white: bool = True
     dewarping: DewarpingOptions = Field(default_factory=DewarpingOptions)
+    dewarp_min_span_percent: int = Field(default=DEFAULT_MIN_SPAN_PERCENT, ge=0, le=100)
     color_common: ColorCommonOptions = Field(default_factory=ColorCommonOptions)
     picture_shape: PictureShapeOptions = Field(default_factory=PictureShapeOptions)
     depth_perception: float = Field(default=2.0, ge=1.0, le=3.0)
@@ -259,6 +264,10 @@ class Params(BaseModel):
     def with_dewarping(self, options: DewarpingOptions) -> Self:
         """Create a copy with different dewarping options."""
         return self.model_copy(update={"dewarping": options})
+
+    def with_dewarp_min_span_percent(self, percent: int) -> Self:
+        """Create a copy with a different minimum span for automatic dewarping."""
+        return self.model_copy(update={"dewarp_min_span_percent": percent})
 
     def with_color_common(self, options: ColorCommonOptions) -> Self:
         """Create a copy with different grayscale and colour options."""

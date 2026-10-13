@@ -20,6 +20,7 @@ from scantailor.core.models import (
 )
 from scantailor.core.settings import Units
 from scantailor.core.stage_sequence import StageSequence
+from scantailor.dewarping import DEFAULT_MIN_SPAN_PERCENT
 from scantailor.filters.deskew.params import AutoManualMode as DeskewMode
 from scantailor.filters.deskew.params import Params as DeskewParams
 from scantailor.filters.output.binarization import BinarizationOptions
@@ -153,6 +154,8 @@ class OutputDefaults(BaseModel):
         picture_shape: Default automatic picture detection.
         splitting: Default layer splitting of mixed output.
         dewarping: Default dewarping options.
+        dewarp_min_span_percent: Default minimum span, as a percentage of the
+            content height, below which automatic dewarping refuses a model.
         depth_perception: Default dewarping depth perception, 1 to 3.
     """
 
@@ -165,6 +168,7 @@ class OutputDefaults(BaseModel):
     picture_shape: PictureShapeOptions = Field(default_factory=PictureShapeOptions)
     splitting: SplittingOptions = Field(default_factory=SplittingOptions)
     dewarping: DewarpingOptions = Field(default_factory=DewarpingOptions)
+    dewarp_min_span_percent: int = Field(default=DEFAULT_MIN_SPAN_PERCENT, ge=0, le=100)
     depth_perception: float = Field(default=2.0, ge=1.0, le=3.0)
 
     def to_params(self) -> OutputParams:
@@ -179,6 +183,7 @@ class OutputDefaults(BaseModel):
             picture_shape=self.picture_shape,
             splitting=self.splitting,
             dewarping=self.dewarping,
+            dewarp_min_span_percent=self.dewarp_min_span_percent,
             depth_perception=self.depth_perception,
         )
 

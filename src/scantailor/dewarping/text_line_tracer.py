@@ -85,10 +85,14 @@ class TextLineResult:
             pixels.
         vertical_bounds (VerticalBounds | None): The content bounds in the input
             image's pixels.
+        traced_count (int): Lines the ridge tracing found before the filters
+            that drop short, stray and doubly bent ones; ``lines`` holds the
+            survivors.
     """
 
     lines: list[NDArray[np.float64]] = field(default_factory=list)
     vertical_bounds: VerticalBounds | None = None
+    traced_count: int = 0
 
 
 def trace_text_lines(
@@ -129,6 +133,7 @@ def trace_text_lines(
     bounds = detect_vert_content_bounds(ink)
 
     polylines = _extract_text_lines(stretch_gray_range(downscaled, 0.0, 0.0), bounds)
+    traced_count = len(polylines)
     polylines = _filter_short_curves(polylines, bounds)
     polylines = _filter_out_of_bounds_curves(polylines, bounds)
 
@@ -147,6 +152,7 @@ def trace_text_lines(
             first=_scale_line(bounds[0], to_original),
             second=_scale_line(bounds[1], to_original),
         ),
+        traced_count=traced_count,
     )
 
 
