@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import pytest
 
+from scantailor.core.transformation import ImageTransformation, render_transformed
 from scantailor.filters.deskew.oblique import (
     build_sausage_mask,
     find_oblique_degrees,
@@ -130,3 +131,28 @@ class TestFindObliqueDegrees:
         find_oblique_degrees(mask)
 
         assert np.array_equal(mask, before)
+
+
+def _lean_of_text_block_edge(page: np.ndarray) -> float:
+    """Lean of the text block's left edge in degrees, positive leaning right."""
+    ink = _binary(page) == 0
+    rows = np.flatnonzero(ink.any(axis=1))
+    left_edges = ink[rows].argmax(axis=1)
+    slope = np.polyfit(rows, left_edges, 1)[0]
+    return float(np.degrees(np.arctan(slope)))
+
+
+class TestCorrectionStraightensThePage:
+    """Shearing by the negated estimate removes the lean the estimate measured."""
+
+    @pytest.mark.parametrize("shear", [-4.0, 4.0])
+    def test_the_remaining_lean_is_well_under_a_degree(self, shear: float):
+        page = sheared_page(shear)
+        found = find_oblique_degrees(_binary(page))
+        assert found is not None
+        xform = ImageTransformation.from_size(page.shape[1], page.shape[0])
+        xform.set_post_oblique(-found)
+
+        corrected = render_transformed(page, xform)
+
+        assert abs(_lean_of_text_block_edge(corrected)) < 1.0
