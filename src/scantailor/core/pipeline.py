@@ -35,7 +35,7 @@ from scantailor.core.transformation import (
     render_transformed,
 )
 from scantailor.core.zones import Zone, ZoneSpline
-from scantailor.dewarping.auto_model import build_auto_distortion_model
+from scantailor.dewarping.auto_model import DewarpMetrics, detect_distortion_model
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
 from scantailor.dewarping.distortion_model import Curve, DistortionModel
 from scantailor.dewarping.marginal_model import build_marginal_model
@@ -83,12 +83,15 @@ class OutputExtras:
         despeckle_dpi: Resolution of ``despeckle_source``, the smaller axis.
         picture_mask: True where the output keeps the original; only for mixed
             output whose pixels are those of ``page`` (not dewarped).
+        dewarp_metrics: What automatic dewarping found on the page; None unless
+            the page is dewarped automatically.
     """
 
     page: NDArray[np.uint8]
     despeckle_source: NDArray[np.uint8] | None
     despeckle_dpi: int
     picture_mask: NDArray[np.bool_] | None = None
+    dewarp_metrics: DewarpMetrics | None = None
 
 
 @dataclass
@@ -109,6 +112,9 @@ class PipelineResult:
             when the output stage did not build one.
         output_extras: What the Output view's tabs show; only when the options
             ask for it and the output stage ran.
+        dewarp_metrics: What automatic dewarping found on the page, whether or
+            not it built a model; None unless the output stage dewarped the
+            page automatically.
     """
 
     image: NDArray[np.uint8]
@@ -120,6 +126,7 @@ class PipelineResult:
     transformation: ImageTransformation | None = None
     distortion_model: DistortionModelSpec | None = None
     output_extras: OutputExtras | None = None
+    dewarp_metrics: DewarpMetrics | None = None
 
 
 @dataclass
@@ -296,6 +303,7 @@ def _run_stages(
     split: SplitImages | None = None
     distortion_model: DistortionModelSpec | None = None
     extras: OutputExtras | None = None
+    dewarp_metrics: DewarpMetrics | None = None
 
     for stage in FilterStage:
         if stage > options.end_stage:
@@ -305,8 +313,8 @@ def _run_stages(
             raise PipelineCancelled
 
         if stage == FilterStage.OUTPUT:
-            stage_meta, generated, distortion_model, extras = _process_output(
-                state, page_id, sequence, options
+            stage_meta, generated, distortion_model, extras, dewarp_metrics = (
+                _process_output(state, page_id, sequence, options)
             )
             if generated is not None:
                 output_image = generated.image
@@ -336,6 +344,7 @@ def _run_stages(
         transformation=state.xform,
         distortion_model=distortion_model,
         output_extras=extras,
+        dewarp_metrics=dewarp_metrics,
     )
 
 
@@ -623,7 +632,13 @@ def _process_output(
     page_id: PageId,
     sequence: StageSequence,
     options: PipelineOptions,
-) -> tuple[dict, OutputResult | None, DistortionModelSpec | None, OutputExtras | None]:
+) -> tuple[
+    dict,
+    OutputResult | None,
+    DistortionModelSpec | None,
+    OutputExtras | None,
+    DewarpMetrics | None,
+]:
     """Process the Output stage.
 
     The view is resampled once, at the output resolution, through the
@@ -633,7 +648,8 @@ def _process_output(
     Returns:
         Tuple of (stage metadata, generated output or None in detect-only mode,
         the distortion model automatic or marginal dewarping built or None,
-        the pictures for the view's tabs or None unless the options ask).
+        the pictures for the view's tabs or None unless the options ask, what
+        automatic dewarping found or None).
     """
     from scantailor.filters.output.generator import generate_output
 
@@ -647,7 +663,7 @@ def _process_output(
     }
 
     if options.detect_only:
-        return metadata, None, None, None
+        return metadata, None, None, None, None
 
     state.scale_to_dpi(params.output_dpi)
     view = state.view()
@@ -704,11 +720,12 @@ def _process_output(
                 min(params.output_dpi.horizontal, params.output_dpi.vertical)
             ),
             picture_mask=_mask_on_page(result.picture_mask, view),
+            dewarp_metrics=found.metrics,
         )
         if options.keep_output_extras
         else None
     )
-    return metadata, result, found.as_source_spec(state), extras
+    return metadata, result, found.as_source_spec(state), extras, found.metrics
 
 
 def _mask_on_page(
@@ -722,9 +739,16 @@ def _mask_on_page(
 
 @dataclass
 class _FoundModel:
-    """The distortion model a dewarper factory built, in view pixels."""
+    """The distortion model a dewarper factory built, in view pixels.
+
+    Attributes:
+        model: The model, once one worked.
+        metrics: What automatic detection found, whether or not it gave a
+            model; None for the other modes.
+    """
 
     model: DistortionModel | None = None
+    metrics: DewarpMetrics | None = None
 
     def dewarper_for(
         self, model: DistortionModel | None, depth: float
@@ -734,6 +758,13 @@ class _FoundModel:
         if dewarper is not None:
             self.model = model
         return dewarper
+
+    def dewarper_for_detected(
+        self, detected: tuple[DistortionModel | None, DewarpMetrics], depth: float
+    ) -> CylindricalSurfaceDewarper | None:
+        """Like ``dewarper_for``, also keeping the metrics of the detection."""
+        model, self.metrics = detected
+        return self.dewarper_for(model, depth)
 
     def as_source_spec(self, state: _PageState) -> DistortionModelSpec | None:
         """Return the model as page edges in source coordinates, or None."""
@@ -760,16 +791,17 @@ def _detected_model(
     dpi: tuple[float, float],
     content: tuple[float, float, float, float],
     spine_on_right: bool,
-    black_on_white: bool,
+    params: Params,
     state: _PageState,
-) -> DistortionModel | None:
+) -> tuple[DistortionModel | None, DewarpMetrics]:
     """Fit the page curvature to its text lines and page edges.
 
     Text lines are traced on ``gray``, the page as laid out for output. The
     page edges are traced on the source image, where the paper still meets its
     surroundings; the view shows margins only. The model comes back in the
-    view's pixels. Returns None when the curves give no valid model; the page
-    is then left undewarped.
+    view's pixels, with what the detection found. The model is None when the
+    curves give no valid model or the model is refused; the page is then left
+    undewarped.
     """
     rect = state.xform.resulting_rect
     view_to_resulting = np.array(
@@ -777,19 +809,26 @@ def _detected_model(
     )
     to_source = state.xform.transform_back @ view_to_resulting
     source_gray = bgr_to_gray(state.source)
-    model = build_auto_distortion_model(
+    detected = detect_distortion_model(
         gray,
         dpi,
         content,
         spine_on_right,
-        edge_gray=source_gray if black_on_white else 255 - source_gray,
+        edge_gray=source_gray if params.black_on_white else 255 - source_gray,
         to_edge_image=to_source[:2],
+        min_span_percent=params.dewarp_min_span_percent,
     )
+    model = detected.model
     if model is None or model.top_curve is None or model.bottom_curve is None:
-        return None
-    return DistortionModel(
-        top_curve=Curve.from_polyline(state.to_view(model.top_curve.polyline)),
-        bottom_curve=Curve.from_polyline(state.to_view(model.bottom_curve.polyline)),
+        return None, detected.metrics
+    return (
+        DistortionModel(
+            top_curve=Curve.from_polyline(state.to_view(model.top_curve.polyline)),
+            bottom_curve=Curve.from_polyline(
+                state.to_view(model.bottom_curve.polyline)
+            ),
+        ),
+        detected.metrics,
     )
 
 
@@ -860,10 +899,8 @@ def _dewarper_source(
     if mode == DewarpingMode.AUTO:
         dpi = (params.output_dpi.horizontal, params.output_dpi.vertical)
         spine_on_right = page_id.sub_page != SubPage.RIGHT_PAGE
-        return lambda gray: found.dewarper_for(
-            _detected_model(
-                gray, dpi, content, spine_on_right, params.black_on_white, state
-            ),
+        return lambda gray: found.dewarper_for_detected(
+            _detected_model(gray, dpi, content, spine_on_right, params, state),
             depth,
         )
     if mode == DewarpingMode.MARGINAL:

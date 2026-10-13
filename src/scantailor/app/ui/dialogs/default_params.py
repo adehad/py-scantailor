@@ -697,6 +697,9 @@ class DefaultParamsDialog(QtWidgets.QDialog):
             self._w(QtWidgets.QComboBox, "dewarpingModeCB"), defaults.dewarping.mode
         )
         self._check("dewarpingPostDeskewCB", defaults.dewarping.post_deskew)
+        self._w(QtWidgets.QSpinBox, "dewarpingMinSpanSB").setValue(
+            defaults.dewarp_min_span_percent
+        )
         self._w(QtWidgets.QSlider, "depthPerceptionSlider").setValue(
             round(defaults.depth_perception * _DEPTH_STEPS_PER_UNIT)
         )
@@ -886,6 +889,9 @@ class DefaultParamsDialog(QtWidgets.QDialog):
                     "post_deskew": self._checked("dewarpingPostDeskewCB"),
                 }
             ),
+            dewarp_min_span_percent=self._w(
+                QtWidgets.QSpinBox, "dewarpingMinSpanSB"
+            ).value(),
             depth_perception=self._w(QtWidgets.QSlider, "depthPerceptionSlider").value()
             / _DEPTH_STEPS_PER_UNIT,
         )

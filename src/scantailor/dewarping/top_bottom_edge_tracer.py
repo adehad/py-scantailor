@@ -5,6 +5,10 @@ A minimax shortest path search over the directional derivative of the image
 little low-contrast ground as possible. Each of the two best paths is turned
 into a snake that is first slid downhill into the blurred gradient's valley,
 then uphill onto its ridge, which is where the edge lies.
+
+A straight edge that hugs the first or the last row of the image is the scan's
+own border, not the paper's edge, and is left out. Upstream keeps it, and then
+often prefers it to the last text line, which flattens the bottom of the model.
 """
 
 import math
@@ -51,6 +55,13 @@ _UPHILL_STAY_PENALTY_LEVEL = -0.02
 _STAY_PENALTY = 100.0
 _FLAT_ENERGY_LEVEL = 0.01
 
+# The scanner's border is a band of a few dozen rows on a 3000-row scan; a
+# paper edge that close to the image border is kept only when it bends, as a
+# bent page's edge does. Distances are in pixels of the traced (shrunk) image.
+_BORDER_BAND_FRACTION = 0.015
+_MIN_BORDER_BAND = 3.0
+_MAX_BORDER_BEND = 2.0
+
 _NEIGHBOUR_VECTORS = np.array(
     [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]],
     dtype=np.int64,
@@ -71,6 +82,8 @@ def trace_top_bottom_edges(
         list[NDArray[np.float64]]: Up to two curves, each of shape ``(n, 2)``,
             in the pixels of ``gray``. They run from the second bound towards
             the first. Empty when the bounds are degenerate or miss the image.
+            A straight curve along the first or last row of the image is not
+            returned; see ``is_image_border``.
     """
     first, second = bounds
     if first[0] == first[1] or second[0] == second[1]:
@@ -124,8 +137,44 @@ def trace_top_bottom_edges(
     for snake in snakes:
         down = _down_the_hill_direction(scaled_width, scaled_height, snake, avg_dir)
         refined = _run_snake(snake, absolute, (-down[0], -down[1]), uphill=True)
+        if is_image_border(refined, scaled_height):
+            continue
         result.append(refined * np.array([1.0 / factor_x, 1.0 / factor_y]))
     return result
+
+
+def is_image_border(curve: NDArray[np.float64], height: int) -> bool:
+    """Tell a straight curve along the first or last row of the image.
+
+    Args:
+        curve (NDArray[np.float64]): Knots of a traced edge, shape ``(n, 2)``,
+            in the pixels of the traced image.
+        height (int): Rows of the traced image.
+
+    Returns:
+        bool: True when every knot lies within 1.5 percent of the image height
+            (at least 3 pixels) of the first or the last row and the knots
+            deviate from their best-fit line by at most 2 pixels.
+    """
+    if len(curve) == 0:
+        return False
+    band = max(_MIN_BORDER_BAND, _BORDER_BAND_FRACTION * height)
+    ys = curve[:, 1]
+    hugs_top = float(ys.max()) < band
+    hugs_bottom = float(ys.min()) > height - 1 - band
+    if not (hugs_top or hugs_bottom):
+        return False
+    return _bend(curve) <= _MAX_BORDER_BEND
+
+
+def _bend(curve: NDArray[np.float64]) -> float:
+    """Largest distance of a knot from the least-squares line through the knots."""
+    xs = curve[:, 0]
+    ys = curve[:, 1]
+    if len(curve) < 3 or float(np.ptp(xs)) < 1.0:
+        return float(np.ptp(ys))
+    slope, intercept = np.polyfit(xs, ys, 1)
+    return float(np.abs(ys - (slope * xs + intercept)).max())
 
 
 def _fit_size(width: int, height: int, side: int) -> tuple[int, int]:

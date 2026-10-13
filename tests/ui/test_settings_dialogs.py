@@ -505,6 +505,31 @@ class TestDefaultParamsDialog:
         assert dialog.get_params().page_layout.alignment.is_null
         assert dialog.get_params() == params
 
+    def test_dewarp_minimum_span_round_trips_through_a_saved_profile(
+        self, qtbot: QtBot, config: pathlib.Path
+    ) -> None:
+        store = ProfileStore(config / "profiles")
+        dialog = self.make(qtbot, config)
+
+        def edit(dlg: QtWidgets.QDialog) -> None:
+            box = find(dlg, QtWidgets.QComboBox, "profileCB")
+            box.setCurrentIndex(box.count() - 1)
+            spin = find(dlg, QtWidgets.QSpinBox, "dewarpingMinSpanSB")
+            assert spin.value() == DefaultParams().output.dewarp_min_span_percent
+            assert (spin.minimum(), spin.maximum()) == (0, 100)
+            spin.setValue(25)
+            box.setEditText("Flat books")
+            find(dlg, QtWidgets.QPushButton, "profileSaveButton").click()
+            accept(dlg)
+
+        exec_while(dialog, edit)
+        assert store.read("Flat books").output.dewarp_min_span_percent == 25
+
+        reopened = DefaultParamsDialog(settings=ApplicationSettings.load(), store=store)
+        qtbot.addWidget(reopened)
+        assert find(reopened, QtWidgets.QSpinBox, "dewarpingMinSpanSB").value() == 25
+        assert reopened.get_params().output.dewarp_min_span_percent == 25
+
     def test_custom_profile_name_may_not_be_reserved(
         self, qtbot: QtBot, config: pathlib.Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
