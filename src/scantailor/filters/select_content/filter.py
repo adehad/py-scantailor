@@ -13,25 +13,67 @@ from .detection import ContentDetectionMode, PageDetectionMode
 from .params import Params
 from .settings import Settings
 
-_OUTLINE_TOLERANCE_PX = 1e-3
+_VIEW_TOLERANCE = 1e-3
 
 
-def _outline_moved(
-    stored: Sequence[tuple[float, float]], current: Sequence[tuple[float, float]]
-) -> bool:
-    """Whether the page outline differs from the one the boxes were made for."""
-    if not stored:
-        return False
-    if len(stored) != len(current):
-        return True
-    return not np.allclose(stored, current, atol=_OUTLINE_TOLERANCE_PX)
+def _view_change(
+    stored: Sequence[Sequence[float]], current: NDArray[np.float64] | None
+) -> NDArray[np.float64] | None:
+    """Map from the view the boxes were drawn in to the current view.
+
+    Args:
+        stored (Sequence[Sequence[float]]): 3x3 source-to-view matrix recorded
+            with the boxes; empty when unknown.
+        current (NDArray[np.float64] | None): 3x3 source-to-view matrix of the
+            image being processed.
+
+    Returns:
+        NDArray[np.float64] | None: 3x3 matrix taking old view pixels to new
+        view pixels, or None when either view is unknown or they are the same.
+    """
+    if not stored or current is None:
+        return None
+    old = np.asarray(stored, dtype=np.float64)
+    new = np.asarray(current, dtype=np.float64)
+    if old.shape != (3, 3) or new.shape != (3, 3):
+        return None
+    if np.allclose(old, new, atol=_VIEW_TOLERANCE):
+        return None
+    return np.asarray(new @ np.linalg.inv(old), dtype=np.float64)
 
 
-def _moved_with_page(content: ContentBox, old: PageBox, new: PageBox) -> ContentBox:
-    """Translate a content box by how far the page box's centre moved."""
-    dx = (new.x + new.width / 2) - (old.x + old.width / 2)
-    dy = (new.y + new.height / 2) - (old.y + old.height / 2)
-    return content.model_copy(update={"x": content.x + dx, "y": content.y + dy})
+def _mapped_box(box: ContentBox, to_new_view: NDArray[np.float64]) -> ContentBox:
+    """Bounding box of ``box`` after its corners are mapped into the new view."""
+    corners = np.array(
+        [
+            [box.x, box.y, 1.0],
+            [box.right, box.y, 1.0],
+            [box.right, box.bottom, 1.0],
+            [box.x, box.bottom, 1.0],
+        ]
+    )
+    mapped = corners @ to_new_view.T
+    xs, ys = mapped[:, 0], mapped[:, 1]
+    return ContentBox(
+        x=float(xs.min()),
+        y=float(ys.min()),
+        width=float(xs.max() - xs.min()),
+        height=float(ys.max() - ys.min()),
+    )
+
+
+def _mapped_page_box(
+    box: PageBox, to_new_view: NDArray[np.float64], width: int, height: int
+) -> PageBox:
+    """Map a page box into the new view and clip it to the image.
+
+    A box that lands entirely outside the image is replaced by the image.
+    """
+    image = ContentBox(x=0.0, y=0.0, width=float(width), height=float(height))
+    mapped = _mapped_box(box.to_content_box(), to_new_view).intersection(image)
+    if mapped.is_empty():
+        return PageBox.from_image_size(width, height)
+    return PageBox(x=mapped.x, y=mapped.y, width=mapped.width, height=mapped.height)
 
 
 class Filter:
@@ -155,13 +197,15 @@ class Filter:
         dpi: float = 300.0,
         outside: NDArray[np.bool_] | None = None,
         page_outline: Sequence[tuple[float, float]] | None = None,
+        view_transform: NDArray[np.float64] | None = None,
     ) -> Params:
         """Process an image to detect content and page boundaries.
 
         Respects detection modes - only runs auto-detection when mode is AUTO.
-        A manual content box follows the page box when the page outline moved
-        since the boxes were made: it is translated by the shift of the page
-        box's centre.
+        Hand-drawn boxes stay on the content they were drawn around: when the
+        view has changed since they were drawn (a split cutter or the deskew
+        angle moved), each is mapped from the old view into the new one and
+        then clipped.
 
         Args:
             image: Grayscale or color image.
@@ -171,17 +215,17 @@ class Filter:
                 behind them; content detection treats them as shadow.
             page_outline: Outline of the page in the coordinates of ``image``;
                 remembered so that a later change of it can be told.
+            view_transform: 3x3 matrix from the source image's pixels to those
+                of ``image``; remembered so that hand-drawn boxes can follow a
+                later change of view.
 
         Returns:
             Updated parameters with detected/stored boxes.
         """
         params = self.get_params(page_id)
         h, w = image.shape[:2]
-        old_page_box = params.page_box
         outline = [] if page_outline is None else list(page_outline)
-        outline_moved = _outline_moved(
-            params.dependencies.rotated_page_outline, outline
-        )
+        to_new_view = _view_change(params.dependencies.view_transform, view_transform)
 
         # Handle page detection
         if params.is_page_auto():
@@ -191,16 +235,19 @@ class Filter:
             page_box = PageBox.from_image_size(w, h)
             params = params.with_page_box(page_box, PageDetectionMode.DISABLED)
             self.set_params(page_id, params)
+        elif to_new_view is not None and not params.page_box.is_empty():
+            page_box = _mapped_page_box(params.page_box, to_new_view, w, h)
+            params = params.with_page_box(page_box)
+            self.set_params(page_id, params)
 
         if (
-            outline_moved
+            to_new_view is not None
             and params.is_content_manual()
             and not params.content_box.is_empty()
-            and not old_page_box.is_empty()
-            and not params.page_box.is_empty()
         ):
-            moved = _moved_with_page(params.content_box, old_page_box, params.page_box)
-            params = params.with_content_box(moved)
+            params = params.with_content_box(
+                _mapped_box(params.content_box, to_new_view)
+            )
 
         # Handle content detection
         if params.is_content_auto():
@@ -234,6 +281,11 @@ class Filter:
                         "page_detection_mode": params.page_detection_mode,
                         "fine_tune_corners": params.fine_tune_corners,
                         "rotated_page_outline": outline,
+                        "view_transform": (
+                            []
+                            if view_transform is None
+                            else np.asarray(view_transform, dtype=np.float64).tolist()
+                        ),
                     }
                 ),
             }
