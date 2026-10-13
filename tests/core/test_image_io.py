@@ -235,7 +235,7 @@ def test_missing_file_raises_file_not_found(tmp_path: Path) -> None:
     [
         ("x.bmp", np.zeros((2, 2), np.uint8)),
         ("x.tif", np.zeros((2, 2), np.float32)),
-        ("x.tif", np.zeros((2, 2, 4), np.uint8)),
+        ("x.tif", np.zeros((2, 2, 5), np.uint8)),
     ],
 )
 def test_write_rejects_unsupported_input(
