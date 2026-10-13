@@ -11,11 +11,13 @@ import pytest
 
 from scantailor.core.batch import output_file_names
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
+from scantailor.core.pdf_source import PdfSource
 from scantailor.core.project import (
     DpiStatus,
     ImageInfo,
     ImageMetadata,
     OutputFileLabel,
+    PageTextGeometry,
     Project,
     StageParamsEntry,
 )
@@ -692,3 +694,74 @@ class TestOutputFileLabels:
         project.remap_image_paths(lambda path: tmp_path / "moved" / path.name)
 
         assert project.output_file_label_map() == {tmp_path / "moved" / "x.png": 0}
+
+
+class TestPdfSourceAndTextGeometry:
+    @staticmethod
+    def _page(path: Path) -> PageId:
+        return PageId(image_id=ImageId(file_path=path), sub_page=SubPage.SINGLE_PAGE)
+
+    def test_the_pdf_source_round_trips_with_relative_paths(self, tmp_path: Path):
+        pdf = tmp_path / "scans" / "book.pdf"
+        project = Project(
+            output_directory=tmp_path / "out",
+            pdf_source=PdfSource(pdf_path=pdf, dpi=300, pages={"page_0001.png": 0}),
+        )
+        project_file = tmp_path / "p.json"
+
+        project.save(project_file)
+        stored = json.loads(project_file.read_text(encoding="utf-8"))
+        loaded = Project.load(project_file)
+
+        assert stored["pdf_source"]["pdf_path"] == "scans/book.pdf"
+        assert loaded.pdf_source == project.pdf_source
+
+    def test_text_geometry_round_trips_with_relative_paths(self, tmp_path: Path):
+        image = tmp_path / "pages" / "page_0001.png"
+        page = self._page(image)
+        project = Project(output_directory=tmp_path / "out")
+        project.add_image(ImageId(file_path=image))
+        project.set_text_geometry(page, {"matrix": [1.0], "rect_x": 0.0})
+        project_file = tmp_path / "p.json"
+
+        project.save(project_file)
+        stored = json.loads(project_file.read_text(encoding="utf-8"))
+        loaded = Project.load(project_file)
+
+        assert stored["text_geometry"][0]["page"]["image_id"]["file_path"] == (
+            "pages/page_0001.png"
+        )
+        assert loaded.text_geometry_of(page) == {"matrix": [1.0], "rect_x": 0.0}
+
+    def test_setting_the_geometry_of_a_page_again_replaces_it(self, tmp_path: Path):
+        page = self._page(tmp_path / "a.png")
+        project = Project()
+
+        project.set_text_geometry(page, {"rect_x": 1.0})
+        project.set_text_geometry(page, {"rect_x": 2.0})
+
+        assert project.text_geometry == [
+            PageTextGeometry(page=page, geometry={"rect_x": 2.0})
+        ]
+
+    def test_removing_a_page_drops_its_geometry(self, tmp_path: Path):
+        first, second = self._page(tmp_path / "a.png"), self._page(tmp_path / "b.png")
+        project = Project()
+        project.add_image(first.image_id)
+        project.add_image(second.image_id)
+        project.set_text_geometry(first, {"rect_x": 1.0})
+        project.set_text_geometry(second, {"rect_x": 2.0})
+
+        project.remove_pages([first])
+
+        assert project.text_geometry_of(first) is None
+        assert project.text_geometry_of(second) == {"rect_x": 2.0}
+
+    def test_a_project_file_without_either_loads_with_none(self, tmp_path: Path):
+        project_file = tmp_path / "old.json"
+        project_file.write_text(json.dumps({"version": 1}), encoding="utf-8")
+
+        project = Project.load(project_file)
+
+        assert project.pdf_source is None
+        assert project.text_geometry == []

@@ -1,6 +1,6 @@
 """Select Content filter implementation."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Hashable, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -119,8 +119,9 @@ class Filter:
         page_id: PageId,
         dpi: float = 300.0,
         store_result: bool = True,
-        outside: NDArray[np.bool_] | None = None,
+        outside: NDArray[np.bool_] | Callable[[], NDArray[np.bool_]] | None = None,
         page_box: ContentBox | None = None,
+        outside_key: Hashable | None = None,
     ) -> ContentDetectionResult:
         """Detect content boundaries in an image.
 
@@ -132,11 +133,19 @@ class Filter:
             outside: Mask of the pixels that have no source pixel behind them
                 (corners exposed by a rotation); they are treated as shadow.
             page_box: Area of the page in pixels of ``image``.
+            outside_key: Identifies a callable ``outside`` so that it is only
+                called when the detection is not already remembered.
 
         Returns:
             ContentDetectionResult with detected box and confidence.
         """
-        result = find_content_box(image, dpi=dpi, page_box=page_box, outside=outside)
+        result = find_content_box(
+            image,
+            dpi=dpi,
+            page_box=page_box,
+            outside=outside,
+            outside_key=outside_key,
+        )
 
         if store_result:
             params = self.get_params(page_id)
@@ -195,7 +204,8 @@ class Filter:
         image: NDArray[np.uint8],
         page_id: PageId,
         dpi: float = 300.0,
-        outside: NDArray[np.bool_] | None = None,
+        outside: NDArray[np.bool_] | Callable[[], NDArray[np.bool_]] | None = None,
+        outside_key: Hashable | None = None,
         page_outline: Sequence[tuple[float, float]] | None = None,
         view_transform: NDArray[np.float64] | None = None,
     ) -> Params:
@@ -212,7 +222,10 @@ class Filter:
             page_id: Page identifier.
             dpi: Image resolution.
             outside: Mask of the pixels of ``image`` that have no source pixel
-                behind them; content detection treats them as shadow.
+                behind them, or a function making it; content detection
+                treats them as shadow.
+            outside_key: Identifies the mask a function ``outside`` makes, so
+                that it is only made when detection must run.
             page_outline: Outline of the page in the coordinates of ``image``;
                 remembered so that a later change of it can be told.
             view_transform: 3x3 matrix from the source image's pixels to those
@@ -257,6 +270,7 @@ class Filter:
                 dpi=dpi,
                 outside=outside,
                 page_box=params.page_box.to_content_box(),
+                outside_key=outside_key,
             )
             params = self.get_params(page_id)
         elif params.is_content_disabled():

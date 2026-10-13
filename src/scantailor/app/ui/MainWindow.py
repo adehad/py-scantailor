@@ -54,6 +54,7 @@ from scantailor.app.ui.pdf_worker import (
     PdfExportResult,
     PdfJob,
     PdfSource,
+    StoredTextRequest,
     TextRequest,
     export_pdf_pages,
     import_pdf_pages,
@@ -73,6 +74,7 @@ from scantailor.core.batch import (
     RenderInfo,
     erase_output_files,
     output_file_names,
+    rename_split_outputs,
 )
 from scantailor.core.default_params import apply_default_params
 from scantailor.core.default_params_profiles import (
@@ -87,6 +89,7 @@ from scantailor.core.filename_ordering import sort_smart
 from scantailor.core.image_io import ImageLoadError, list_image_pages
 from scantailor.core.models import Dpi, ImageId, PageId
 from scantailor.core.page_source import DpiOverrides, dpi_overrides_of
+from scantailor.core.pipeline import OutputExtras
 from scantailor.core.project import ImageInfo, ImageMetadata, LayoutDirection, Project
 from scantailor.core.recent_projects import RecentProjects
 from scantailor.core.relinker import Relinker, image_directories
@@ -98,6 +101,7 @@ from scantailor.core.stage_params import (
     collect_stage_params,
 )
 from scantailor.core.stage_sequence import FilterStage, StageSequence
+from scantailor.core.text_layer import TextGeometry
 from scantailor.core.xml_compat import import_xml_project_file
 from scantailor.filters.output.params import ApplyGroup, DistortionModelSpec
 from scantailor.filters.page_layout.settings import MARGIN_SIDES
@@ -311,6 +315,7 @@ class MainWindowManager:
         self.renderer = PageRenderer(self.ui)
         self.renderer.render_done.connect(self._on_render_done)
         self.renderer.distortion_model_found.connect(self._on_distortion_model_found)
+        self.renderer.output_extras_found.connect(self._on_output_extras_found)
         self.renderer.render_failed.connect(self._on_render_failed)
         self._render_pending = False
         self._thumbnail_epoch = 0
@@ -571,13 +576,18 @@ class MainWindowManager:
         self._rebuild_recent_menu()
 
     def _render_page_thumbnail(self, page: PageId, stage: str) -> QtGui.QImage:
-        """Render a thumbnail on a worker thread; settings are only read."""
+        """Render a thumbnail on a worker thread; settings are only read.
+
+        The render the user is waiting for goes first.
+        """
+        self.renderer.wait_until_idle()
         return render_thumbnail(
             page,
             self.stages,
             FilterStage(int(stage)),
             self.thumbnails.render_size,
             self._dpi_overrides,
+            self.renderer.sources,
         )
 
     def _refresh_dpi_overrides(self) -> None:
@@ -935,6 +945,7 @@ class MainWindowManager:
             self._adopt_stored_page_counts([info.id for info in self.project.images])
         self.thumbnails.set_stage(str(int(stage)))
         panels = StagePanels(stage, self.stages, self.ui)
+        panels.set_source_cache(self.renderer.sources)
         panels.set_dpi_overrides(self._dpi_overrides)
         panels.settings_changed.connect(self._on_settings_edited)
         panels.page_size_changed.connect(self.status_panel.set_page_size)
@@ -1195,7 +1206,12 @@ class MainWindowManager:
         self._show_not_ready(False)
         self._set_render_pending(True)
         self.renderer.request(
-            self._current_page, self.stages, panels.stage, self._dpi_overrides
+            self._current_page,
+            self.stages,
+            panels.stage,
+            self._dpi_overrides,
+            pixels=panels.stage == FilterStage.OUTPUT,
+            extras=panels.stage == FilterStage.OUTPUT,
         )
 
     def _cancel_render(self) -> None:
@@ -1242,6 +1258,10 @@ class MainWindowManager:
                 return
         if self._panels is not None and page_id == self._current_page:
             self._panels.show_image(image)  # type: ignore[arg-type]
+
+    def _on_output_extras_found(self, page_id: PageId, extras: OutputExtras) -> None:
+        if self._panels is not None and page_id == self._current_page:
+            self._panels.set_output_extras(extras)
 
     def _on_distortion_model_found(
         self, page_id: PageId, model: DistortionModelSpec
@@ -1609,6 +1629,17 @@ class MainWindowManager:
     def _on_batch_finished(self, result: BatchResult) -> None:
         self.last_batch_result = result
         self._render_info.update(result.render_info)
+        if self.project is not None:
+            for page, info in result.render_info.items():
+                self.project.set_text_geometry(
+                    page,
+                    TextGeometry.of(
+                        info.transformation,
+                        info.output_dpi,
+                        dewarped=info.was_dewarped,
+                        dewarp=info.dewarp,
+                    ).model_dump(mode="json"),
+                )
         self._set_batch_ui(False)
         if self.batch_dialog is not None:
             self.batch_dialog.finish(result)
@@ -1701,7 +1732,9 @@ class MainWindowManager:
         if not pages:
             return
         pages_dir = imported.images[0].parent
-        project = Project(output_directory=pages_dir / "out")
+        project = Project(
+            output_directory=pages_dir / "out", pdf_source=imported.source
+        )
         for image_id, metadata in pages:
             project.add_image(image_id, metadata)
         _create_directory(project.output_directory)
@@ -1762,9 +1795,10 @@ class MainWindowManager:
 
         Returns:
             PdfExportRequest: Plain data; a page carries text only when its
-            geometry is known from a batch run in this session.
+            geometry is known from a batch run, in this session or a saved one.
         """
-        source = self.pdf_source if options.carry_text else None
+        source = self.pdf_source
+        carries_text = source is not None and options.carry_text
         output_settings = self.stages.output_filter.settings
         plans: list[PagePlan] = []
         for page, file in files.items():
@@ -1773,11 +1807,23 @@ class MainWindowManager:
                 info.output_dpi if info else output_settings.get_params(page).output_dpi
             )
             text = None
-            index = source.page_index(page.image_id.file_path) if source else None
+            index = (
+                source.page_index(page.image_id.file_path)
+                if source is not None and carries_text
+                else None
+            )
             if index is not None and info is not None:
                 text = TextRequest(
-                    index, info.transformation, info.output_dpi, info.was_dewarped
+                    index,
+                    info.transformation,
+                    info.output_dpi,
+                    info.was_dewarped,
+                    info.dewarp,
                 )
+            elif index is not None and self.project is not None:
+                stored = self.project.text_geometry_of(page)
+                if stored is not None:
+                    text = StoredTextRequest(index, TextGeometry.model_validate(stored))
             plans.append(
                 PagePlan(file, (float(dpi.horizontal), float(dpi.vertical)), text)
             )
@@ -1787,6 +1833,7 @@ class MainWindowManager:
             options.bilevel_codec,
             options.jpeg_quality,
             source,
+            carry_text=options.carry_text,
         )
 
     def _on_pdf_exported(self, result: PdfExportResult) -> None:
@@ -2188,7 +2235,15 @@ class MainWindowManager:
         if project is None or self.batch_runner.is_running:
             return
         selected = self.thumbnails.selected_pages()
-        project.layout_direction = "RTL" if project.layout_direction == "LTR" else "LTR"
+        previous = project.layout_direction
+        project.layout_direction = "RTL" if previous == "LTR" else "LTR"
+        rename_split_outputs(
+            project.output_directory,
+            project.get_pages(),
+            previous,
+            project.layout_direction,
+            project.output_file_label_map(),
+        )
         self.modified = True
         self._invalidate_thumbnails()
         self._refresh_page_list()
@@ -2444,13 +2499,16 @@ class MainWindowManager:
             modified (bool): Whether the project has unsaved changes.
         """
         self._discard_panels()
+        self.renderer.sources.clear()
         self._thumbnail_epoch += 1
         self.project = project
         self._refresh_dpi_overrides()
         self.stages = stages
         self.thumbnails.set_project(project)
         self.projectFile = str(project_file) if project_file else ""
-        self.pdf_source = PdfSource.find(info.id.file_path for info in project.images)
+        self.pdf_source = project.pdf_source or PdfSource.find(
+            info.id.file_path for info in project.images
+        )
         self._render_info = {}
         self._modified = modified
         self._saved_state = None if modified else self._state_snapshot()
@@ -2639,6 +2697,7 @@ class MainWindowManager:
     def _close_project_without_saving(self) -> None:
         """Drop the project and reset the window to its empty state."""
         self._discard_panels()
+        self.renderer.sources.clear()
         self._thumbnail_epoch += 1
         self.project = None
         self._refresh_dpi_overrides()

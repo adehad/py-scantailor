@@ -2,7 +2,7 @@
 
 import os
 import threading
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import ExitStack
 from dataclasses import dataclass, field
@@ -10,77 +10,30 @@ from pathlib import Path
 
 import pypdfium2 as pdfium
 from loguru import logger
-from pydantic import BaseModel, Field
 from PySide6 import QtCore
 
 from scantailor.core.batch import pool_size, spawn_pool
 from scantailor.core.models import Dpi
 from scantailor.core.pdf_export import BilevelCodec, export_pdf
 from scantailor.core.pdf_import import import_pdf
-from scantailor.core.text_layer import TextLayer, TextLayerJob, build_text_layers
+from scantailor.core.pdf_pool import PdfCancelled
+from scantailor.core.pdf_source import SOURCE_FILE_NAME, PdfSource
+from scantailor.core.text_layer import (
+    DewarpSpec,
+    TextGeometry,
+    TextLayer,
+    TextLayerJob,
+    build_text_layers,
+)
 from scantailor.core.transformation import ImageTransformation
 
-SOURCE_FILE_NAME = "pdf_source.json"
-_PAGE_POLL_SECONDS = 0.1
+__all__ = ["SOURCE_FILE_NAME", "PdfSource"]
+
 # Spawning workers costs seconds, which a short document never earns back.
 _POOL_MIN_PAGES = 8
 
 Report = Callable[[int, int, str], None]
 Work = Callable[[Report, threading.Event], object]
-
-
-class JobCancelled(Exception):
-    """Raised by work that noticed its cancel event and stopped."""
-
-
-class PdfSource(BaseModel):
-    """Where a project's page images came from, stored beside the images.
-
-    Attributes:
-        pdf_path: The PDF the pages were rendered from.
-        dpi: Resolution the pages were rendered at.
-        pages: Zero-based PDF page index per image file name.
-    """
-
-    pdf_path: Path
-    dpi: int = Field(gt=0)
-    pages: dict[str, int] = Field(default_factory=dict)
-
-    def save(self, directory: Path) -> None:
-        """Write the mapping into ``directory``."""
-        (directory / SOURCE_FILE_NAME).write_text(
-            self.model_dump_json(indent=2), encoding="utf-8"
-        )
-
-    @classmethod
-    def load(cls, directory: Path) -> "PdfSource | None":
-        """Read the mapping stored in ``directory``; None when absent or unreadable."""
-        path = directory / SOURCE_FILE_NAME
-        try:
-            return cls.model_validate_json(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return None
-
-    @classmethod
-    def find(cls, image_files: Iterable[Path]) -> "PdfSource | None":
-        """Return the first mapping stored beside any of ``image_files``."""
-        seen: set[Path] = set()
-        for file in image_files:
-            if file.parent in seen:
-                continue
-            seen.add(file.parent)
-            if (source := cls.load(file.parent)) is not None:
-                return source
-        return None
-
-    def page_index(self, image_file: Path) -> int | None:
-        """Return the PDF page an image file was rendered from, if it was."""
-        return self.pages.get(image_file.name)
-
-    @property
-    def is_available(self) -> bool:
-        """Whether the PDF still exists, so its text can be read."""
-        return self.pdf_path.is_file()
 
 
 @dataclass(frozen=True)
@@ -101,51 +54,41 @@ def import_pdf_pages(
 ) -> ImportedPdf:
     """Render a PDF into ``out_dir`` and record where the images came from.
 
-    ``import_pdf`` cannot be interrupted, so progress is read from the files it
-    leaves behind and a cancel takes effect once the rendering call returns, when
-    its files are removed again.
+    Pages are rendered beside ``out_dir`` and moved in only when all are done,
+    so a cancel leaves the folder, and any earlier import in it, as it was.
 
     Args:
         pdf_path (Path): Source PDF.
         out_dir (Path): Directory for the page images.
         dpi (int): Rendering resolution.
         report (Report): Receives ``(done, total, text)``.
-        cancel (threading.Event): Set to discard the result.
+        cancel (threading.Event): Set to stop and discard the result.
 
     Returns:
         ImportedPdf: The images and their mapping, which is also saved in ``out_dir``.
 
     Raises:
-        JobCancelled: If ``cancel`` was set.
+        PdfCancelled: If ``cancel`` was set.
         ValueError: If the PDF is unreadable or has no pages.
     """
     total = _page_count(pdf_path)
-    finished = threading.Event()
-
-    def watch_files() -> None:
-        while not finished.wait(_PAGE_POLL_SECONDS):
-            report(sum(1 for _ in out_dir.glob("page_*.png")), total, "Rendering")
-
-    watcher = threading.Thread(target=watch_files, daemon=True)
-    watcher.start()
-    try:
-        with ExitStack() as stack:
-            pool = _pool_if_worth_it(stack, total)
-            images = import_pdf(pdf_path, out_dir, dpi, executor=pool)
-    finally:
-        finished.set()
-        watcher.join()
-    if cancel.is_set():
-        for image in images:
-            image.unlink(missing_ok=True)
-        raise JobCancelled
+    report(0, total, "Rendering")
+    with ExitStack() as stack:
+        pool = _pool_if_worth_it(stack, total)
+        images = import_pdf(
+            pdf_path,
+            out_dir,
+            dpi,
+            executor=pool,
+            cancel=cancel,
+            on_page=lambda done, count: report(done, count, "Rendering"),
+        )
     source = PdfSource(
         pdf_path=pdf_path,
         dpi=dpi,
         pages={image.name: index for index, image in enumerate(images)},
     )
     source.save(out_dir)
-    report(len(images), len(images), "Rendering")
     return ImportedPdf(source, images)
 
 
@@ -169,12 +112,27 @@ class TextRequest:
         transformation: Source pixels to output pixels.
         output_dpi: Resolution of the output image.
         dewarped: True when the output was dewarped.
+        dewarp: How it was dewarped; without it a dewarped page has no text.
     """
 
     page_index: int
     transformation: ImageTransformation
     output_dpi: Dpi
     dewarped: bool
+    dewarp: DewarpSpec | None = None
+
+
+@dataclass(frozen=True)
+class StoredTextRequest:
+    """Like ``TextRequest``, from geometry that was saved with the project.
+
+    Attributes:
+        page_index: Zero-based page of the source PDF.
+        geometry: How the output page relates to its source page.
+    """
+
+    page_index: int
+    geometry: TextGeometry
 
 
 @dataclass(frozen=True)
@@ -189,7 +147,7 @@ class PagePlan:
 
     image: Path
     dpi: tuple[float, float]
-    text: TextRequest | None = None
+    text: TextRequest | StoredTextRequest | None = None
 
 
 @dataclass(frozen=True)
@@ -201,7 +159,9 @@ class PdfExportRequest:
         out_path: Destination PDF.
         bilevel_codec: Codec of black and white pages.
         jpeg_quality: JPEG quality of grey and colour pages.
-        source: Mapping to the source PDF; needed only for text.
+        source: The PDF the project's pages came from, if any. It is never
+            overwritten, and its bookmarks and page labels are carried over.
+        carry_text: Whether to carry the source PDF's text onto the pages.
     """
 
     pages: list[PagePlan]
@@ -209,6 +169,7 @@ class PdfExportRequest:
     bilevel_codec: BilevelCodec = "jbig2"
     jpeg_quality: int = 85
     source: PdfSource | None = None
+    carry_text: bool = True
 
 
 @dataclass
@@ -237,7 +198,8 @@ def export_pdf_pages(
 
     Args:
         request (PdfExportRequest): The pages and options.
-        report (Report): Receives ``(done, total, text)``.
+        report (Report): Receives ``(done, total, text)``: while pages are
+            encoded on a pool, while each is added to the PDF, and when it is saved.
         cancel (threading.Event): Set to stop; checked between pages and before
             the file is moved into place.
 
@@ -245,7 +207,8 @@ def export_pdf_pages(
         PdfExportResult: Page and text layer counts.
 
     Raises:
-        JobCancelled: If ``cancel`` was set.
+        PdfCancelled: If ``cancel`` was set.
+        ValueError: If the destination is the source PDF.
     """
     if request.source is not None and _same_file(
         request.out_path, request.source.pdf_path
@@ -258,10 +221,9 @@ def export_pdf_pages(
         pool = _pool_if_worth_it(stack, total)
         layers = _text_layers_of(request, pool)
         if cancel.is_set():
-            raise JobCancelled
+            raise PdfCancelled
         carries_text = any(layer is not None for layer in layers)
-        report(total, total, "Writing PDF")
-        _write_pdf(request, layers if carries_text else None, pool, cancel)
+        _write_pdf(request, layers if carries_text else None, pool, cancel, report)
     logger.info("Exported {} pages to {}", total, request.out_path)
     return PdfExportResult(
         request.out_path, total, sum(layer is not None for layer in layers)
@@ -279,6 +241,7 @@ def _write_pdf(
     layers: list[TextLayer | None] | None,
     pool: ProcessPoolExecutor | None,
     cancel: threading.Event,
+    report: Report,
 ) -> None:
     partial = request.out_path.with_name(request.out_path.name + ".part")
     try:
@@ -289,39 +252,53 @@ def _write_pdf(
             colour_quality=request.jpeg_quality,
             text_layers=layers,
             executor=pool,
+            cancel=cancel,
+            on_progress=report,
+            outline_source=_outline_source(request),
         )
         if cancel.is_set():
-            raise JobCancelled
+            raise PdfCancelled
         os.replace(partial, request.out_path)
     finally:
         partial.unlink(missing_ok=True)
 
 
+def _outline_source(request: PdfExportRequest) -> Path | None:
+    source = request.source
+    return source.pdf_path if source is not None and source.is_available else None
+
+
 def _text_layers_of(
     request: PdfExportRequest, pool: ProcessPoolExecutor | None
 ) -> list[TextLayer | None]:
-    source = request.source
+    source = request.source if request.carry_text else None
     jobs: list[TextLayerJob] = []
     positions: list[int] = []
     for position, page in enumerate(request.pages):
         if source is None or page.text is None:
             continue
-        jobs.append(
-            TextLayerJob.of(
-                source.pdf_path,
-                page.text.page_index,
-                page.text.transformation,
-                Dpi.uniform(source.dpi),
-                page.text.output_dpi,
-                dewarped=page.text.dewarped,
-            )
-        )
+        jobs.append(_text_job(source, page.text))
         positions.append(position)
     built = build_text_layers(jobs, executor=pool)
     layers: list[TextLayer | None] = [None] * len(request.pages)
     for position, layer in zip(positions, built, strict=True):
         layers[position] = layer
     return layers
+
+
+def _text_job(source: PdfSource, text: TextRequest | StoredTextRequest) -> TextLayerJob:
+    source_dpi = Dpi.uniform(source.dpi)
+    if isinstance(text, StoredTextRequest):
+        return text.geometry.job(source.pdf_path, text.page_index, source_dpi)
+    return TextLayerJob.of(
+        source.pdf_path,
+        text.page_index,
+        text.transformation,
+        source_dpi,
+        text.output_dpi,
+        dewarped=text.dewarped,
+        dewarp=text.dewarp,
+    )
 
 
 def _same_file(first: Path, second: Path) -> bool:
@@ -343,7 +320,7 @@ class _Worker(QtCore.QObject):
     def run(self) -> None:
         try:
             result = self._work(self.progress.emit, self._cancel)
-        except JobCancelled:
+        except PdfCancelled:
             self.cancelled.emit()
         except Exception as error:
             logger.exception("PDF job failed")

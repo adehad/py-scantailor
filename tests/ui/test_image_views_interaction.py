@@ -11,7 +11,11 @@ from pytestqt.qtbot import QtBot
 from scantailor.app.ui.image_views.base import ImageViewBase
 from scantailor.app.ui.image_views.deskew import DeskewImageView
 from scantailor.app.ui.image_views.fix_orientation import FixOrientationImageView
-from scantailor.app.ui.image_views.output import OutputImageView, ZoneKind
+from scantailor.app.ui.image_views.output import (
+    ImageViewTab,
+    OutputImageView,
+    ZoneKind,
+)
 from scantailor.app.ui.image_views.page_layout import PageLayoutImageView
 from scantailor.app.ui.image_views.page_split import PageSplitImageView
 from scantailor.app.ui.image_views.select_content import SelectContentImageView
@@ -501,6 +505,8 @@ def _open_output_view(qtbot: QtBot, window: MainWindowManager) -> OutputImageVie
         lambda _view: window._panels._output_transformation is not None,
     )
     assert isinstance(view, OutputImageView)
+    # Zones are drawn and edited in the zone tabs only.
+    view.set_current_tab(ImageViewTab.PICTURE_ZONES)
     return view
 
 

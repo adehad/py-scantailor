@@ -1,10 +1,13 @@
 """Content box and page edge detection."""
 
+from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 
 import cv2
 import numpy as np
 from numpy.typing import NDArray
+
+from scantailor.core.result_memo import ResultMemo, array_digest
 
 from .content_box import ContentBox
 from .content_box_finder import PROCESSING_DPI, Rect, find_content_rect
@@ -26,13 +29,18 @@ class ContentDetectionResult:
 _TARGET_DPI = float(PROCESSING_DPI)
 _DEFAULT_DPI = 300.0
 
+# Detection results by processed image; revisiting a page or a stage looks at
+# the same pixels again.
+_CONTENT_MEMO = ResultMemo[Rect | None](capacity=32)
+
 
 def find_content_box(
     image: NDArray[np.uint8],
     dpi: float = _DEFAULT_DPI,
     margin: int = 10,
     page_box: ContentBox | None = None,
-    outside: NDArray[np.bool_] | None = None,
+    outside: NDArray[np.bool_] | Callable[[], NDArray[np.bool_]] | None = None,
+    outside_key: Hashable | None = None,
 ) -> ContentDetectionResult:
     """Detect content boundaries in an image.
 
@@ -53,25 +61,42 @@ def find_content_box(
             pixel behind them, such as the corners exposed by a rotation. They
             are painted with the darkest gray level of the rest of the image,
             so that a shadow along the edge of the page still reaches the edge
-            of the image.
+            of the image. A callable is only called when the result is not
+            already remembered, which needs ``outside_key``.
+        outside_key (Hashable | None): Identifies the mask a callable
+            ``outside`` returns for this image; equal keys must mean equal
+            masks. Without it a callable is called at once.
 
     Returns:
         ContentDetectionResult: The detected box and a confidence from 0 to 1;
             the confidence is 0 when no content was found.
     """
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image
-    everything_outside = outside is not None and bool(outside.all())
-    if outside is not None and outside.any() and not everything_outside:
-        gray = np.where(outside, gray[~outside].min(), gray).astype(np.uint8)
+    gray = np.asarray(
+        cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image,
+        dtype=np.uint8,
+    )
+    deferred: Callable[[], NDArray[np.bool_]] | None = None
+    mask: NDArray[np.bool_] | None = None
+    if callable(outside):
+        if outside_key is None:
+            mask = outside()
+        else:
+            deferred = outside
+    else:
+        mask = outside
     h, w = gray.shape[:2]
 
     scaled_w = max(1, round(w * _TARGET_DPI / dpi))
     scaled_h = max(1, round(h * _TARGET_DPI / dpi))
     interpolation = cv2.INTER_AREA if scaled_w < w else cv2.INTER_LINEAR
-    scaled = np.asarray(
-        cv2.resize(gray, (scaled_w, scaled_h), interpolation=interpolation),
-        dtype=np.uint8,
-    )
+
+    def scale(source: NDArray[np.uint8]) -> NDArray[np.uint8]:
+        return np.asarray(
+            cv2.resize(source, (scaled_w, scaled_h), interpolation=interpolation),
+            dtype=np.uint8,
+        )
+
+    scaled = scale(gray)
     x_scale = w / scaled_w
     y_scale = h / scaled_h
 
@@ -83,7 +108,32 @@ def find_content_box(
             min(scaled_w - 1, round(page_box.right / x_scale) - 1),
             min(scaled_h - 1, round(page_box.bottom / y_scale) - 1),
         )
-    found = None if everything_outside else find_content_rect(scaled, page_rect)
+    if deferred is not None:
+
+        def search() -> Rect | None:
+            made = deferred()
+            if made.all():
+                return None
+            painted = scaled
+            if made.any():
+                painted = scale(_paint_outside_darkest(gray, made))
+            return find_content_rect(painted, page_rect)
+
+        found = _CONTENT_MEMO.get_or_compute(
+            (array_digest(scaled), page_rect, outside_key), search
+        )
+    else:
+        everything_outside = mask is not None and bool(mask.all())
+        if mask is not None and mask.any() and not everything_outside:
+            scaled = scale(_paint_outside_darkest(gray, mask))
+        found = (
+            None
+            if everything_outside
+            else _CONTENT_MEMO.get_or_compute(
+                (array_digest(scaled), page_rect),
+                lambda: find_content_rect(scaled, page_rect),
+            )
+        )
 
     if found is None:
         return ContentDetectionResult(
@@ -113,6 +163,17 @@ def find_content_box(
     return ContentDetectionResult(
         content_box=content_box, confidence=max(0.0, min(1.0, confidence))
     )
+
+
+def _paint_outside_darkest(
+    gray: NDArray[np.uint8], outside: NDArray[np.bool_]
+) -> NDArray[np.uint8]:
+    """Return ``gray`` with the ``outside`` pixels set to the darkest level inside."""
+    inside = (~outside).view(np.uint8)
+    darkest = np.uint8(cv2.minMaxLoc(gray, mask=inside)[0])
+    painted = gray.copy()
+    np.copyto(painted, darkest, where=outside)
+    return painted
 
 
 def find_page_edges(

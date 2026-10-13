@@ -3,11 +3,13 @@
 The view of every stage but Output shows the oriented source image through the
 transformation the earlier stages define, with the stage's own geometry drawn
 on top. Dragging a handle stores the new geometry as manual parameters of the
-current page and asks for a re-render. The source image is decoded here, off
-the GUI thread, because the views need unprocessed pixels that the renderer's
-stage results no longer hold.
+current page and asks for a re-render. The views need unprocessed pixels that
+the renderer's stage results no longer hold, so the source image is taken from
+the decoded sources the renderer shares, decoding it off the GUI thread when it
+is not there yet.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import cast
 
@@ -19,7 +21,12 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from scantailor.app.ui.image_views.base import ImageViewBase
 from scantailor.app.ui.image_views.deskew import DeskewImageView
 from scantailor.app.ui.image_views.fix_orientation import FixOrientationImageView
-from scantailor.app.ui.image_views.output import OutputImageView, ViewZone, ZoneKind
+from scantailor.app.ui.image_views.output import (
+    ImageViewTab,
+    OutputImageView,
+    ViewZone,
+    ZoneKind,
+)
 from scantailor.app.ui.image_views.page_layout import PageLayoutImageView
 from scantailor.app.ui.image_views.page_split import PageSplitImageView
 from scantailor.app.ui.image_views.select_content import SelectContentImageView
@@ -31,6 +38,7 @@ from scantailor.app.ui.options_widgets import (
     page_split,
     select_content,
 )
+from scantailor.app.ui.source_cache import SourceCache
 from scantailor.core.image_io import ImageLoadError
 from scantailor.core.models import ImageId, Margins, OrthogonalRotation, PageId
 from scantailor.core.page_geometry import (
@@ -39,6 +47,7 @@ from scantailor.core.page_geometry import (
     transformation_dpi,
 )
 from scantailor.core.page_source import DpiOverrides, load_page
+from scantailor.core.pipeline import OutputExtras
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation, Rect
 from scantailor.core.zones import (
@@ -46,7 +55,14 @@ from scantailor.core.zones import (
     PictureLayer,
     PictureZoneProperties,
 )
-from scantailor.filters.output.params import FillZoneSpec, PictureZoneSpec
+from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.params import (
+    ColorMode,
+    DistortionModelSpec,
+    FillZoneSpec,
+    PictureZoneSpec,
+)
+from scantailor.filters.output.params import Params as OutputParams
 from scantailor.filters.page_layout.page_rect import adapt_content_rect, rect_size_mm
 from scantailor.filters.page_split.page_layout import PageLayout
 from scantailor.filters.select_content.content_box import ContentBox, PageBox
@@ -63,6 +79,8 @@ _VIEW_CLASSES: dict[FilterStage, type[ImageViewBase]] = {
 
 # Layer a newly drawn picture zone gets; it adds the zone to the picture mask.
 _NEW_PICTURE_LAYER = PictureLayer.PAINTER2
+
+_NO_DESPECKLING = "Despeckling can't be done in Color / Grayscale mode."
 
 
 @dataclass
@@ -135,6 +153,7 @@ class _SourceTask(QtCore.QRunnable):
         image_id: ImageId,
         dpi_overrides: DpiOverrides,
         signals: _SourceSignals,
+        sources: SourceCache | None = None,
     ) -> None:
         super().__init__()
         self.setAutoDelete(True)
@@ -142,11 +161,15 @@ class _SourceTask(QtCore.QRunnable):
         self._image_id = image_id
         self._dpi_overrides = dpi_overrides
         self._signals = signals
+        self._sources = sources
 
     def run(self) -> None:
-        """Decode the image and report it, or the failure."""
+        """Decode the image, or take it from the shared sources, and report it."""
         try:
-            page = load_page(self._image_id, self._dpi_overrides)
+            if self._sources is None:
+                page = load_page(self._image_id, self._dpi_overrides)
+            else:
+                page = self._sources.load(self._image_id, self._dpi_overrides)
         except (ImageLoadError, OSError) as error:
             self._report(self._signals.failed, str(error))
             return
@@ -165,6 +188,39 @@ def _to_display(pixels: NDArray[np.uint8]) -> NDArray[np.uint8]:
     if pixels.ndim == 3 and pixels.shape[2] == 3:
         return np.ascontiguousarray(pixels[:, :, ::-1])
     return pixels
+
+
+def _model_in_view_pixels(
+    model: DistortionModelSpec,
+    xform: ImageTransformation,
+    scale: NDArray[np.float64],
+) -> DistortionModelSpec:
+    """Map a stored distortion model into the pixels of the Output view."""
+    return _mapped_edges(model, lambda points: xform.map_polygon(points) * scale)
+
+
+def _model_in_page_pixels(
+    model: DistortionModelSpec,
+    xform: ImageTransformation,
+    scale: NDArray[np.float64],
+) -> DistortionModelSpec:
+    """Map an edited model from the Output view's pixels back to stored ones."""
+    return _mapped_edges(model, lambda points: xform.map_polygon_back(points / scale))
+
+
+def _mapped_edges(
+    model: DistortionModelSpec,
+    mapping: Callable[[NDArray[np.float64]], NDArray[np.float64]],
+) -> DistortionModelSpec:
+    def edge(
+        points: tuple[tuple[float, float], ...],
+    ) -> tuple[tuple[float, float], ...]:
+        if not points:
+            return ()
+        mapped = mapping(np.asarray(points, dtype=np.float64))
+        return tuple((float(x), float(y)) for x, y in mapped)
+
+    return DistortionModelSpec(top=edge(model.top), bottom=edge(model.bottom))
 
 
 def _qrect(box: ContentBox | PageBox) -> QtCore.QRectF:
@@ -218,6 +274,9 @@ class StagePanels(QtCore.QObject):
         self._output_transformation: ImageTransformation | None = None
         # Output pixels per transformation pixel; the Output stage resamples.
         self._output_scale = np.ones(2)
+        self._extras: OutputExtras | None = None
+        self._fed_extras: OutputExtras | None = None
+        self._fed_model: tuple[DistortionModelSpec, float] | None = None
 
         self._source_pool = QtCore.QThreadPool(self)
         self._source_pool.setMaxThreadCount(1)
@@ -226,6 +285,7 @@ class StagePanels(QtCore.QObject):
         self._source_signals.failed.connect(self._on_source_failed)
         self._source_generation = 0
         self._dpi_overrides: DpiOverrides = {}
+        self._sources: SourceCache | None = None
 
         self._connect_view(stage)
         self._viewport = self.view.viewport()
@@ -269,6 +329,15 @@ class StagePanels(QtCore.QObject):
         self.page_size_changed.emit(
             QtCore.QSizeF(size.width() / scale_x, size.height() / scale_y), dpi
         )
+
+    def set_source_cache(self, sources: SourceCache) -> None:
+        """Take decoded sources from a cache that other users share.
+
+        Args:
+            sources (SourceCache): The cache; applies to sources requested from
+                now on.
+        """
+        self._sources = sources
 
     def set_dpi_overrides(self, dpi_overrides: DpiOverrides) -> None:
         """Use the project's resolutions for sources decoded from now on.
@@ -328,6 +397,26 @@ class StagePanels(QtCore.QObject):
             view.margins_set_locally.connect(self._on_margins_set)
         elif isinstance(view, OutputImageView):
             view.zones_changed.connect(self._on_zones_changed)
+            view.distortion_model_changed.connect(self._on_distortion_model_edited)
+            view.tab_changed.connect(self._on_output_tab_changed)
+            if isinstance(self.options, output.OptionsWidget):
+                self.options.despeckle_level_changed.connect(view.set_despeckle_level)
+            view.set_tabs(list(ImageViewTab))
+
+    def _on_output_tab_changed(self, tab: ImageViewTab) -> None:
+        if isinstance(self.options, output.OptionsWidget):
+            self.options.set_dewarping_tab_active(tab is ImageViewTab.DEWARPING)
+            self.options.set_despeckle_tab_active(tab is ImageViewTab.DESPECKLING)
+
+    def set_output_extras(self, extras: OutputExtras) -> None:
+        """Take the pictures the Output view's tabs show besides the output page.
+
+        They are shown once the render of the page arrives.
+
+        Args:
+            extras (OutputExtras): What the render of the current page made.
+        """
+        self._extras = extras
 
     def _on_option_edited(self, *_args: object) -> None:
         # The widgets have already stored the new values, so the signal
@@ -377,12 +466,21 @@ class StagePanels(QtCore.QObject):
             return
         self._source = None
         self._source_generation += 1
+        cached = (
+            None
+            if self._sources is None
+            else self._sources.peek(image_id, self._dpi_overrides)
+        )
+        if cached is not None:
+            self._adopt_source(image_id, cached.pixels, cached.horizontal_dpi())
+            return
         self._source_pool.start(
             _SourceTask(
                 self._source_generation,
                 image_id,
                 self._dpi_overrides,
                 self._source_signals,
+                self._sources,
             )
         )
 
@@ -396,6 +494,11 @@ class StagePanels(QtCore.QObject):
     ) -> None:
         if generation != self._source_generation:
             return
+        self._adopt_source(image_id, pixels, dpi)
+
+    def _adopt_source(
+        self, image_id: ImageId, pixels: NDArray[np.uint8], dpi: float
+    ) -> None:
         self._source = _Source(image_id, pixels, dpi)
         if isinstance(self.options, page_layout.OptionsWidget):
             self.options.set_page_dpi(dpi, dpi)
@@ -433,6 +536,13 @@ class StagePanels(QtCore.QObject):
         elif isinstance(view, OutputImageView):
             view.set_zones([])
             self._output_transformation = None
+            self._extras = None
+            self._fed_extras = None
+            self._fed_model = None
+            view.set_tab_image(ImageViewTab.DEWARPING, None)
+            view.set_tab_image(ImageViewTab.PICTURE_ZONES, None)
+            view.set_despeckle_source(None, 0, DespeckleLevel.OFF)
+            view.set_tab_message(ImageViewTab.DESPECKLING, None)
 
     def _present(self) -> None:
         """Show the page's image once the source and the render have arrived."""
@@ -635,6 +745,57 @@ class StagePanels(QtCore.QObject):
             for spec in params.fill_zones
         ]
         view.set_zones(zones)
+        self._feed_output_tabs(view, params, xform, scale)
+
+    def _feed_output_tabs(
+        self,
+        view: OutputImageView,
+        params: OutputParams,
+        xform: ImageTransformation,
+        scale: NDArray[np.float64],
+    ) -> None:
+        """Give the dewarping, despeckling and picture zone tabs their pictures."""
+        extras = self._extras
+        if extras is None:
+            return
+        if extras is not self._fed_extras:
+            self._fed_extras = extras
+            self._fed_model = None
+            page = _to_display(extras.page)
+            shown = None if view._fit_mode else _ViewState.of(view)
+            view.set_tab_image(ImageViewTab.DEWARPING, page)
+            view.set_tab_image(ImageViewTab.PICTURE_ZONES, page)
+            if shown is not None:
+                shown.apply_to(view)
+            view.set_despeckle_source(
+                extras.despeckle_source, extras.despeckle_dpi, params.despeckle_level
+            )
+            view.set_tab_message(
+                ImageViewTab.DESPECKLING,
+                _NO_DESPECKLING
+                if extras.despeckle_source is None
+                and params.color_mode == ColorMode.COLOR_GRAYSCALE
+                else None,
+            )
+        model = (params.distortion_model, params.depth_perception)
+        if model != self._fed_model:
+            self._fed_model = model
+            view.set_distortion_model(
+                _model_in_view_pixels(params.distortion_model, xform, scale),
+                params.depth_perception,
+            )
+
+    def _on_distortion_model_edited(self, model: DistortionModelSpec) -> None:
+        xform = self._output_transformation
+        if xform is None or not isinstance(self.options, output.OptionsWidget):
+            return
+        page = self._page
+        if page is None:
+            return
+        stored = _model_in_page_pixels(model, xform, self._output_scale)
+        depth = self.sequence.output_filter.get_params(page).depth_perception
+        self._fed_model = (stored, depth)
+        self.options.set_distortion_model(stored)
 
     @staticmethod
     def _view_zone(

@@ -1,28 +1,38 @@
 """Carry a source PDF page's text layer onto the processed output page.
 
-The text-showing content of a source page (every BT..ET block and the fonts it
-references) is re-wrapped so that, placed on an output page, each glyph lands
-over the same part of the picture it sat over in the source. Rendering mode 3
-makes it invisible: selectable and searchable, never painted.
+The text-showing content of a source page (every BT..ET block, including those
+drawn by form XObjects, and the fonts it references) is re-wrapped so that,
+placed on an output page, each glyph lands over the same part of the picture it
+sat over in the source. Rendering mode 3 makes it invisible: selectable and
+searchable, never painted. Type 3 fonts ignore the rendering mode, so they are
+replaced by stand-ins with the same metrics whose glyphs draw nothing.
 
-The mapping from source to output is an affine matrix, so pages that were
-dewarped (a non-linear mapping) have no text layer.
+An affine source-to-output mapping moves the original text operators as one
+block. A dewarped page has no such mapping, so its text is read back through
+pdfium and re-placed character by character at the dewarped position, in a
+plain font whose codes are mapped to the characters by a ToUnicode table.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final
 
+import cv2
 import numpy as np
 import pikepdf
+import pypdfium2 as pdfium
 from loguru import logger
 from numpy.typing import NDArray
+from pydantic import BaseModel, ConfigDict
 
-from scantailor.core.batch import map_pool
+from scantailor.core.dewarp_spec import DewarpSpec
 from scantailor.core.models import Dpi
+from scantailor.core.pdf_pool import map_pool_progress
 from scantailor.core.transformation import ImageTransformation
+from scantailor.dewarping.page_dewarper import dewarper_from_polylines
+from scantailor.dewarping.raster_dewarper import output_model_domain
 
 _POINTS_PER_INCH: Final = 72.0
 _INVISIBLE_RENDER_MODE: Final = 3
@@ -30,6 +40,17 @@ _INVISIBLE_RENDER_MODE: Final = 3
 _TEXT_STATE_OPERATORS: Final = frozenset({"Tc", "Tw", "Tz", "TL", "Tf", "Ts"})
 _MIN_DETERMINANT: Final = 1e-12
 _DIRECT_OBJECT: Final = (0, 0)
+_MAX_FORM_DEPTH: Final = 12
+# pdfium extracts no text from codes below 0x21, so the codes of a generated
+# font start there.
+_FIRST_CODE: Final = 0x21
+_CODES_PER_FONT: Final = 256 - _FIRST_CODE
+_GENERATED_FONT_PREFIX: Final = "/STU"
+
+ObjectGen = tuple[int, int]
+# An object number, and where to find the object from the page's resources when
+# it is written directly in a resource dictionary and has no number.
+FontRef = tuple[ObjectGen, tuple[str, ...]]
 
 
 @dataclass
@@ -57,7 +78,7 @@ def _inherited(node: pikepdf.Object | None, key: str) -> pikepdf.Object | None:
     return None
 
 
-def _matrix_of(operands: list[pikepdf.Object]) -> NDArray[np.float64]:
+def _matrix_of(operands: Sequence[pikepdf.Object | float]) -> NDArray[np.float64]:
     a, b, c, d, e, f = (float(v) for v in operands)
     return np.array([[a, c, e], [b, d, f], [0, 0, 1]], dtype=np.float64)
 
@@ -80,64 +101,151 @@ def _instruction(
     return pikepdf.ContentStreamInstruction(list(operands), pikepdf.Operator(operator))
 
 
-def _text_blocks(
-    page: pikepdf.Page,
-) -> tuple[list[pikepdf.ContentStreamInstruction], set[str]]:
-    """Collect each BT..ET block with the CTM and text state in force at its start.
+_Instruction = pikepdf.ContentStreamInstruction
+_Resources = pikepdf.Object | None
 
-    Returns:
-        The instructions, each block wrapped in q/cm/Q with its text state
-        restated and its render mode forced to invisible; and the names of the
-        fonts selected by them.
+
+class _TextCollector:
+    """Collects the text blocks of a page, descending into form XObjects.
+
+    Each BT..ET block is wrapped in q/cm/Q with the CTM and the text state in
+    force at its start, and its render mode forced to invisible. Fonts are
+    renamed on collection, so two resource dictionaries that use one name for
+    different fonts do not clash on the output page.
     """
-    ctm = np.eye(3)
-    ctm_stack: list[NDArray[np.float64]] = []
-    state: dict[str, pikepdf.ContentStreamInstruction] = {}
-    state_stack: list[dict[str, pikepdf.ContentStreamInstruction]] = []
-    output: list[pikepdf.ContentStreamInstruction] = []
-    fonts: set[str] = set()
-    in_text = False
 
-    for item in pikepdf.parse_content_stream(page):
-        if isinstance(item, pikepdf.ContentStreamInlineImage):
-            continue
-        operator = str(item.operator)
+    def __init__(self) -> None:
+        self.output: list[_Instruction] = []
+        self.fonts: dict[str, FontRef] = {}
+        self._aliases: dict[ObjectGen | tuple[str, ...], str] = {}
+
+    def collect(self, page: pikepdf.Page) -> None:
+        resources = _inherited(page.obj, "/Resources")
+        self._run(
+            pikepdf.parse_content_stream(page), resources, (), np.eye(3), {}, 0, ()
+        )
+        used = {str(i.operands[0]) for i in self.output if str(i.operator) == "Tf"}
+        self.fonts = {name: ref for name, ref in self.fonts.items() if name in used}
+
+    def _font_alias(
+        self, resources: _Resources, path: tuple[str, ...], name: str
+    ) -> str | None:
+        fonts = None if resources is None else resources.get("/Font")
+        if fonts is None or name not in fonts:
+            logger.warning("Font {} not in resources", name)
+            return None
+        objgen = fonts[name].objgen
+        key = objgen if objgen != _DIRECT_OBJECT else (*path, "/Font", name)
+        alias = self._aliases.get(key)
+        if alias is None:
+            alias, number = name, 1
+            while alias in self.fonts:
+                number += 1
+                alias = f"{name}_{number}"
+            self._aliases[key] = alias
+            self.fonts[alias] = (objgen, (*path, "/Font", name))
+        return alias
+
+    def _with_font_alias(
+        self, item: _Instruction, resources: _Resources, path: tuple[str, ...]
+    ) -> _Instruction:
         operands = list(item.operands)
+        alias = self._font_alias(resources, path, str(operands[0]))
+        if alias is None or alias == str(operands[0]):
+            return item
+        return _instruction("Tf", pikepdf.Name(alias), operands[1])
 
-        if in_text:
-            if operator == "Tr":
+    def _run(
+        self,
+        items: Sequence[Any],
+        resources: _Resources,
+        path: tuple[str, ...],
+        ctm: NDArray[np.float64],
+        state: dict[str, _Instruction],
+        depth: int,
+        active_forms: tuple[ObjectGen, ...],
+    ) -> None:
+        ctm_stack: list[NDArray[np.float64]] = []
+        state_stack: list[dict[str, _Instruction]] = []
+        state = dict(state)
+        in_text = False
+
+        for item in items:
+            if isinstance(item, pikepdf.ContentStreamInlineImage):
                 continue
-            if operator in _TEXT_STATE_OPERATORS:
-                state[operator] = item
-            if operator == "Tf":
-                fonts.add(str(operands[0]))
-            output.append(item)
-            if operator == "ET":
-                output.append(_instruction("Q"))
-                in_text = False
-            continue
+            operator = str(item.operator)
+            operands = list(item.operands)
 
-        if operator == "q":
-            ctm_stack.append(ctm)
-            state_stack.append(dict(state))
-        elif operator == "Q" and ctm_stack:
-            ctm = ctm_stack.pop()
-            state = state_stack.pop()
-        elif operator == "cm":
-            ctm = ctm @ _matrix_of(operands)
-        elif operator in _TEXT_STATE_OPERATORS:
-            state[operator] = item
-        elif operator == "BT":
-            in_text = True
-            output.append(_instruction("q"))
-            output.append(_instruction("cm", *_cm_operands(ctm)))
-            for restated in state.values():
-                output.append(restated)
-                if str(restated.operator) == "Tf":
-                    fonts.add(str(restated.operands[0]))
-            output.append(item)
-            output.append(_instruction("Tr", _INVISIBLE_RENDER_MODE))
-    return output, fonts
+            if in_text:
+                if operator == "Tr":
+                    continue
+                if operator == "Tf":
+                    item = self._with_font_alias(item, resources, path)
+                if operator in _TEXT_STATE_OPERATORS:
+                    state[operator] = item
+                self.output.append(item)
+                if operator == "ET":
+                    self.output.append(_instruction("Q"))
+                    in_text = False
+                continue
+
+            if operator == "q":
+                ctm_stack.append(ctm)
+                state_stack.append(dict(state))
+            elif operator == "Q" and ctm_stack:
+                ctm = ctm_stack.pop()
+                state = state_stack.pop()
+            elif operator == "cm":
+                ctm = ctm @ _matrix_of(operands)
+            elif operator == "Tf":
+                state["Tf"] = self._with_font_alias(item, resources, path)
+            elif operator in _TEXT_STATE_OPERATORS:
+                state[operator] = item
+            elif operator == "Do":
+                self._enter_form(
+                    str(operands[0]), resources, path, ctm, state, depth, active_forms
+                )
+            elif operator == "BT":
+                in_text = True
+                self.output.append(_instruction("q"))
+                self.output.append(_instruction("cm", *_cm_operands(ctm)))
+                self.output.extend(state.values())
+                self.output.append(item)
+                self.output.append(_instruction("Tr", _INVISIBLE_RENDER_MODE))
+
+    def _enter_form(
+        self,
+        name: str,
+        resources: _Resources,
+        path: tuple[str, ...],
+        ctm: NDArray[np.float64],
+        state: dict[str, _Instruction],
+        depth: int,
+        active_forms: tuple[ObjectGen, ...],
+    ) -> None:
+        xobjects = None if resources is None else resources.get("/XObject")
+        form = None if xobjects is None else xobjects.get(name)
+        if (
+            form is None
+            or form.get("/Subtype") != "/Form"
+            or depth >= _MAX_FORM_DEPTH
+            or (form.objgen != _DIRECT_OBJECT and form.objgen in active_forms)
+        ):
+            return
+        matrix = form.get("/Matrix")
+        form_ctm = ctm if matrix is None else ctm @ _matrix_of(list(matrix))
+        own = form.get("/Resources")
+        form_resources = resources if own is None else own
+        form_path = path if own is None else (*path, "/XObject", name, "/Resources")
+        self._run(
+            pikepdf.parse_content_stream(form),
+            form_resources,
+            form_path,
+            form_ctm,
+            state,
+            depth + 1,
+            (*active_forms, form.objgen),
+        )
 
 
 def _page_orientation_matrix(page: pikepdf.Page) -> NDArray[np.float64]:
@@ -156,6 +264,35 @@ def _page_orientation_matrix(page: pikepdf.Page) -> NDArray[np.float64]:
     else:
         turn = np.eye(3)
     return turn @ unrotated
+
+
+def _source_pixels_matrix(source_dpi: Dpi) -> NDArray[np.float64]:
+    return np.diag(
+        np.array(
+            [
+                source_dpi.horizontal / _POINTS_PER_INCH,
+                source_dpi.vertical / _POINTS_PER_INCH,
+                1.0,
+            ],
+            dtype=np.float64,
+        )
+    )
+
+
+def _output_points_matrix(
+    output_dpi: Dpi, output_height_px: float
+) -> NDArray[np.float64]:
+    return np.array(
+        [
+            [_POINTS_PER_INCH / output_dpi.horizontal, 0, 0],
+            [
+                0,
+                -_POINTS_PER_INCH / output_dpi.vertical,
+                output_height_px * _POINTS_PER_INCH / output_dpi.vertical,
+            ],
+            [0, 0, 1],
+        ]
+    )
 
 
 def source_to_output_points(
@@ -181,33 +318,81 @@ def source_to_output_points(
         NDArray[np.float64]: 3x3 matrix in column-vector form, source points to
         output points (y up in both).
     """
-    to_source_px = np.diag(
-        np.array(
-            [
-                source_dpi.horizontal / _POINTS_PER_INCH,
-                source_dpi.vertical / _POINTS_PER_INCH,
-                1.0,
-            ],
-            dtype=np.float64,
-        )
-    )
-    to_output_points: NDArray[np.float64] = np.array(
-        [
-            [_POINTS_PER_INCH / output_dpi.horizontal, 0, 0],
-            [
-                0,
-                -_POINTS_PER_INCH / output_dpi.vertical,
-                output_height_px * _POINTS_PER_INCH / output_dpi.vertical,
-            ],
-            [0, 0, 1],
-        ]
-    )
     return (
-        to_output_points
+        _output_points_matrix(output_dpi, output_height_px)
         @ source_to_output_px
-        @ to_source_px
+        @ _source_pixels_matrix(source_dpi)
         @ _page_orientation_matrix(page)
     )
+
+
+class TextGeometry(BaseModel):
+    """How an output page relates to its source page, as storable plain data.
+
+    This is everything a text layer needs beyond the source PDF itself, so it can
+    be saved with a project and still map text after the pipeline has not run in
+    the current session.
+
+    Attributes:
+        matrix: The 3x3 source-pixel to output-pixel matrix of the page's
+            transformation, row-major.
+        rect_x: Left edge of the transformation's resulting rect.
+        rect_y: Top edge of that rect.
+        rect_width: Width of that rect, which is the output width.
+        rect_height: Height of that rect, which is the output height.
+        output_dpi: Horizontal and vertical resolution of the output image.
+        dewarped: True when the output was dewarped.
+        dewarp: How it was dewarped; a dewarped page has text only when given.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    matrix: tuple[float, ...]
+    rect_x: float
+    rect_y: float
+    rect_width: float
+    rect_height: float
+    output_dpi: tuple[float, float]
+    dewarped: bool = False
+    dewarp: DewarpSpec | None = None
+
+    @classmethod
+    def of(
+        cls,
+        transformation: ImageTransformation,
+        output_dpi: Dpi,
+        *,
+        dewarped: bool = False,
+        dewarp: DewarpSpec | None = None,
+    ) -> "TextGeometry":
+        """Capture the geometry of a page from its final transformation."""
+        rect = transformation.resulting_rect
+        return cls(
+            matrix=tuple(float(v) for v in transformation.transform.ravel()),
+            rect_x=float(rect.x),
+            rect_y=float(rect.y),
+            rect_width=float(rect.width),
+            rect_height=float(rect.height),
+            output_dpi=(output_dpi.horizontal, output_dpi.vertical),
+            dewarped=dewarped,
+            dewarp=dewarp,
+        )
+
+    def job(self, pdf_path: Path, page_index: int, source_dpi: Dpi) -> "TextLayerJob":
+        """Describe the text layer of source page ``page_index`` of ``pdf_path``."""
+        return TextLayerJob(
+            pdf_path=str(pdf_path),
+            page_index=page_index,
+            matrix=self.matrix,
+            rect_x=self.rect_x,
+            rect_y=self.rect_y,
+            rect_height=self.rect_height,
+            source_dpi=(source_dpi.horizontal, source_dpi.vertical),
+            output_dpi=self.output_dpi,
+            dewarped=self.dewarped,
+            dewarp=self.dewarp,
+            rect_width=self.rect_width,
+        )
 
 
 @dataclass(frozen=True)
@@ -227,6 +412,9 @@ class TextLayerJob:
         output_dpi (tuple[float, float]): Horizontal and vertical resolution of
             the output image.
         dewarped (bool): True when the output was dewarped.
+        dewarp (DewarpSpec | None): How it was dewarped; without it a dewarped
+            page gets no text layer.
+        rect_width (float): Width of the resulting rect, which is the output width.
     """
 
     pdf_path: str
@@ -238,6 +426,8 @@ class TextLayerJob:
     source_dpi: tuple[float, float]
     output_dpi: tuple[float, float]
     dewarped: bool = False
+    dewarp: DewarpSpec | None = None
+    rect_width: float = 0.0
 
     @staticmethod
     def of(
@@ -248,20 +438,13 @@ class TextLayerJob:
         output_dpi: Dpi,
         *,
         dewarped: bool = False,
+        dewarp: DewarpSpec | None = None,
     ) -> "TextLayerJob":
         """Describe the text layer of a page from its transformation."""
-        rect = transformation.resulting_rect
-        return TextLayerJob(
-            pdf_path=str(pdf_path),
-            page_index=page_index,
-            matrix=tuple(float(v) for v in transformation.transform.ravel()),
-            rect_x=float(rect.x),
-            rect_y=float(rect.y),
-            rect_height=float(rect.height),
-            source_dpi=(source_dpi.horizontal, source_dpi.vertical),
-            output_dpi=(output_dpi.horizontal, output_dpi.vertical),
-            dewarped=dewarped,
+        geometry = TextGeometry.of(
+            transformation, output_dpi, dewarped=dewarped, dewarp=dewarp
         )
+        return geometry.job(pdf_path, page_index, source_dpi)
 
 
 @dataclass(frozen=True)
@@ -270,33 +453,33 @@ class TextLayerData:
 
     Attributes:
         content (bytes): Content stream of the layer.
-        fonts (dict[str, tuple[int, int]]): Object number and generation, in the
-            source PDF, of each font the content selects; ``(0, 0)`` for a font
-            written directly in the page's resources.
+        fonts (dict[str, FontRef]): Object number and generation, in the source
+            PDF, of each font the content selects, and the path to it from the
+            page's resources for a font written directly in a dictionary.
+        generated_fonts (dict[str, tuple[int, ...]]): Fonts the layer defines
+            itself, by name: the Unicode code point of each code, from the first.
     """
 
     content: bytes
-    fonts: dict[str, tuple[int, int]]
+    fonts: dict[str, FontRef]
+    generated_fonts: dict[str, tuple[int, ...]] = field(default_factory=dict)
 
 
-def _source_font(
-    source: pikepdf.Pdf, page_index: int, name: str, reference: tuple[int, int]
-) -> pikepdf.Object | None:
-    """Find a font by reference, or by name in the page's resources when direct."""
-    if reference != _DIRECT_OBJECT:
-        return source.get_object(reference)
-    resources = _inherited(source.pages[page_index].obj, "/Resources")
-    fonts = None if resources is None else resources.get("/Font")
-    if fonts is None or name not in fonts:
+def _font_at(source: pikepdf.Pdf, page_index: int, reference: FontRef) -> Any:
+    """Find a font by object number, or by its path through the page's resources."""
+    objgen, path = reference
+    if objgen != _DIRECT_OBJECT:
+        return source.get_object(objgen)
+    node: Any = _inherited(source.pages[page_index].obj, "/Resources")
+    try:
+        for key in path:
+            node = node[key]
+    except (KeyError, TypeError, AttributeError):
         return None
-    return source.make_indirect(fonts[name])
+    return node
 
 
-def _extract_layer(source: pikepdf.Pdf, job: TextLayerJob) -> TextLayerData | None:
-    if job.dewarped:
-        logger.info("Page {}: no text layer for a dewarped page", job.page_index)
-        return None
-
+def _affine_checks(job: TextLayerJob) -> NDArray[np.float64] | None:
     matrix = np.array(job.matrix, dtype=np.float64).reshape(3, 3)
     if not np.allclose(matrix[2], [0, 0, 1], atol=1e-9):
         logger.info(
@@ -308,13 +491,26 @@ def _extract_layer(source: pikepdf.Pdf, job: TextLayerJob) -> TextLayerData | No
             "Page {}: no text layer, transformation is singular", job.page_index
         )
         return None
+    return matrix
+
+
+def _extract_layer(source: pikepdf.Pdf, job: TextLayerJob) -> TextLayerData | None:
+    matrix = _affine_checks(job)
+    if matrix is None:
+        return None
+    if job.dewarped:
+        if job.dewarp is None:
+            logger.info("Page {}: no text layer for a dewarped page", job.page_index)
+            return None
+        return _extract_dewarped_layer(source, job, matrix, job.dewarp)
 
     to_output_origin = np.array(
         [[1, 0, -job.rect_x], [0, 1, -job.rect_y], [0, 0, 1]], dtype=np.float64
     )
     page = source.pages[job.page_index]
-    instructions, font_names = _text_blocks(page)
-    if not instructions:
+    collector = _TextCollector()
+    collector.collect(page)
+    if not collector.output:
         logger.info("Page {}: no text to carry over", job.page_index)
         return None
 
@@ -325,24 +521,259 @@ def _extract_layer(source: pikepdf.Pdf, job: TextLayerJob) -> TextLayerData | No
         Dpi(horizontal=job.output_dpi[0], vertical=job.output_dpi[1]),
         job.rect_height,
     )
-    source_resources = _inherited(page.obj, "/Resources")
-    source_fonts = None if source_resources is None else source_resources.get("/Font")
-    fonts: dict[str, tuple[int, int]] = {}
-    for name in sorted(font_names):
-        if source_fonts is not None and name in source_fonts:
-            fonts[name] = source_fonts[name].objgen
-        else:
-            logger.warning("Page {}: font {} not in resources", job.page_index, name)
-
     content = pikepdf.unparse_content_stream(
         [
             _instruction("q"),
             _instruction("cm", *_cm_operands(cm)),
-            *instructions,
+            *collector.output,
             _instruction("Q"),
         ]
     )
-    return TextLayerData(content, fonts)
+    return TextLayerData(content, collector.fonts)
+
+
+def _dewarp_mapper(
+    job: TextLayerJob, matrix: NDArray[np.float64], spec: DewarpSpec
+) -> Callable[[NDArray[np.float64]], NDArray[np.float64]] | None:
+    """Return a function taking source pixels to dewarped output pixels, or None."""
+    to_view = (
+        np.array(
+            [[1, 0, -job.rect_x], [0, 1, -job.rect_y], [0, 0, 1]], dtype=np.float64
+        )
+        @ matrix
+    )
+    width, height = round(job.rect_width), round(job.rect_height)
+    if width <= 0 or height <= 0:
+        return None
+
+    def in_view(polyline: tuple[tuple[float, float], ...]) -> NDArray[np.float64]:
+        points = np.asarray(polyline, dtype=np.float64)
+        homogeneous = np.column_stack([points, np.ones(len(points))])
+        return (homogeneous @ to_view.T)[:, :2]
+
+    try:
+        dewarper = dewarper_from_polylines(
+            in_view(spec.top), in_view(spec.bottom), spec.depth_perception
+        )
+        if dewarper is None:
+            return None
+        left, top, right, bottom = output_model_domain(dewarper, (width, height))
+    except (ValueError, ArithmeticError, np.linalg.LinAlgError, IndexError):
+        return None
+    rotation = np.vstack(
+        [
+            cv2.getRotationMatrix2D(
+                (width / 2.0, height / 2.0), -spec.post_deskew_angle, 1.0
+            ),
+            [0, 0, 1],
+        ]
+    )
+
+    def map_points(source_px: NDArray[np.float64]) -> NDArray[np.float64]:
+        view = (np.column_stack([source_px, np.ones(len(source_px))]) @ to_view.T)[
+            :, :2
+        ]
+        model = dewarper.map_points_to_dewarped_space(view)
+        dewarped = np.column_stack(
+            [
+                (model[:, 0] - left) / (right - left) * width,
+                (model[:, 1] - top) / (bottom - top) * height,
+            ]
+        )
+        turned = np.column_stack([dewarped, np.ones(len(dewarped))]) @ rotation.T
+        return turned[:, :2]
+
+    return map_points
+
+
+@dataclass(frozen=True)
+class _SourceChar:
+    codepoint: int
+    left: float
+    bottom: float
+    right: float
+    top: float
+
+
+def _source_characters(pdf_path: str, page_index: int) -> list[_SourceChar]:
+    """Read every positioned character of a page, in reading order, via pdfium."""
+    document = pdfium.PdfDocument(pdf_path)
+    try:
+        textpage = document[page_index].get_textpage()
+        count = textpage.count_chars()
+        text = textpage.get_text_range(0, count) if count else ""
+        characters: list[_SourceChar] = []
+        for index in range(count):
+            character = (
+                text[index] if len(text) == count else textpage.get_text_range(index, 1)
+            )
+            if not character or character in "\r\n\x00":
+                continue
+            left, bottom, right, top = textpage.get_charbox(index, loose=True)
+            if right <= left or top <= bottom:
+                continue
+            characters.append(_SourceChar(ord(character[0]), left, bottom, right, top))
+        return characters
+    finally:
+        document.close()
+
+
+def _extract_dewarped_layer(
+    source: pikepdf.Pdf,
+    job: TextLayerJob,
+    matrix: NDArray[np.float64],
+    spec: DewarpSpec,
+) -> TextLayerData | None:
+    mapper = _dewarp_mapper(job, matrix, spec)
+    if mapper is None:
+        logger.info("Page {}: no text layer, dewarp model unusable", job.page_index)
+        return None
+    characters = _source_characters(job.pdf_path, job.page_index)
+    if not characters:
+        logger.info("Page {}: no text to carry over", job.page_index)
+        return None
+
+    page = source.pages[job.page_index]
+    source_dpi = Dpi(horizontal=job.source_dpi[0], vertical=job.source_dpi[1])
+    output_dpi = Dpi(horizontal=job.output_dpi[0], vertical=job.output_dpi[1])
+    user_to_pixels = _source_pixels_matrix(source_dpi) @ _page_orientation_matrix(page)
+    to_points = _output_points_matrix(output_dpi, job.rect_height)
+
+    # Origin, end of the baseline and top of the left edge of every character box.
+    user = np.array(
+        [
+            point
+            for c in characters
+            for point in (
+                (c.left, c.bottom, 1),
+                (c.right, c.bottom, 1),
+                (c.left, c.top, 1),
+            )
+        ],
+        dtype=np.float64,
+    )
+    pixels = (user @ user_to_pixels.T)[:, :2]
+    placed = mapper(pixels)
+    points = (np.column_stack([placed, np.ones(len(placed))]) @ to_points.T)[:, :2]
+    corners = points.reshape(-1, 3, 2)
+
+    codes: dict[int, tuple[int, int]] = {}
+    codepoints: list[int] = []
+    lines = [f"BT {_INVISIBLE_RENDER_MODE} Tr"]
+    current_font = -1
+    for character, (origin, end, top) in zip(characters, corners, strict=True):
+        if not np.isfinite([origin, end, top]).all():
+            continue
+        if character.codepoint not in codes:
+            codes[character.codepoint] = (
+                len(codepoints) // _CODES_PER_FONT,
+                len(codepoints) % _CODES_PER_FONT + _FIRST_CODE,
+            )
+            codepoints.append(character.codepoint)
+        font, code = codes[character.codepoint]
+        if font != current_font:
+            lines.append(f"{_GENERATED_FONT_PREFIX}{font} 1 Tf")
+            current_font = font
+        along, up = end - origin, top - origin
+        lines.append(
+            f"{along[0]:.4f} {along[1]:.4f} {up[0]:.4f} {up[1]:.4f} "
+            f"{origin[0]:.4f} {origin[1]:.4f} Tm <{code:02x}> Tj"
+        )
+    lines.append("ET")
+    if len(lines) <= 2:
+        return None
+    generated = {
+        f"{_GENERATED_FONT_PREFIX}{font}": tuple(
+            codepoints[font * _CODES_PER_FONT : (font + 1) * _CODES_PER_FONT]
+        )
+        for font in range(current_font + 1 if current_font >= 0 else 0)
+    }
+    return TextLayerData("\n".join(lines).encode("ascii"), {}, generated)
+
+
+def _copy_object(owner: pikepdf.Pdf, source: pikepdf.Pdf, value: Any) -> Any:
+    """Copy an object, direct or not, from ``source`` into ``owner``."""
+    if not value.is_indirect:
+        value = source.make_indirect(value)
+    return owner.copy_foreign(value)
+
+
+def _generated_font(owner: pikepdf.Pdf, codepoints: tuple[int, ...]) -> pikepdf.Object:
+    """Build a font of ``len(codepoints)`` one-em glyphs that extract as given."""
+    entries = "\n".join(
+        f"<{code:02X}> <{_utf16_hex(codepoint)}>"
+        for code, codepoint in enumerate(codepoints, start=_FIRST_CODE)
+    )
+    cmap = (
+        "/CIDInit /ProcSet findresource begin 12 dict begin begincmap\n"
+        "/CMapName /Adobe-Identity-UCS def /CMapType 2 def\n"
+        "1 begincodespacerange <00> <FF> endcodespacerange\n"
+        f"{len(codepoints)} beginbfchar\n{entries}\nendbfchar\n"
+        "endcmap CMapName currentdict /CMap defineresource pop end end"
+    )
+    to_unicode = owner.make_stream(cmap.encode("ascii"))
+    return owner.make_indirect(
+        pikepdf.Dictionary(
+            Type=pikepdf.Name.Font,
+            Subtype=pikepdf.Name.Type1,
+            BaseFont=pikepdf.Name.Helvetica,
+            FirstChar=_FIRST_CODE,
+            LastChar=_FIRST_CODE + len(codepoints) - 1,
+            Widths=pikepdf.Array([1000] * len(codepoints)),
+            ToUnicode=to_unicode,
+        )
+    )
+
+
+def _utf16_hex(codepoint: int) -> str:
+    return chr(codepoint).encode("utf-16-be").hex().upper()
+
+
+def _is_type3(font: Any) -> bool:
+    return font.get("/Subtype") == "/Type3"
+
+
+def _invisible_type3(owner: pikepdf.Pdf, source: pikepdf.Pdf, font: Any) -> Any:
+    """Copy a Type 3 font with glyph procedures that paint nothing.
+
+    Widths, encoding and ToUnicode are kept, so the text still advances and
+    extracts as it did.
+    """
+    widths = [float(w) for w in font.get("/Widths", [])]
+    first = int(font.get("/FirstChar", 0))
+    code_of: dict[str, int] = {}
+    encoding = font.get("/Encoding")
+    if isinstance(encoding, pikepdf.Dictionary) and "/Differences" in encoding:
+        code = 0
+        for entry in encoding["/Differences"]:
+            if isinstance(entry, pikepdf.Name):
+                code_of[str(entry)] = code
+                code += 1
+            else:
+                code = int(entry)
+    procs = pikepdf.Dictionary()
+    char_procs = font.get("/CharProcs")
+    for name in () if char_procs is None else char_procs.keys():
+        index = code_of.get(name, -1) - first
+        width = widths[index] if 0 <= index < len(widths) else 0.0
+        procs[name] = owner.make_stream(f"{width:g} 0 d0".encode("ascii"))
+    stand_in = pikepdf.Dictionary(
+        Type=pikepdf.Name.Font,
+        Subtype=pikepdf.Name.Type3,
+        FontBBox=pikepdf.Array([float(v) for v in font.get("/FontBBox", [0, 0, 0, 0])]),
+        FontMatrix=pikepdf.Array(
+            [float(v) for v in font.get("/FontMatrix", [0.001, 0, 0, 0.001, 0, 0])]
+        ),
+        CharProcs=owner.make_indirect(procs),
+        FirstChar=first,
+        LastChar=int(font.get("/LastChar", first + len(widths) - 1)),
+        Widths=pikepdf.Array(widths),
+    )
+    if encoding is not None:
+        stand_in["/Encoding"] = _copy_object(owner, source, encoding)
+    if "/ToUnicode" in font:
+        stand_in["/ToUnicode"] = _copy_object(owner, source, font["/ToUnicode"])
+    return owner.make_indirect(stand_in)
 
 
 def _attach_layer(
@@ -351,9 +782,15 @@ def _attach_layer(
     """Make a layer whose fonts are objects of ``owner``, copied from ``source``."""
     fonts = pikepdf.Dictionary()
     for name, reference in data.fonts.items():
-        font = _source_font(source, job.page_index, name, reference)
-        if font is not None:
-            fonts[name] = owner.copy_foreign(font)
+        font = _font_at(source, job.page_index, reference)
+        if font is None:
+            continue
+        if _is_type3(font):
+            fonts[name] = _invisible_type3(owner, source, font)
+        else:
+            fonts[name] = _copy_object(owner, source, font)
+    for name, codepoints in data.generated_fonts.items():
+        fonts[name] = _generated_font(owner, codepoints)
     return TextLayer(content=data.content, resources={"/Font": fonts}, _owner=owner)
 
 
@@ -365,11 +802,12 @@ def build_text_layer(
     output_dpi: Dpi,
     *,
     dewarped: bool = False,
+    dewarp: DewarpSpec | None = None,
 ) -> TextLayer | None:
     """Build the invisible text layer of one output page.
 
-    Text drawn by form XObjects and Type 3 glyph procedures is not carried over;
-    only text operators in the page's own content stream are.
+    Text drawn by form XObjects is carried like the page's own. Type 3 fonts are
+    replaced by invisible stand-ins with the same metrics.
 
     Args:
         pdf_path (Path): The source PDF.
@@ -380,13 +818,21 @@ def build_text_layer(
         output_dpi (Dpi): Resolution of the output image.
         dewarped (bool): True when output was dewarped, which no affine matrix
             describes.
+        dewarp (DewarpSpec | None): How the page was dewarped. A dewarped page
+            has a text layer only when this is given.
 
     Returns:
         TextLayer | None: The layer, or None when the page has no text or the
-        mapping is not affine and invertible.
+        mapping cannot be inverted.
     """
     job = TextLayerJob.of(
-        pdf_path, page_index, transformation, source_dpi, output_dpi, dewarped=dewarped
+        pdf_path,
+        page_index,
+        transformation,
+        source_dpi,
+        output_dpi,
+        dewarped=dewarped,
+        dewarp=dewarp,
     )
     return build_text_layers([job])[0]
 
@@ -436,7 +882,9 @@ def build_text_layers(
         if executor is None:
             extracted = [_extract_layer(source_of(job.pdf_path), job) for job in jobs]
         else:
-            extracted = map_pool(_extract_in_worker, jobs, executor, max_workers)
+            extracted = map_pool_progress(
+                _extract_in_worker, jobs, executor, max_workers
+            )
 
         owner = pikepdf.Pdf.new()
         layers: list[TextLayer | None] = []
