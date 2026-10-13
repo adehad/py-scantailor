@@ -193,12 +193,26 @@ class TestAutoDewarpAcceptance:
         assert result.distortion_model is None
 
     def test_three_text_lines_give_the_two_traced_lines_a_model_needs(self):
+        """Three neighbouring lines span little, so the minimum span must allow them."""
+        page = _page()
+        sequence = _dewarp_sequence(page, DewarpingMode.AUTO)
+        output = sequence.output_filter
+        output.set_params(page, output.get_params(page).with_dewarp_min_span_percent(0))
+
+        result = _run(self._first_lines(3), page, sequence)
+
+        assert result.distortion_model is not None
+
+    def test_three_text_lines_are_refused_by_the_default_minimum_span(self):
         page = _page()
         sequence = _dewarp_sequence(page, DewarpingMode.AUTO)
 
         result = _run(self._first_lines(3), page, sequence)
 
-        assert result.distortion_model is not None
+        assert result.distortion_model is None
+        assert result.dewarp_metrics is not None
+        assert result.dewarp_metrics.span_percent is not None
+        assert result.dewarp_metrics.span_percent < 40.0
 
 
 class TestDespeckleStrength:

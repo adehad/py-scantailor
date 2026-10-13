@@ -3579,6 +3579,56 @@ QToolButton:pressed {
                  </layout>
                 </item>
                 <item>
+                 <layout class="QHBoxLayout" name="dewarpingMinSpanLayout">
+                  <item>
+                   <spacer name="dewarpingMinSpanSpacerLeft">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>1</width>
+                      <height>1</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="dewarpingMinSpanLabel">
+                    <property name="text">
+                     <string>Minimum span (%):</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QSpinBox" name="dewarpingMinSpanSB">
+                    <property name="toolTip">
+                     <string>Leave the page as it is when the curves found lie closer together than this share of the content height</string>
+                    </property>
+                    <property name="minimum">
+                     <number>0</number>
+                    </property>
+                    <property name="maximum">
+                     <number>100</number>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <spacer name="dewarpingMinSpanSpacerRight">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>1</width>
+                      <height>1</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                 </layout>
+                </item>
+                <item>
                  <layout class="QHBoxLayout" name="horizontalLayout_21">
                   <item>
                    <spacer name="horizontalSpacer_53">
