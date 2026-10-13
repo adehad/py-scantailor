@@ -16,7 +16,7 @@ the oriented source image through the accumulated transformation, either to
 give a later stage something to detect on or to produce the result.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
 
 import numpy as np
@@ -66,6 +66,27 @@ from .stage_sequence import FilterStage, StageSequence
 _MIN_CROP_EDGE_PX = 1.0
 
 
+class PipelineCancelled(Exception):
+    """Raised between stages when ``PipelineOptions.should_cancel`` says to stop."""
+
+
+@dataclass(frozen=True)
+class OutputExtras:
+    """What the Output view's tabs show besides the output page.
+
+    Attributes:
+        page: The page at output resolution as it is before dewarping and
+            binarisation, in the pixels the output image has.
+        despeckle_source: The text as a bilevel page just before despeckling,
+            0 being ink; None when the output is not binarised.
+        despeckle_dpi: Resolution of ``despeckle_source``, the smaller axis.
+    """
+
+    page: NDArray[np.uint8]
+    despeckle_source: NDArray[np.uint8] | None
+    despeckle_dpi: int
+
+
 @dataclass
 class PipelineResult:
     """Result of processing an image through the pipeline.
@@ -82,6 +103,8 @@ class PipelineResult:
         distortion_model: Page edges that automatic or marginal dewarping
             found, in the coordinates ``Params.distortion_model`` uses; None
             when the output stage did not build one.
+        output_extras: What the Output view's tabs show; only when the options
+            ask for it and the output stage ran.
     """
 
     image: NDArray[np.uint8]
@@ -92,6 +115,7 @@ class PipelineResult:
     split: SplitImages | None = None
     transformation: ImageTransformation | None = None
     distortion_model: DistortionModelSpec | None = None
+    output_extras: OutputExtras | None = None
 
 
 @dataclass
@@ -105,6 +129,11 @@ class PipelineOptions:
         dewarper: Dewarper to use for every page instead of the one the output
             parameters describe.
         detect_only: If True, only run detection without applying transforms.
+        keep_output_extras: Also return the pictures the Output view's tabs
+            show, in ``PipelineResult.output_extras``.
+        should_cancel: Asked before each stage; when it returns True the run
+            stops with ``PipelineCancelled``. Called on the thread that runs
+            the pipeline.
     """
 
     start_stage: FilterStage = FilterStage.FIX_ORIENTATION
@@ -112,6 +141,8 @@ class PipelineOptions:
     dpi: float = 300.0
     dewarper: CylindricalSurfaceDewarper | None = None
     detect_only: bool = False
+    keep_output_extras: bool = False
+    should_cancel: Callable[[], bool] | None = None
 
 
 class _PageState:
@@ -255,14 +286,17 @@ def _run_stages(
     output_dpi: Dpi | None = None
     split: SplitImages | None = None
     distortion_model: DistortionModelSpec | None = None
+    extras: OutputExtras | None = None
 
     for stage in FilterStage:
         if stage > options.end_stage:
             break
         detect = stage >= detect_from
+        if options.should_cancel is not None and options.should_cancel():
+            raise PipelineCancelled
 
         if stage == FilterStage.OUTPUT:
-            stage_meta, generated, distortion_model = _process_output(
+            stage_meta, generated, distortion_model, extras = _process_output(
                 state, page_id, sequence, options
             )
             if generated is not None:
@@ -292,6 +326,7 @@ def _run_stages(
         split=split,
         transformation=state.xform,
         distortion_model=distortion_model,
+        output_extras=extras,
     )
 
 
@@ -461,6 +496,18 @@ def _outside_source_mask(state: _PageState) -> NDArray[np.bool_]:
     return mask
 
 
+def _outside_source_key(state: _PageState) -> tuple:
+    """Identify the mask ``_outside_source_mask`` would make for this state."""
+    xform = state.xform
+    rect = xform.resulting_rect
+    return (
+        state.source.shape,
+        xform.transform.tobytes(),
+        np.asarray(xform.resulting_pre_crop_area).tobytes(),
+        (rect.x, rect.y, rect.width, rect.height),
+    )
+
+
 def _process_select_content(
     state: _PageState,
     page_id: PageId,
@@ -480,7 +527,8 @@ def _process_select_content(
             state.view(),
             page_id,
             dpi=options.dpi,
-            outside=_outside_source_mask(state),
+            outside=lambda: _outside_source_mask(state),
+            outside_key=_outside_source_key(state),
             page_outline=_polygon_points(state.xform.resulting_pre_crop_area),
             view_transform=state.xform.transform,
         )
@@ -594,7 +642,7 @@ def _process_output(
     page_id: PageId,
     sequence: StageSequence,
     options: PipelineOptions,
-) -> tuple[dict, OutputResult | None, DistortionModelSpec | None]:
+) -> tuple[dict, OutputResult | None, DistortionModelSpec | None, OutputExtras | None]:
     """Process the Output stage.
 
     The view is resampled once, at the output resolution, through the
@@ -603,7 +651,8 @@ def _process_output(
 
     Returns:
         Tuple of (stage metadata, generated output or None in detect-only mode,
-        the distortion model automatic or marginal dewarping built or None).
+        the distortion model automatic or marginal dewarping built or None,
+        the pictures for the view's tabs or None unless the options ask).
     """
     from scantailor.filters.output.generator import generate_output
 
@@ -616,7 +665,7 @@ def _process_output(
     }
 
     if options.detect_only:
-        return metadata, None, None
+        return metadata, None, None, None
 
     state.scale_to_dpi(params.output_dpi)
     view = state.view()
@@ -628,6 +677,12 @@ def _process_output(
     page_outline = _polygon_points(
         state.xform.resulting_pre_crop_area - [rect.x, rect.y]
     )
+    height, width = state.source.shape[:2]
+    source_outline = _polygon_points(
+        state.to_view(
+            np.array([(0, 0), (width, 0), (width, height), (0, height)], dtype=float)
+        )
+    )
     found = _FoundModel()
     result = generate_output(
         view,
@@ -638,13 +693,26 @@ def _process_output(
         page_outline=page_outline,
         picture_zones=_view_zones(state, params.picture_zones),
         fill_zones=_view_zones(state, params.fill_zones),
+        source_outline=source_outline,
+        keep_despeckle_source=options.keep_output_extras,
     )
 
     metadata["is_binary"] = result.is_binary
     metadata["was_dewarped"] = result.was_dewarped
     metadata["output_dpi"] = (params.output_dpi.horizontal, params.output_dpi.vertical)
 
-    return metadata, result, found.as_source_spec(state)
+    extras = (
+        OutputExtras(
+            page=view,
+            despeckle_source=result.despeckle_source,
+            despeckle_dpi=round(
+                min(params.output_dpi.horizontal, params.output_dpi.vertical)
+            ),
+        )
+        if options.keep_output_extras
+        else None
+    )
+    return metadata, result, found.as_source_spec(state), extras
 
 
 @dataclass

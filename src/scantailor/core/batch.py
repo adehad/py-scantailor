@@ -26,11 +26,13 @@ import numpy as np
 from loguru import logger
 from numpy.typing import NDArray
 
+from scantailor.core.dewarp_spec import DewarpSpec
 from scantailor.core.image_io import tiff_compressions_in_use, write_image
 from scantailor.core.models import Dpi, PageId, SubPage
 from scantailor.core.page_source import DpiOverrides, load_page
 from scantailor.core.pipeline import (
     PipelineOptions,
+    PipelineResult,
     fix_aggregate_page_size,
     process_page,
 )
@@ -49,7 +51,9 @@ from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.generator import applied_post_deskew_angle
 from scantailor.filters.output.params import DistortionModelSpec
+from scantailor.filters.output.params import Params as OutputParams
 from scantailor.filters.output.split_output import (
     BACKGROUND_DIR,
     FOREGROUND_DIR,
@@ -87,12 +91,15 @@ class RenderInfo:
             transformation describes.
         distortion_model: Page edges that automatic or marginal dewarping
             found, to be stored in the page's parameters; None if none was built.
+        dewarp: How the page was dewarped, for placing its text; None when it
+            was not dewarped or no model is known.
     """
 
     transformation: ImageTransformation
     output_dpi: Dpi
     was_dewarped: bool
     distortion_model: DistortionModelSpec | None = None
+    dewarp: DewarpSpec | None = None
 
 
 @dataclass(frozen=True)
@@ -259,6 +266,53 @@ def erase_output_files(
     return deleted
 
 
+def rename_split_outputs(
+    output_dir: Path,
+    pages: Sequence[PageId],
+    old_direction: LayoutDirection,
+    new_direction: LayoutDirection,
+    file_labels: Mapping[Path, int] | None = None,
+) -> list[tuple[Path, Path]]:
+    """Rename the outputs of split pages to the names a new reading order gives.
+
+    Each half keeps its content and only changes its ``_1L``/``_2L`` or
+    ``_1R``/``_2R`` number, in the output folder and in the layer sub-folders.
+    A half's old and new name never coincide with another half's, so no file
+    overwrites a file that is itself being renamed.
+
+    Args:
+        output_dir (Path): The project's output folder.
+        pages (Sequence[PageId]): All pages of the project.
+        old_direction (LayoutDirection): Reading direction the files were named
+            under.
+        new_direction (LayoutDirection): Reading direction to name them for.
+        file_labels (Mapping[Path, int] | None): Stored labels of source files,
+            as passed to ``output_file_names``.
+
+    Returns:
+        list[tuple[Path, Path]]: Old and new path of every file that was renamed.
+            A file that cannot be renamed is logged and left where it is.
+    """
+    old_names = output_file_names(pages, old_direction, file_labels)
+    new_names = output_file_names(pages, new_direction, file_labels)
+    root = Path(os.path.abspath(output_dir))
+    renamed: list[tuple[Path, Path]] = []
+    for page in pages:
+        if page.sub_page == SubPage.SINGLE_PAGE or old_names[page] == new_names[page]:
+            continue
+        for folder in (root, *(root / layer for layer in _SPLIT_LAYER_DIRS)):
+            source, target = folder / old_names[page], folder / new_names[page]
+            if source.is_symlink() or not source.is_file():
+                continue
+            try:
+                os.replace(source, target)
+            except OSError as error:
+                logger.warning("Could not rename {} to {}: {}", source, target, error)
+                continue
+            renamed.append((source, target))
+    return renamed
+
+
 # ProcessPoolExecutor refuses more workers than WaitForMultipleObjects can wait on.
 _MAX_WINDOWS_WORKERS = 61
 
@@ -354,46 +408,6 @@ def spawn_pool(
         initializer=_init_pool_worker,
         initargs=(initializer, initargs),
     )
-
-
-def map_pool[Job, Result](
-    function: Callable[[Job], Result],
-    jobs: Sequence[Job],
-    executor: ProcessPoolExecutor,
-    max_workers: int | None = None,
-) -> list[Result]:
-    """Run ``function`` over ``jobs`` on a shared pool and return results in job order.
-
-    Args:
-        function (Callable[[Job], Result]): Picklable module-level callable.
-        jobs (Sequence[Job]): Picklable job arguments.
-        executor (ProcessPoolExecutor): A pool from ``spawn_pool``; left running.
-        max_workers (int | None): The pool's size.
-
-    Returns:
-        list[Result]: One result per job, in the order of ``jobs``.
-
-    Raises:
-        BaseException: The error of the first failed job in job order, after
-            every scheduled job has finished.
-    """
-    position = {id(job): index for index, job in enumerate(jobs)}
-    results: dict[int, Result] = {}
-    errors: dict[int, BaseException] = {}
-
-    def on_outcome(
-        job: Job, result: Result | None, error: BaseException | None
-    ) -> None:
-        index = position[id(job)]
-        if error is not None:
-            errors[index] = error
-        else:
-            results[index] = result  # type: ignore[assignment]
-
-    run_pool(function, jobs, on_outcome, max_workers=max_workers, executor=executor)
-    if errors:
-        raise errors[min(errors)]
-    return [results[index] for index in range(len(jobs))]
 
 
 def _drain[Job, Result](
@@ -670,13 +684,32 @@ def _render_page(job: _PageJob) -> tuple[Path, RenderInfo]:
             )
     if rendered.transformation is None or dpi is None:
         raise RuntimeError("The pipeline returned no output geometry")
+    was_dewarped = bool(rendered.metadata.get("OUTPUT", {}).get("was_dewarped"))
     info = RenderInfo(
         rendered.transformation,
         dpi,
-        bool(rendered.metadata.get("OUTPUT", {}).get("was_dewarped")),
+        was_dewarped,
         rendered.distortion_model,
+        _dewarp_spec(rendered, stages.output_filter.get_params(job.page))
+        if was_dewarped
+        else None,
     )
     return job.output_path, info
+
+
+def _dewarp_spec(rendered: PipelineResult, params: OutputParams) -> DewarpSpec | None:
+    """Describe the dewarp that produced a rendered page, or None if unknown."""
+    model = rendered.distortion_model
+    if model is None and params.distortion_model.is_defined():
+        model = params.distortion_model
+    if model is None:
+        return None
+    return DewarpSpec(
+        top=model.top,
+        bottom=model.bottom,
+        depth_perception=params.depth_perception,
+        post_deskew_angle=applied_post_deskew_angle(params),
+    )
 
 
 def run_batch(
