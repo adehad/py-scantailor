@@ -5,7 +5,10 @@ from pathlib import Path
 from typing import Any, cast
 
 from PySide6.QtCore import (
+    QEvent,
+    QItemSelectionModel,
     QModelIndex,
+    QObject,
     QPersistentModelIndex,
     QPoint,
     QRect,
@@ -14,12 +17,13 @@ from PySide6.QtCore import (
     Qt,
     Signal,
 )
-from PySide6.QtGui import QPainter, QPalette, QPen
+from PySide6.QtGui import QMouseEvent, QPainter, QPalette, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QListView,
     QMenu,
+    QRubberBand,
     QStyle,
     QStyledItemDelegate,
     QStyleOptionViewItem,
@@ -160,6 +164,99 @@ class ThumbnailDelegate(QStyledItemDelegate):
         painter.restore()
 
 
+class _RubberBandSelector(QObject):
+    """Selects every thumbnail a Ctrl+drag over empty space touches.
+
+    Dragging over a thumbnail is left to the view, so Ctrl+click keeps toggling
+    single pages. The selection is extended, never replaced. Only active while the
+    view allows extended selection.
+
+    Args:
+        view (QListView): The view whose viewport is watched.
+    """
+
+    _MIN_EXTENT = 3
+
+    def __init__(self, view: QListView) -> None:
+        """Initialise; arguments are described on the class."""
+        super().__init__(view)
+        self._view = view
+        self._band = QRubberBand(QRubberBand.Shape.Rectangle, view.viewport())
+        self._origin = QPoint()
+        self._active = False
+        view.viewport().installEventFilter(self)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        kind = event.type()
+        if kind not in (
+            QEvent.Type.MouseButtonPress,
+            QEvent.Type.MouseMove,
+            QEvent.Type.MouseButtonRelease,
+        ):
+            return False
+        mouse = cast(QMouseEvent, event)
+        position = mouse.position().toPoint()
+        if kind == QEvent.Type.MouseButtonPress:
+            return self._begin(mouse, position)
+        if not self._active:
+            return False
+        if kind == QEvent.Type.MouseMove:
+            self._band.setGeometry(QRect(self._origin, position).normalized())
+            return True
+        if mouse.button() != Qt.MouseButton.LeftButton:
+            return False
+        self._finish()
+        return True
+
+    def _begin(self, mouse: QMouseEvent, position: QPoint) -> bool:
+        view = self._view
+        starts_here = (
+            mouse.button() == Qt.MouseButton.LeftButton
+            and bool(mouse.modifiers() & Qt.KeyboardModifier.ControlModifier)
+            and view.selectionMode()
+            == QAbstractItemView.SelectionMode.ExtendedSelection
+            and not view.indexAt(position).isValid()
+        )
+        if not starts_here:
+            return False
+        self._origin = position
+        self._active = True
+        self._band.setGeometry(QRect(position, QSize()))
+        self._band.show()
+        return True
+
+    def _finish(self) -> None:
+        self._active = False
+        self._band.hide()
+        area = self._band.geometry().normalized()
+        if area.width() > self._MIN_EXTENT and area.height() > self._MIN_EXTENT:
+            self._select_touching(area)
+
+    def _select_touching(self, area: QRect) -> None:
+        view = self._view
+        model = view.model()
+        selection = view.selectionModel()
+        touched = [
+            index
+            for row in range(model.rowCount())
+            if view.visualRect(index := model.index(row, 0)).intersects(area)
+        ]
+        if not touched:
+            return
+        for index in touched:
+            selection.select(index, QItemSelectionModel.SelectionFlag.Select)
+        current = selection.currentIndex()
+        leader_still_valid = (
+            current.isValid()
+            and selection.isSelected(current)
+            and view.visualRect(current).intersects(area)
+        )
+        if not leader_still_valid:
+            selection.setCurrentIndex(
+                touched[0], QItemSelectionModel.SelectionFlag.NoUpdate
+            )
+
+
 class ThumbnailListWidget(QWidget):
     """Scrollable list of page thumbnails.
 
@@ -238,6 +335,7 @@ class ThumbnailListWidget(QWidget):
             *extra_orders,
         ]
         self._restoring = False
+        self._sorting_paused = False
         self._follow_current = True
         self._has_project = project is not None
         self._context_menu_enabled = True
@@ -255,6 +353,7 @@ class ThumbnailListWidget(QWidget):
         self._view.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self._view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._view.customContextMenuRequested.connect(self._on_context_menu_requested)
+        self._rubber_band = _RubberBandSelector(self._view)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -517,16 +616,48 @@ class ThumbnailListWidget(QWidget):
         """
         self._order_combo.setCurrentIndex(index)
 
+    def select_pages(self, pages: Sequence[PageId]) -> None:
+        """Add pages to the selection without changing the current page.
+
+        Args:
+            pages (Sequence[PageId]): The pages to select; those not listed are ignored.
+        """
+        self._restoring = True
+        try:
+            self._restore(list(pages), None)
+        finally:
+            self._restoring = False
+        self.selection_changed.emit(self.selected_pages())
+
+    def set_sorting_paused(self, paused: bool) -> None:
+        """Show the pages in the project's order, or go back to the chosen order.
+
+        Args:
+            paused (bool): True to ignore the chosen sort order for now.
+        """
+        if paused == self._sorting_paused:
+            return
+        self._sorting_paused = paused
+        self._apply_order()
+
     def item_rect(self, page: PageId) -> QRect:
         """Return a page's rectangle in viewport coordinates."""
         return self._view.visualRect(self._model.index(self._model.row_of(page)))
 
     def _on_order_chosen(self, option_index: int) -> None:
+        self._apply_order()
+
+    def _apply_order(self) -> None:
+        order = (
+            natural_order()
+            if self._sorting_paused
+            else self._orders[self._order_combo.currentIndex()]
+        )
         selected = self.selected_pages()
         current = self._model.current_page
         self._restoring = True
         try:
-            self._model.set_order(self._orders[option_index])
+            self._model.set_order(order)
             self._restore(selected, current)
         finally:
             self._restoring = False

@@ -56,6 +56,7 @@ from scantailor.filters.output.split_output import (
     ORIGINAL_BACKGROUND_DIR,
     write_split_images,
 )
+from scantailor.filters.page_layout.params import ContentSize
 from scantailor.filters.page_split.layout_type import LayoutType
 
 DEFAULT_DPI = 300.0
@@ -441,6 +442,7 @@ def collect_stage_defaults(stages: StageSequence) -> StageDefaultsData:
     """
     output = stages.output_filter.settings
     select_content = stages.select_content_filter.settings
+    frozen = stages.page_layout_filter.settings.get_frozen_aggregate_hard_size_mm()
     return {
         "page_split_layout_type": (
             stages.page_split_filter.settings.get_default_layout_type().value
@@ -451,6 +453,10 @@ def collect_stage_defaults(stages: StageSequence) -> StageDefaultsData:
         "page_detection_box": list(select_content.get_page_detection_box()),
         "page_detection_tolerance": select_content.get_page_detection_tolerance(),
         "deskew_auto_oblique": stages.deskew_filter.auto_oblique_default,
+        "deskew_content_based": stages.deskew_filter.content_based,
+        "page_layout_frozen_aggregate_size": (
+            None if frozen is None else frozen.model_dump(mode="json")
+        ),
     }
 
 
@@ -471,6 +477,13 @@ def apply_stage_defaults(stages: StageSequence, defaults: StageDefaultsData) -> 
     stages.deskew_filter.auto_oblique_default = bool(
         defaults.get("deskew_auto_oblique", False)
     )
+    stages.deskew_filter.content_based = bool(
+        defaults.get("deskew_content_based", True)
+    )
+    if (frozen := defaults.get("page_layout_frozen_aggregate_size")) is not None:
+        stages.page_layout_filter.settings.restore_frozen_aggregate_hard_size_mm(
+            ContentSize.model_validate(frozen)
+        )
 
 
 def _dump_entries(entries: dict[str, list[StageParamsEntry]]) -> StageParamsData:

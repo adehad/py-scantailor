@@ -49,7 +49,7 @@ def test_open_project_with_chosen_file_loads_it_and_names_the_window(
     tmp_path: pathlib.Path,
     page_images: PageImages,
 ):
-    project = Project()
+    project = Project(output_directory=tmp_path)
     for path in page_images.paths:
         project.add_image(
             ImageId(file_path=path),
@@ -121,7 +121,7 @@ def test_open_project_keeps_modified_project_when_save_prompt_is_cancelled(
     tmp_path: pathlib.Path,
 ):
     other = tmp_path / "other.ScanTailor"
-    Project().save(other)
+    Project(output_directory=tmp_path).save(other)
     file_dialogs.open_file = str(other)
     save_prompt.answers.append(SaveChoice.CANCEL)
     before = project_window.project
@@ -138,7 +138,7 @@ def test_open_project_discarding_changes_replaces_the_project(
     tmp_path: pathlib.Path,
 ):
     other = tmp_path / "other.ScanTailor"
-    Project().save(other)
+    Project(output_directory=tmp_path).save(other)
     file_dialogs.open_file = str(other)
     save_prompt.answers.append(SaveChoice.DISCARD)
 

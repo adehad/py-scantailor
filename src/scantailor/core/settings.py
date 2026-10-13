@@ -23,6 +23,18 @@ class Units(str, Enum):
     CENTIMETERS = "cm"
 
 
+class ZoneCreationMode(int, Enum):
+    """How a new zone is drawn in the Output view.
+
+    Values match the ones upstream stores, and the Z, X and C shortcuts that
+    choose them.
+    """
+
+    POLYGONAL = 0
+    LASSO = 1
+    RECTANGULAR = 2
+
+
 class TiffCompression(int, Enum):
     """TIFF compression methods.
 
@@ -118,6 +130,11 @@ class ApplicationSettings(BaseModel):
     auto_save_project: bool = Field(default=False)
     show_canceling_selection_question: bool = Field(default=True)
 
+    # Output view
+    default_zone_creation_mode: ZoneCreationMode = Field(
+        default=ZoneCreationMode.POLYGONAL
+    )
+
     # Output settings
     tiff_bw_compression: TiffCompression = Field(default=TiffCompression.CCITT_FAX4)
     tiff_color_compression: TiffCompression = Field(default=TiffCompression.LZW)
@@ -147,6 +164,15 @@ class ApplicationSettings(BaseModel):
 
     # Profile settings
     current_profile: str = Field(default="Default")
+
+    @field_validator("default_zone_creation_mode", mode="before")
+    @classmethod
+    def _unknown_zone_mode_means_polygonal(cls, value: object) -> object:
+        """Fall back to polygonal for a stored value no mode has, as upstream does."""
+        try:
+            return ZoneCreationMode(value)
+        except ValueError:
+            return ZoneCreationMode.POLYGONAL
 
     @field_validator("tiff_bw_compression")
     @classmethod

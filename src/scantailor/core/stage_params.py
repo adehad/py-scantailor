@@ -10,11 +10,12 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from scantailor.core.models import Dpi, ImageId, OrthogonalRotation, PageId
+from scantailor.core.models import Dpi, ImageId, PageId
 from scantailor.core.project import StageParamsEntry
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.page_layout.params import ContentSize
 from scantailor.filters.page_split.layout_type import LayoutType
 
 STAGE_KEYS: dict[FilterStage, str] = {
@@ -80,16 +81,16 @@ def collect_stage_params(
     result: dict[str, list[StageParamsEntry]] = {}
 
     orientation = stages.fix_orientation_filter.settings
-    rotations = [
+    orientations = [
         StageParamsEntry(
             page=PageId(image_id=image_id),
-            params=_dump(orientation.get_rotation_for(image_id)),
+            params=orientation.dump_params(image_id),
         )
         for image_id in _distinct_images(pages)
-        if orientation.is_rotation_set(image_id)
+        if orientation.has_params(image_id)
     ]
-    if rotations:
-        result[STAGE_KEYS[FilterStage.FIX_ORIENTATION]] = rotations
+    if orientations:
+        result[STAGE_KEYS[FilterStage.FIX_ORIENTATION]] = orientations
 
     for stage in FilterStage:
         if stage is FilterStage.FIX_ORIENTATION:
@@ -121,9 +122,7 @@ def apply_stage_params(
     """
     orientation = stages.fix_orientation_filter.settings
     for entry in stage_params.get(STAGE_KEYS[FilterStage.FIX_ORIENTATION], []):
-        orientation.apply_rotation(
-            entry.page.image_id, OrthogonalRotation.model_validate(entry.params)
-        )
+        orientation.load_params(entry.page.image_id, entry.params)
 
     for stage in FilterStage:
         if stage is FilterStage.FIX_ORIENTATION:
@@ -146,6 +145,7 @@ def collect_stage_defaults(stages: StageSequence) -> dict[str, Any]:
     """
     output = stages.output_filter.settings
     select_content = stages.select_content_filter.settings
+    frozen = stages.page_layout_filter.settings.get_frozen_aggregate_hard_size_mm()
     return {
         "page_split_layout_type": (
             stages.page_split_filter.settings.get_default_layout_type().value
@@ -156,6 +156,10 @@ def collect_stage_defaults(stages: StageSequence) -> dict[str, Any]:
         "page_detection_box": list(select_content.get_page_detection_box()),
         "page_detection_tolerance": select_content.get_page_detection_tolerance(),
         "deskew_auto_oblique": stages.deskew_filter.auto_oblique_default,
+        "deskew_content_based": stages.deskew_filter.content_based,
+        "page_layout_frozen_aggregate_size": (
+            None if frozen is None else frozen.model_dump(mode="json")
+        ),
     }
 
 
@@ -190,3 +194,9 @@ def apply_stage_defaults(stages: StageSequence, defaults: dict[str, Any]) -> Non
         select_content.set_page_detection_tolerance(tolerance)
     if (auto_oblique := defaults.get("deskew_auto_oblique")) is not None:
         stages.deskew_filter.auto_oblique_default = bool(auto_oblique)
+    if (content_based := defaults.get("deskew_content_based")) is not None:
+        stages.deskew_filter.content_based = bool(content_based)
+    if (frozen := defaults.get("page_layout_frozen_aggregate_size")) is not None:
+        stages.page_layout_filter.settings.restore_frozen_aggregate_hard_size_mm(
+            ContentSize.model_validate(frozen)
+        )

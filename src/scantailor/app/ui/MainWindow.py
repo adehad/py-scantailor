@@ -2,7 +2,7 @@
 
 import enum
 import pathlib
-from collections.abc import Callable, Hashable, Iterable
+from collections.abc import Callable, Collection, Hashable, Iterable
 from typing import Any, cast
 
 from loguru import logger as _LOG
@@ -26,6 +26,9 @@ from scantailor.app.ui.dialogs.about import AboutDialog
 from scantailor.app.ui.dialogs.apply_to import (
     DESKEW_OPTIONS,
     DESKEW_TITLE,
+    MARGIN_SIDE_ICONS,
+    MARGIN_SIDE_OPTIONS,
+    MARGINS_OPTIONS_TITLE,
     OUTPUT_GROUP_TITLES,
     ApplyToDialog,
 )
@@ -41,6 +44,7 @@ from scantailor.app.ui.dialogs.relinking import RelinkingDialog
 from scantailor.app.ui.dialogs.remove_pages import RemovePagesDialog
 from scantailor.app.ui.dialogs.settings import SettingsDialog
 from scantailor.app.ui.dialogs.split_mode import SplitModeDialog
+from scantailor.app.ui.icons import icon
 from scantailor.app.ui.page_renderer import PageRenderer, render_thumbnail
 from scantailor.app.ui.panels.new_open_project import NewOpenProjectPanel
 from scantailor.app.ui.pdf_worker import (
@@ -71,7 +75,14 @@ from scantailor.core.batch import (
     output_file_names,
 )
 from scantailor.core.default_params import apply_default_params
-from scantailor.core.default_params_profiles import active_default_params
+from scantailor.core.default_params_profiles import (
+    CUSTOM_PROFILE,
+    DEFAULT_PROFILE,
+    SOURCE_PROFILE,
+    ProfileError,
+    ProfileStore,
+    active_default_params,
+)
 from scantailor.core.filename_ordering import sort_smart
 from scantailor.core.image_io import ImageLoadError, list_image_pages
 from scantailor.core.models import Dpi, ImageId, PageId
@@ -89,6 +100,7 @@ from scantailor.core.stage_params import (
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.xml_compat import import_xml_project_file
 from scantailor.filters.output.params import ApplyGroup, DistortionModelSpec
+from scantailor.filters.page_layout.settings import MARGIN_SIDES
 from scantailor.filters.page_split.layout_type import LayoutType
 
 PROJECT_SUFFIX = ".ScanTailor"
@@ -399,6 +411,10 @@ class MainWindowManager:
         self.sortOptions = get_cwidget(self.ui, QComboBox, "sortOptions")
         self.actionFixDpi = get_cwidget(self.ui, QtGui.QAction, "actionFixDpi")
         self.actionRelinking = get_cwidget(self.ui, QtGui.QAction, "actionRelinking")
+        self.actionReverseTwoPageOrder = get_cwidget(
+            self.ui, QtGui.QAction, "actionReverseTwoPageOrder"
+        )
+        self.actionReverseTwoPageOrder.setIcon(icon("swap-pages"))
         self.actionDebug = get_cwidget(self.ui, QtGui.QAction, "actionDebug")
         self.actionSettings = get_cwidget(self.ui, QtGui.QAction, "actionSettings")
         self.actionDefaults = get_cwidget(self.ui, QtGui.QAction, "actionDefaults")
@@ -440,6 +456,8 @@ class MainWindowManager:
             self.ui, QToolButton, "deviationHighlightingBtn"
         )
         self.sortingOrderBtn = get_cwidget(self.ui, QToolButton, "sortingOrderBtn")
+        self.pauseSortingBtn = get_cwidget(self.ui, QToolButton, "pauseSortingBtn")
+        self.pauseSortingBtn.setIcon(icon("pause", "play"))
         self.filterList = get_cwidget(self.ui, StageListView, "filterList")
         self.actionAddFiles = QtGui.QAction(self.ui.tr("Add Files..."), self.ui)
         self._insert_add_files_action()
@@ -490,6 +508,9 @@ class MainWindowManager:
         self.actionSwitchFilter6.triggered.connect(self.switchFilter6)
         self.actionFixDpi.triggered.connect(self.fixDpiDialogRequested)
         self.actionRelinking.triggered.connect(self.showRelinkingDialog)
+        self.actionReverseTwoPageOrder.triggered.connect(
+            self.toggleTwoPageSpreadReadingOrder
+        )
         self.actionDebug.toggled.connect(self.debugToggled)
         self.actionSettings.triggered.connect(self.openSettingsDialog)
         self.actionDefaults.triggered.connect(self.openDefaultParamsDialog)
@@ -566,6 +587,7 @@ class MainWindowManager:
         )
         if self._panels is not None:
             self._panels.set_dpi_overrides(self._dpi_overrides)
+            self._show_source_image_info()
 
     def _thumbnail_digest(self, page: PageId, _stage: str) -> Hashable:
         """Return what identifies the parameters a page's thumbnail was made with."""
@@ -596,6 +618,7 @@ class MainWindowManager:
         self.sortOptions.setCurrentIndex(self.thumbnails.order_combo.currentIndex())
         self.sortOptions.currentIndexChanged.connect(self.thumbnails.set_order)
         self.sortOptions.currentIndexChanged.connect(self._update_status_bar)
+        self.pauseSortingBtn.toggled.connect(self._on_pause_sorting_toggled)
         self.focusButton.toggled.connect(self._on_focus_toggled)
         self.selectionModeBtn.toggled.connect(
             self.thumbnails.set_multi_selection_enabled
@@ -620,6 +643,11 @@ class MainWindowManager:
         view = self.thumbnails.view
         for target in (view, view.viewport(), view.verticalScrollBar()):
             target.installEventFilter(self._wheel_zoom)
+
+    def _on_pause_sorting_toggled(self, paused: bool) -> None:
+        """Show the pages in the project's order while the sort order is paused."""
+        self.thumbnails.set_sorting_paused(paused)
+        self._update_status_bar()
 
     def _on_focus_toggled(self, checked: bool) -> None:
         """Follow the current page in the thumbnail list, scrolling to it now."""
@@ -916,6 +944,12 @@ class MainWindowManager:
             cast(Any, panels.options).page_count_requested.connect(
                 self._on_page_count_requested
             )
+        if panels.stage == FilterStage.DESKEW:
+            cast(Any, panels.options).auto_oblique_default_changed.connect(
+                self._remember_auto_oblique_default
+            )
+        if panels.stage == FilterStage.PAGE_LAYOUT:
+            self._connect_margins_panel(cast(Any, panels.options))
         self.optionsFrameLayout.addWidget(panels.options)
         self.imageFrameLayout.addWidget(panels.view)
         self.imageFrameLayout.setCurrentWidget(panels.view)
@@ -923,6 +957,67 @@ class MainWindowManager:
         if self._welcome_widget is not None:
             self.imageFrameLayout.setCurrentWidget(self._welcome_widget)
         self._show_current_page()
+
+    def _connect_margins_panel(self, options: Any) -> None:
+        """Route the Margins panel's size matching and source DPI signals.
+
+        Args:
+            options (Any): The Margins options widget.
+        """
+        options.match_size_to_all_requested.connect(
+            lambda: self.apply_to_pages(
+                FilterStage.PAGE_LAYOUT, self.pages(), part="alignment"
+            )
+        )
+        options.aggregate_size_changed.connect(self._on_aggregate_size_changed)
+        options.fix_dpi_requested.connect(self.fixDpiDialogRequested)
+        options.source_dpi_changed.connect(self._on_source_dpi_edited)
+
+    def _on_aggregate_size_changed(self) -> None:
+        """Redraw every page after the size the pages are matched to changed."""
+        self.modified = True
+        self._invalidate_thumbnails()
+        self._request_render()
+
+    def _on_source_dpi_edited(self, horizontal: int, vertical: int) -> None:
+        """Store the resolution typed for the current page's image.
+
+        Args:
+            horizontal (int): Dots per inch along x.
+            vertical (int): Dots per inch along y.
+        """
+        info = self._current_image_info()
+        if info is None or self.batch_runner.is_running:
+            return
+        dpi = Dpi(horizontal=horizontal, vertical=vertical)
+        if info.metadata.dpi == dpi:
+            return
+        info.metadata = info.metadata.model_copy(update={"dpi": dpi})
+        self.modified = True
+        self._refresh_dpi_overrides()
+        self._invalidate_thumbnails()
+        self._request_render()
+
+    def _current_image_info(self) -> ImageInfo | None:
+        """Return the project's record of the current page's image, if any."""
+        page = self._current_page
+        if page is None or self.project is None:
+            return None
+        return next(
+            (info for info in self.project.images if info.id == page.image_id), None
+        )
+
+    def _show_source_image_info(self) -> None:
+        """Tell the Margins panel the size and resolution of the current image."""
+        panels = self._panels
+        if panels is None or panels.stage != FilterStage.PAGE_LAYOUT:
+            return
+        info = self._current_image_info()
+        if info is not None:
+            metadata = info.metadata
+            cast(Any, panels.options).set_source_image(
+                metadata.width, metadata.height, metadata.dpi
+            )
 
     def _propagate_between_stages(
         self, previous: FilterStage, new: FilterStage
@@ -1015,6 +1110,39 @@ class MainWindowManager:
             self.modified = True
             self._refresh_page_list()
 
+    def _remember_auto_oblique_default(self, enabled: bool) -> None:
+        """Keep the oblique default of new pages in the default parameters in use.
+
+        The built-in Default and Source profiles cannot be edited, so a change
+        moves the choice to the Custom profile, which starts from their values.
+
+        Args:
+            enabled (bool): Whether new pages detect their oblique correction.
+        """
+        settings = ApplicationSettings.get_instance()
+        store = ProfileStore()
+        params = active_default_params(settings, store)
+        if params.deskew.auto_oblique == enabled:
+            return
+        params = params.model_copy(
+            update={
+                "deskew": params.deskew.model_copy(update={"auto_oblique": enabled})
+            }
+        )
+        profile = settings.current_profile
+        if profile.strip().casefold() in (
+            DEFAULT_PROFILE.casefold(),
+            SOURCE_PROFILE.casefold(),
+        ):
+            profile = CUSTOM_PROFILE
+        try:
+            store.set_active(params, profile)
+            if profile != settings.current_profile:
+                settings.current_profile = profile
+                settings.save()
+        except (ProfileError, OSError):
+            _LOG.exception("The oblique default could not be stored")
+
     def _discard_panels(self) -> None:
         """Remove the widgets of the stage that is being left."""
         panels, self._panels = self._panels, None
@@ -1040,6 +1168,7 @@ class MainWindowManager:
         if panels is None:
             return
         panels.set_page(self._current_page)
+        self._show_source_image_info()
         self._request_render()
 
     def _update_status_bar(self) -> None:
@@ -1173,8 +1302,12 @@ class MainWindowManager:
             self.actionExportPdf,
             self.actionFixDpi,
             self.actionRelinking,
+            self.actionReverseTwoPageOrder,
         ):
             action.setEnabled(loaded)
+        self.pauseSortingBtn.setEnabled(loaded)
+        if not loaded:
+            self.pauseSortingBtn.setChecked(False)
 
     def _update_window_title(self) -> None:
         """Show the project name and, via ``[*]``, the unsaved-changes marker."""
@@ -1243,10 +1376,9 @@ class MainWindowManager:
             return False
         if stage == FilterStage.PAGE_SPLIT:
             return self._show_split_mode_dialog(page)
-        option_labels = {
-            key: self.ui.tr(label)
-            for key, label in _APPLY_OPTIONS.get(stage, {}).items()
-        }
+        margins = stage == FilterStage.PAGE_LAYOUT and part == "margins"
+        options = MARGIN_SIDE_OPTIONS if margins else _APPLY_OPTIONS.get(stage, {})
+        option_labels = {key: self.ui.tr(label) for key, label in options.items()}
         dialog = ApplyToDialog(
             page,
             self.pages(),
@@ -1254,13 +1386,16 @@ class MainWindowManager:
             self.ui,
             title=self._apply_dialog_title(stage, part),
             options=option_labels,
+            option_icons=MARGIN_SIDE_ICONS if margins else None,
+            options_title=self.ui.tr(MARGINS_OPTIONS_TITLE) if margins else None,
         )
         accepted = dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted
         targets = dialog.pages() if accepted else []
         flags = {key: dialog.option_checked(key) for key in option_labels}
         dialog.deleteLater()
         others = [target for target in targets if target != page]
-        if not others:
+        sides = tuple(side for side in MARGIN_SIDE_OPTIONS if flags.get(side))
+        if not others or (margins and not sides):
             return False
         self.apply_to_pages(
             stage,
@@ -1270,6 +1405,7 @@ class MainWindowManager:
             page_box=flags.get("page_box", True),
             deskew=flags.get("deskew", True),
             oblique=flags.get("oblique", True),
+            sides=sides if margins else MARGIN_SIDES,
         )
         return True
 
@@ -1339,6 +1475,7 @@ class MainWindowManager:
         oblique: bool = True,
         layout_type: LayoutType = LayoutType.AUTO_LAYOUT_TYPE,
         apply_cut: bool = False,
+        sides: Collection[str] = MARGIN_SIDES,
     ) -> None:
         """Copy the current page's settings of ``stage`` to other pages.
 
@@ -1353,6 +1490,7 @@ class MainWindowManager:
             layout_type (LayoutType): Page Split: the layout type to request.
             apply_cut (bool): Page Split: also copy the cutter lines, adapted to
                 each target.
+            sides (Collection[str]): Margins: the sides to copy.
         """
         source = self._current_page
         if source is None or not targets:
@@ -1385,7 +1523,7 @@ class MainWindowManager:
             case FilterStage.PAGE_LAYOUT if part == "alignment":
                 propagation.apply_alignment(stages, source, targets)
             case FilterStage.PAGE_LAYOUT:
-                propagation.apply_margins(stages, source, targets)
+                propagation.apply_margins(stages, source, targets, sides)
             case FilterStage.OUTPUT:
                 propagation.apply_output(stages, source, targets, ApplyGroup(part))
             case _:
@@ -1806,9 +1944,8 @@ class MainWindowManager:
 
         Args:
             project (Project): The project.
-            only_missing (bool): Keep only folders that do not exist. The output
-                folder is then listed only when an image folder is missing too,
-                because a missing output folder alone is simply recreated.
+            only_missing (bool): Keep only folders that do not exist; the output
+                folder is listed when it is one of them.
 
         Returns:
             list[pathlib.Path]: Distinct folders in sorted order.
@@ -1816,8 +1953,6 @@ class MainWindowManager:
         directories = image_directories(
             [info.id.file_path for info in project.images], only_missing=only_missing
         )
-        if only_missing and not directories:
-            return []
         output = project.output_directory
         if output not in directories and not (only_missing and output.is_dir()):
             directories = sorted([*directories, output])
@@ -2046,6 +2181,18 @@ class MainWindowManager:
         apply_stage_defaults(stages, project.stage_defaults)
         project_file = pathlib.Path(self.projectFile) if self.projectFile else None
         self._install_project(project, stages, project_file=project_file, modified=True)
+
+    def toggleTwoPageSpreadReadingOrder(self, _checked: bool = False) -> None:
+        """Swap which half of a two-page image comes first, in the list and names."""
+        project = self.project
+        if project is None or self.batch_runner.is_running:
+            return
+        selected = self.thumbnails.selected_pages()
+        project.layout_direction = "RTL" if project.layout_direction == "LTR" else "LTR"
+        self.modified = True
+        self._invalidate_thumbnails()
+        self._refresh_page_list()
+        self.thumbnails.select_pages(selected)
 
     def debugToggled(self, enabled: bool) -> None:
         """Debug toggled."""
