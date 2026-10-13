@@ -128,3 +128,29 @@ def test_file_has_header_and_ends_with_end_of_page_and_end_of_file() -> None:
     segments = _parse_segments(data[13:])
     assert [(n, t, p, len(d)) for n, t, p, d in segments][2:] == [(2, 49, 1, 0), (3, 51, 0, 0)]
     assert data[13:].startswith(encode_pdf_stream(image))
+
+
+def test_masked_array_is_rejected_instead_of_encoding_its_raw_data() -> None:
+    masked = np.ma.masked_array(np.ones((4, 4), dtype=bool), mask=np.eye(4, dtype=bool))
+
+    with pytest.raises(TypeError, match="masked"):
+        encode_pdf_stream(masked)
+    with pytest.raises(TypeError, match="masked"):
+        encode_file(masked)
+
+
+def test_segment_longer_than_a_32_bit_length_field_is_refused() -> None:
+    from jbig2_numba.segments import SegmentType, segment_header
+
+    with pytest.raises(ValueError, match="32-bit"):
+        segment_header(0, SegmentType.PAGE_INFORMATION, 1, 2**32)
+    with pytest.raises(ValueError, match="32-bit"):
+        segment_header(0, SegmentType.PAGE_INFORMATION, 1, 0xFFFFFFFF)
+
+
+def test_segment_header_accepts_the_largest_known_length() -> None:
+    from jbig2_numba.segments import SegmentType, segment_header
+
+    header = segment_header(0, SegmentType.PAGE_INFORMATION, 1, 0xFFFFFFFE)
+
+    assert header.endswith(b"\xff\xff\xff\xfe")

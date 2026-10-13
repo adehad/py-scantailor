@@ -5,13 +5,17 @@ poppler via ``pdfimages -png``) so no page rendering or resampling is
 involved. With ``/DeviceGray`` a decoded sample of 0 is black.
 """
 
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import pymupdf
+import pytest
 from PIL import Image
+
+POPPLER_MISSING_REASON = "poppler's pdfimages is not on PATH; install poppler-utils"
 
 
 @dataclass(frozen=True)
@@ -119,7 +123,10 @@ def decode_with_poppler(pdf: TestPdf, workdir: Path) -> list[np.ndarray]:
 
     Raises:
         AssertionError: If poppler reports an error or emits a different number of images.
+        pytest.skip.Exception: If ``pdfimages`` is not installed.
     """
+    if shutil.which("pdfimages") is None:
+        pytest.skip(POPPLER_MISSING_REASON)
     pdf_path = workdir / "test.pdf"
     pdf_path.write_bytes(pdf.data)
     result = subprocess.run(
@@ -147,7 +154,12 @@ def decode_with_both(images: list[EmbeddedImage], workdir: Path) -> dict[str, li
         workdir (Path): Empty scratch directory for poppler.
 
     Returns:
-        dict[str, list[np.ndarray]]: Decoded images keyed by decoder name.
+        dict[str, list[np.ndarray]]: Decoded images keyed by decoder name; poppler
+        is left out when ``pdfimages`` is missing, so the MuPDF check still runs.
+        ``test_poppler_available`` reports the gap as a skip.
     """
     pdf = build_pdf(images)
-    return {"mupdf": decode_with_pymupdf(pdf), "poppler": decode_with_poppler(pdf, workdir)}
+    decoded = {"mupdf": decode_with_pymupdf(pdf)}
+    if shutil.which("pdfimages") is not None:
+        decoded["poppler"] = decode_with_poppler(pdf, workdir)
+    return decoded
