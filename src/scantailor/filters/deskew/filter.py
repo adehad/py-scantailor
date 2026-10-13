@@ -177,8 +177,10 @@ class Filter:
             dependencies: Upstream geometry to record with the angle, so a
                 change of it invalidates the angle.
             dpi: Resolution of ``image``. When given, horizontal scanner
-                shadows are removed from the binarised page before the skew is
-                measured; None measures the page as it is.
+                shadows are removed from the binarised page before the content
+                based skew and the oblique angle are measured; the top edge is
+                always found on the page as it is. None measures the page
+                uncleaned throughout.
 
         Returns:
             SkewResult with detected angle and confidence.
@@ -197,14 +199,16 @@ class Filter:
 
         # Binarize for better skew detection
         binary = binarize_otsu(gray)
-        if dpi is not None:
-            binary = remove_horizontal_shadows(binary, dpi)
 
         result = None
         if not self.content_based:
+            # The dark surround along the top is the edge to find; the shadow
+            # cleanup erases it.
             result = find_skew_from_top_edge(
                 binary, max_angle=max_angle, min_angle=self.DEFAULT_MIN_ANGLE
             )
+        if dpi is not None:
+            binary = remove_horizontal_shadows(binary, dpi)
         if result is None or not result.is_confident():
             # Pages without a dark surround reaching the top have no usable edge.
             result = find_skew(

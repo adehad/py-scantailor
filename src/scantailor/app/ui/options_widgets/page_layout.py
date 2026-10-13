@@ -774,10 +774,12 @@ class OptionsWidget(QWidget):
     def _on_top_bottom_link_changed(self, checked: bool) -> None:
         """Handle top/bottom link button change."""
         self._state.top_bottom_linked = checked
+        self._state.remember_top_bottom_link(checked)
 
     def _on_left_right_link_changed(self, checked: bool) -> None:
         """Handle left/right link button change."""
         self._state.left_right_linked = checked
+        self._state.remember_left_right_link(checked)
 
     def _on_match_size_changed(self, checked: bool) -> None:
         """Handle match size checkbox change."""

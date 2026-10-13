@@ -534,25 +534,33 @@ class SelectContentImageView(ImageViewBase):
     def _nearest_edges(
         box: QRectF, click: QPointF, modifiers: Qt.KeyboardModifier
     ) -> Edge:
-        """Pick the box sides a content correction moves."""
+        """Pick the box sides a content correction moves.
+
+        Each axis picks its own side, so a tie between a horizontal and a
+        vertical distance cannot make a key restricted to one axis move the
+        other. Ties within an axis go to top and left, and without a key the
+        nearest side wins in the order top, left, bottom, right.
+        """
         top = click.y() - box.top()
         left = click.x() - box.left()
         bottom = box.bottom() - click.y()
         right = box.right() - click.x()
-        # Equal distances keep the side assigned last.
-        by_distance = {top: Edge.TOP}
-        by_distance[left] = Edge.LEFT
-        by_distance[bottom] = Edge.BOTTOM
-        by_distance[right] = Edge.RIGHT
+        vertical_side = (top, Edge.TOP) if top <= bottom else (bottom, Edge.BOTTOM)
+        horizontal_side = (left, Edge.LEFT) if left <= right else (right, Edge.RIGHT)
         horizontal = Qt.KeyboardModifier.ShiftModifier
         vertical = Qt.KeyboardModifier.ControlModifier
         if modifiers == horizontal:
-            return by_distance[min(left, right)]
+            return horizontal_side[1]
         if modifiers == vertical:
-            return by_distance[min(top, bottom)]
+            return vertical_side[1]
         if modifiers == (horizontal | vertical):
-            return by_distance[min(left, right)] | by_distance[min(top, bottom)]
-        return by_distance[min(by_distance)]
+            return horizontal_side[1] | vertical_side[1]
+        order = (Edge.TOP, Edge.LEFT, Edge.BOTTOM, Edge.RIGHT)
+        nearest = min(
+            (vertical_side, horizontal_side),
+            key=lambda side: (side[0], order.index(side[1])),
+        )
+        return nearest[1]
 
     def contextMenuEvent(self, event: QtGui.QContextMenuEvent) -> None:
         """Offer to create or remove the content box.
