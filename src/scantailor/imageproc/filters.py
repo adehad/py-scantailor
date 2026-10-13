@@ -4,6 +4,8 @@ Provides common image filters including blur, edge detection,
 and noise reduction.
 """
 
+from concurrent.futures import ThreadPoolExecutor
+
 import cv2
 import numpy as np
 from numpy.typing import NDArray
@@ -243,6 +245,65 @@ def _savgol_hat_matrix(window: int, degree: int) -> NDArray[np.float64]:
     return np.asarray(design @ np.linalg.pinv(design), dtype=np.float64)
 
 
+# OpenCV counts into float32, which holds whole numbers exactly up to 2**24.
+_HISTOGRAM_CHUNK_PIXELS = 1 << 23
+_HISTOGRAM_LEVELS = 256
+
+
+def gray_histogram(image: NDArray[np.uint8]) -> NDArray[np.int64]:
+    """Count the pixels at each gray level.
+
+    Args:
+        image (NDArray[np.uint8]): Gray image, or any array of 8-bit values.
+
+    Returns:
+        NDArray[np.int64]: 256 counts that add up to ``image.size``.
+    """
+    if image.dtype != np.uint8 or image.ndim != 2 or image.size == 0:
+        return np.bincount(image.ravel(), minlength=_HISTOGRAM_LEVELS).astype(np.int64)
+    contiguous = np.ascontiguousarray(image)
+    rows = max(1, _HISTOGRAM_CHUNK_PIXELS // contiguous.shape[1])
+    counts = np.zeros(_HISTOGRAM_LEVELS, dtype=np.int64)
+    for first in range(0, contiguous.shape[0], rows):
+        chunk = contiguous[first : first + rows]
+        histogram = cv2.calcHist([chunk], [0], None, [_HISTOGRAM_LEVELS], [0, 256])
+        counts += histogram.ravel().astype(np.int64)
+    return counts
+
+
+# Fewest lines of work that are worth handing to a thread of their own.
+_MIN_LINES_PER_BAND = 256
+
+
+def _correlate1d_in_bands(
+    data: NDArray[np.float32],
+    weights: NDArray[np.float32],
+    axis: int,
+) -> NDArray[np.float32]:
+    """``ndimage.correlate1d`` with the lines split between threads.
+
+    Every output sample depends on one line only, so splitting across the other
+    axis gives the same values as one call; scipy releases the GIL.
+    """
+    result = np.empty_like(data)
+    across = 1 - axis
+    count = data.shape[across]
+    bands = max(1, min(cv2.getNumThreads(), count // _MIN_LINES_PER_BAND))
+    edges = np.linspace(0, count, bands + 1).astype(int)
+
+    def run(index: int) -> None:
+        part = slice(edges[index], edges[index + 1])
+        key = (part, slice(None)) if axis == 1 else (slice(None), part)
+        ndimage.correlate1d(data[key], weights, axis=axis, output=result[key])
+
+    if bands == 1:
+        run(0)
+    else:
+        with ThreadPoolExecutor(max_workers=bands) as pool:
+            list(pool.map(run, range(bands)))
+    return result
+
+
 def _savgol_axis(
     data: NDArray[np.float32],
     window: int,
@@ -259,7 +320,7 @@ def _savgol_axis(
     left = window // 2
     right = window - left - 1
 
-    result = ndimage.correlate1d(data, hat[left].astype(np.float32), axis=axis)
+    result = _correlate1d_in_bands(data, hat[left].astype(np.float32), axis)
     source = np.moveaxis(data, axis, 0)
     target = np.moveaxis(result, axis, 0)
     target[:left] = np.tensordot(hat[:left], source[:window], axes=(1, 0))
@@ -329,7 +390,7 @@ def stretch_gray_range(
     """
     if image.size == 0:
         return image.copy()
-    hist = np.bincount(image.ravel(), minlength=256)
+    hist = gray_histogram(image)
     count = image.size
     if black_clip >= 1.0:
         low = int(black_clip + 0.5)
