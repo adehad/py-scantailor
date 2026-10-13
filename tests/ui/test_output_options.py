@@ -7,6 +7,7 @@ from PySide6 import QtWidgets
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.dialogs.apply_to import OUTPUT_GROUP_TITLES
+from scantailor.app.ui.icons import is_palette_icon
 from scantailor.app.ui.options_widgets.output import OptionsWidget
 from scantailor.core.models import ImageId, PageId, SubPage
 from scantailor.filters.output.binarization import BinarizationMethod
@@ -125,6 +126,50 @@ class TestControlsWriteParams:
 
         assert getattr(gray.params.color_common, field) is False
         assert gray.changed == [PAGE]
+
+    def test_fill_outside_page_box_is_off_until_chosen(self, gray: _Widget):
+        assert not gray.find(QtWidgets.QCheckBox, "fillOutsidePageBoxCB").isChecked()
+        assert gray.params.color_common.fill_outside_page_box is False
+
+    def test_fill_outside_page_box_checkbox_sets_its_flag_and_clears_offcut(
+        self, gray: _Widget
+    ):
+        gray.set_check("fillOutsidePageBoxCB", True)
+
+        common = gray.params.color_common
+        assert common.fill_outside_page_box is True
+        assert common.fill_offcut is False
+        assert not gray.find(QtWidgets.QCheckBox, "fillOffcutCB").isChecked()
+        assert gray.changed == [PAGE]
+
+    def test_fill_offcut_clears_fill_outside_page_box(self, gray: _Widget):
+        gray.set_check("fillOutsidePageBoxCB", True)
+
+        gray.set_check("fillOffcutCB", True)
+
+        common = gray.params.color_common
+        assert common.fill_offcut is True
+        assert common.fill_outside_page_box is False
+        assert not gray.find(QtWidgets.QCheckBox, "fillOutsidePageBoxCB").isChecked()
+
+    def test_unchecking_fill_outside_page_box_leaves_offcut_off(self, gray: _Widget):
+        gray.set_check("fillOutsidePageBoxCB", True)
+
+        gray.set_check("fillOutsidePageBoxCB", False)
+
+        common = gray.params.color_common
+        assert common.fill_outside_page_box is False
+        assert common.fill_offcut is False
+
+    def test_fill_outside_page_box_explains_itself_and_shows_its_icon(
+        self, gray: _Widget
+    ):
+        box = gray.find(QtWidgets.QCheckBox, "fillOutsidePageBoxCB")
+
+        assert box.text() == "Fill outside page box"
+        assert box.toolTip().startswith("Fill the full output page rectangle")
+        assert is_palette_icon(box.icon())
+        assert box.icon().name() == "scantailor:squares-exclude"
 
     def test_filling_color_combo_sets_filling_color(self, gray: _Widget):
         combo = gray.find(QtWidgets.QComboBox, "fillingColorBox")
@@ -370,6 +415,55 @@ class TestBinarization:
 
         assert getattr(widget.params.binarization, field) == pytest.approx(value)
 
+    def test_combo_offers_the_methods_in_upstream_order(self, bw: _Widget):
+        combo = bw.find(QtWidgets.QComboBox, "methodCombo")
+
+        assert [combo.itemText(i) for i in range(combo.count())] == [
+            "Otsu",
+            "Sauvola",
+            "Wolf",
+            "Fox",
+            "Window",
+            "Bradley",
+            "Grad",
+            "EdgeDiv",
+        ]
+
+    @pytest.mark.parametrize(
+        "method",
+        [BinarizationMethod.FOX, BinarizationMethod.WINDOW, BinarizationMethod.GRAD],
+    )
+    def test_wolf_family_methods_edit_the_wolf_options(
+        self, qtbot: QtBot, method: BinarizationMethod
+    ):
+        widget = _Widget(
+            qtbot, Params(binarization=Params().binarization.with_method(method))
+        )
+
+        widget.find(QtWidgets.QDoubleSpinBox, "wolfCoefSpinBox").setValue(0.45)
+        widget.find(QtWidgets.QSpinBox, "wolfLowerBoundSpinBox").setValue(12)
+        widget.find(QtWidgets.QSpinBox, "wolfUpperBoundSpinBox").setValue(240)
+
+        binarization = widget.params.binarization
+        assert binarization.method is method
+        assert binarization.wolf_coef == pytest.approx(0.45)
+        assert (binarization.wolf_lower_bound, binarization.wolf_upper_bound) == (
+            12,
+            240,
+        )
+        assert widget.shown("wolfCoefSpinBox")
+        assert widget.shown("windowSizeSpinBox")
+
+    @pytest.mark.parametrize("method", ["Fox", "Window", "Grad"])
+    def test_choosing_a_new_method_in_the_combo_stores_it(
+        self, bw: _Widget, method: str
+    ):
+        combo = bw.find(QtWidgets.QComboBox, "methodCombo")
+
+        combo.setCurrentIndex(combo.findText(method))
+
+        assert bw.params.binarization.method is BinarizationMethod(method.lower())
+
     @pytest.mark.parametrize(
         ("name", "field"),
         [
@@ -391,7 +485,16 @@ class TestBinarization:
 
     @pytest.mark.parametrize(
         ("method", "page"),
-        [(method, index) for index, method in enumerate(BinarizationMethod)],
+        [
+            (BinarizationMethod.OTSU, 0),
+            (BinarizationMethod.SAUVOLA, 1),
+            (BinarizationMethod.WOLF, 2),
+            (BinarizationMethod.FOX, 2),
+            (BinarizationMethod.WINDOW, 2),
+            (BinarizationMethod.BRADLEY, 3),
+            (BinarizationMethod.GRAD, 2),
+            (BinarizationMethod.EDGEDIV, 4),
+        ],
     )
     def test_each_method_shows_its_own_options_page(
         self, qtbot: QtBot, method: BinarizationMethod, page: int
@@ -462,6 +565,7 @@ class TestVisibilityPerMode:
         [
             ("fillMarginsCB", True, True, True),
             ("fillOffcutCB", True, True, True),
+            ("fillOutsidePageBoxCB", True, True, True),
             ("equalizeIlluminationCB", True, False, True),
             ("equalizeIlluminationColorCB", False, True, True),
             ("savitzkyGolaySmoothingCB", True, False, True),

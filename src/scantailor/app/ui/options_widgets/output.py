@@ -60,8 +60,17 @@ _METHOD_LABELS = {
     BinarizationMethod.OTSU: "Otsu",
     BinarizationMethod.SAUVOLA: "Sauvola",
     BinarizationMethod.WOLF: "Wolf",
+    BinarizationMethod.FOX: "Fox",
+    BinarizationMethod.WINDOW: "Window",
     BinarizationMethod.BRADLEY: "Bradley",
+    BinarizationMethod.GRAD: "Grad",
     BinarizationMethod.EDGEDIV: "EdgeDiv",
+}
+# Methods that share the controls of another method's page.
+_SHARED_METHOD_PAGE = {
+    BinarizationMethod.FOX: BinarizationMethod.WOLF,
+    BinarizationMethod.WINDOW: BinarizationMethod.WOLF,
+    BinarizationMethod.GRAD: BinarizationMethod.WOLF,
 }
 _FILLING_LABELS = {
     FillingColor.BACKGROUND: "Background",
@@ -301,6 +310,13 @@ class OptionsWidget(QWidget):
 
         self._fill_margins_check = _check_box("fillMarginsCB", "Fill margins")
         self._fill_offcut_check = _check_box("fillOffcutCB", "Fill offcut")
+        self._fill_outside_page_box_check = _check_box(
+            "fillOutsidePageBoxCB",
+            "Fill outside page box",
+            "Fill the full output page rectangle with the background color outside "
+            "the page content, instead of following offcut geometry.",
+        )
+        self._fill_outside_page_box_check.setIcon(icon("squares-exclude"))
         self._equalize_check = _check_box(
             "equalizeIlluminationCB", "Equalize illumination"
         )
@@ -316,6 +332,7 @@ class OptionsWidget(QWidget):
         for widget in (
             self._fill_margins_check,
             self._fill_offcut_check,
+            self._fill_outside_page_box_check,
             self._equalize_check,
             self._equalize_color_check,
             self._savitzky_golay_check,
@@ -452,14 +469,17 @@ class OptionsWidget(QWidget):
                 ("Blur weight:", self._edge_div_kbd_spinbox),
             ],
         }
-        for method in BinarizationMethod:
+        self._method_page_index: dict[BinarizationMethod, int] = {}
+        for method, controls in pages.items():
             page = QWidget()
             grid = QGridLayout(page)
             grid.setContentsMargins(0, 0, 0, 0)
-            for row, (label, spinbox) in enumerate(pages[method]):
+            for row, (label, spinbox) in enumerate(controls):
                 grid.addWidget(QLabel(label), row, 0)
                 grid.addWidget(spinbox, row, 1)
-            self._method_options.addWidget(page)
+            self._method_page_index[method] = self._method_options.addWidget(page)
+        for method, shared in _SHARED_METHOD_PAGE.items():
+            self._method_page_index[method] = self._method_page_index[shared]
         self._method_options.currentChanged.connect(self._fit_method_options)
 
     def _fit_method_options(self, index: int) -> None:
@@ -635,8 +655,9 @@ class OptionsWidget(QWidget):
         self._fill_margins_check.toggled.connect(
             lambda on: self._edit_color_common(fill_margins=on)
         )
-        self._fill_offcut_check.toggled.connect(
-            lambda on: self._edit_color_common(fill_offcut=on)
+        self._fill_offcut_check.toggled.connect(self._on_fill_offcut_changed)
+        self._fill_outside_page_box_check.toggled.connect(
+            self._on_fill_outside_page_box_changed
         )
         self._equalize_check.toggled.connect(self._on_equalize_changed)
         self._equalize_color_check.toggled.connect(
@@ -801,9 +822,10 @@ class OptionsWidget(QWidget):
 
         self._edit(change, refresh=True)
 
-    def _edit_color_common(self, **fields: object) -> None:
+    def _edit_color_common(self, refresh: bool = False, **fields: object) -> None:
         self._edit(
-            lambda p: p.with_color_common(p.color_common.model_copy(update=fields))
+            lambda p: p.with_color_common(p.color_common.model_copy(update=fields)),
+            refresh=refresh,
         )
 
     def _edit_posterization(self, **fields: object) -> None:
@@ -871,6 +893,7 @@ class OptionsWidget(QWidget):
 
         self._fill_margins_check.setChecked(common.fill_margins)
         self._fill_offcut_check.setChecked(common.fill_offcut)
+        self._fill_outside_page_box_check.setChecked(common.fill_outside_page_box)
         self._equalize_check.setChecked(params.binarization.normalize_illumination)
         self._equalize_check.setVisible(mode != ColorMode.COLOR_GRAYSCALE)
         self._equalize_color_check.setChecked(common.normalize_illumination)
@@ -916,7 +939,7 @@ class OptionsWidget(QWidget):
         self._threshold_label.setText(str(options.threshold_adjustment))
         self._window_size_spinbox.setValue(options.window_size)
         self._window_size_row.setVisible(options.method != BinarizationMethod.OTSU)
-        method_index = list(BinarizationMethod).index(options.method)
+        method_index = self._method_page_index[options.method]
         self._method_options.setCurrentIndex(method_index)
         self._fit_method_options(method_index)
         self._sauvola_coef_spinbox.setValue(options.sauvola_coef)
@@ -994,6 +1017,21 @@ class OptionsWidget(QWidget):
             return params
 
         self._edit(change, refresh=True)
+
+    def _on_fill_offcut_changed(self, checked: bool) -> None:
+        """Filling the offcut and filling outside the page box exclude each other."""
+        self._edit_color_common(
+            refresh=True,
+            fill_offcut=checked,
+            **({"fill_outside_page_box": False} if checked else {}),
+        )
+
+    def _on_fill_outside_page_box_changed(self, checked: bool) -> None:
+        self._edit_color_common(
+            refresh=True,
+            fill_outside_page_box=checked,
+            **({"fill_offcut": False} if checked else {}),
+        )
 
     def _on_filling_changed(self, index: int) -> None:
         color = self._filling_color_combo.itemData(index)

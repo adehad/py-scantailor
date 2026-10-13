@@ -35,6 +35,7 @@ class RenderParams:
     # Core rendering flags
     fill_margins: bool = False
     fill_offcut: bool = False
+    fill_outside_page_box: bool = False
     normalize_illumination: bool = False
     normalize_illumination_color: bool = False
     need_binarization: bool = False
@@ -97,7 +98,10 @@ class RenderParams:
             render.posterize = color_common.posterization.enabled
 
         render.fill_margins = color_common.fill_margins
-        render.fill_offcut = color_common.fill_offcut
+        render.fill_outside_page_box = color_common.fill_outside_page_box
+        render.fill_offcut = (
+            color_common.fill_offcut and not color_common.fill_outside_page_box
+        )
         render.normalize_illumination_color = color_common.normalize_illumination
 
         return render
