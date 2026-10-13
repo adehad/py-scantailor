@@ -45,12 +45,15 @@ class Settings(BaseModel):
         params: Parameters set explicitly or detected, per page.
         auto_oblique_default: Whether pages without parameters detect their
             oblique correction. Off keeps a fresh page unsheared.
+        content_based: True to find the skew from the page content, False to
+            find it from the top page edge.
 
     This class is thread-safe for concurrent access.
     """
 
     params: dict[PageId, Params] = Field(default_factory=dict)
     auto_oblique_default: bool = False
+    content_based: bool = True
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -121,6 +124,20 @@ class Settings(BaseModel):
         """Return whether pages without parameters detect their oblique angle."""
         with self._lock:
             return self.auto_oblique_default
+
+    def set_content_based(self, enabled: bool) -> None:
+        """Choose how the skew is found.
+
+        Args:
+            enabled: True to use the page content, False to use the top page edge.
+        """
+        with self._lock:
+            self.content_based = enabled
+
+    def get_content_based(self) -> bool:
+        """Return whether the skew is found from the page content."""
+        with self._lock:
+            return self.content_based
 
     def request_detection(self, page_id: PageId, part: Detection) -> None:
         """Make one part of a page automatic and have it detected again.
