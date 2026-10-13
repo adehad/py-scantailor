@@ -4,6 +4,8 @@ This filter manages page margins and alignment across a project, ensuring
 consistent page sizes in the final output.
 """
 
+from collections.abc import Collection
+
 from scantailor.core.models import Margins, PageId
 from scantailor.filters.page_layout.alignment import Alignment
 from scantailor.filters.page_layout.page_rect import (
@@ -11,7 +13,7 @@ from scantailor.filters.page_layout.page_rect import (
     rect_from_params,
 )
 from scantailor.filters.page_layout.params import ContentSize, Params
-from scantailor.filters.page_layout.settings import Settings
+from scantailor.filters.page_layout.settings import MARGIN_SIDES, Settings
 
 
 class Filter:
@@ -138,14 +140,21 @@ class Filter:
         """
         self._settings.apply_params_to_pages(page_ids, params)
 
-    def apply_margins_to_pages(self, page_ids: list[PageId], margins: Margins) -> None:
+    def apply_margins_to_pages(
+        self,
+        page_ids: list[PageId],
+        margins: Margins,
+        sides: Collection[str] = MARGIN_SIDES,
+    ) -> None:
         """Apply margins to multiple pages.
 
         Args:
             page_ids: List of pages to set margins for.
             margins: The margins in millimeters.
+            sides: Names of the sides taken from ``margins``; the other sides of
+                each page keep their own value.
         """
-        self._settings.apply_margins_to_pages(page_ids, margins)
+        self._settings.apply_margins_to_pages(page_ids, margins, sides)
 
     def apply_alignment_to_pages(
         self, page_ids: list[PageId], alignment: Alignment

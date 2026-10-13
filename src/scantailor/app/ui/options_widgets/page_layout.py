@@ -3,7 +3,8 @@
 Provides UI controls for configuring margins and alignment.
 """
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QSize, Signal
+from PySide6.QtGui import QIcon, QIntValidator
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -12,6 +13,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QSizePolicy,
     QSpacerItem,
@@ -20,10 +22,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from scantailor.app.ui import icons
 from scantailor.app.ui.icons import icon
 from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
-from scantailor.core.models import Margins, PageId
+from scantailor.core.models import Dpi, Margins, PageId
+from scantailor.core.project import DpiStatus, ImageMetadata
 from scantailor.core.settings import Units
 from scantailor.core.units import convert_length, spin_box_precision
 from scantailor.filters.page_layout.alignment import (
@@ -36,6 +40,10 @@ from scantailor.filters.page_layout.filter import Filter
 # Margins are stored in millimetres; this bounds what the spin boxes accept.
 _MAX_MARGIN_MM = 9999.0
 _OPPOSITE_SIDE = {"top": "bottom", "bottom": "top", "left": "right", "right": "left"}
+# Digits of the longest DPI the source DPI fields take.
+_DPI_FIELD_MAX_LENGTH = 4
+_DPI_FIELD_WIDTH = 56
+_SOURCE_DPI_PRESETS = (300, 400, 600, 1200)
 
 
 class OptionsWidget(QWidget):
@@ -54,12 +62,23 @@ class OptionsWidget(QWidget):
             Args: page_id (PageId), alignment (Alignment)
         apply_margins_requested: Emitted when user clicks "Apply To..." for margins
         apply_alignment_requested: Emitted when user clicks "Apply To..." for alignment
+        match_size_to_all_requested: Emitted after the current page is set to match
+            size with other pages and the other pages should follow
+        aggregate_size_changed: Emitted when the size the pages are matched to
+            may have changed, so thumbnails and the shown page need redrawing
+        fix_dpi_requested: Emitted when user clicks "Fix all..."
+        source_dpi_changed: Emitted with horizontal and vertical DPI (int) when
+            the user sets a valid source DPI for the current page's image
     """
 
     margins_changed = Signal(PageId, Margins)
     alignment_changed = Signal(PageId, Alignment)
     apply_margins_requested = Signal()
     apply_alignment_requested = Signal()
+    match_size_to_all_requested = Signal()
+    aggregate_size_changed = Signal()
+    fix_dpi_requested = Signal()
+    source_dpi_changed = Signal(int, int)
 
     def __init__(
         self,
@@ -81,6 +100,8 @@ class OptionsWidget(QWidget):
         self._units_provider = units_provider or UnitsProvider.get_instance()
         self._margins_mm = Margins()
         self._dpi = (0.0, 0.0)
+        self._source_pixel_size = (0, 0)
+        self._source_dpi = Dpi()
         self._current_page_id: PageId | None = None
         self._updating = False  # Prevent signal loops
         self._link_top_bottom = False
@@ -175,6 +196,8 @@ class OptionsWidget(QWidget):
         )
         margins_layout.addLayout(spinbox_layout)
 
+        margins_layout.addLayout(self._build_source_dpi_row())
+
         # Apply margins button
         apply_margins_layout = QHBoxLayout()
         apply_margins_layout.addItem(
@@ -183,6 +206,9 @@ class OptionsWidget(QWidget):
         self._apply_margins_btn = QPushButton("Apply To ...")
         self._apply_margins_btn.setObjectName("applyMarginsBtn")
         apply_margins_layout.addWidget(self._apply_margins_btn)
+        self._fix_dpi_btn = QPushButton(self.tr("Fix all..."))
+        self._fix_dpi_btn.setObjectName("fixDpiBtn")
+        apply_margins_layout.addWidget(self._fix_dpi_btn)
         apply_margins_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
@@ -280,6 +306,18 @@ class OptionsWidget(QWidget):
         )
         alignment_layout.addLayout(align_grid_layout)
 
+        self._freeze_aggregate_check = QCheckBox(
+            self.tr("Lock aggregate size for matching")
+        )
+        self._freeze_aggregate_check.setObjectName("freezeAggregateHardSizeCb")
+        self._freeze_aggregate_check.setToolTip(
+            self.tr(
+                "Keep the aggregate page size used for matching fixed while you "
+                "switch pages, so the reference dimensions do not jump."
+            )
+        )
+        alignment_layout.addWidget(self._freeze_aggregate_check)
+
         # Apply alignment button
         apply_align_layout = QHBoxLayout()
         apply_align_layout.addItem(
@@ -288,6 +326,15 @@ class OptionsWidget(QWidget):
         self._apply_alignment_btn = QPushButton("Apply To ...")
         self._apply_alignment_btn.setObjectName("applyAlignmentBtn")
         apply_align_layout.addWidget(self._apply_alignment_btn)
+        self._match_size_to_all_btn = QPushButton(self.tr("Match size to all pages"))
+        self._match_size_to_all_btn.setObjectName("matchSizeToAllBtn")
+        self._match_size_to_all_btn.setToolTip(
+            self.tr(
+                'Apply "Match size with other pages" to every page so they all '
+                "share the same output size."
+            )
+        )
+        apply_align_layout.addWidget(self._match_size_to_all_btn)
         apply_align_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
@@ -300,6 +347,44 @@ class OptionsWidget(QWidget):
             QSpacerItem(1, 1, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         )
 
+    def _build_source_dpi_row(self) -> QVBoxLayout:
+        """Build the rows that show and edit the DPI of the current page's image.
+
+        The preset and the two fields do not fit side by side in the options dock,
+        so the fields sit on a second row.
+        """
+        column = QVBoxLayout()
+        row = QHBoxLayout()
+        self._source_dpi_label = QLabel(self.tr("Source DPI"))
+        self._source_dpi_label.setObjectName("sourceDpiLabel")
+        row.addWidget(self._source_dpi_label)
+
+        self._source_dpi_combo = QComboBox()
+        self._source_dpi_combo.setObjectName("sourceDpiCombo")
+        self._source_dpi_combo.addItem(self.tr("Custom"), None)
+        for dpi in _SOURCE_DPI_PRESETS:
+            self._source_dpi_combo.addItem(f"{dpi} x {dpi}", QSize(dpi, dpi))
+        row.addWidget(self._source_dpi_combo, 1)
+        column.addLayout(row)
+
+        fields = QHBoxLayout()
+        fields.addStretch(1)
+        self._source_x_dpi = QLineEdit()
+        self._source_x_dpi.setObjectName("sourceXDpi")
+        fields.addWidget(self._source_x_dpi)
+        self._source_dpi_times_label = QLabel("\u00d7")
+        fields.addWidget(self._source_dpi_times_label)
+        self._source_y_dpi = QLineEdit()
+        self._source_y_dpi.setObjectName("sourceYDpi")
+        fields.addWidget(self._source_y_dpi)
+        column.addLayout(fields)
+
+        for field in (self._source_x_dpi, self._source_y_dpi):
+            field.setMaxLength(_DPI_FIELD_MAX_LENGTH)
+            field.setMaximumWidth(_DPI_FIELD_WIDTH)
+            field.setValidator(QIntValidator(field))
+        return column
+
     def _connect_signals(self) -> None:
         """Connect widget signals to slots."""
         # Margins
@@ -311,6 +396,10 @@ class OptionsWidget(QWidget):
         self._top_bottom_link.toggled.connect(self._on_top_bottom_link_changed)
         self._left_right_link.toggled.connect(self._on_left_right_link_changed)
         self._apply_margins_btn.clicked.connect(self.apply_margins_requested.emit)
+        self._fix_dpi_btn.clicked.connect(self.fix_dpi_requested.emit)
+        self._source_dpi_combo.activated.connect(self._on_source_dpi_preset_chosen)
+        self._source_x_dpi.editingFinished.connect(self._on_source_dpi_edited)
+        self._source_y_dpi.editingFinished.connect(self._on_source_dpi_edited)
         self._units_provider.units_changed.connect(self._apply_units)
 
         # Alignment
@@ -321,6 +410,8 @@ class OptionsWidget(QWidget):
             self._on_alignment_button_clicked
         )
         self._apply_alignment_btn.clicked.connect(self.apply_alignment_requested.emit)
+        self._match_size_to_all_btn.clicked.connect(self._on_match_size_to_all)
+        self._freeze_aggregate_check.clicked.connect(self._on_freeze_aggregate_toggled)
 
     def set_current_page(self, page_id: PageId) -> None:
         """Set the current page being edited.
@@ -342,6 +433,143 @@ class OptionsWidget(QWidget):
         """
         self._dpi = (horizontal, vertical)
         self._apply_units()
+
+    def set_source_image(self, width: int, height: int, dpi: Dpi) -> None:
+        """Show the pixel size and resolution of the current page's image.
+
+        Args:
+            width: Image width in pixels.
+            height: Image height in pixels.
+            dpi: Resolution the project uses for the image; null when undefined.
+        """
+        self._source_pixel_size = (width, height)
+        self._source_dpi = dpi
+        self._show_source_dpi()
+
+    def _source_metadata(self, dpi: Dpi) -> ImageMetadata:
+        width, height = self._source_pixel_size
+        return ImageMetadata(width=width, height=height, dpi=dpi)
+
+    def _show_source_dpi(self) -> None:
+        """Fill the source DPI fields from the stored resolution."""
+        for field in (self._source_x_dpi, self._source_y_dpi):
+            field.blockSignals(True)
+        try:
+            if self._source_dpi.is_null():
+                self._source_x_dpi.clear()
+                self._source_y_dpi.clear()
+            else:
+                self._source_x_dpi.setText(str(self._source_dpi.horizontal))
+                self._source_y_dpi.setText(str(self._source_dpi.vertical))
+        finally:
+            for field in (self._source_x_dpi, self._source_y_dpi):
+                field.blockSignals(False)
+        self._refresh_source_dpi_feedback()
+
+    def _typed_source_dpi(self) -> Dpi | None:
+        """Return the DPI typed into the fields, or None while it is incomplete."""
+        try:
+            horizontal = int(self._source_x_dpi.text())
+            vertical = int(self._source_y_dpi.text())
+        except ValueError:
+            return None
+        if horizontal < 0 or vertical < 0:
+            return None
+        return Dpi(horizontal=horizontal, vertical=vertical)
+
+    def _refresh_source_dpi_feedback(self) -> None:
+        """Match the preset box to the typed values and flag doubtful ones."""
+        typed = self._typed_source_dpi()
+        preset = 0
+        if typed is not None:
+            for row in range(1, self._source_dpi_combo.count()):
+                size = self._source_dpi_combo.itemData(row)
+                if (typed.horizontal, typed.vertical) == (size.width(), size.height()):
+                    preset = row
+                    break
+        self._source_dpi_combo.setCurrentIndex(preset)
+
+        if typed is None:
+            self._decorate_source_dpi_field(self._source_x_dpi, DpiStatus.OK)
+            self._decorate_source_dpi_field(self._source_y_dpi, DpiStatus.OK)
+            return
+        metadata = self._source_metadata(typed)
+        self._decorate_source_dpi_field(
+            self._source_x_dpi, metadata.horizontal_dpi_status()
+        )
+        self._decorate_source_dpi_field(
+            self._source_y_dpi, metadata.vertical_dpi_status()
+        )
+
+    def _decorate_source_dpi_field(self, field: QLineEdit, status: DpiStatus) -> None:
+        """Colour a DPI field and explain why when its value is doubtful."""
+        warnings = {
+            DpiStatus.TOO_LARGE: self.tr("DPI is too large and most likely wrong."),
+            DpiStatus.TOO_SMALL: self.tr(
+                "DPI is too small. Even if it's correct, you are not going to get "
+                "acceptable results with it."
+            ),
+            DpiStatus.TOO_SMALL_FOR_PIXEL_SIZE: self.tr(
+                "An extremely low DPI value. That might correspond to a very large "
+                "paper size for the pixel size in question."
+            ),
+        }
+        warning = warnings.get(status)
+        if warning is None:
+            field.setStyleSheet("")
+            field.setToolTip("")
+            return
+        # The application style sheet ignores a palette set on the field.
+        danger = icons.mode_color(QIcon.Mode.Normal, "danger").name()
+        field.setStyleSheet(f"QLineEdit {{ color: {danger}; }}")
+        field.setToolTip(warning)
+
+    def _on_source_dpi_preset_chosen(self, index: int) -> None:
+        """Copy a preset's values into the fields and commit them."""
+        size = self._source_dpi_combo.itemData(index)
+        if size is None:
+            return
+        self._source_x_dpi.setText(str(size.width()))
+        self._source_y_dpi.setText(str(size.height()))
+        self._on_source_dpi_edited()
+
+    def _on_source_dpi_edited(self) -> None:
+        """Report a valid, changed source DPI; otherwise only update the feedback."""
+        self._refresh_source_dpi_feedback()
+        typed = self._typed_source_dpi()
+        if typed is None or typed == self._source_dpi:
+            return
+        if not self._source_metadata(typed).is_dpi_ok():
+            return
+        self._source_dpi = typed
+        self.set_page_dpi(typed.horizontal, typed.vertical)
+        self.source_dpi_changed.emit(typed.horizontal, typed.vertical)
+
+    def _on_match_size_to_all(self) -> None:
+        """Turn on size matching for the current page and ask for it on all pages."""
+        page_id = self._current_page_id
+        if page_id is None:
+            return
+        params = self._filter.get_params(page_id)
+        alignment = Alignment(
+            vertical=params.alignment.vertical,
+            horizontal=params.alignment.horizontal,
+            is_null=False,
+        )
+        self._filter.set_params(page_id, params.with_alignment(alignment))
+        self._updating = True
+        try:
+            self._match_size_check.setChecked(True)
+        finally:
+            self._updating = False
+        self.alignment_changed.emit(page_id, alignment)
+        self.match_size_to_all_requested.emit()
+        self.aggregate_size_changed.emit()
+
+    def _on_freeze_aggregate_toggled(self, checked: bool) -> None:
+        """Hold or release the size that pages are matched to."""
+        self._filter.settings.set_aggregate_hard_size_frozen(checked)
+        self.aggregate_size_changed.emit()
 
     def _spin_boxes(self) -> dict[str, QDoubleSpinBox]:
         return {
@@ -398,6 +626,9 @@ class OptionsWidget(QWidget):
             # Update alignment
             alignment = params.alignment
             self._match_size_check.setChecked(alignment.aligned_with_others())
+            self._freeze_aggregate_check.setChecked(
+                self._filter.settings.is_aggregate_hard_size_frozen()
+            )
 
             # Update mode combos
             h_mode_index = self._get_h_mode_index(alignment.horizontal)
