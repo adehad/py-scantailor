@@ -35,7 +35,7 @@ from .binarization import (
 )
 from .color_mode import ColorMode
 from .color_options import ColorCommonOptions, FillingColor, PosterizationOptions
-from .despeckle import DespeckleLevel
+from .despeckle import MAX_DESPECKLE_FACTOR, DespeckleLevel
 from .dewarping_options import DewarpingMode, DewarpingOptions
 from .params import (
     DistortionModelSpec,
@@ -56,12 +56,6 @@ _MIN_POINTS_PER_ZONE = 3
 _MIN_POINTS_PER_CURVE = 2
 _SHORT_HEX_DIGITS = 3
 _HEX_RGB_DIGITS = (_SHORT_HEX_DIGITS, 6, 8)
-# Midpoints between the stored strengths 0, 1, 2 and 3.
-_DESPECKLE_UPPER_BOUNDS = (
-    (DespeckleLevel.OFF, 0.5),
-    (DespeckleLevel.CAUTIOUS, 1.5),
-    (DespeckleLevel.NORMAL, 2.5),
-)
 
 _COLOR_MODES = {
     "bw": ColorMode.BLACK_AND_WHITE,
@@ -137,10 +131,12 @@ def despeckle_level_from_factor(factor: float) -> DespeckleLevel:
     Returns:
         DespeckleLevel: The nearest level.
     """
-    for level, upper_bound in _DESPECKLE_UPPER_BOUNDS:
-        if factor < upper_bound:
-            return level
-    return DespeckleLevel.AGGRESSIVE
+    return DespeckleLevel.nearest(factor)
+
+
+def _continuous_despeckle(factor: float) -> float | None:
+    """Return the factor unless a named level already says it."""
+    return None if DespeckleLevel.nearest(factor).to_factor() == factor else factor
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -153,15 +149,15 @@ def _read_params(element: ET.Element | None) -> Params:
     if element is None:
         return Params()
     color_params = child(element, "color-params")
+    despeckle = _clamp(attr_float(element, "despeckleLevel"), 0.0, MAX_DESPECKLE_FACTOR)
     return Params(
         output_dpi=_read_dpi(child(element, "dpi")),
         color_mode=_COLOR_MODES.get(
             attr_text(color_params, "colorMode"), ColorMode.BLACK_AND_WHITE
         ),
         binarization=_read_binarization(child(color_params, "bw")),
-        despeckle_level=despeckle_level_from_factor(
-            attr_float(element, "despeckleLevel")
-        ),
+        despeckle_level=despeckle_level_from_factor(despeckle),
+        despeckle_factor=_continuous_despeckle(despeckle),
         black_on_white=attr_flag(element, "blackOnWhite"),
         dewarping=_read_dewarping(child(element, "dewarping-options")),
         color_common=_read_color_common(child(color_params, "color-or-grayscale")),

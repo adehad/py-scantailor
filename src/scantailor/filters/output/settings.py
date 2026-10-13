@@ -63,6 +63,26 @@ class Settings:
         with self._lock:
             self._params[page_id] = params
 
+    def set_post_deskew_angle(self, page_id: "PageId", angle: float) -> bool:
+        """Record the rotation applied to a dewarped page that has stored parameters.
+
+        Args:
+            page_id (PageId): The page.
+            angle (float): Rotation in degrees, positive turning clockwise.
+
+        Returns:
+            bool: True if the stored parameters changed. A page without stored
+                parameters is left without them.
+        """
+        with self._lock:
+            stored = self._params.get(page_id)
+            if stored is None or stored.dewarping.post_deskew_angle == angle:
+                return False
+            self._params[page_id] = stored.with_dewarping(
+                stored.dewarping.model_copy(update={"post_deskew_angle": angle})
+            )
+            return True
+
     def is_params_set(self, page_id: "PageId") -> bool:
         """Check if parameters have been explicitly set for a page.
 

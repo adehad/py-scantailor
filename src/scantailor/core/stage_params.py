@@ -15,6 +15,7 @@ from scantailor.core.project import StageParamsEntry
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.page_layout.guide import Guide
 from scantailor.filters.page_layout.params import ContentSize
 from scantailor.filters.page_split.layout_type import LayoutType
 
@@ -145,7 +146,8 @@ def collect_stage_defaults(stages: StageSequence) -> dict[str, Any]:
     """
     output = stages.output_filter.settings
     select_content = stages.select_content_filter.settings
-    frozen = stages.page_layout_filter.settings.get_frozen_aggregate_hard_size_mm()
+    layout = stages.page_layout_filter.settings
+    frozen = layout.get_frozen_aggregate_hard_size_mm()
     return {
         "page_split_layout_type": (
             stages.page_split_filter.settings.get_default_layout_type().value
@@ -160,6 +162,10 @@ def collect_stage_defaults(stages: StageSequence) -> dict[str, Any]:
         "page_layout_frozen_aggregate_size": (
             None if frozen is None else frozen.model_dump(mode="json")
         ),
+        "page_layout_middle_rect_shown": layout.is_middle_rect_shown(),
+        "page_layout_guides": [
+            guide.model_dump(mode="json") for guide in layout.get_guides()
+        ],
     }
 
 
@@ -199,4 +205,10 @@ def apply_stage_defaults(stages: StageSequence, defaults: dict[str, Any]) -> Non
     if (frozen := defaults.get("page_layout_frozen_aggregate_size")) is not None:
         stages.page_layout_filter.settings.restore_frozen_aggregate_hard_size_mm(
             ContentSize.model_validate(frozen)
+        )
+    if (shown := defaults.get("page_layout_middle_rect_shown")) is not None:
+        stages.page_layout_filter.settings.set_middle_rect_shown(bool(shown))
+    if (guides := defaults.get("page_layout_guides")) is not None:
+        stages.page_layout_filter.settings.set_guides(
+            Guide.model_validate(guide) for guide in guides
         )
