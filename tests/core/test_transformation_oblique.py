@@ -18,8 +18,8 @@ def _transformation() -> ImageTransformation:
 
 
 def _shear_factor(degrees: float) -> float:
-    """Horizontal shift per pixel going down; the angle counts half."""
-    return math.tan(math.radians(degrees) * 0.5)
+    """Horizontal shift per pixel going down that removes a lean of ``degrees``."""
+    return math.tan(math.radians(degrees))
 
 
 class TestObliqueState:
@@ -84,7 +84,7 @@ class TestObliqueState:
 
 
 class TestObliqueGeometry:
-    """The shear is x' = x - tan(angle / 2) * y, applied after the rotation."""
+    """The shear is x' = x - tan(angle) * y, applied after the rotation."""
 
     @pytest.mark.parametrize("degrees", [-5.0, -2.0, 1.0, 5.0])
     def test_points_slide_sideways_in_proportion_to_their_height(self, degrees: float):
@@ -96,6 +96,18 @@ class TestObliqueGeometry:
 
         assert y1 - y0 == pytest.approx(300)
         assert x1 - x0 == pytest.approx(-_shear_factor(degrees) * 300)
+
+    @pytest.mark.parametrize("degrees", [-5.0, -1.5, 2.0, 4.0])
+    def test_the_vertical_axis_tilts_by_the_whole_angle(self, degrees: float):
+        """The angle is the lean the shear removes, not a fraction of it."""
+        xform = _transformation()
+        xform.set_post_oblique(degrees)
+
+        x0, y0 = xform.transform_point(200, 0)
+        x1, y1 = xform.transform_point(200, HEIGHT)
+
+        lean_to_the_right = math.degrees(math.atan2(x1 - x0, y1 - y0))
+        assert lean_to_the_right == pytest.approx(-degrees)
 
     def test_horizontal_distances_are_kept(self):
         xform = _transformation()
@@ -202,6 +214,21 @@ class TestObliqueRendering:
         top, bottom = 50, HEIGHT - 50
         lean = self._column_of_line(result[bottom]) - self._column_of_line(result[top])
         assert lean == pytest.approx(-_shear_factor(4.0) * (bottom - top), abs=1.0)
+
+    @pytest.mark.parametrize("degrees", [-3.0, 4.0])
+    def test_a_line_leaning_by_the_angle_is_made_vertical(self, degrees: float):
+        source = np.full((HEIGHT, WIDTH), 255, dtype=np.uint8)
+        for y in range(HEIGHT):
+            x = round(200 + _shear_factor(degrees) * y)
+            source[y, x : x + 3] = 0
+        xform = _transformation()
+        xform.set_post_oblique(degrees)
+
+        result = render_transformed(source, xform)
+
+        top, bottom = 50, HEIGHT - 50
+        lean = self._column_of_line(result[bottom]) - self._column_of_line(result[top])
+        assert lean == pytest.approx(0.0, abs=1.0)
 
     def test_a_marked_pixel_lands_where_the_points_say(self):
         source = np.full((HEIGHT, WIDTH), 255, dtype=np.uint8)
