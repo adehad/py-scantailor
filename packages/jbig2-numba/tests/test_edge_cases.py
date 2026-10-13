@@ -158,7 +158,11 @@ def test_other_dtypes_are_rejected(dtype) -> None:
 
 def test_ndarray_subclasses_are_encoded_like_plain_arrays() -> None:
     mask = noise(10, 11, 0.5, seed=32)
-    assert encode_generic(np.ma.masked_array(mask)) == encode_generic(mask)
+
+    class Tagged(np.ndarray):
+        pass
+
+    assert encode_generic(mask.view(Tagged)) == encode_generic(mask)
 
 
 @pytest.mark.parametrize("bad", [(0, 300), (300, 0), (-1, -1)])
