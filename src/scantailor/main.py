@@ -5,6 +5,7 @@ from PySide6 import QtCore, QtWidgets
 from .app._ui import resources_rc
 from .app.ui.MainWindow import MainWindowManager
 from .app.ui.theme import apply_theme
+from .imageproc.numba_warmup import start_warmup
 from .translations import load_translation
 
 assert resources_rc, "The import ensures we load in the resources for the rest of Qt."
@@ -25,6 +26,7 @@ def main() -> int:
     load_translation(app)
     main_window = MainWindowManager()
     main_window.show()
+    start_warmup()
     return app.exec()
 
 

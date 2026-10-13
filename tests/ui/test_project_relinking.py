@@ -8,11 +8,19 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import pytest
-from PySide6 import QtWidgets
+from PySide6 import QtCore, QtWidgets
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.dialogs.relinking import RelinkingDialog
 from scantailor.app.ui.MainWindow import MainWindowManager
+from scantailor.app.ui.widgets.relinkable_path_visualization import (
+    RelinkablePathVisualization,
+)
+from scantailor.app.ui.widgets.relinking_list_view import (
+    UNCOMMITTED_STATUS_ROLE,
+    RelinkingListView,
+    RelinkingStatus,
+)
 from scantailor.core.image_io import list_image_pages
 from scantailor.core.project import Project
 from scantailor.core.stage_params import collect_stage_params
@@ -294,9 +302,10 @@ def test_relinking_dialog_shows_the_new_location_and_flags_missing_folders(
     dialog.relink_directory(gone, existing)
 
     assert not dialog.has_missing_directories()
-    row = dialog.findChild(QtWidgets.QListWidget).item(0)
-    assert row.text() == str(existing)
-    assert row.toolTip() == str(gone)
+    row = dialog.findChild(RelinkingListView).model().index(0, 0)
+    assert row.data() == str(existing)
+    assert row.data(QtCore.Qt.ItemDataRole.ToolTipRole) == str(gone)
+    assert row.data(UNCOMMITTED_STATUS_ROLE) == RelinkingStatus.EXISTS
 
 
 def test_relinking_dialog_undo_restores_the_previous_choice(
@@ -319,7 +328,35 @@ def test_relinking_dialog_undo_restores_the_previous_choice(
     assert dialog.relinker().is_empty()
 
 
-def test_relinking_dialog_relink_button_asks_for_a_folder(
+def _select_first_row(dialog: RelinkingDialog) -> RelinkingListView:
+    view = dialog.findChild(RelinkingListView)
+    view.setCurrentIndex(view.model().index(0, 0))
+    return view
+
+
+def _path_buttons(dialog: RelinkingDialog) -> list[QtWidgets.QPushButton]:
+    return dialog.findChild(RelinkablePathVisualization).findChildren(
+        QtWidgets.QPushButton
+    )
+
+
+def test_relinking_dialog_shows_the_path_of_the_selected_folder_as_components(
+    qtbot: QtBot, tmp_path: pathlib.Path
+):
+    gone = tmp_path / "gone"
+    dialog = RelinkingDialog([gone])
+    qtbot.addWidget(dialog)
+    path_view = dialog.findChild(RelinkablePathVisualization)
+    assert path_view.isHidden()
+
+    _select_first_row(dialog)
+
+    assert not path_view.isHidden()
+    labels = [b.text() for b in _path_buttons(dialog)]
+    assert labels[-1] == "gone"
+
+
+def test_clicking_the_last_path_component_relinks_that_folder(
     qtbot: QtBot,
     tmp_path: pathlib.Path,
     file_dialogs: FileDialogStub,
@@ -330,12 +367,63 @@ def test_relinking_dialog_relink_button_asks_for_a_folder(
     file_dialogs.directory = str(target)
     dialog = RelinkingDialog([gone])
     qtbot.addWidget(dialog)
-    dialog.findChild(QtWidgets.QListWidget).selectAll()
+    _select_first_row(dialog)
 
-    dialog.findChild(QtWidgets.QPushButton).click()
+    _path_buttons(dialog)[-1].click()
 
-    assert dialog.relinker().substitute(gone) == target
+    qtbot.waitUntil(lambda: dialog.relinker().substitute(gone) == target)
     assert file_dialogs.calls[0][0] == "getExistingDirectory"
+    assert "Substitution Directory for" in file_dialogs.calls[0][1][1]
+
+
+def test_clicking_a_parent_component_relinks_every_listed_folder_below_it(
+    qtbot: QtBot,
+    tmp_path: pathlib.Path,
+    file_dialogs: FileDialogStub,
+):
+    moved_root = tmp_path / "moved"
+    (moved_root / "scans").mkdir(parents=True)
+    (moved_root / "out").mkdir()
+    old_root = tmp_path / "old"
+    file_dialogs.directory = str(moved_root)
+    dialog = RelinkingDialog([old_root / "scans", old_root / "out"])
+    qtbot.addWidget(dialog)
+    _select_first_row(dialog)
+    buttons = _path_buttons(dialog)
+
+    buttons[-2].click()
+
+    qtbot.waitUntil(lambda: not dialog.relinker().is_empty())
+    assert dialog.relinker().substitute(old_root / "scans") == moved_root / "scans"
+    assert dialog.relinker().substitute(old_root / "out") == moved_root / "out"
+    assert not dialog.has_missing_directories()
+    dialog.undo()
+    assert dialog.relinker().is_empty()
+
+
+def test_relinking_two_folders_to_the_same_place_is_refused_with_an_error(
+    qtbot: QtBot,
+    tmp_path: pathlib.Path,
+    file_dialogs: FileDialogStub,
+):
+    target = tmp_path / "target"
+    target.mkdir()
+    first, second = tmp_path / "first", tmp_path / "second"
+    dialog = RelinkingDialog([first, second])
+    qtbot.addWidget(dialog)
+    dialog.relink_directory(first, target)
+    file_dialogs.directory = str(target)
+    view = dialog.findChild(RelinkingListView)
+    view.setCurrentIndex(view.model().index(1, 0))
+
+    _path_buttons(dialog)[-1].click()
+
+    error = dialog.findChild(QtWidgets.QLabel, "errorLabel")
+    qtbot.waitUntil(lambda: not error.isHidden())
+    assert dialog.relinker().substitute(second) == second
+    assert error.text() == "This change would merge several files into one."
+    _select_first_row(dialog)
+    assert error.isHidden()
 
 
 def test_open_ignores_unsaved_prompt_when_relinking_is_cancelled(

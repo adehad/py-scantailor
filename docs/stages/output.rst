@@ -88,6 +88,22 @@ next zone.
 .. screenshot:: stage6_zone_properties
    :alt: The layer choices of a picture zone
 
+.. screenshot:: stage6_tab_picture_mask
+   :alt: The Picture Zones tab in mixed mode with the picture mask shown
+
+In mixed mode the Picture Zones tab also shows the mask of what the output keeps as
+a picture. The mask pulses slowly so that you can see the page under it, and your
+zones are applied to it in the order the output applies them. It pulses only while
+this tab is showing.
+
+.. screenshot:: status_tip
+   :alt: The status bar telling what the pointer is over in a zone tab
+
+While the pointer is over a zone, a vertex, an edge or the dewarping grid, the
+status bar says what a click or a drag does there, including the keys that change
+it. In the Dewarping tab, hold **Ctrl** while dragging an end point of an edge to move
+it only vertically, or **Shift** to move it only horizontally.
+
 .. screenshot:: stage6_tab_fill_zones
    :alt: The Fill Zones tab with a fill zone drawn over the page
 
@@ -100,7 +116,9 @@ editing the grid of a page whose dewarping is **Auto** or **Marginal** makes it
    :alt: The Dewarping tab with the distortion grid
 
 The **Despeckling** tab shows the page before despeckling, with the specks the
-chosen level removes in red. It previews every level as you pick it, and the page
+chosen level removes in red and a halo of red around each, fading with the
+distance, that shows how far from the text a speck has to be to go. The pictures of
+a mixed page show through unchanged. It previews every level as you pick it, and the page
 renders again only once the slider has rested. Despeckling applies to black and
 white pages and to the text of mixed pages; in **Color / Grayscale** mode the tab
 says so.

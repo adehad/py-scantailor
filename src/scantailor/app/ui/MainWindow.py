@@ -61,6 +61,7 @@ from scantailor.app.ui.pdf_worker import (
 )
 from scantailor.app.ui.stage_panels import StagePanels
 from scantailor.app.ui.thumbnails import ThumbnailListWidget
+from scantailor.app.ui.thumbnails.stage_orders import is_page_incomplete
 from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.app.ui.utils import get_cwidget
 from scantailor.app.ui.widgets.processing_indicator import ProcessingIndicator
@@ -104,6 +105,7 @@ from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.text_layer import TextGeometry
 from scantailor.core.xml_compat import import_xml_project_file
 from scantailor.filters.output.params import ApplyGroup, DistortionModelSpec
+from scantailor.filters.page_layout.params import ContentSize
 from scantailor.filters.page_layout.settings import MARGIN_SIDES
 from scantailor.filters.page_split.layout_type import LayoutType
 
@@ -343,6 +345,8 @@ class MainWindowManager:
         self._auto_save_timer.setSingleShot(True)
         self._auto_save_timer.setInterval(_AUTO_SAVE_INTERVAL_MS)
         self._auto_save_timer.timeout.connect(self._auto_save_project)
+        self._auto_save_deferred = False
+        self._aggregate_size: ContentSize | None = None
         # Serialised project as last saved or opened; None while never saved.
         self._saved_state: str | None = None
         self.workerThreadPool = None  # std::make_unique<WorkerThreadPool>()
@@ -627,6 +631,9 @@ class MainWindowManager:
         )
         self.sortOptions.setCurrentIndex(self.thumbnails.order_combo.currentIndex())
         self.sortOptions.currentIndexChanged.connect(self.thumbnails.set_order)
+        self.sortingOrderBtn.toggled.connect(self.thumbnails.set_sort_reversed)
+        self.thumbnails.orders_changed.connect(self._refill_sort_options)
+        self._refill_sort_options()
         self.sortOptions.currentIndexChanged.connect(self._update_status_bar)
         self.pauseSortingBtn.toggled.connect(self._on_pause_sorting_toggled)
         self.focusButton.toggled.connect(self._on_focus_toggled)
@@ -653,6 +660,40 @@ class MainWindowManager:
         view = self.thumbnails.view
         for target in (view, view.viewport(), view.verticalScrollBar()):
             target.installEventFilter(self._wheel_zoom)
+
+    def _bind_thumbnail_stages(self) -> None:
+        """Offer the current stages' sort options and incomplete marks."""
+        self.thumbnails.bind_stage_sequence(self.stages)
+        self.thumbnails.set_incompleteness_provider(self._page_incomplete)
+
+    def _page_incomplete(self, page: PageId, stage_key: str) -> bool:
+        """Tell whether a stage has no result for a page.
+
+        Output keeps no parameters for a page that a batch rendered with the
+        default settings, so a page whose written geometry is on record counts as
+        done.
+        """
+        stage = FilterStage(int(stage_key))
+        if not is_page_incomplete(self.stages, stage, page):
+            return False
+        project = self.project
+        written = project is not None and project.text_geometry_of(page) is not None
+        return not (stage == FilterStage.OUTPUT and written)
+
+    def _refill_sort_options(self) -> None:
+        """List the shown stage's sort options; hide the controls if it has none."""
+        names = self.thumbnails.order_names()
+        self.sortOptions.blockSignals(True)
+        self.sortOptions.clear()
+        self.sortOptions.addItems(names)
+        self.sortOptions.setCurrentIndex(0 if names else -1)
+        self.sortOptions.blockSignals(False)
+        self.sortOptions.setVisible(bool(names))
+        self.sortingOrderBtn.setVisible(bool(names))
+        self.pauseSortingBtn.setEnabled(bool(names) and self.project is not None)
+        if not names:
+            self.pauseSortingBtn.setChecked(False)
+        self._update_status_bar()
 
     def _on_pause_sorting_toggled(self, paused: bool) -> None:
         """Show the pages in the project's order while the sort order is paused."""
@@ -877,6 +918,11 @@ class MainWindowManager:
         ]
 
     @property
+    def render_pending(self) -> bool:
+        """Whether the shown page is still being rendered."""
+        return self._render_pending
+
+    @property
     def modified(self) -> bool:
         """Whether the project has changes that are not on disk."""
         return self._modified
@@ -947,6 +993,8 @@ class MainWindowManager:
         panels = StagePanels(stage, self.stages, self.ui)
         panels.set_source_cache(self.renderer.sources)
         panels.set_dpi_overrides(self._dpi_overrides)
+        panels.set_removed_pages_provider(self._removed_halves_of)
+        panels.unremove_page_requested.connect(self._on_unremove_page_requested)
         panels.settings_changed.connect(self._on_settings_edited)
         panels.page_size_changed.connect(self.status_panel.set_page_size)
         panels.cursor_moved.connect(self.status_panel.set_cursor_position)
@@ -967,6 +1015,31 @@ class MainWindowManager:
         self._panels = panels
         if self._welcome_widget is not None:
             self.imageFrameLayout.setCurrentWidget(self._welcome_widget)
+        self._show_current_page()
+
+    def _removed_halves_of(self, image_id: ImageId) -> tuple[bool, bool]:
+        """Return whether the left and the right half of an image were removed."""
+        project = self.project
+        info = (
+            next((i for i in project.images if i.id == image_id), None)
+            if project
+            else None
+        )
+        if info is None:
+            return (False, False)
+        return (info.left_half_removed, info.right_half_removed)
+
+    def _on_unremove_page_requested(self, page: PageId) -> None:
+        """Bring back the removed half of the image the page belongs to."""
+        project = self.project
+        if project is None or self.batch_runner.is_running:
+            return
+        if not project.restore_removed_half(page.image_id):
+            return
+        self._refresh_dpi_overrides()
+        self.modified = True
+        self._refresh_page_list(page)
+        self._invalidate_thumbnails()
         self._show_current_page()
 
     def _connect_margins_panel(self, options: Any) -> None:
@@ -1103,11 +1176,19 @@ class MainWindowManager:
         if self.project is None or not self.projectFile:
             return
         if self.batch_runner.is_running:
-            # The worker owns the settings that would be written.
+            # The worker owns the settings that would be written; the save
+            # runs when the batch ends.
+            self._auto_save_deferred = True
             return
+        self._auto_save_deferred = False
         if not ApplicationSettings.get_instance().auto_save_project:
             return
         self._write_project(pathlib.Path(self.projectFile))
+
+    def _run_deferred_auto_save(self) -> None:
+        """Save now if an auto-save came due while a batch was running."""
+        if self._auto_save_deferred:
+            self._auto_save_project()
 
     def _on_page_count_requested(self, image_id: ImageId, count: int) -> None:
         """Give an image the page count its chosen layout type implies.
@@ -1251,8 +1332,25 @@ class MainWindowManager:
         self._invalidate_thumbnails(self._current_page)
         self._request_render()
 
+    def _remember_aggregate_size(self) -> bool:
+        """Note the size the pages are matched to; tell whether it moved.
+
+        Page Layout records a page's content size when the page is processed,
+        and that can change the largest aligned size, which every other page is
+        sized against. Their thumbnails are then stale.
+
+        Returns:
+            bool: True if the size differs from the one noted last.
+        """
+        size = self.stages.page_layout_filter.get_aggregate_hard_size()
+        changed = self._aggregate_size is not None and size != self._aggregate_size
+        self._aggregate_size = size
+        return changed
+
     def _on_render_done(self, page_id: PageId, image: object) -> None:
         self._set_render_pending(False)
+        if self._remember_aggregate_size():
+            self._invalidate_thumbnails()
         if self._adopt_stored_page_counts([page_id.image_id]):
             if page_id not in self.pages():
                 return
@@ -1651,10 +1749,13 @@ class MainWindowManager:
             dict.fromkeys(page.image_id for page in (*result.written, *result.failed))
         )
         self._invalidate_thumbnails()
+        self._remember_aggregate_size()
         self._request_render()
+        self._run_deferred_auto_save()
 
     def _on_batch_failed(self, message: str) -> None:
         self._set_batch_ui(False)
+        self._run_deferred_auto_save()
         _LOG.warning(f"Batch processing failed: {message}")
         if self.batch_dialog is not None:
             self.batch_dialog.deleteLater()
@@ -1739,6 +1840,9 @@ class MainWindowManager:
             project.add_image(image_id, metadata)
         _create_directory(project.output_directory)
         stages = StageSequence()
+        apply_default_params(
+            stages, [image_id for image_id, _ in pages], active_default_params()
+        )
         stages.output_filter.settings.set_default_dpi(Dpi.uniform(dpi))
         self._install_project(project, stages, project_file=None, modified=True)
 
@@ -2361,6 +2465,9 @@ class MainWindowManager:
         project.register_output_file_labels()
         if not project.insert_images(infos, existing, before=before):
             return
+        propagation.seed_new_pages(
+            self.stages, [info.id for info in infos], active_default_params()
+        )
         self._refresh_dpi_overrides()
         self.modified = True
         current = self._current_page
@@ -2504,11 +2611,16 @@ class MainWindowManager:
         self.project = project
         self._refresh_dpi_overrides()
         self.stages = stages
+        self._bind_thumbnail_stages()
+        self._remember_aggregate_size()
         self.thumbnails.set_project(project)
         self.projectFile = str(project_file) if project_file else ""
-        self.pdf_source = project.pdf_source or PdfSource.find(
-            info.id.file_path for info in project.images
-        )
+        if project.pdf_source is None:
+            project.pdf_source = PdfSource.find(
+                info.id.file_path for info in project.images
+            )
+            modified = modified or project.pdf_source is not None
+        self.pdf_source = project.pdf_source
         self._render_info = {}
         self._modified = modified
         self._saved_state = None if modified else self._state_snapshot()
@@ -2622,6 +2734,8 @@ class MainWindowManager:
             return False
         self._saved_state = self._state_snapshot()
         self.modified = False
+        if project.pdf_source is not None:
+            PdfSource.discard_sidecars(info.id.file_path for info in project.images)
         return True
 
     def _state_snapshot(self) -> str:
@@ -2702,6 +2816,7 @@ class MainWindowManager:
         self.project = None
         self._refresh_dpi_overrides()
         self.stages = StageSequence()
+        self._bind_thumbnail_stages()
         self.thumbnails.set_project(None)
         self.projectFile = ""
         self.pdf_source = None

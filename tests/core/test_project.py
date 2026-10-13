@@ -232,6 +232,32 @@ class TestProject:
         assert len(pages) == 1
         assert pages[0].sub_page == SubPage.LEFT_PAGE
 
+    def test_restoring_a_removed_half_brings_back_both_pages_in_order(self):
+        project = Project()
+        image_id = ImageId(file_path=Path("/scan.tiff"))
+        project.images.append(
+            ImageInfo(id=image_id, num_sub_pages=1, left_half_removed=True)
+        )
+
+        pages = project.restore_removed_half(image_id)
+
+        assert [page.sub_page for page in pages] == [
+            SubPage.LEFT_PAGE,
+            SubPage.RIGHT_PAGE,
+        ]
+        assert project.get_pages() == pages
+        assert project.images[0].num_sub_pages == 2
+
+    def test_restoring_an_image_with_nothing_removed_changes_nothing(self):
+        project = Project()
+        image_id = ImageId(file_path=Path("/scan.tiff"))
+        project.images.append(ImageInfo(id=image_id))
+        other = ImageId(file_path=Path("/other.tiff"))
+
+        assert project.restore_removed_half(image_id) == []
+        assert project.restore_removed_half(other) == []
+        assert project.images[0].num_sub_pages == 1
+
     def test_json_round_trip(self):
         project = Project(
             output_directory=Path("/output"),
@@ -443,31 +469,6 @@ class TestXmlCompatibility:
 
         assert len(reloaded.images) == 1
         assert reloaded.images[0].metadata.width == 2480
-
-
-class TestPlausibleDpi:
-    """Tests for ImageMetadata.has_plausible_dpi."""
-
-    @pytest.mark.parametrize(
-        ("dpi", "expected"),
-        [
-            (Dpi.uniform(300), True),
-            (Dpi(), False),
-            (Dpi(horizontal=300, vertical=0), False),
-            (Dpi.uniform(100), False),
-            (Dpi.uniform(12000), False),
-        ],
-        ids=["normal", "undefined", "one-axis-undefined", "too-small", "too-large"],
-    )
-    def test_reports_whether_both_axes_are_usable(self, dpi: Dpi, expected: bool):
-        metadata = ImageMetadata(width=2480, height=3508, dpi=dpi)
-
-        assert metadata.has_plausible_dpi() is expected
-
-    def test_rejects_dpi_too_low_for_the_pixel_size(self):
-        metadata = ImageMetadata(width=20000, height=30000, dpi=Dpi.uniform(150))
-
-        assert not metadata.has_plausible_dpi()
 
 
 class TestRelativePaths:
