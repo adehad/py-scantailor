@@ -736,13 +736,12 @@ class XSpline:
                     dd3 = 0.0
                 derivs.second_deriv_coeffs[i] = dd3
 
-        # Merge control points with same index
+        # Runs of one control point (the ends repeat theirs) become one entry;
+        # entries whose coefficients all vanish are dropped.
         write_idx = 0
         merge_idx = 0
         read_idx = 1
-
-        while read_idx < 4:
-            # Merge all consecutive points with same index
+        while True:
             while (
                 read_idx < 4
                 and derivs.control_points[read_idx] == derivs.control_points[merge_idx]
@@ -758,7 +757,6 @@ class XSpline:
                 ]
                 read_idx += 1
 
-            # Check if coefficients are non-zero
             coeff_sum = (
                 abs(derivs.zero_deriv_coeffs[merge_idx])
                 + abs(derivs.first_deriv_coeffs[merge_idx])
@@ -779,29 +777,8 @@ class XSpline:
 
             if read_idx >= 4:
                 break
-
             merge_idx = read_idx
             read_idx += 1
-
-        # Handle the last merge group
-        if merge_idx < 4:
-            coeff_sum = (
-                abs(derivs.zero_deriv_coeffs[merge_idx])
-                + abs(derivs.first_deriv_coeffs[merge_idx])
-                + abs(derivs.second_deriv_coeffs[merge_idx])
-            )
-            if coeff_sum > 1e-10:
-                derivs.zero_deriv_coeffs[write_idx] = derivs.zero_deriv_coeffs[
-                    merge_idx
-                ]
-                derivs.first_deriv_coeffs[write_idx] = derivs.first_deriv_coeffs[
-                    merge_idx
-                ]
-                derivs.second_deriv_coeffs[write_idx] = derivs.second_deriv_coeffs[
-                    merge_idx
-                ]
-                derivs.control_points[write_idx] = derivs.control_points[merge_idx]
-                write_idx += 1
 
         derivs.num_control_points = write_idx
         return derivs

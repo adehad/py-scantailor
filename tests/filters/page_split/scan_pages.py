@@ -143,6 +143,26 @@ def single_page_missing_inside_edge(
     return page
 
 
+def single_page_with_neighbours_letters_on_left_edge(
+    width: int = 1000, height: int = 1400
+) -> NDArray[np.uint8]:
+    """One page with a strip of its neighbour's text running off the left edge."""
+    page = single_page(width, height)
+    page[:, :200] = PAPER
+    add_text(page, 0, 70, 150, height - 150, seed=4)
+    return page
+
+
+def single_page_with_neighbours_letters_on_right_edge(
+    width: int = 1000, height: int = 1400
+) -> NDArray[np.uint8]:
+    """One page with a strip of its neighbour's text running off the right edge."""
+    page = single_page(width, height)
+    page[:, width - 200 :] = PAPER
+    add_text(page, width - 70, width, 150, height - 150, seed=5)
+    return page
+
+
 def single_page_with_dark_gutter_strip(
     width: int = 1000, height: int = 1400
 ) -> NDArray[np.uint8]:

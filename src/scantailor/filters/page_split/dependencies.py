@@ -14,6 +14,8 @@ class Dependencies(BaseModel):
         rotation_degrees: Orthogonal rotation applied to the image before the
             analysis.
         layout_type: Layout type that was requested at the time.
+        trim: ``(x, y, width, height)`` of the manual trim the analysis was
+            confined to, in oriented pixels; None when it saw the whole image.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -21,6 +23,7 @@ class Dependencies(BaseModel):
     image_size: tuple[int, int] = (0, 0)
     rotation_degrees: int = 0
     layout_type: LayoutType = LayoutType.AUTO_LAYOUT_TYPE
+    trim: tuple[int, int, int, int] | None = None
 
     def is_null(self) -> bool:
         """Return True when nothing is known about the original analysis."""
@@ -42,6 +45,9 @@ class Dependencies(BaseModel):
         page-plus-offcut request cannot be reused for another type because
         which side the page is on is unknown.
 
+        A layout found in pixels is stale once the trim it was confined to
+        changes; one placed by hand is not.
+
         Args:
             current (Dependencies): The dependencies as they stand now.
             manual_split_line (bool): Whether the stored split line was placed
@@ -55,6 +61,8 @@ class Dependencies(BaseModel):
         if self.image_size != current.image_size:
             return False
         if self.rotation_degrees != current.rotation_degrees:
+            return False
+        if self.trim != current.trim and not manual_split_line:
             return False
         if self.layout_type == current.layout_type:
             return True

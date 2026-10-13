@@ -28,6 +28,7 @@ def detect_split(
     layout_type: LayoutType = LayoutType.AUTO_LAYOUT_TYPE,
     dpi: float = 300.0,
     bw_threshold: int | None = None,
+    region: tuple[int, int, int, int] | None = None,
 ) -> SplitResult:
     """Detect how to split an upright page image into pages.
 
@@ -37,12 +38,16 @@ def detect_split(
             detector choose.
         dpi (float): Resolution of the image, the same horizontally and vertically.
         bw_threshold (int | None): Gray level below which a pixel counts as black
-            when whitespace is analysed. By default Otsu's threshold of the image.
+            when whitespace is analysed. By default Otsu's threshold of the
+            analysed part of the image.
+        region (tuple[int, int, int, int] | None): ``(x, y, width, height)`` of
+            the only part of the image to analyse, such as what a manual trim
+            keeps. The layout is still in the pixels of the whole image.
 
     Returns:
         SplitResult: The layout, always of the requested type unless that was
         automatic.
     """
     return SplitResult(
-        estimate_page_layout(to_gray(image), layout_type, dpi, bw_threshold)
+        estimate_page_layout(to_gray(image), layout_type, dpi, bw_threshold, region)
     )

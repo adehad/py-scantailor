@@ -7,6 +7,9 @@ It splits scanned images into individual pages, handling cases like:
 - Pages with offcut garbage (cut off edges)
 """
 
+import math
+from functools import partial
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -161,6 +164,8 @@ class Filter:
         dpi: float = 300.0,
         store_result: bool = True,
         rotation_degrees: int = 0,
+        bw_threshold: int | None = None,
+        trim_area: NDArray[np.float64] | None = None,
     ) -> SplitResult:
         """Detect how to split an image.
 
@@ -171,18 +176,24 @@ class Filter:
             store_result: If True, store the result in settings.
             rotation_degrees: Orthogonal rotation already applied to ``image``;
                 recorded so a later rotation change invalidates the result.
+            bw_threshold: Gray level below which a pixel is black, when the page
+                has a stored one; otherwise Otsu's threshold of the analysed part.
+            trim_area: Corners, in pixels of ``image``, of the region a manual
+                trim keeps. Only that region is analysed and a change of it
+                invalidates the result.
 
         Returns:
-            SplitResult with the detected layout.
+            SplitResult with the detected layout, in the pixels of ``image``.
         """
         params = self.get_params(page_id)
         layout_type = params.layout_type
+        trim = _trim_rect(trim_area, image.shape)
 
-        result = detect_split(image, layout_type, dpi)
+        result = detect_split(image, layout_type, dpi, bw_threshold, trim)
 
         if store_result:
             dependencies = self._dependencies_of(
-                params.layout_type, image.shape, rotation_degrees
+                params.layout_type, image.shape, rotation_degrees, trim
             )
             new_params = params.with_auto_layout(result.layout).model_copy(
                 update={"dependencies": dependencies}
@@ -364,13 +375,17 @@ class Filter:
 
     @staticmethod
     def _dependencies_of(
-        layout_type: LayoutType, image_shape: tuple[int, ...], rotation_degrees: int
+        layout_type: LayoutType,
+        image_shape: tuple[int, ...],
+        rotation_degrees: int,
+        trim: tuple[int, int, int, int] | None = None,
     ) -> Dependencies:
         height, width = image_shape[:2]
         return Dependencies(
             image_size=(width, height),
             rotation_degrees=rotation_degrees,
             layout_type=layout_type,
+            trim=trim,
         )
 
     def clear_detection(self, page_id: "PageId") -> None:
@@ -390,6 +405,8 @@ class Filter:
         page_id: "PageId",
         dpi: float = 300.0,
         rotation_degrees: int = 0,
+        bw_threshold: int | None = None,
+        trim_area: NDArray[np.float64] | None = None,
     ) -> Params:
         """Make the stored layout fit the image, detecting only when it must.
 
@@ -404,6 +421,9 @@ class Filter:
             page_id: The page ID.
             dpi: Image resolution.
             rotation_degrees: Orthogonal rotation applied to ``image``.
+            bw_threshold: The page's stored black and white threshold, if any.
+            trim_area: Corners, in pixels of ``image``, of the region a manual
+                trim keeps; None when there is no trim.
 
         Returns:
             The updated parameters.
@@ -411,10 +431,21 @@ class Filter:
         params = self.get_params(page_id)
         layout = params.page_layout
         requested = params.layout_type
+        detect = partial(
+            self._detect,
+            image,
+            page_id,
+            dpi,
+            rotation_degrees,
+            bw_threshold,
+            trim_area,
+        )
         if layout is None or _conflicts(requested, layout):
-            return self._detect(image, page_id, dpi, rotation_degrees)
+            return detect()
 
-        current = self._dependencies_of(requested, image.shape, rotation_degrees)
+        current = self._dependencies_of(
+            requested, image.shape, rotation_degrees, _trim_rect(trim_area, image.shape)
+        )
         if params.dependencies.is_compatible_with(
             current, manual_split_line=params.is_manual()
         ):
@@ -422,7 +453,7 @@ class Filter:
             if new_layout.layout_type == layout.layout_type:
                 return params
         elif requested == LayoutType.AUTO_LAYOUT_TYPE:
-            return self._detect(image, page_id, dpi, rotation_degrees)
+            return detect()
         else:
             height, width = image.shape[:2]
             outline = (0.0, 0.0, float(width), float(height))
@@ -444,8 +475,17 @@ class Filter:
         page_id: "PageId",
         dpi: float,
         rotation_degrees: int,
+        bw_threshold: int | None,
+        trim_area: NDArray[np.float64] | None,
     ) -> Params:
-        self.detect_split(image, page_id, dpi=dpi, rotation_degrees=rotation_degrees)
+        self.detect_split(
+            image,
+            page_id,
+            dpi=dpi,
+            rotation_degrees=rotation_degrees,
+            bw_threshold=bw_threshold,
+            trim_area=trim_area,
+        )
         return self.get_params(page_id)
 
     def get_sub_page_count(self, page_id: "PageId") -> int:
@@ -483,6 +523,28 @@ def _dependencies_for(
         rotation_degrees=rotation_degrees,
         layout_type=layout_type,
     )
+
+
+def _trim_rect(
+    trim_area: NDArray[np.float64] | None, image_shape: tuple[int, ...]
+) -> tuple[int, int, int, int] | None:
+    """Bounding box of a trim polygon as ``(x, y, width, height)`` in pixels.
+
+    Returns:
+        The box clipped to the image; None when there is no trim or it keeps
+        the whole image.
+    """
+    if trim_area is None:
+        return None
+    height, width = image_shape[:2]
+    left = max(0, math.floor(float(trim_area[:, 0].min())))
+    top = max(0, math.floor(float(trim_area[:, 1].min())))
+    right = min(width, math.ceil(float(trim_area[:, 0].max())))
+    bottom = min(height, math.ceil(float(trim_area[:, 1].max())))
+    if right <= left or bottom <= top:
+        return None
+    rect = (left, top, right - left, bottom - top)
+    return None if rect == (0, 0, width, height) else rect
 
 
 _LAYOUT_TYPES = {

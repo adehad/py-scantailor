@@ -12,6 +12,7 @@ from scantailor.filters.page_split import page_layout_estimator as estimator
 from scantailor.filters.page_split.layout_type import LayoutType
 
 from . import cpp_reference as cpp
+from .test_page_layout_estimator import port_keeps_the_strip
 
 UPSTREAM_TYPES = {
     LayoutType.AUTO_LAYOUT_TYPE: cpp.AUTO,
@@ -53,6 +54,13 @@ def test_folding_line_rules_match_upstream(
     got = estimator._try_cut_at_folding_line(requested, gray, 300.0)
     expected = cpp.try_cut_at_folding_line(UPSTREAM_TYPES[requested], gray, 300.0)
 
+    single_auto_page = requested is LayoutType.AUTO_LAYOUT_TYPE and height > width
+    if single_auto_page and not lines:
+        # Upstream answers "uncut" here without looking at the whitespace; the
+        # port leaves the decision to the whitespace analysis.
+        assert expected is not None
+        assert got is None
+        return
     if expected is None:
         assert got is None
         return
@@ -124,6 +132,19 @@ def test_content_spans_from_components_match_upstream(
         UPSTREAM_TYPES[requested], pages, img, left, right
     )
 
+    spans = estimator.find_content_spans(
+        estimator._content_columns(img).tolist(),
+        estimator._MIN_CONTENT_WIDTH,
+        estimator._MIN_WHITESPACE_WIDTH,
+    )
+    if (
+        pages == 1
+        and requested is LayoutType.AUTO_LAYOUT_TYPE
+        and port_keeps_the_strip(spans, img.shape[1], left, right)
+    ):
+        assert kind == cpp.CUT
+        assert got.layout_type.value == cpp.UNCUT
+        return
     assert got.layout_type.value == kind
     if line1 is not None:
         assert _mid_x(got.lines[0]) == pytest.approx(_mid_x(line1))
