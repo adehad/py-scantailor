@@ -7,7 +7,8 @@ Pixel conventions shared with the rest of the port:
 * Grayscale and bilevel images are 2-D ``uint8`` arrays. Bilevel files load as
   0 (black) / 255 (white).
 * Colour images are ``(H, W, 3)`` ``uint8`` arrays in BGR order, as cv2 expects.
-* Deeper samples (16-bit) are scaled to 8-bit. Alpha channels are discarded.
+* Deeper samples (16-bit) are scaled to 8-bit. Alpha channels are discarded
+  on load; ``write_image`` stores a ``(H, W, 4)`` BGRA array with its alpha.
 
 A missing or unusable DPI is reported as the null ``Dpi`` (0, 0), exactly as the
 C++ metadata loaders do; callers decide how to prompt for a fallback using
@@ -15,7 +16,10 @@ C++ metadata loaders do; callers decide how to prompt for a fallback using
 """
 
 import io
+import math
+import os
 import struct
+import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -31,9 +35,12 @@ from scantailor.core.models import Dpi, ImageId
 from scantailor.core.project import ImageMetadata
 from scantailor.core.settings import TiffCompression, TiffCompressions
 
-# Scans routinely exceed Pillow's default decompression-bomb threshold.
-Image.MAX_IMAGE_PIXELS = None
+# Scans routinely exceed Pillow's default decompression-bomb threshold of about
+# 89 megapixels. Pillow warns above this limit and refuses above twice it.
+MAX_IMAGE_PIXELS: Final = 500_000_000
+Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
+_MAX_SAMPLE_16: Final = 65535
 _TIFF_SUFFIXES: Final = frozenset({".tif", ".tiff"})
 _TAG_X_RESOLUTION: Final = 282
 _TAG_Y_RESOLUTION: Final = 283
@@ -73,6 +80,28 @@ def _round_half_up(value: float) -> int:
     return int(value + 0.5)
 
 
+def _dpi_value(raw: Any, scale: float = 1.0) -> int:
+    """Round a resolution to whole dots per inch; 0 when it is not a usable number.
+
+    TIFF stores resolutions as rationals, and a zero denominator converts to
+    nan or infinity.
+    """
+    try:
+        value = float(raw) * scale
+    except (TypeError, ValueError, ZeroDivisionError):
+        return 0
+    if not math.isfinite(value) or value <= 0:
+        return 0
+    return _round_half_up(value)
+
+
+def _dpi_from_pair(horizontal: int, vertical: int) -> Dpi:
+    """Return the resolution, or the null one if either direction is unknown."""
+    if horizontal <= 0 or vertical <= 0:
+        return Dpi()
+    return Dpi(horizontal=horizontal, vertical=vertical)
+
+
 def _dpi_from_tiff_tags(image: Image.Image) -> Dpi:
     tags = getattr(image, "tag_v2", None)
     if tags is None:
@@ -88,10 +117,7 @@ def _dpi_from_tiff_tags(image: Image.Image) -> Dpi:
         scale = _CM_PER_INCH
     else:
         return Dpi()
-    return Dpi(
-        horizontal=_round_half_up(float(x_res) * scale),
-        vertical=_round_half_up(float(y_res) * scale),
-    )
+    return _dpi_from_pair(_dpi_value(x_res, scale), _dpi_value(y_res, scale))
 
 
 def _dpi_from_jfif(image: Image.Image) -> Dpi:
@@ -101,10 +127,7 @@ def _dpi_from_jfif(image: Image.Image) -> Dpi:
     if not density or unit not in (_JFIF_UNIT_INCH, _JFIF_UNIT_CENTIMETER):
         return Dpi()
     scale = _CM_PER_INCH if unit == _JFIF_UNIT_CENTIMETER else 1.0
-    return Dpi(
-        horizontal=_round_half_up(density[0] * scale),
-        vertical=_round_half_up(density[1] * scale),
-    )
+    return _dpi_from_pair(_dpi_value(density[0], scale), _dpi_value(density[1], scale))
 
 
 def _dpi_of(image: Image.Image) -> Dpi:
@@ -115,8 +138,7 @@ def _dpi_of(image: Image.Image) -> Dpi:
     dpi = image.info.get("dpi")
     if not dpi:
         return Dpi()
-    horizontal, vertical = (_round_half_up(float(v)) for v in dpi[:2])
-    return Dpi(horizontal=max(horizontal, 0), vertical=max(vertical, 0))
+    return _dpi_from_pair(*(_dpi_value(v) for v in dpi[:2]))
 
 
 # EXIF orientation value to the transpose that makes the stored pixels upright.
@@ -279,7 +301,7 @@ def _open(path: Path) -> Iterator[Image.Image]:
             raise UnsupportedImageFormatError(
                 f"Unrecognised image format: {path}"
             ) from exc
-        except (OSError, SyntaxError, ValueError) as exc:
+        except (OSError, SyntaxError, ValueError, Image.DecompressionBombError) as exc:
             raise ImageLoadError(f"Cannot read image {path}: {exc}") from exc
         if image.format == "TIFF" and orientations:
             setattr(image, _TIFF_ORIENTATIONS_ATTRIBUTE, orientations)
@@ -349,8 +371,9 @@ def _has_gray_palette(image: Image.Image) -> bool:
 def _to_array(image: Image.Image) -> NDArray[np.uint8]:
     mode = image.mode
     if mode in ("I;16", "I;16L", "I;16B", "I"):
-        samples = np.asarray(image, dtype=np.uint32)
-        return ((samples * 255 + 32767) // 65535).astype(np.uint8)
+        # Mode I is signed 32-bit; negative samples would wrap as unsigned.
+        samples = np.clip(np.asarray(image, dtype=np.int64), 0, _MAX_SAMPLE_16)
+        return ((samples * 255 + 32767) // _MAX_SAMPLE_16).astype(np.uint8)
     if mode in ("1", "L", "LA"):
         return np.asarray(image.convert("L"), dtype=np.uint8)
     if mode in ("P", "PA") and _has_gray_palette(image):
@@ -390,7 +413,13 @@ def load_image(
             image.load()
             metadata = _metadata_of(image)
             pixels = _to_array(_upright(image))
-        except (OSError, SyntaxError, EOFError, ValueError) as exc:
+        except (
+            OSError,
+            SyntaxError,
+            EOFError,
+            ValueError,
+            Image.DecompressionBombError,
+        ) as exc:
             raise ImageLoadError(f"Cannot decode {path}: {exc}") from exc
     if dpi is not None and not dpi.is_null():
         metadata = metadata.model_copy(update={"dpi": dpi})
@@ -432,11 +461,17 @@ def write_image(
     convention); TIFF output uses the black-and-white method, CCITT G4 unless
     chosen otherwise. ``uint8`` arrays are gray ``(H, W)`` or BGR ``(H, W, 3)``
     and use the colour method, LZW unless chosen otherwise. Like C++, grey images
-    follow the colour method.
+    follow the colour method. ``(H, W, 4)`` ``uint8`` arrays are BGRA and keep
+    their alpha as an extra sample, as C++ does for images with an alpha channel.
+    16-bit RGB is not written, since C++ writes none either; reduce it to 8 bits.
+
+    The file is written under a temporary name beside ``path`` and renamed into
+    place, so a failure leaves any earlier file at ``path`` untouched.
 
     Args:
         path (Path): Destination; suffix must be .tif, .tiff or .png.
-        pixels (NDArray): ``bool`` or ``uint8`` array as described above. Not modified.
+        pixels (NDArray): ``bool`` or ``uint8`` array as described above. Not
+            modified.
         dpi (Dpi | None): Resolution tags to store; omitted when None or null.
         compressions (TiffCompressions | None): TIFF methods; the ones set by
             ``tiff_compressions_in_use``, else the defaults, when None. PNG ignores
@@ -464,6 +499,17 @@ def write_image(
     elif pixels.dtype == np.uint8 and pixels.ndim == 3 and pixels.shape[2] == 3:
         image = Image.fromarray(np.ascontiguousarray(pixels[..., ::-1]), mode="RGB")
         compression = _PILLOW_COMPRESSION[chosen.color]
+    elif pixels.dtype == np.uint8 and pixels.ndim == 3 and pixels.shape[2] == 4:
+        bgra_to_rgba = pixels[..., [2, 1, 0, 3]]
+        image = Image.fromarray(np.ascontiguousarray(bgra_to_rgba), mode="RGBA")
+        compression = _PILLOW_COMPRESSION[chosen.color]
+        if compression == _PILLOW_COMPRESSION[TiffCompression.JPEG]:
+            # libtiff's JPEG codec has no place for an alpha sample.
+            compression = _PILLOW_COMPRESSION[TiffCompression.DEFLATE]
+    elif pixels.dtype == np.uint16 and pixels.ndim == 3:
+        raise ValueError(
+            "16-bit colour images cannot be written; convert them to 8 bits first"
+        )
     else:
         raise ValueError(f"Unsupported array dtype={pixels.dtype} shape={pixels.shape}")
 
@@ -472,6 +518,9 @@ def write_image(
         options["dpi"] = (dpi.horizontal, dpi.vertical)
     if is_tiff:
         options["compression"] = compression
-        image.save(path, format="TIFF", **options)
-    else:
-        image.save(path, format="PNG", **options)
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.part")
+    try:
+        image.save(temporary, format="TIFF" if is_tiff else "PNG", **options)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
