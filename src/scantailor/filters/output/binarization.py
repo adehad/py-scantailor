@@ -14,14 +14,21 @@ class BinarizationMethod(Enum):
     OTSU: Otsu's method - automatic global threshold.
     SAUVOLA: Sauvola's method - local adaptive thresholding.
     WOLF: Wolf's method - improved local adaptive thresholding.
+    FOX: Fox's method - Wolf with Singh's local contrast.
+    WINDOW: Dynamic window method of Bataineh et al.
     BRADLEY: Bradley's method - simple local adaptive thresholding.
+    GRAD: Gradient snip - local mean blended with a page level taken where the
+        contrast is.
     EDGEDIV: Edge division method - edge enhancement with illumination normalization.
     """
 
     OTSU = "otsu"
     SAUVOLA = "sauvola"
     WOLF = "wolf"
+    FOX = "fox"
+    WINDOW = "window"
     BRADLEY = "bradley"
+    GRAD = "grad"
     EDGEDIV = "edgediv"
 
     @classmethod
@@ -67,11 +74,13 @@ class BinarizationOptions(BaseModel):
         method: The binarization algorithm to use.
         threshold_adjustment: Global threshold adjustment (-100 to 100).
             Positive values make image darker (more black).
-        window_size: Window size for local methods (Sauvola, Wolf, Bradley, EdgeDiv).
+        window_size: Window size for local methods (every method but Otsu).
         sauvola_coef: Sauvola's k coefficient (0.0-1.0).
-        wolf_coef: Wolf's k coefficient (0.0-1.0).
-        wolf_lower_bound: Wolf's lower bound (0-255).
-        wolf_upper_bound: Wolf's upper bound (0-255).
+        wolf_coef: Wolf's k coefficient (0.0-1.0); Fox, Window and Grad read it too.
+        wolf_lower_bound: Wolf's lower bound (0-255); Fox, Window and Grad read it
+            too.
+        wolf_upper_bound: Wolf's upper bound (0-255); Fox, Window and Grad read it
+            too.
         bradley_coef: Bradley's k coefficient (0.0-1.0). Higher values make
             it easier for pixels to be classified as foreground (black).
         edge_div_kep: EdgeDiv edge enhancement weight (0.0-1.0).

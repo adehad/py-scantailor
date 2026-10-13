@@ -1,7 +1,8 @@
 """Threshold adjustment of the binarization methods.
 
 Otsu shifts its global threshold and clamps it; the local methods take the
-adjustment as a delta added to every local threshold.
+adjustment as a delta that enters each threshold the way ScanTailor Advanced
+1.2.1 does it.
 """
 
 import numpy as np
@@ -93,7 +94,7 @@ class TestLocalMethodsTakeDelta:
         image = _flat(100)  # Threshold 100 * (1 - 0.2) = 80.
 
         assert np.all(binarize_bradley(image, k=0.2, delta=0.0) == BACKGROUND)
-        assert np.all(binarize_bradley(image, k=0.2, delta=20.0) == BACKGROUND)
+        assert np.all(binarize_bradley(image, k=0.2, delta=19.0) == BACKGROUND)
         assert np.all(binarize_bradley(image, k=0.2, delta=21.0) == INK)
 
     def test_bradley_delta_with_k_of_one_is_the_whole_threshold(self) -> None:
@@ -102,19 +103,29 @@ class TestLocalMethodsTakeDelta:
         assert np.all(binarize_bradley(image, k=1.0, delta=5.0) == BACKGROUND)
         assert np.all(binarize_bradley(image, k=1.0, delta=6.0) == INK)
 
-    def test_sauvola_delta_is_added_to_the_threshold(self) -> None:
-        image = _flat(100)  # Zero deviation: threshold 100 * (1 - 0.2) = 80.
+    def test_sauvola_delta_adds_delta_over_128_to_the_contrast_term(self) -> None:
+        image = _flat(
+            100
+        )  # Zero deviation: threshold 100 * (1 - 0.2 * (1 - delta / 128)).
 
         assert np.all(binarize_sauvola(image, k=0.2, delta=-5.0) == BACKGROUND)
         assert np.all(binarize_sauvola(image, k=0.2, delta=0.0) == BACKGROUND)
-        assert np.all(binarize_sauvola(image, k=0.2, delta=25.0) == INK)
+        assert np.all(binarize_sauvola(image, k=0.2, delta=127.0) == BACKGROUND)
+        assert np.all(binarize_sauvola(image, k=0.2, delta=130.0) == INK)
 
-    def test_wolf_delta_is_added_to_the_threshold(self) -> None:
-        image = _flat(100)  # Flat image: threshold equals the mean, 100.
+    def test_wolf_delta_adds_delta_over_128_to_the_contrast_term(self) -> None:
+        # A window over the whole page gives every pixel the same statistics,
+        # a mean just under 100, and the page minimum is the single 0 pixel.
+        image = _flat(100)
+        image[0, 0] = 0
 
-        assert np.all(binarize_wolf(image, k=0.3, delta=0.0) == BACKGROUND)
-        assert np.all(binarize_wolf(image, k=0.3, delta=1.0) == INK)
-        assert np.all(binarize_wolf(image, k=0.3, delta=-1.0) == BACKGROUND)
+        background = binarize_wolf(
+            image, window_size=101, k=0.3, delta=0.0, lower_bound=0
+        )
+        shifted = binarize_wolf(image, window_size=101, k=0.3, delta=1.0, lower_bound=0)
+
+        assert np.all(background[image == 100] == BACKGROUND)
+        assert np.all(shifted[image == 100] == INK)
 
     def test_wolf_lower_bound_forces_ink(self) -> None:
         image = _flat(100)

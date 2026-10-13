@@ -60,7 +60,7 @@ def test_sauvola_matches_clipped_window_reference(size: int) -> None:
     expected = _reference(
         image,
         size,
-        lambda mean, dev: mean * (1.0 + k * (dev / 128.0 - 1.0)) + delta,
+        lambda mean, dev: mean * (1.0 - k * (1.0 - (dev / 128.0 + delta / 128.0))),
     )
 
     assert np.array_equal(binarize_sauvola(image, size, k, delta), expected)
