@@ -13,6 +13,7 @@ from numpy.typing import NDArray
 from scantailor.core.models import Dpi, PageId
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation, Rect
+from scantailor.filters.fix_orientation.image_trim import merge_with_trim
 from scantailor.filters.page_layout.page_rect import (
     adapt_content_rect,
     calc_page_polygon,
@@ -54,9 +55,10 @@ def build_transformation(
             image after Fix Orientation.
         dpi (float): Resolution of the source image.
         through (FilterStage): Last stage whose geometry is included.
-            ``FIX_ORIENTATION`` gives the identity, ``PAGE_SPLIT`` adds the
-            crop to the page, ``DESKEW`` adds the rotation and ``PAGE_LAYOUT``
-            adds the crop to the final page.
+            ``FIX_ORIENTATION`` gives the identity, or the crop to the manual
+            trim when the image has one, ``PAGE_SPLIT`` adds the crop to the
+            page, ``DESKEW`` adds the rotation and ``PAGE_LAYOUT`` adds the
+            crop to the final page.
 
     Returns:
         ImageTransformation: Maps oriented source pixels to the coordinates the
@@ -64,10 +66,15 @@ def build_transformation(
     """
     width, height = oriented_size
     xform = ImageTransformation.from_size(width, height, transformation_dpi(dpi))
+    trim_area = sequence.fix_orientation_filter.trim_crop_area(
+        page_id.image_id, oriented_size
+    )
+    if trim_area is not None:
+        xform.set_pre_crop_area(trim_area)
     if through < FilterStage.PAGE_SPLIT:
         return xform
 
-    crop = _page_crop_area(sequence, page_id, oriented_size)
+    crop = _page_crop_area(sequence, page_id, oriented_size, trim_area)
     if crop is not None:
         xform.set_pre_crop_area(crop)
     if through < FilterStage.DESKEW:
@@ -81,7 +88,10 @@ def build_transformation(
 
 
 def _page_crop_area(
-    sequence: StageSequence, page_id: PageId, size: tuple[int, int]
+    sequence: StageSequence,
+    page_id: PageId,
+    size: tuple[int, int],
+    trim_area: NDArray[np.float64] | None,
 ) -> NDArray[np.float64] | None:
     layout = sequence.page_split_filter.get_params(page_id).page_layout
     if layout is None:
@@ -96,7 +106,9 @@ def _page_crop_area(
         [np.clip(outline[:, 0], 0, width), np.clip(outline[:, 1], 0, height)]
     ).astype(np.float64)
     extent = clipped.max(axis=0) - clipped.min(axis=0)
-    return None if np.any(extent < _MIN_CROP_EDGE_PX) else clipped
+    if np.any(extent < _MIN_CROP_EDGE_PX):
+        return None
+    return merge_with_trim(clipped, trim_area)
 
 
 def content_rect_of(sequence: StageSequence, page_id: PageId) -> Rect:
