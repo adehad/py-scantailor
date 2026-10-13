@@ -48,11 +48,15 @@ def warm_up_kernels() -> None:
     only run the kernels on tiny input.
     """
     from scantailor.core.estimate_background import normalize_illumination_gray
+    from scantailor.dewarping.auto_model import (
+        warm_up_kernels as warm_up_dewarping_kernels,
+    )
     from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
     from scantailor.dewarping.raster_dewarper import compute_dewarp_maps
     from scantailor.filters.select_content.content_box_finder import find_content_rect
     from scantailor.imageproc.color_segmenter import segment_colors
     from scantailor.imageproc.despeckle import despeckle
+    from scantailor.imageproc.hough_line_detector import HoughLineDetector
     from scantailor.imageproc.reconstruction import reconstruction
 
     page = _text_like_page()
@@ -79,6 +83,13 @@ def warm_up_kernels() -> None:
     bottom = np.array([[0, 280], [100, 295], [200, 280]], dtype=np.float64)
     dewarper = CylindricalSurfaceDewarper.from_directrices(top, bottom)
     compute_dewarp_maps(dewarper, (_BLOCK_DPI, _BLOCK_DPI), (0.0, 0.0, 1.0, 1.0))
+    warm_up_dewarping_kernels()
+    detector = HoughLineDetector(_SIDE, _SIDE, 1.0, 0.0, 5.0, 36)
+    detector.process(
+        np.array([10, 80, 150], dtype=np.int64),
+        np.array([20, 80, 140], dtype=np.int64),
+        np.ones(3, dtype=np.uint32),
+    )
 
 
 def start_warmup() -> threading.Thread:

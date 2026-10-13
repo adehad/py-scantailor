@@ -11,14 +11,14 @@ import numpy as np
 from loguru import logger
 from numpy.typing import NDArray
 
+from scantailor.core.models import Dpi
+from scantailor.dewarping.auto_model import build_auto_distortion_model
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
 from scantailor.dewarping.distortion_model import (
     DistortionModel,
     create_distortion_model,
 )
-from scantailor.dewarping.distortion_model_builder import build_distortion_model
 from scantailor.dewarping.marginal_model import build_marginal_model
-from scantailor.dewarping.text_lines import trace_text_lines
 
 ContentRect = tuple[float, float, float, float]
 
@@ -72,30 +72,28 @@ def dewarper_from_model(
 
 def auto_dewarper(
     gray: NDArray[np.uint8],
-    dpi: tuple[float, float],
+    dpi: Dpi | tuple[float, float] | float,
     content_rect: ContentRect,
     depth_perception: float,
+    spine_on_right: bool = True,
 ) -> CylindricalSurfaceDewarper | None:
-    """Detect the page curvature from its text lines.
+    """Detect the page curvature from its text lines and page edges.
 
     Args:
         gray (NDArray[np.uint8]): 2-D gray page with dark text on a light
             background, illumination already normalised.
-        dpi (tuple[float, float]): Horizontal and vertical resolution of ``gray``.
+        dpi (Dpi | tuple[float, float] | float): Horizontal and vertical
+            resolution of ``gray``.
         content_rect (ContentRect): (x, y, width, height) of the content.
         depth_perception (float): See ``dewarper_from_polylines``.
+        spine_on_right (bool): True for a single or left page, False for a
+            right page.
 
     Returns:
-        CylindricalSurfaceDewarper | None: The dewarper, or None when too few
-            text lines were found to tell the page is curved.
+        CylindricalSurfaceDewarper | None: The dewarper, or None when the curves
+            found give no valid distortion model.
     """
-    x, y, width, height = content_rect
-    traced = trace_text_lines(
-        gray, dpi, (round(x), round(y), round(width), round(height))
-    )
-    if traced.vertical_bounds is None:
-        return None
-    model = build_distortion_model(traced.lines, traced.vertical_bounds)
+    model = build_auto_distortion_model(gray, dpi, content_rect, spine_on_right)
     return dewarper_from_model(model, depth_perception)
 
 

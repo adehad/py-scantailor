@@ -35,15 +35,14 @@ from scantailor.core.transformation import (
     render_transformed,
 )
 from scantailor.core.zones import Zone, ZoneSpline
+from scantailor.dewarping.auto_model import build_auto_distortion_model
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
 from scantailor.dewarping.distortion_model import DistortionModel
-from scantailor.dewarping.distortion_model_builder import build_distortion_model
 from scantailor.dewarping.marginal_model import build_marginal_model
 from scantailor.dewarping.page_dewarper import (
     dewarper_from_model,
     dewarper_from_polylines,
 )
-from scantailor.dewarping.text_lines import trace_text_lines
 from scantailor.filters.deskew.dependencies import Dependencies as DeskewDependencies
 from scantailor.filters.deskew.filter import Filter as DeskewFilter
 from scantailor.filters.deskew.params import Params as DeskewParams
@@ -758,15 +757,14 @@ def _detected_model(
     gray: NDArray[np.uint8],
     dpi: tuple[float, float],
     content: tuple[float, float, float, float],
+    spine_on_right: bool,
 ) -> DistortionModel | None:
-    """Fit the page curvature to its traced text lines."""
-    x, y, width, height = content
-    traced = trace_text_lines(
-        gray, dpi, (round(x), round(y), round(width), round(height))
-    )
-    if traced.vertical_bounds is None:
-        return None
-    return build_distortion_model(traced.lines, traced.vertical_bounds)
+    """Fit the page curvature to its text lines and page edges.
+
+    Returns None when the curves give no valid model; the page is then left
+    undewarped.
+    """
+    return build_auto_distortion_model(gray, dpi, content, spine_on_right)
 
 
 def _polygon_points(polygon: NDArray[np.float64]) -> list[tuple[float, float]]:
@@ -834,8 +832,9 @@ def _dewarper_source(
 
     if mode == DewarpingMode.AUTO:
         dpi = (params.output_dpi.horizontal, params.output_dpi.vertical)
+        spine_on_right = page_id.sub_page != SubPage.RIGHT_PAGE
         return lambda gray: found.dewarper_for(
-            _detected_model(gray, dpi, content), depth
+            _detected_model(gray, dpi, content, spine_on_right), depth
         )
     if mode == DewarpingMode.MARGINAL:
         spine_on_right = page_id.sub_page != SubPage.RIGHT_PAGE
