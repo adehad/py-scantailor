@@ -1,8 +1,9 @@
 """Fix Orientation filter image view.
 
 Shows the unrotated source image under the stored rotation, with an arrow in
-a corner that points where the top of the page now is. Left and right arrow
-keys, L and R, and a double click ask for a quarter turn.
+a corner that points where the top of the page now is. Only the part inside the
+manual trim is shown. Left and right arrow keys, L and R, and a double click
+ask for a quarter turn.
 """
 
 import copy
@@ -16,7 +17,8 @@ from PySide6.QtGui import QImage, QPainter, QPen
 from scantailor.app.ui.image_views.base import ImageViewBase
 from scantailor.app.ui.theme.tokens import view_color
 from scantailor.core.models import OrthogonalRotation
-from scantailor.core.transformation import ImageTransformation
+from scantailor.core.transformation import ImageTransformation, Rect
+from scantailor.filters.fix_orientation.image_trim import ImageTrim
 
 
 class FixOrientationImageView(ImageViewBase):
@@ -44,6 +46,7 @@ class FixOrientationImageView(ImageViewBase):
         super().__init__(parent=parent)
         self._rotation = OrthogonalRotation(degrees=0)
         self._base_transformation: ImageTransformation | None = None
+        self._trim = ImageTrim()
 
     @property
     def rotation(self) -> OrthogonalRotation:
@@ -73,7 +76,36 @@ class FixOrientationImageView(ImageViewBase):
     def _rotated(self, transformation: ImageTransformation) -> ImageTransformation:
         rotated = copy.deepcopy(transformation)
         rotated.set_pre_rotation(self._rotation)
+        if self._trim.enabled:
+            width, height = (
+                transformation.orig_rect.width,
+                transformation.orig_rect.height,
+            )
+            x, y, inner_width, inner_height = self._trim.to_inner_rect(
+                round(width), round(height)
+            )
+            rotated.set_pre_crop_area(
+                rotated.orig_rect_to_pre_crop_space(
+                    Rect(x=x, y=y, width=inner_width, height=inner_height)
+                )
+            )
         return rotated
+
+    def set_trim(self, trim: ImageTrim) -> None:
+        """Show only the part of the page that a trim keeps.
+
+        Args:
+            trim (ImageTrim): The trim of the shown image; its edges are those
+                of the unrotated image.
+        """
+        if trim == self._trim:
+            return
+        self._trim = trim
+        if self._base_transformation is not None:
+            ImageViewBase.set_transformation(
+                self, self._rotated(self._base_transformation), keep_view=True
+            )
+        self.update()
 
     def set_rotation(self, rotation: OrthogonalRotation) -> None:
         """Show the page under a rotation.

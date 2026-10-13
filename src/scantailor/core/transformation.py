@@ -457,6 +457,21 @@ class ImageTransformation:
         self._reset_post_scale()
         self._update()
 
+    def orig_rect_to_pre_crop_space(self, rect: Rect) -> NDArray[np.float64]:
+        """Map a rectangle of the original image to the pre-crop area's space.
+
+        Args:
+            rect (Rect): Rectangle in original image coordinates.
+
+        Returns:
+            NDArray[np.float64]: Its four corners after pre-scale and pre-rotate,
+            shape (4, 2); the coordinates ``set_pre_crop_area`` takes.
+        """
+        return _transform_polygon(
+            _rect_to_polygon(rect),
+            _then(self._pre_scale_xform, self._pre_rotate_xform),
+        )
+
     # Step 4: Post-rotate
 
     def set_post_rotation(self, degrees: float) -> None:

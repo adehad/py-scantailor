@@ -1,6 +1,5 @@
 """Reading Fix Orientation settings from a C++ ScanTailor project file."""
 
-from dataclasses import dataclass
 from xml.etree import ElementTree as ET
 
 from scantailor.core.models import ImageId, OrthogonalRotation
@@ -13,29 +12,15 @@ from scantailor.core.xml_reader import (
     image_elements,
     skip_malformed,
 )
+from scantailor.filters.fix_orientation.image_trim import ImageTrim
 
-
-@dataclass(frozen=True)
-class ImageTrim:
-    """The per-image trim of a version 4 project, in source pixels.
-
-    Attributes:
-        left (int): Pixels cut from the left edge.
-        right (int): Pixels cut from the right edge.
-        top (int): Pixels cut from the top edge.
-        bottom (int): Pixels cut from the bottom edge.
-    """
-
-    left: int
-    right: int
-    top: int
-    bottom: int
+__all__ = ["ImageTrim", "read_rotations", "read_trims"]
 
 
 def read_rotations(
     filter_element: ET.Element | None, context: XmlProjectContext
 ) -> list[StageParamsEntry]:
-    """Read the per-image rotations of the ``<fix-orientation>`` element.
+    """Read the per-image rotations and trims of the ``<fix-orientation>`` element.
 
     The element's ``<image-settings>`` (a per-page binarization threshold and
     black-on-white flag) have no counterpart in the port and are not read.
@@ -45,18 +30,25 @@ def read_rotations(
         context (XmlProjectContext): Id lookup of the project.
 
     Returns:
-        list[StageParamsEntry]: One entry per image with a stored rotation;
-            malformed ones are logged and left out.
+        list[StageParamsEntry]: One entry per image with a stored rotation or an
+            enabled trim, shaped as ``Settings.dump_params`` writes it; malformed
+            ones are logged and left out.
     """
+    trims = read_trims(filter_element, context)
     entries: list[StageParamsEntry] = []
     for image_id, element in image_elements(filter_element, context):
         with skip_malformed("fix orientation rotation", element):
+            params: dict[str, object] = {}
             rotation_element = child(element, "rotation")
-            if rotation_element is None:
-                continue  # version 4 writes images that only have a trim
-            degrees = attr_int(rotation_element, "degrees")
-            rotation = OrthogonalRotation.model_validate({"degrees": degrees})
-            entries.append(entry_for_image(image_id, rotation.model_dump(mode="json")))
+            if rotation_element is not None:
+                degrees = attr_int(rotation_element, "degrees")
+                rotation = OrthogonalRotation.model_validate({"degrees": degrees})
+                params.update(rotation.model_dump(mode="json"))
+            trim = trims.get(image_id)
+            if trim is not None:
+                params["trim"] = trim.model_dump(mode="json")
+            if params:
+                entries.append(entry_for_image(image_id, params))
     return entries
 
 
@@ -82,6 +74,7 @@ def read_trims(
             if (trim_element.get("enabled") or "0") == "0":
                 continue
             trims[image_id] = ImageTrim(
+                enabled=True,
                 left=attr_int(trim_element, "left"),
                 right=attr_int(trim_element, "right"),
                 top=attr_int(trim_element, "top"),
