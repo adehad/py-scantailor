@@ -22,6 +22,12 @@ from scantailor.main import setup_qcore
 
 PAGE_WIDTH = 600
 PAGE_HEIGHT = 800
+# Every text line starts at this margin and is at least this wide and tall.
+FIRST_LINE_TOP = 80
+LINE_LEFT = 60
+LINE_PITCH = 40
+BLOB_HEIGHT = 14
+MIN_WORD_WIDTH = 20
 # 300 dpi; the default Qt writes (about 100 dpi) would open the Fix DPI dialog.
 SCAN_DOTS_PER_METER = 11811
 
@@ -128,17 +134,20 @@ class PageImages:
 
     directory: pathlib.Path
     paths: list[pathlib.Path]
+    ink_point: tuple[int, int]
+    """(x, y) of a pixel that is dark on every page."""
 
 
 def _draw_text_like_blobs(rng: np.random.Generator) -> np.ndarray:
     page = np.full((PAGE_HEIGHT, PAGE_WIDTH, 3), 255, dtype=np.uint8)
-    for line_top in range(80, PAGE_HEIGHT - 80, 40):
-        x = 60
+    for line_top in range(FIRST_LINE_TOP, PAGE_HEIGHT - 80, LINE_PITCH):
+        x = LINE_LEFT
         while x < PAGE_WIDTH - 60:
-            word_width = int(rng.integers(20, 80))
-            page[line_top : line_top + 14, x : min(x + word_width, PAGE_WIDTH - 60)] = (
-                30
-            )
+            word_width = int(rng.integers(MIN_WORD_WIDTH, 80))
+            page[
+                line_top : line_top + BLOB_HEIGHT,
+                x : min(x + word_width, PAGE_WIDTH - 60),
+            ] = 30
             x += word_width + 12
     return page
 
@@ -164,7 +173,11 @@ def page_images(tmp_path: pathlib.Path) -> PageImages:
         image.setDotsPerMeterY(SCAN_DOTS_PER_METER)
         assert image.save(str(path)), f"could not write {path}"
         paths.append(path)
-    return PageImages(directory=directory, paths=paths)
+    ink_point = (
+        LINE_LEFT + MIN_WORD_WIDTH // 2,
+        FIRST_LINE_TOP + BLOB_HEIGHT // 2,
+    )
+    return PageImages(directory=directory, paths=paths, ink_point=ink_point)
 
 
 @dataclasses.dataclass
@@ -202,30 +215,69 @@ def file_dialogs(monkeypatch: pytest.MonkeyPatch) -> FileDialogStub:
     return stub
 
 
-@pytest.fixture
-def respond_to_modal(qtbot: QtBot) -> Callable[..., None]:
-    """Return a function that schedules a response to the next modal dialog.
+class ModalResponder:
+    """Answers modal dialogs from the event loop and fails when none appears.
 
-    The callback runs from the event loop while the modal dialog is blocking
-    in exec(), so it works for dialogs and QMessageBox instances alike.
+    The callback runs while the modal dialog is blocking in exec(), so it works
+    for dialogs and QMessageBox instances alike. A response that finds no modal
+    within its timeout, or is still waiting when the test ends, is recorded in
+    ``unanswered`` and fails the test at teardown.
     """
 
-    def schedule(accept: bool = True, timeout_ms: int = 5000) -> None:
+    def __init__(self) -> None:
+        self.unanswered = 0
+        self._pending = 0
+        self._cancelled = False
+
+    def __call__(self, accept: bool = True, timeout_ms: int = 5000) -> None:
+        """Schedule a response to the next modal dialog.
+
+        Args:
+            accept: Accept the dialog; otherwise reject it.
+            timeout_ms: How long to wait for a modal dialog to appear.
+        """
         deadline = QtCore.QDeadlineTimer(timeout_ms)
+        self._pending += 1
 
         def poll() -> None:
+            if self._cancelled:
+                return
             modal = QtWidgets.QApplication.activeModalWidget()
             if isinstance(modal, QtWidgets.QDialog):
+                self._pending -= 1
                 if accept:
                     modal.accept()
                 else:
                     modal.reject()
-            elif not deadline.hasExpired():
+            elif deadline.hasExpired():
+                self._pending -= 1
+                self.unanswered += 1
+            else:
                 QtCore.QTimer.singleShot(10, poll)
 
         QtCore.QTimer.singleShot(10, poll)
 
-    return schedule
+    def finish(self) -> int:
+        """Stop waiting and return how many responses never met a modal dialog."""
+        self._cancelled = True
+        self.unanswered += self._pending
+        self._pending = 0
+        return self.unanswered
+
+    def forget_unanswered(self) -> None:
+        """Accept that scheduled responses found no modal, so teardown passes."""
+        self.unanswered = 0
+
+
+@pytest.fixture
+def respond_to_modal(qtbot: QtBot) -> Iterator[ModalResponder]:
+    """Return a function that schedules a response to the next modal dialog."""
+    responder = ModalResponder()
+    yield responder
+    unanswered = responder.finish()
+    assert unanswered == 0, (
+        f"{unanswered} scheduled modal response(s) never met a modal dialog"
+    )
 
 
 @pytest.fixture
