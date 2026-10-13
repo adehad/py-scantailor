@@ -24,6 +24,11 @@ from loguru import logger
 from numpy.typing import NDArray
 
 from scantailor.core.models import Dpi, PageId, SubPage
+from scantailor.core.page_geometry import (
+    page_crop_area,
+    page_polygon,
+    selection_rects,
+)
 from scantailor.core.transformation import (
     ImageTransformation,
     Rect,
@@ -42,7 +47,6 @@ from scantailor.dewarping.text_lines import trace_text_lines
 from scantailor.filters.deskew.dependencies import Dependencies as DeskewDependencies
 from scantailor.filters.deskew.filter import Filter as DeskewFilter
 from scantailor.filters.deskew.params import Params as DeskewParams
-from scantailor.filters.fix_orientation.image_trim import merge_with_trim
 from scantailor.filters.output.dewarping_options import DewarpingMode
 from scantailor.filters.output.generator import DewarperSource, OutputResult
 from scantailor.filters.output.params import (
@@ -51,19 +55,16 @@ from scantailor.filters.output.params import (
     Params,
     PictureZoneSpec,
 )
+from scantailor.filters.output.post_deskew import measure_post_deskew
 from scantailor.filters.output.split_output import SplitImages
 from scantailor.filters.page_layout.page_rect import (
     adapt_content_rect,
     calc_margins_mm,
-    calc_page_polygon,
     rect_size_mm,
 )
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
 
 from .stage_sequence import FilterStage, StageSequence
-
-# Smallest crop edge, in pixels, that is still worth applying.
-_MIN_CROP_EDGE_PX = 1.0
 
 
 class PipelineCancelled(Exception):
@@ -80,11 +81,14 @@ class OutputExtras:
         despeckle_source: The text as a bilevel page just before despeckling,
             0 being ink; None when the output is not binarised.
         despeckle_dpi: Resolution of ``despeckle_source``, the smaller axis.
+        picture_mask: True where the output keeps the original; only for mixed
+            output whose pixels are those of ``page`` (not dewarped).
     """
 
     page: NDArray[np.uint8]
     despeckle_source: NDArray[np.uint8] | None
     despeckle_dpi: int
+    picture_mask: NDArray[np.bool_] | None = None
 
 
 @dataclass
@@ -166,6 +170,11 @@ class _PageState:
     def _new_transformation(self, source: NDArray[np.uint8]) -> ImageTransformation:
         height, width = source.shape[:2]
         return ImageTransformation.from_size(width, height, self._dpi)
+
+    @property
+    def dpi(self) -> Dpi:
+        """Resolution the transformation is built with."""
+        return self._dpi
 
     def replace_source(self, source: NDArray[np.uint8]) -> None:
         """Swap in new source pixels and discard the accumulated transformation."""
@@ -420,38 +429,21 @@ def _process_page_split(
         return metadata
 
     metadata["num_sub_pages"] = params.page_layout.num_sub_pages
-    outline = params.page_layout.get_page_outline(page_id.sub_page)
-    if outline is None:
+    height, width = state.source.shape[:2]
+    area = page_crop_area(
+        params.page_layout, page_id.sub_page, (width, height), state.trim_area
+    )
+    if area is None:
         logger.debug(
-            "No {} region in layout {}; keeping the whole image",
+            "No usable {} region in layout {}; keeping the whole image",
             page_id.sub_page,
             params.page_layout.layout_type,
         )
         return metadata
 
-    area = _clip_to_image(outline, state.source.shape)
-    if area is not None:
-        area = merge_with_trim(area, state.trim_area)
-        state.crop_to(area)
-        metadata["crop_area"] = area.tolist()
+    state.crop_to(area)
+    metadata["crop_area"] = area.tolist()
     return metadata
-
-
-def _clip_to_image(
-    polygon: NDArray[np.floating], image_shape: tuple[int, ...]
-) -> NDArray[np.float64] | None:
-    """Clamp a polygon to the image bounds; None if it would be degenerate."""
-    height, width = image_shape[:2]
-    clipped = np.column_stack(
-        [
-            np.clip(polygon[:, 0], 0, width),
-            np.clip(polygon[:, 1], 0, height),
-        ]
-    ).astype(np.float64)
-    extent = clipped.max(axis=0) - clipped.min(axis=0)
-    if np.any(extent < _MIN_CROP_EDGE_PX):
-        return None
-    return clipped
 
 
 def _process_deskew(
@@ -468,7 +460,9 @@ def _process_deskew(
     )
 
     if detect and filter_.needs_detection(page_id, dependencies):
-        filter_.detect_skew(state.view(), page_id, dependencies=dependencies)
+        filter_.detect_skew(
+            state.view(), page_id, dependencies=dependencies, dpi=state.dpi
+        )
 
     params = filter_.get_params(page_id)
     if detect and params.is_manual() and params.dependencies != dependencies:
@@ -570,23 +564,7 @@ def _process_page_layout(
     selection = sequence.select_content_filter.get_params(page_id)
     xform = state.xform
 
-    view_rect = xform.resulting_rect
-    page_rect = (
-        Rect(
-            x=selection.page_box.x,
-            y=selection.page_box.y,
-            width=selection.page_box.width,
-            height=selection.page_box.height,
-        )
-        if selection.page_box.is_valid()
-        else view_rect
-    )
-    content_rect = Rect(
-        x=selection.content_box.x,
-        y=selection.content_box.y,
-        width=selection.content_box.width,
-        height=selection.content_box.height,
-    )
+    page_rect, content_rect = selection_rects(selection, xform.resulting_rect)
     adapted_content = adapt_content_rect(xform, content_rect)
 
     content_width_mm, content_height_mm = rect_size_mm(xform, content_rect)
@@ -605,13 +583,14 @@ def _process_page_layout(
     params = update.params
     aggregate = update.aggregate_after
     content_polygon_source = xform.map_polygon_back(adapted_content.to_polygon())
-    page_polygon = calc_page_polygon(
-        xform,
-        adapted_content,
-        params,
-        (aggregate.width_mm, aggregate.height_mm),
+    state.crop_to_page(
+        page_polygon(
+            xform,
+            content_rect,
+            params,
+            (aggregate.width_mm, aggregate.height_mm),
+        )
     )
-    state.crop_to_page(page_polygon)
     state.content_polygon_source = (
         None if content_rect.is_empty() else content_polygon_source
     )
@@ -619,6 +598,7 @@ def _process_page_layout(
     margins = params.hard_margins_mm
     final_rect = state.xform.resulting_rect
     return {
+        "aggregate_size_changed": update.aggregate_changed,
         "margins": {
             "left": margins.left,
             "right": margins.right,
@@ -661,6 +641,7 @@ def _process_output(
     metadata: dict = {
         "color_mode": params.color_mode.value,
         "despeckle_level": params.despeckle_level.value,
+        "despeckle_strength": params.despeckle_strength,
         "binarization_method": params.binarization.method.value,
     }
 
@@ -684,10 +665,22 @@ def _process_output(
         )
     )
     found = _FoundModel()
+    source = _dewarper_source(state, view, page_id, params, options, found)
+    post_deskew_angle, source = measure_post_deskew(view, params, source, page_outline)
+    if (
+        params.needs_dewarping()
+        and post_deskew_angle != params.dewarping.post_deskew_angle
+    ):
+        params = params.with_dewarping(
+            params.dewarping.model_copy(update={"post_deskew_angle": post_deskew_angle})
+        )
+        sequence.output_filter.settings.set_post_deskew_angle(
+            page_id, post_deskew_angle
+        )
     result = generate_output(
         view,
-        params,
-        dewarper=_dewarper_source(state, view, page_id, params, options, found),
+        params.for_generation(),
+        dewarper=source,
         color_options=params.color_common,
         content_polygon=content_polygon,
         page_outline=page_outline,
@@ -700,6 +693,7 @@ def _process_output(
     metadata["is_binary"] = result.is_binary
     metadata["was_dewarped"] = result.was_dewarped
     metadata["output_dpi"] = (params.output_dpi.horizontal, params.output_dpi.vertical)
+    metadata["post_deskew_angle"] = post_deskew_angle
 
     extras = (
         OutputExtras(
@@ -708,11 +702,21 @@ def _process_output(
             despeckle_dpi=round(
                 min(params.output_dpi.horizontal, params.output_dpi.vertical)
             ),
+            picture_mask=_mask_on_page(result.picture_mask, view),
         )
         if options.keep_output_extras
         else None
     )
     return metadata, result, found.as_source_spec(state), extras
+
+
+def _mask_on_page(
+    mask: NDArray[np.bool_] | None, page: NDArray[np.uint8]
+) -> NDArray[np.bool_] | None:
+    """Return the picture mask if it lies on the pixels of ``page``."""
+    if mask is None or mask.shape != page.shape[:2]:
+        return None
+    return mask
 
 
 @dataclass

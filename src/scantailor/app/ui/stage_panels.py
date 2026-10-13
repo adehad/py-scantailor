@@ -28,6 +28,7 @@ from scantailor.app.ui.image_views.output import (
     ZoneKind,
 )
 from scantailor.app.ui.image_views.page_layout import PageLayoutImageView
+from scantailor.app.ui.image_views.page_layout_state import PageLayoutState
 from scantailor.app.ui.image_views.page_split import PageSplitImageView
 from scantailor.app.ui.image_views.select_content import SelectContentImageView
 from scantailor.app.ui.options_widgets import (
@@ -39,8 +40,15 @@ from scantailor.app.ui.options_widgets import (
     select_content,
 )
 from scantailor.app.ui.source_cache import SourceCache
+from scantailor.core.content_mask import ContentMask, compute_content_mask
 from scantailor.core.image_io import ImageLoadError
-from scantailor.core.models import ImageId, Margins, OrthogonalRotation, PageId
+from scantailor.core.models import (
+    ImageId,
+    Margins,
+    OrthogonalRotation,
+    PageId,
+    SubPage,
+)
 from scantailor.core.page_geometry import (
     build_transformation,
     content_rect_of,
@@ -56,6 +64,7 @@ from scantailor.core.zones import (
     PictureZoneProperties,
 )
 from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.dewarping_options import DewarpingMode
 from scantailor.filters.output.params import (
     ColorMode,
     DistortionModelSpec,
@@ -63,6 +72,7 @@ from scantailor.filters.output.params import (
     PictureZoneSpec,
 )
 from scantailor.filters.output.params import Params as OutputParams
+from scantailor.filters.page_layout.guide import Guide as StoredGuide
 from scantailor.filters.page_layout.page_rect import adapt_content_rect, rect_size_mm
 from scantailor.filters.page_split.page_layout import PageLayout
 from scantailor.filters.select_content.content_box import ContentBox, PageBox
@@ -241,11 +251,14 @@ class StagePanels(QtCore.QObject):
             is shown; dpi (float).
         cursor_moved: The cursor moved over the view. Args: position (QPointF | None)
             in pixels from the page's top left corner, None when it left the view.
+        unremove_page_requested: The user asked in the Page Split view for a
+            removed half back. Args: page (PageId) of the removed half.
     """
 
     settings_changed = QtCore.Signal()
     page_size_changed = QtCore.Signal(object, float)
     cursor_moved = QtCore.Signal(object)
+    unremove_page_requested = QtCore.Signal(object)
 
     def __init__(
         self,
@@ -286,6 +299,8 @@ class StagePanels(QtCore.QObject):
         self._source_generation = 0
         self._dpi_overrides: DpiOverrides = {}
         self._sources: SourceCache | None = None
+        self._removed_pages: Callable[[ImageId], tuple[bool, bool]] | None = None
+        self._content_mask: tuple[tuple[object, ...], ContentMask] | None = None
 
         self._connect_view(stage)
         self._viewport = self.view.viewport()
@@ -339,6 +354,17 @@ class StagePanels(QtCore.QObject):
         """
         self._sources = sources
 
+    def set_removed_pages_provider(
+        self, provider: Callable[[ImageId], tuple[bool, bool]] | None
+    ) -> None:
+        """Tell the Page Split view which halves of an image the project dropped.
+
+        Args:
+            provider (Callable[[ImageId], tuple[bool, bool]] | None): Returns
+                whether the left and the right half of an image were removed.
+        """
+        self._removed_pages = provider
+
     def set_dpi_overrides(self, dpi_overrides: DpiOverrides) -> None:
         """Use the project's resolutions for sources decoded from now on.
 
@@ -387,6 +413,7 @@ class StagePanels(QtCore.QObject):
             view.rotation_requested.connect(self._on_rotation_requested)
         elif isinstance(view, PageSplitImageView):
             view.page_layout_set_locally.connect(self._on_page_layout_set)
+            view.unremove_requested.connect(self._on_unremove_requested)
         elif isinstance(view, DeskewImageView):
             view.manual_deskew_angle_set.connect(self._on_deskew_angle_set)
             view.manual_oblique_angle_set.connect(self._on_oblique_angle_set)
@@ -395,6 +422,9 @@ class StagePanels(QtCore.QObject):
             view.manual_page_rect_set.connect(self._on_page_rect_set)
         elif isinstance(view, PageLayoutImageView):
             view.margins_set_locally.connect(self._on_margins_set)
+            if isinstance(self.options, page_layout.OptionsWidget):
+                self._keep_page_layout_state_in_settings(self.options.state)
+                view.set_state(self.options.state)
         elif isinstance(view, OutputImageView):
             view.zones_changed.connect(self._on_zones_changed)
             view.distortion_model_changed.connect(self._on_distortion_model_edited)
@@ -402,6 +432,26 @@ class StagePanels(QtCore.QObject):
             if isinstance(self.options, output.OptionsWidget):
                 self.options.despeckle_level_changed.connect(view.set_despeckle_level)
             view.set_tabs(list(ImageViewTab))
+
+    def _keep_page_layout_state_in_settings(self, state: PageLayoutState) -> None:
+        """Load the guides from the Page Layout settings and write changes back."""
+        settings = self.sequence.page_layout_filter.settings
+        state.load(
+            [(g.position_mm, g.is_horizontal) for g in settings.get_guides()],
+            settings.is_middle_rect_shown(),
+        )
+
+        def store_guides() -> None:
+            settings.set_guides(
+                StoredGuide(position_mm=g.position_mm, is_horizontal=g.is_horizontal)
+                for g in state.guides
+            )
+
+        def store_middle_rect_choice() -> None:
+            settings.set_middle_rect_shown(state.middle_rect_shown)
+
+        state.guides_changed.connect(store_guides)
+        state.middle_rect_shown_changed.connect(store_middle_rect_choice)
 
     def _on_output_tab_changed(self, tab: ImageViewTab) -> None:
         if isinstance(self.options, output.OptionsWidget):
@@ -541,6 +591,8 @@ class StagePanels(QtCore.QObject):
             self._fed_model = None
             view.set_tab_image(ImageViewTab.DEWARPING, None)
             view.set_tab_image(ImageViewTab.PICTURE_ZONES, None)
+            view.set_tab_image(ImageViewTab.FILL_ZONES, None)
+            view.set_picture_mask(None)
             view.set_despeckle_source(None, 0, DespeckleLevel.OFF)
             view.set_tab_message(ImageViewTab.DESPECKLING, None)
 
@@ -647,6 +699,8 @@ class StagePanels(QtCore.QObject):
 
         oriented_size = self._oriented_size(page, source)
         if isinstance(view, PageSplitImageView):
+            if self._removed_pages is not None:
+                view.set_removed_pages(*self._removed_pages(page.image_id))
             view.set_page_layout(
                 sequence.page_split_filter.get_params(page).page_layout
             )
@@ -666,6 +720,36 @@ class StagePanels(QtCore.QObject):
         elif isinstance(view, OutputImageView):
             self._refresh_zones(view, page, oriented_size, source.dpi)
 
+    def _content_mask_provider(
+        self, page: PageId, source_dpi: float, xform: ImageTransformation
+    ) -> Callable[[], ContentMask | None]:
+        """Return a function that finds the content of the page when first asked.
+
+        The mask costs a binarisation of the whole page, so it is only made for
+        a double click and then kept while the page and its transformation stay.
+        """
+        rotation = self._rotation(page).degrees
+        key = (
+            page.image_id,
+            rotation,
+            source_dpi,
+            xform.transform.tobytes(),
+            xform.resulting_pre_crop_area.tobytes(),
+        )
+
+        def provide() -> ContentMask | None:
+            source = self._source
+            if source is None or source.image_id != page.image_id:
+                return None
+            cached = self._content_mask
+            if cached is None or cached[0] != key:
+                oriented = rotate_orthogonal(source.pixels, rotation)
+                cached = (key, compute_content_mask(oriented, xform))
+                self._content_mask = cached
+            return cached[1]
+
+        return provide
+
     def _oriented_size(self, page: PageId, source: _Source) -> tuple[int, int]:
         height, width = source.pixels.shape[:2]
         if self._rotation(page).degrees in (90, 270):
@@ -680,11 +764,11 @@ class StagePanels(QtCore.QObject):
         dpi: float,
     ) -> None:
         params = self.sequence.select_content_filter.get_params(page)
-        view.set_transformation(
-            build_transformation(
-                self.sequence, page, oriented_size, dpi, FilterStage.DESKEW
-            )
+        xform = build_transformation(
+            self.sequence, page, oriented_size, dpi, FilterStage.DESKEW
         )
+        view.set_transformation(xform)
+        view.set_content_mask_provider(self._content_mask_provider(page, dpi, xform))
         view.set_page_rect_enabled(not params.is_page_disabled())
         view.set_page_rect(
             _qrect(params.page_box) if params.page_box.is_valid() else QtCore.QRectF()
@@ -708,9 +792,11 @@ class StagePanels(QtCore.QObject):
             sequence, page, oriented_size, dpi, FilterStage.DESKEW
         )
         view.set_transformation(xform)
+        view.set_content_mask_provider(self._content_mask_provider(page, dpi, xform))
 
         mm_x, mm_y = rect_size_mm(xform, Rect(x=0, y=0, width=1, height=1))
         view.set_mm_per_pixel(mm_x, mm_y)
+        view.set_aligned(filter_.get_params(page).alignment.aligned_with_others())
         content = adapt_content_rect(xform, content_rect_of(sequence, page))
         hard = filter_.get_margins(page)
         soft = filter_.calculate_soft_margins(page)
@@ -765,10 +851,19 @@ class StagePanels(QtCore.QObject):
             shown = None if view._fit_mode else _ViewState.of(view)
             view.set_tab_image(ImageViewTab.DEWARPING, page)
             view.set_tab_image(ImageViewTab.PICTURE_ZONES, page)
+            # The zones lie on the page as it is before dewarping, which is not
+            # what the dewarped output shows.
+            view.set_tab_image(
+                ImageViewTab.FILL_ZONES, page if params.needs_dewarping() else None
+            )
             if shown is not None:
                 shown.apply_to(view)
+            view.set_picture_mask(extras.picture_mask)
             view.set_despeckle_source(
-                extras.despeckle_source, extras.despeckle_dpi, params.despeckle_level
+                extras.despeckle_source,
+                extras.despeckle_dpi,
+                params.despeckle_level,
+                self._stage_image,
             )
             view.set_tab_message(
                 ImageViewTab.DESPECKLING,
@@ -793,7 +888,14 @@ class StagePanels(QtCore.QObject):
         if page is None:
             return
         stored = _model_in_page_pixels(model, xform, self._output_scale)
-        depth = self.sequence.output_filter.get_params(page).depth_perception
+        filter_ = self.sequence.output_filter
+        params = filter_.get_params(page)
+        if params.dewarping.mode is DewarpingMode.OFF:
+            filter_.set_params(
+                page,
+                params.with_dewarping(params.dewarping.with_mode(DewarpingMode.MANUAL)),
+            )
+        depth = params.depth_perception
         self._fed_model = (stored, depth)
         self.options.set_distortion_model(stored)
 
@@ -844,6 +946,13 @@ class StagePanels(QtCore.QObject):
             page, layout, rotation_degrees=rotation.degrees
         )
         self._after_edit()
+
+    def _on_unremove_requested(self, sub_page: SubPage) -> None:
+        page = self._page
+        if page is not None:
+            self.unremove_page_requested.emit(
+                PageId(image_id=page.image_id, sub_page=sub_page)
+            )
 
     def _on_deskew_angle_set(self, degrees: float) -> None:
         page = self._page

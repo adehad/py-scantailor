@@ -1,5 +1,6 @@
 """File > Open PDF turns the pages of a PDF into a project."""
 
+import json
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -68,7 +69,8 @@ def test_project_remembers_source_pdf_and_page_mapping(
     assert source.pdf_path == source_pdf
     assert source.dpi == IMPORT_DPI
     assert [source.page_index(info.id.file_path) for info in project.images] == [0, 1]
-    assert (source_pdf.parent / "book_pages" / SOURCE_FILE_NAME).is_file()
+    assert project.pdf_source == source
+    assert not (source_pdf.parent / "book_pages" / SOURCE_FILE_NAME).exists()
     assert pdf_window.actionExportPdf.isEnabled()
 
 
@@ -92,6 +94,30 @@ def test_saved_project_still_knows_its_source_pdf_when_reopened(
 
     assert pdf_window.pdf_source is not None
     assert pdf_window.pdf_source.dpi == IMPORT_DPI
+
+
+def test_project_saved_with_a_sidecar_mapping_still_finds_its_source_pdf(
+    pdf_window: MainWindowManager,  # noqa: F811
+    file_dialogs: "FileDialogStub",
+    tmp_path: Path,
+):
+    source = pdf_window.pdf_source
+    assert source is not None
+    project_file = tmp_path / "book.ScanTailor"
+    file_dialogs.save_file = str(project_file)
+    assert pdf_window.save_project_as()
+    pdf_window.closeProject()
+    data = json.loads(project_file.read_text(encoding="utf-8"))
+    del data["pdf_source"]
+    project_file.write_text(json.dumps(data), encoding="utf-8")
+    pages_dir = source.pdf_path.parent / "book_pages"
+    (pages_dir / SOURCE_FILE_NAME).write_text(
+        source.model_dump_json(), encoding="utf-8"
+    )
+
+    assert pdf_window.open_project_file(project_file)
+
+    assert pdf_window.pdf_source == source
 
 
 def test_cancelling_the_dpi_dialog_creates_no_project(

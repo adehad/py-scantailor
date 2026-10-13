@@ -39,3 +39,13 @@ Working through the stages
 
 The six stages sit in the list at the top left. Work through them in order; each
 one starts from the result of the one before. See :doc:`stages/index`.
+
+First start
+===========
+
+The first start of a packaged build compiles the image processing kernels once and
+keeps them in a cache folder (``%LOCALAPPDATA%
+umba`` on Windows, ``~/.cache/numba``
+on Linux and macOS), so the first pages take longer to process. The application does
+this in the background after its window opens. From a source checkout,
+``python -m scantailor.imageproc.numba_warmup`` does it ahead of time.
