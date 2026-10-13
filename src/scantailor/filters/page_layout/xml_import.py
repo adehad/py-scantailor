@@ -1,5 +1,6 @@
 """Reading Page Layout settings from a C++ ScanTailor project file."""
 
+from dataclasses import dataclass, field
 from xml.etree import ElementTree as ET
 
 from scantailor.core.models import Margins
@@ -11,6 +12,7 @@ from scantailor.core.xml_reader import (
     attr_int,
     attr_text,
     child,
+    children,
     page_elements,
     read_rect_f,
     read_size_f,
@@ -18,6 +20,7 @@ from scantailor.core.xml_reader import (
 )
 
 from .alignment import Alignment, HorizontalAlignment, VerticalAlignment
+from .guide import Guide
 from .params import ContentRect, ContentSize, Params
 
 _VERTICAL = {
@@ -34,13 +37,25 @@ _HORIZONTAL = {
 }
 
 
+@dataclass(frozen=True)
+class PageLayoutImport:
+    """What a ``<page-layout>`` element holds.
+
+    Attributes:
+        entries (list[StageParamsEntry]): Stored parameters, one per page.
+        middle_rect_shown (bool): Whether the hard margins rectangle is shown.
+        guides (tuple[Guide, ...]): The alignment guides.
+    """
+
+    entries: list[StageParamsEntry] = field(default_factory=list)
+    middle_rect_shown: bool = True
+    guides: tuple[Guide, ...] = ()
+
+
 def read_page_layout(
     filter_element: ET.Element | None, context: XmlProjectContext
 ) -> list[StageParamsEntry]:
     """Read the per-page margins and alignment of the ``<page-layout>`` element.
-
-    The element's ``showMiddleRect`` flag and ``<guides>`` have no counterpart
-    in the port and are not read.
 
     Args:
         filter_element (ET.Element | None): The ``<page-layout>`` element.
@@ -49,6 +64,26 @@ def read_page_layout(
     Returns:
         list[StageParamsEntry]: One entry per page with stored parameters;
             malformed ones are logged and left out.
+    """
+    return read_page_layout_stage(filter_element, context).entries
+
+
+def read_page_layout_stage(
+    filter_element: ET.Element | None, context: XmlProjectContext
+) -> PageLayoutImport:
+    """Read the ``<page-layout>`` element with its project-wide settings.
+
+    ``showMiddleRect`` reads as shown when it is absent. C++ reads an absent
+    attribute as hidden, which leaves the rectangle hidden after a project
+    saved before the attribute existed is opened.
+
+    Args:
+        filter_element (ET.Element | None): The ``<page-layout>`` element.
+        context (XmlProjectContext): Id lookup of the project.
+
+    Returns:
+        PageLayoutImport: The per-page parameters, the rectangle flag and the
+            guides; malformed pages and guides are logged and left out.
     """
     entries: list[StageParamsEntry] = []
     for page_id, element in page_elements(filter_element, context):
@@ -60,7 +95,25 @@ def read_page_layout(
             entries.append(
                 StageParamsEntry(page=page_id, params=params.model_dump(mode="json"))
             )
-    return entries
+    return PageLayoutImport(
+        entries=entries,
+        middle_rect_shown=attr_flag(filter_element, "showMiddleRect", default=True),
+        guides=_read_guides(child(filter_element, "guides")),
+    )
+
+
+def _read_guides(element: ET.Element | None) -> tuple[Guide, ...]:
+    """Read the ``<guides>`` element; any orientation but vertical is horizontal."""
+    guides: list[Guide] = []
+    for guide in children(element, "guide"):
+        with skip_malformed("page layout guide", guide):
+            guides.append(
+                Guide(
+                    position_mm=attr_float(guide, "position"),
+                    is_horizontal=attr_text(guide, "orientation") != "vertical",
+                )
+            )
+    return tuple(guides)
 
 
 def _read_params(element: ET.Element) -> Params:

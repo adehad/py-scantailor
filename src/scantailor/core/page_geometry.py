@@ -10,7 +10,7 @@ it is cheap enough for the GUI thread. It applies the stages the same way
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.core.models import Dpi, PageId
+from scantailor.core.models import Dpi, PageId, SubPage
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation, Rect
 from scantailor.filters.fix_orientation.image_trim import merge_with_trim
@@ -18,9 +18,12 @@ from scantailor.filters.page_layout.page_rect import (
     adapt_content_rect,
     calc_page_polygon,
 )
+from scantailor.filters.page_layout.params import Params as PageLayoutParams
+from scantailor.filters.page_split.page_layout import PageLayout
 from scantailor.filters.page_split.page_layout_adapter import (
     correct_page_layout_type,
 )
+from scantailor.filters.select_content.params import Params as SelectContentParams
 
 # Smallest crop edge, in pixels, that is still worth applying.
 _MIN_CROP_EDGE_PX = 1.0
@@ -74,7 +77,12 @@ def build_transformation(
     if through < FilterStage.PAGE_SPLIT:
         return xform
 
-    crop = _page_crop_area(sequence, page_id, oriented_size, trim_area)
+    layout = sequence.page_split_filter.get_params(page_id).page_layout
+    crop = (
+        None
+        if layout is None
+        else page_crop_area(layout, page_id.sub_page, oriented_size, trim_area)
+    )
     if crop is not None:
         xform.set_pre_crop_area(crop)
     if through < FilterStage.DESKEW:
@@ -87,17 +95,29 @@ def build_transformation(
     return xform
 
 
-def _page_crop_area(
-    sequence: StageSequence,
-    page_id: PageId,
+def page_crop_area(
+    layout: PageLayout,
+    sub_page: SubPage,
     size: tuple[int, int],
     trim_area: NDArray[np.float64] | None,
 ) -> NDArray[np.float64] | None:
-    layout = sequence.page_split_filter.get_params(page_id).page_layout
-    if layout is None:
-        return None
+    """Return the region Page Split keeps of the oriented image for one page.
+
+    Args:
+        layout (PageLayout): The page's split layout; its type is corrected to
+            the cutters it has.
+        sub_page (SubPage): Which page of the layout.
+        size (tuple[int, int]): Width and height in pixels of the oriented image.
+        trim_area (NDArray[np.float64] | None): Region Fix Orientation's manual
+            trim keeps, in the same coordinates; None when there is no trim.
+
+    Returns:
+        NDArray[np.float64] | None: Polygon in oriented source pixels, clipped to
+        the image and to the trim; None when the layout has no such page or the
+        clipped region is degenerate, in which case the whole image is kept.
+    """
     layout = correct_page_layout_type(layout)
-    outline = layout.get_page_outline(page_id.sub_page)
+    outline = layout.get_page_outline(sub_page)
     if outline is None:
         return None
 
@@ -122,8 +142,65 @@ def content_rect_of(sequence: StageSequence, page_id: PageId) -> Rect:
         Rect: The box in the coordinates of the Select Content stage; empty
         when no content was found or selected.
     """
-    box = sequence.select_content_filter.get_params(page_id).content_box
-    return Rect(x=box.x, y=box.y, width=box.width, height=box.height)
+    return selection_rects(
+        sequence.select_content_filter.get_params(page_id),
+        Rect(x=0, y=0, width=0, height=0),
+    )[1]
+
+
+def selection_rects(
+    selection: SelectContentParams, view_rect: Rect
+) -> tuple[Rect, Rect]:
+    """Return the page and content rectangles Select Content stored.
+
+    Args:
+        selection (SelectContentParams): The page's Select Content parameters.
+        view_rect (Rect): Rectangle of the transformed view; stands in for the
+            page rectangle while no valid page box is stored.
+
+    Returns:
+        tuple[Rect, Rect]: The page rectangle and the content rectangle, in the
+        coordinates of the Select Content stage.
+    """
+    page_box, content_box = selection.page_box, selection.content_box
+    page_rect = (
+        Rect(x=page_box.x, y=page_box.y, width=page_box.width, height=page_box.height)
+        if page_box.is_valid()
+        else view_rect
+    )
+    content_rect = Rect(
+        x=content_box.x,
+        y=content_box.y,
+        width=content_box.width,
+        height=content_box.height,
+    )
+    return page_rect, content_rect
+
+
+def page_polygon(
+    xform: ImageTransformation,
+    content_rect: Rect,
+    layout_params: PageLayoutParams,
+    aggregate_hard_size_mm: tuple[float, float],
+) -> NDArray[np.float64]:
+    """Return the final page polygon Page Layout crops to.
+
+    Args:
+        xform (ImageTransformation): Transformation the content rectangle is in.
+        content_rect (Rect): Content rectangle as Select Content stored it.
+        layout_params (PageLayoutParams): The page's margins and alignment.
+        aggregate_hard_size_mm (tuple[float, float]): Largest hard size among
+            aligned pages.
+
+    Returns:
+        NDArray[np.float64]: (4, 2) polygon in the coordinates of ``xform``.
+    """
+    return calc_page_polygon(
+        xform,
+        adapt_content_rect(xform, content_rect),
+        layout_params,
+        aggregate_hard_size_mm,
+    )
 
 
 def _page_polygon(
@@ -131,9 +208,9 @@ def _page_polygon(
 ) -> NDArray[np.float64]:
     layout_filter = sequence.page_layout_filter
     aggregate = layout_filter.get_aggregate_hard_size()
-    return calc_page_polygon(
+    return page_polygon(
         xform,
-        adapt_content_rect(xform, content_rect_of(sequence, page_id)),
+        content_rect_of(sequence, page_id),
         layout_filter.get_params(page_id),
         (aggregate.width_mm, aggregate.height_mm),
     )

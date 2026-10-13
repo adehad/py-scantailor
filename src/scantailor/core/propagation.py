@@ -8,14 +8,17 @@ The ``apply_*`` functions implement "Apply to..." for each stage.
 
 from collections.abc import Collection, Iterable, Sequence
 from enum import Enum, auto
+from typing import Any
 
 import numpy as np
 
 from scantailor.core.batch import DEFAULT_DPI
+from scantailor.core.default_params import DefaultParams
 from scantailor.core.models import ImageId, OrthogonalRotation, PageId, SubPage
 from scantailor.core.pipeline import PipelineOptions, fix_aggregate_page_size
 from scantailor.core.project import ImageInfo, ImageMetadata, Project
 from scantailor.core.stage_sequence import FilterStage, StageSequence
+from scantailor.filters.deskew.params import AutoManualMode as DeskewMode
 from scantailor.filters.output.params import ApplyGroup
 from scantailor.filters.page_layout.settings import MARGIN_SIDES
 from scantailor.filters.page_split.dependencies import (
@@ -269,6 +272,60 @@ def propagate_content_boxes(project: Project, stages: StageSequence) -> None:
         # Only the image size matters when nothing is detected.
         blank = np.zeros((metadata.height, metadata.width), dtype=np.uint8)
         fix_aggregate_page_size([(blank, page)], stages, stored_only)
+
+
+def seed_new_pages(
+    stages: StageSequence, images: Iterable[ImageId], defaults: DefaultParams
+) -> None:
+    """Start the pages of images added to an open project from the defaults.
+
+    C++ gives a page the default parameters of every stage when it is first
+    processed. Pages that already have parameters keep them, and the stage-wide
+    values of the project (page detection box, default layout type, oblique
+    default) are left as they are. A stage whose defaults are the factory ones
+    is not seeded, so detection keeps running by itself.
+
+    Args:
+        stages (StageSequence): Stages of the open project.
+        images (Iterable[ImageId]): The images that were added.
+        defaults (DefaultParams): The selected default parameters.
+    """
+    factory = DefaultParams()
+    image_list = list(images)
+    pages = [
+        PageId(image_id=image_id, sub_page=sub_page)
+        for image_id in image_list
+        for sub_page in SubPage
+    ]
+
+    if defaults.fix_orientation != factory.fix_orientation:
+        orientation = stages.fix_orientation_filter.settings
+        for image_id in image_list:
+            if not orientation.is_rotation_set(image_id):
+                orientation.apply_rotation(
+                    image_id, defaults.fix_orientation.image_rotation
+                )
+
+    seeds: list[tuple[Any, Any]] = []
+    if defaults.deskew.mode is DeskewMode.MANUAL:
+        seeds.append((stages.deskew_filter.settings, defaults.get_deskew_params()))
+    if defaults.select_content != factory.select_content:
+        seeds.append(
+            (
+                stages.select_content_filter.settings,
+                defaults.get_select_content_params(),
+            )
+        )
+    if defaults.page_layout != factory.page_layout:
+        seeds.append(
+            (stages.page_layout_filter.settings, defaults.get_page_layout_params())
+        )
+    if defaults.output != factory.output:
+        seeds.append((stages.output_filter.settings, defaults.get_output_params()))
+    for settings, params in seeds:
+        for page in pages:
+            if not settings.is_params_set(page):
+                settings.set_params(page, params)
 
 
 def _forget_geometry(stages: StageSequence, page: PageId) -> None:
