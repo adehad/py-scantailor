@@ -407,6 +407,7 @@ def _open_layout_view(qtbot: QtBot, window: MainWindowManager) -> PageLayoutImag
         lambda v: v.margins_mm().left > 0,
     )
     assert isinstance(view, PageLayoutImageView)
+    view.set_margin_links(left_right=False, top_bottom=False)
     return view
 
 

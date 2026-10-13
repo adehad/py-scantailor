@@ -684,6 +684,7 @@ MARGIN = 60  # Far enough from the content box to be a different drag target
 
 def _layout_view(make_view) -> PageLayoutImageView:
     view = make_view(PageLayoutImageView)
+    view.set_margin_links(left_right=False, top_bottom=False)
     view.set_mm_per_pixel(0.1, 0.2)
     inner = QtCore.QRectF(200, 300, 200, 200)
     middle = inner.adjusted(-MARGIN, -MARGIN, MARGIN, MARGIN)
