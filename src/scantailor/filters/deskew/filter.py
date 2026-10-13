@@ -10,12 +10,13 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.core.models import PageId
+from scantailor.core.models import Dpi, PageId
 from scantailor.core.transformation import ImageTransformation
 from scantailor.filters.deskew.dependencies import Dependencies
 from scantailor.filters.deskew.oblique import find_oblique_degrees, rotate_mask
 from scantailor.filters.deskew.params import MAX_OBLIQUE_DEG, Params
 from scantailor.filters.deskew.settings import Detection, Settings
+from scantailor.filters.deskew.shadow_cleanup import remove_horizontal_shadows
 from scantailor.filters.deskew.top_edge import find_skew_from_top_edge
 from scantailor.imageproc.analysis import SkewResult, find_skew
 from scantailor.imageproc.binarize import binarize_otsu
@@ -160,6 +161,7 @@ class Filter:
         accuracy: float | None = None,
         store_result: bool = True,
         dependencies: Dependencies | None = None,
+        dpi: Dpi | None = None,
     ) -> SkewResult:
         """Detect the skew angle for an image.
 
@@ -174,6 +176,9 @@ class Filter:
             store_result: If True, store the detected angle in settings.
             dependencies: Upstream geometry to record with the angle, so a
                 change of it invalidates the angle.
+            dpi: Resolution of ``image``. When given, horizontal scanner
+                shadows are removed from the binarised page before the skew is
+                measured; None measures the page as it is.
 
         Returns:
             SkewResult with detected angle and confidence.
@@ -192,6 +197,8 @@ class Filter:
 
         # Binarize for better skew detection
         binary = binarize_otsu(gray)
+        if dpi is not None:
+            binary = remove_horizontal_shadows(binary, dpi)
 
         result = None
         if not self.content_based:

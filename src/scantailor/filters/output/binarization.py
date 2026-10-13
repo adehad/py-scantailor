@@ -91,6 +91,12 @@ class BinarizationOptions(BaseModel):
             EdgeDiv. Higher = more edge enhancement.
         edge_div_kbd: Blur division weight (0.0-1.0), read by BlurDiv and
             EdgeDiv. Higher = more illumination normalization.
+
+    C++ reads the one Sauvola coefficient for Bradley, EdgePlus, BlurDiv and
+    EdgeDiv. The three fields above stay separate so that each method keeps
+    its own control in the options widget, and the C++ project import copies
+    the Sauvola coefficient into the fields a method reads, so an imported
+    project binarises as it did in C++.
         normalize_illumination: Normalize illumination before binarization.
         savitzky_golay_smoothing: Smooth the gray image before binarization.
         morphological_smoothing: Apply morphological smoothing after binarization.

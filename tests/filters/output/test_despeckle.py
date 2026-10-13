@@ -1,6 +1,8 @@
 """Tests for DespeckleLevel enum."""
 
-from scantailor.filters.output.despeckle import DespeckleLevel
+import pytest
+
+from scantailor.filters.output.despeckle import DespeckleLevel, DespeckleStrength
 
 
 class TestDespeckleLevel:
@@ -38,9 +40,39 @@ class TestDespeckleLevel:
         """Parse aggressive string."""
         assert DespeckleLevel.from_string("aggressive") == DespeckleLevel.AGGRESSIVE
 
-    def test_from_string_unknown_defaults_to_off(self):
-        """Unknown string defaults to off."""
-        assert DespeckleLevel.from_string("unknown") == DespeckleLevel.OFF
+    def test_from_string_unknown_raises_instead_of_turning_despeckle_off(self):
+        """An unknown name is an error, not a silent Off."""
+        with pytest.raises(ValueError, match="unknown despeckle level 'unknown'"):
+            DespeckleLevel.from_string("unknown")
+
+    @pytest.mark.parametrize(
+        ("factor", "level"),
+        [
+            (0.0, DespeckleLevel.OFF),
+            (0.49, DespeckleLevel.OFF),
+            (0.5, DespeckleLevel.CAUTIOUS),
+            (1.49, DespeckleLevel.CAUTIOUS),
+            (1.5, DespeckleLevel.NORMAL),
+            (2.49, DespeckleLevel.NORMAL),
+            (2.5, DespeckleLevel.AGGRESSIVE),
+            (3.5, DespeckleLevel.AGGRESSIVE),
+        ],
+    )
+    def test_nearest_picks_the_level_by_the_midpoints_between_presets(
+        self, factor, level
+    ):
+        assert DespeckleLevel.nearest(factor) == level
+
+
+class TestDespeckleStrength:
+    def test_it_answers_the_generator_as_a_level_does(self):
+        strength = DespeckleStrength(1.7)
+
+        assert strength.to_factor() == 1.7
+        assert strength.is_enabled()
+
+    def test_zero_is_not_enabled(self):
+        assert not DespeckleStrength(0.0).is_enabled()
 
     def test_str_representation(self):
         """String representation returns value."""
