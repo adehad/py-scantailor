@@ -43,6 +43,9 @@ class ColorCommonOptions(BaseModel):
     Attributes:
         fill_offcut: Paint everything outside the page outline (the cut-off part
             of a neighbouring page, for instance) with the filling colour.
+        fill_outside_page_box: Do not follow the page outline: the margin colour,
+            illumination and the kept area come from the whole output rectangle.
+            Takes the place of ``fill_offcut`` when both are set.
         fill_margins: Paint everything outside the content area with the filling colour.
         normalize_illumination: Flatten uneven lighting before output.
         filling_color: Colour used when filling margins.
@@ -54,6 +57,7 @@ class ColorCommonOptions(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     fill_offcut: bool = True
+    fill_outside_page_box: bool = False
     fill_margins: bool = True
     normalize_illumination: bool = False
     filling_color: FillingColor = FillingColor.BACKGROUND

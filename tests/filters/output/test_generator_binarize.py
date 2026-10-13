@@ -1,13 +1,20 @@
 """The output generator applies the threshold adjustment per binarization method."""
 
 import numpy as np
+import pytest
 
 from scantailor.filters.output.binarization import (
     BinarizationMethod,
     BinarizationOptions,
 )
 from scantailor.filters.output.generator import _binarize
-from scantailor.imageproc.binarize import binarize_edge_div
+from scantailor.imageproc.binarize import (
+    binarize_edge_div,
+    binarize_fox,
+    binarize_grad,
+    binarize_sauvola,
+    binarize_window,
+)
 
 INK = 0
 BACKGROUND = 255
@@ -20,9 +27,8 @@ def _flat(level: int) -> np.ndarray:
 def _options(
     method: BinarizationMethod, adjustment: int, **extra
 ) -> BinarizationOptions:
-    return BinarizationOptions(
-        method=method, threshold_adjustment=adjustment, window_size=15, **extra
-    )
+    extra.setdefault("window_size", 15)
+    return BinarizationOptions(method=method, threshold_adjustment=adjustment, **extra)
 
 
 class TestOtsu:
@@ -72,21 +78,31 @@ class TestLocalMethods:
         assert np.all(_binarize(image, plain) == BACKGROUND)
         assert np.all(_binarize(image, darker) == INK)
 
-    def test_sauvola_adjustment_is_a_threshold_delta(self) -> None:
+    def test_sauvola_adjustment_is_a_contrast_delta(self) -> None:
+        rng = np.random.default_rng(2)
+        image = rng.integers(0, 256, (36, 36), dtype=np.uint8)
+        options = _options(BinarizationMethod.SAUVOLA, 60, sauvola_coef=0.2)
+
+        expected = binarize_sauvola(image, window_size=15, k=0.2, delta=60)
+
+        assert np.array_equal(_binarize(image, options), expected)
+        plain = _binarize(
+            image, _options(BinarizationMethod.SAUVOLA, 0, sauvola_coef=0.2)
+        )
+        assert np.count_nonzero(expected == INK) > np.count_nonzero(plain == INK)
+
+    def test_wolf_adjustment_is_a_contrast_delta(self) -> None:
         image = _flat(100)
-        plain = _options(BinarizationMethod.SAUVOLA, 0, sauvola_coef=0.2)
-        darker = _options(BinarizationMethod.SAUVOLA, 25, sauvola_coef=0.2)
+        image[0, 0] = 0
+        plain = _options(
+            BinarizationMethod.WOLF, 0, window_size=101, wolf_lower_bound=0
+        )
+        darker = _options(
+            BinarizationMethod.WOLF, 1, window_size=101, wolf_lower_bound=0
+        )
 
-        assert np.all(_binarize(image, plain) == BACKGROUND)
-        assert np.all(_binarize(image, darker) == INK)
-
-    def test_wolf_adjustment_is_a_threshold_delta(self) -> None:
-        image = _flat(100)
-        plain = _options(BinarizationMethod.WOLF, 0)
-        darker = _options(BinarizationMethod.WOLF, 1)
-
-        assert np.all(_binarize(image, plain) == BACKGROUND)
-        assert np.all(_binarize(image, darker) == INK)
+        assert np.all(_binarize(image, plain)[image == 100] == BACKGROUND)
+        assert np.all(_binarize(image, darker)[image == 100] == INK)
 
     def test_wolf_bounds_come_from_the_options(self) -> None:
         image = _flat(100)
@@ -96,6 +112,34 @@ class TestLocalMethods:
 
         assert np.all(_binarize(image, always_ink) == INK)
         assert np.all(_binarize(image, never_ink) == BACKGROUND)
+
+    @pytest.mark.parametrize(
+        ("method", "function"),
+        [
+            (BinarizationMethod.FOX, binarize_fox),
+            (BinarizationMethod.WINDOW, binarize_window),
+            (BinarizationMethod.GRAD, binarize_grad),
+        ],
+    )
+    def test_wolf_family_methods_use_the_wolf_coefficient_and_bounds(
+        self, method: BinarizationMethod, function
+    ) -> None:
+        rng = np.random.default_rng(5)
+        image = rng.integers(0, 256, (36, 36), dtype=np.uint8)
+        options = _options(
+            method,
+            9,
+            wolf_coef=0.42,
+            wolf_lower_bound=20,
+            wolf_upper_bound=230,
+            sauvola_coef=0.9,
+        )
+
+        expected = function(
+            image, window_size=15, k=0.42, delta=9, lower_bound=20, upper_bound=230
+        )
+
+        assert np.array_equal(_binarize(image, options), expected)
 
     def test_local_methods_are_not_clamped_like_otsu(self) -> None:
         """A flat dark page stays ink at adjustment 0 for Bradley; no 30..225 clamp."""

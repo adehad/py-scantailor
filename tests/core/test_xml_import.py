@@ -20,7 +20,6 @@ from scantailor.core.stage_sequence import StageSequence
 from scantailor.core.xml_compat import (
     NEWEST_PROJECT_VERSION,
     XmlProjectImport,
-    XmlUnappliedSettings,
     apply_xml_stage_defaults,
     import_xml_project,
     import_xml_project_file,
@@ -224,67 +223,59 @@ class TestVersion4:
         assert manual["deskew_angle_deg"] == pytest.approx(0.5)
         assert manual["mode"] == "manual"
 
-    def test_trim_only_image_gets_no_rotation_entry_and_keeps_its_trim(
+    def test_trim_only_image_gets_an_entry_with_the_trim_and_no_rotation(
         self, tmp_path: Path
     ):
         imported = _load(tmp_path, "version4")
         first_image = imported.project.images[0].id
         second_image = imported.project.images[1].id
 
-        rotated = {
-            entry.page.image_id
+        params = {
+            entry.page.image_id: entry.params
             for entry in imported.project.stage_params["fix_orientation"]
         }
-        assert rotated == {second_image}
-        assert imported.unapplied.fix_orientation_trims == {
-            first_image: ImageTrim(left=4, right=5, top=6, bottom=7)
+        assert set(params) == {first_image, second_image}
+        assert params[first_image] == {
+            "trim": {
+                "enabled": True,
+                "left": 4,
+                "right": 5,
+                "top": 6,
+                "bottom": 7,
+            }
         }
+        assert "trim" not in params[second_image]
 
-    def test_disabled_trim_is_not_kept(self, tmp_path: Path):
+    def test_imported_trim_reaches_the_fix_orientation_settings(self, tmp_path: Path):
         imported = _load(tmp_path, "version4")
+        stages = StageSequence()
+        apply_stage_params(stages, imported.project.stage_params)
+        settings = stages.fix_orientation_filter.settings
+        first_image = imported.project.images[0].id
+        second_image = imported.project.images[1].id
 
-        assert imported.project.images[1].id not in (
-            imported.unapplied.fix_orientation_trims
+        assert settings.get_trim(first_image) == ImageTrim(
+            enabled=True, left=4, right=5, top=6, bottom=7
         )
+        assert not settings.get_trim(second_image).enabled
 
-    def test_fill_outside_page_box_pages_are_kept(self, tmp_path: Path):
+    def test_content_based_deskew_flag_defaults_to_on(self, tmp_path: Path):
+        assert _load(tmp_path, "version4").stage_defaults.deskew_content_based is False
+        assert _load(tmp_path, "simple").stage_defaults.deskew_content_based is True
+
+    def test_top_edge_deskew_reaches_the_deskew_filter(self, tmp_path: Path):
         imported = _load(tmp_path, "version4")
+        stages = StageSequence()
+        apply_stage_defaults(stages, imported.project.stage_defaults)
 
-        assert imported.unapplied.fill_outside_page_box_pages == set(
-            imported.project.get_pages()
-        )
+        assert stages.deskew_filter.content_based is False
 
-    def test_content_based_deskew_flag_is_kept_and_defaults_to_on(self, tmp_path: Path):
-        assert _load(tmp_path, "version4").unapplied.deskew_content_based is False
-        assert _load(tmp_path, "simple").unapplied.deskew_content_based is True
+    def test_version_3_projects_keep_content_based_deskew(self, tmp_path: Path):
+        imported = _load(tmp_path, "simple")
+        stages = StageSequence()
+        apply_stage_defaults(stages, imported.project.stage_defaults)
 
-    def test_version_3_projects_have_nothing_unapplied(self, tmp_path: Path):
-        unapplied = _load(tmp_path, "simple").unapplied
-
-        assert unapplied == XmlUnappliedSettings()
-
-    def test_dropping_version_4_settings_is_logged_as_a_warning(self, tmp_path: Path):
-        messages: list[str] = []
-        sink = logger.add(messages.append, level="WARNING", format="{message}")
-        try:
-            _load(tmp_path, "version4")
-        finally:
-            logger.remove(sink)
-
-        text = "".join(messages)
-        assert "trim" in text
-        assert "fill outside page box" in text
-        assert "whole page" in text
-
-    def test_version_3_projects_log_no_dropped_settings(self, tmp_path: Path):
-        messages: list[str] = []
-        sink = logger.add(messages.append, level="WARNING", format="{message}")
-        try:
-            _load(tmp_path, "simple")
-        finally:
-            logger.remove(sink)
-
-        assert not any("Dropping" in message for message in messages)
+        assert stages.deskew_filter.content_based is True
 
 
 class TestVersion:
