@@ -11,7 +11,49 @@ import pytest
 _SRC = Path(__file__).resolve().parents[2] / "src"
 
 # Called only from other kernels, so numba compiles them with their callers.
-_INNER_KERNELS = {"_scan_row", "_grown"}
+_INNER_KERNELS = {
+    "_scan_row",
+    "_grown",
+    "_add_attraction_forces",
+    "_arc_lengths",
+    "_bending_energy",
+    "_blend_weights",
+    "_bubble_down",
+    "_bubble_up",
+    "_constrain_spline_point_to_line",
+    "_control_points_force",
+    "_curve_distance",
+    "_elasticity_energy",
+    "_energy_at",
+    "_external_energy_at",
+    "_frames",
+    "_frenet_unit",
+    "_g_blend",
+    "_g_blend_d1",
+    "_g_blend_d2",
+    "_h_blend",
+    "_h_blend_d1",
+    "_h_blend_d2",
+    "_has_loops",
+    "_junction_points_force",
+    "_linear_combination_at",
+    "_linear_combination_for",
+    "_local_approximant",
+    "_model_vertices",
+    "_node_energy",
+    "_normal_movement",
+    "_optimize",
+    "_point_and_derivs",
+    "_point_at",
+    "_point_at_impl",
+    "_project_scalar",
+    "_segment_and_t",
+    "_segment_control_points",
+    "_sq_dist_approximant",
+    "_tangent_movement",
+    "_tension_params",
+    "_thickness_adjustment",
+}
 
 _CHECK = textwrap.dedent(
     """

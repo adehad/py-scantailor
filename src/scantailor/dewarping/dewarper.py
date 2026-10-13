@@ -3,22 +3,20 @@
 This module provides the CylindricalSurfaceDewarper class that corrects
 perspective distortion from curved page surfaces (like book spines).
 
-SIMPLIFICATIONS FROM C++ IMPLEMENTATION
-========================================
+RELATION TO THE C++ IMPLEMENTATION
+==================================
 
 The original C++ CylindricalSurfaceDewarper
-(src/dewarping/CylindricalSurfaceDewarper.cpp):
-- Uses custom HomographicTransform<1,D> and
-  HomographicTransform<2,D> templates
-- Has a CoupledPolylinesIterator for synchronizing traversal of two polylines
-- Uses ToLineProjector for projecting points onto lines
-- Custom matrix solving via MatrixCalc
+(src/dewarping/CylindricalSurfaceDewarper.cpp) is transcribed step by step where
+it decides the result: the corner homography and its inverse (solved with the
+C++ solver's rules for near-zero entries), the walk over both directrices in
+order of plane x, the position of the straight line and the arc length mapping.
+The distortion model builder scores candidate curves with this mapping, and
+agrees with the C++ builder only because these steps agree.
 
-PYTHON SIMPLIFICATION:
-- Uses existing Homography class from scantailor.math
-- CoupledPolylinesIterator replaced with simpler sequential iteration
-- numpy.linalg.solve for matrix operations
-- Direct line projection calculations
+It is vectorised where the C++ code maps one point at a time: many points or
+generatrices go through numpy together, and the per-generatrix 1D homographies
+are solved with ``numpy.linalg.solve``.
 
 COORDINATE SYSTEMS:
 - img: Warped image coordinates (input)
@@ -38,10 +36,13 @@ import numpy as np
 from numpy.typing import NDArray
 
 from scantailor.dewarping.arc_length_mapper import ArcLengthMapper
-from scantailor.dewarping.polyline_intersector import (
-    PolylineIntersector,
-    project_point_to_line,
+from scantailor.dewarping.line_geometry import (
+    line_intersection,
+    point_at,
+    projection_scalar,
 )
+from scantailor.dewarping.polyline_intersector import PolylineIntersector
+from scantailor.dewarping.spline_fit import lu_solve
 from scantailor.math.homography import Homography
 
 
@@ -230,7 +231,7 @@ class CylindricalSurfaceDewarper:
 
         # Compute homography mapping plane coords to image coords
         pln2img = cls._calc_pln_to_img_homography(img_directrix1, img_directrix2)
-        img2pln = pln2img.inverse()
+        img2pln = _invert(pln2img)
 
         # Find the Y value in plane coords where the surface is flat
         pln_straight_line_y = cls._calc_pln_straight_line_y(
@@ -432,17 +433,17 @@ class CylindricalSurfaceDewarper:
 
         Maps: (0,0)->top-left, (1,0)->top-right, (0,1)->bottom-left, (1,1)->bottom-right
         """
-        src_points = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float32)
-        dst_points = np.array(
+        plane = np.array([[0, 0], [1, 0], [0, 1], [1, 1]], dtype=np.float64)
+        image = np.array(
             [
                 img_directrix1[0],
                 img_directrix1[-1],
                 img_directrix2[0],
                 img_directrix2[-1],
             ],
-            dtype=np.float32,
+            dtype=np.float64,
         )
-        return Homography.from_four_points(src_points, dst_points)
+        return _four_point_homography(plane, image)
 
     @classmethod
     def _calc_pln_straight_line_y(
@@ -455,108 +456,33 @@ class CylindricalSurfaceDewarper:
         """Calculate the Y value in plane coords where surface is flat.
 
         This finds where the page surface would appear as a straight line
-        if viewed from the camera position.
+        if viewed from the camera position. Every generatrix through a point
+        of either directrix votes with the weight of its perspective shift.
         """
         pln_y_accum = 0.0
         weight_accum = 0.0
 
-        # Iterate through both polylines together
-        for img_curve1_pt, img_curve2_pt, pln_x in cls._coupled_polylines_iter(
+        for img_curve1_pt, img_curve2_pt, pln_x in _coupled_polylines(
             img_directrix1, img_directrix2, pln2img, img2pln
         ):
-            img_line1_pt = pln2img.apply_to_point(np.array([pln_x, 0.0]))
-            img_line2_pt = pln2img.apply_to_point(np.array([pln_x, 1.0]))
-
-            # Project points onto the curve-defined generatrix
-            _, p1 = project_point_to_line(img_curve1_pt, img_curve1_pt, img_curve2_pt)
-            _, p2 = project_point_to_line(img_line1_pt, img_curve1_pt, img_curve2_pt)
-            _, p3 = project_point_to_line(img_line2_pt, img_curve1_pt, img_curve2_pt)
-            _, p4 = project_point_to_line(img_curve2_pt, img_curve1_pt, img_curve2_pt)
-
-            dp1 = p2 - p1  # 0
-            dp2 = p4 - p3  # 1 - p3
-
+            generatrix = (img_curve1_pt, img_curve2_pt)
+            img_line1_pt = _apply(pln2img, (pln_x, 0.0))
+            img_line2_pt = _apply(pln2img, (pln_x, 1.0))
+            p1 = 0.0
+            p2 = projection_scalar(generatrix, img_line1_pt)
+            p3 = projection_scalar(generatrix, img_line2_pt)
+            p4 = 1.0
+            dp1 = p2 - p1
+            dp2 = p4 - p3
             weight = abs(dp1 + dp2)
             if weight < 0.01:
                 continue
 
-            # Find the point where the curved and straight lines would coincide
             p0 = (p3 * dp1 + p2 * dp2) / (dp1 + dp2)
-
-            # Get the image point at this projection
-            img_pt = img_curve1_pt + p0 * (img_curve2_pt - img_curve1_pt)
-            pln_pt = img2pln.apply_to_point(img_pt)
-
-            pln_y_accum += pln_pt[1] * weight
+            pln_y_accum += _apply(img2pln, point_at(generatrix, p0))[1] * weight
             weight_accum += weight
 
         return 0.5 if weight_accum == 0 else pln_y_accum / weight_accum
-
-    @staticmethod
-    def _coupled_polylines_iter(
-        img_directrix1: NDArray[np.float64],
-        img_directrix2: NDArray[np.float64],
-        pln2img: Homography,
-        img2pln: Homography,
-    ):
-        """Iterate through both polylines, yielding corresponding points.
-
-        Yields tuples of (curve1_pt, curve2_pt, pln_x) where pln_x increases
-        monotonically.
-        """
-        i1, i2 = 0, 0
-        n1, n2 = len(img_directrix1), len(img_directrix2)
-
-        prev_pt1 = img_directrix1[0]
-        prev_pt2 = img_directrix2[0]
-        next_pln_x1 = 0.0
-        next_pln_x2 = 0.0
-
-        while i1 < n1 or i2 < n2:
-            if i1 < n1 and (i2 >= n2 or next_pln_x1 <= next_pln_x2):
-                pt1 = img_directrix1[i1]
-                pln_pt1 = img2pln.apply_to_point(pt1)
-                pln_x = pln_pt1[0]
-
-                # Find corresponding point on directrix2
-                pln_ptx = np.array([pln_x, pln_pt1[1] + 1])
-                img_ptx = pln2img.apply_to_point(pln_ptx)
-
-                # Intersect line (pt1, img_ptx) with segment (prev_pt2, next_pt2)
-                pt2 = _line_segment_intersect(
-                    pt1, img_ptx, prev_pt2, img_directrix2[min(i2, n2 - 1)]
-                )
-                if pt2 is None:
-                    pt2 = img_directrix2[min(i2, n2 - 1)]
-
-                yield pt1, pt2, pln_x
-
-                prev_pt1 = pt1
-                i1 += 1
-                if i1 < n1:
-                    next_pln_x1 = img2pln.apply_to_point(img_directrix1[i1])[0]
-            else:
-                pt2 = img_directrix2[i2]
-                pln_pt2 = img2pln.apply_to_point(pt2)
-                pln_x = pln_pt2[0]
-
-                # Find corresponding point on directrix1
-                pln_ptx = np.array([pln_x, pln_pt2[1] + 1])
-                img_ptx = pln2img.apply_to_point(pln_ptx)
-
-                # Intersect line (pt2, img_ptx) with segment (prev_pt1, next_pt1)
-                pt1 = _line_segment_intersect(
-                    pt2, img_ptx, prev_pt1, img_directrix1[min(i1, n1 - 1)]
-                )
-                if pt1 is None:
-                    pt1 = img_directrix1[min(i1, n1 - 1)]
-
-                yield pt1, pt2, pln_x
-
-                prev_pt2 = pt2
-                i2 += 1
-                if i2 < n2:
-                    next_pln_x2 = img2pln.apply_to_point(img_directrix2[i2])[0]
 
     def _init_arc_length_mapper(
         self,
@@ -566,19 +492,16 @@ class CylindricalSurfaceDewarper:
         """Initialize the arc length mapper from directrices."""
         prev_pln_x = -np.inf
 
-        for img_curve1_pt, img_curve2_pt, pln_x in self._coupled_polylines_iter(
+        for img_curve1_pt, img_curve2_pt, pln_x in _coupled_polylines(
             img_directrix1, img_directrix2, self._pln2img, self._img2pln
         ):
             if pln_x <= prev_pln_x:
                 # S-shaped surface - skip these points
                 continue
 
-            img_line1_pt = self._pln2img.apply_to_point(np.array([pln_x, 0.0]))
-            img_line2_pt = self._pln2img.apply_to_point(np.array([pln_x, 1.0]))
-
-            # Project onto curve-defined generatrix
-            _, y1 = project_point_to_line(img_line1_pt, img_curve1_pt, img_curve2_pt)
-            _, y2 = project_point_to_line(img_line2_pt, img_curve1_pt, img_curve2_pt)
+            generatrix = (img_curve1_pt, img_curve2_pt)
+            y1 = projection_scalar(generatrix, _apply(self._pln2img, (pln_x, 0.0)))
+            y2 = projection_scalar(generatrix, _apply(self._pln2img, (pln_x, 1.0)))
 
             # Compute elevation based on depth perception
             elevation = self._depth_perception * (1.0 - (y2 - y1))
@@ -592,40 +515,127 @@ class CylindricalSurfaceDewarper:
         self._arc_length_mapper.normalize_range(1.0)
 
 
-def _line_segment_intersect(
-    line_p1: NDArray[np.floating],
-    line_p2: NDArray[np.floating],
-    seg_p1: NDArray[np.floating],
-    seg_p2: NDArray[np.floating],
-) -> NDArray[np.float64] | None:
-    """Find intersection of infinite line with line segment.
+Point = tuple[float, float]
+
+
+def _apply(homography: Homography, point: Point) -> Point:
+    """Apply a homography to one point in double precision."""
+    matrix = homography.matrix
+    x, y = point
+    w = matrix[2, 0] * x + matrix[2, 1] * y + matrix[2, 2]
+    return (
+        (matrix[0, 0] * x + matrix[0, 1] * y + matrix[0, 2]) / w,
+        (matrix[1, 0] * x + matrix[1, 1] * y + matrix[1, 2]) / w,
+    )
+
+
+def _four_point_homography(
+    source: NDArray[np.float64], target: NDArray[np.float64]
+) -> Homography:
+    """Homography taking four points to four points, solved like the C++ code.
 
     Args:
-        line_p1: First point defining the infinite line.
-        line_p2: Second point defining the infinite line.
-        seg_p1: First endpoint of the line segment.
-        seg_p2: Second endpoint of the line segment.
+        source (NDArray[np.float64]): Points, shape ``(4, 2)``.
+        target (NDArray[np.float64]): Their images, shape ``(4, 2)``.
 
     Returns:
-        Intersection point, or None if no intersection.
+        Homography: The transformation with its bottom right element 1.
+
+    Raises:
+        numpy.linalg.LinAlgError: If the points do not determine a homography.
     """
-    x1, y1 = line_p1
-    x2, y2 = line_p2
-    x3, y3 = seg_p1
-    x4, y4 = seg_p2
+    system = np.zeros((8, 8))
+    rhs = np.zeros(8)
+    for i, ((x, y), (u, v)) in enumerate(zip(source, target, strict=True)):
+        system[2 * i] = [-x, -y, -1, 0, 0, 0, u * x, u * y]
+        rhs[2 * i] = -u
+        system[2 * i + 1] = [0, 0, 0, -x, -y, -1, v * x, v * y]
+        rhs[2 * i + 1] = -v
+    solution = lu_solve(system, rhs)
+    if solution is None:
+        raise np.linalg.LinAlgError("The four points do not determine a homography")
+    matrix = np.append(solution, 1.0).reshape(3, 3)
+    return Homography(matrix=matrix)
 
-    denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-    if abs(denom) < 1e-10:
-        return None
 
-    t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
-    u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom
+def _invert(homography: Homography) -> Homography:
+    """Invert a homography with the C++ solver's rules for near-zero entries."""
+    matrix = homography.matrix
+    columns = []
+    for i in range(3):
+        unit = np.zeros(3)
+        unit[i] = 1.0
+        column = lu_solve(np.asarray(matrix, dtype=np.float64), unit)
+        if column is None:
+            raise np.linalg.LinAlgError("The homography is singular")
+        columns.append(column)
+    return Homography(matrix=np.column_stack(columns))
 
-    # Check if intersection is within segment (u in [0, 1])
-    if u < 0 or u > 1:
-        return None
 
-    x = x1 + t * (x2 - x1)
-    y = y1 + t * (y2 - y1)
+def _coupled_polylines(
+    directrix1: NDArray[np.float64],
+    directrix2: NDArray[np.float64],
+    pln2img: Homography,
+    img2pln: Homography,
+):
+    """Walk two polylines together, in order of their plane x.
 
-    return np.array([x, y], dtype=np.float64)
+    For every vertex of either polyline the point of the other polyline on the
+    same generatrix is found, extending the segment before it if need be.
+
+    Yields:
+        tuple: ``(point on the first, point on the second, plane x)``.
+    """
+    n1 = len(directrix1)
+    n2 = len(directrix2)
+    i1 = i2 = 0
+    prev1 = next1 = (float(directrix1[0, 0]), float(directrix1[0, 1]))
+    prev2 = next2 = (float(directrix2[0, 0]), float(directrix2[0, 1]))
+    next_x1 = next_x2 = 0.0
+
+    def vertex(polyline: NDArray[np.float64], index: int) -> Point:
+        return (float(polyline[index, 0]), float(polyline[index, 1]))
+
+    while True:
+        if next_x1 < next_x2 and i1 != n1:
+            pln = _apply(img2pln, next1)
+            point1 = next1
+            across = _apply(pln2img, (pln[0], pln[1] + 1))
+            crossing = line_intersection((point1, across), (next2, prev2))
+            point2 = next2 if crossing is None else crossing
+            yield point1, point2, pln[0]
+
+            i1 += 1
+            if i1 != n1:
+                prev1, next1 = next1, vertex(directrix1, i1)
+                next_x1 = _apply(img2pln, next1)[0]
+            if (
+                i2 != n2
+                and (next2[0] - point2[0]) ** 2 + (next2[1] - point2[1]) ** 2 < 1
+            ):
+                i2 += 1
+                if i2 != n2:
+                    prev2, next2 = next2, vertex(directrix2, i2)
+                    next_x2 = _apply(img2pln, next2)[0]
+        elif i2 != n2:
+            pln = _apply(img2pln, next2)
+            point2 = next2
+            across = _apply(pln2img, (pln[0], pln[1] + 1))
+            crossing = line_intersection((point2, across), (next1, prev1))
+            point1 = next1 if crossing is None else crossing
+            yield point1, point2, pln[0]
+
+            i2 += 1
+            if i2 != n2:
+                prev2, next2 = next2, vertex(directrix2, i2)
+                next_x2 = _apply(img2pln, next2)[0]
+            if (
+                i1 != n1
+                and (next1[0] - point1[0]) ** 2 + (next1[1] - point1[1]) ** 2 < 1
+            ):
+                i1 += 1
+                if i1 != n1:
+                    prev1, next1 = next1, vertex(directrix1, i1)
+                    next_x1 = _apply(img2pln, next1)[0]
+        else:
+            return
