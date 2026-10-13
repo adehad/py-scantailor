@@ -15,8 +15,9 @@ By default **Auto** finds the angle from the lines of text. Tick **Top page edge
 (book scans)** to find it from the top edge of the page instead, which suits book
 scans with a dark background around the page. Changing it detects the angle again
 for the current page while its angle is **Auto**; other pages with **Auto** keep
-their angle until they are processed. A page with a light surround has no visible
-edge, so it is taken as straight.
+their angle until they are processed. A page needs a dark surround that reaches
+the top of the scan; a page without one has no visible edge, and its angle is then
+found from the lines of text.
 
 Oblique correction
 ==================

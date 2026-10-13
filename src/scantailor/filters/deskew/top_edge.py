@@ -15,6 +15,8 @@ _MIN_SIDE_PX = 10
 _MAX_SEARCH_ROWS = 200
 _SAMPLE_COLUMNS = 80
 _WINDOW_ROWS = 3
+# A window with this many ink pixels or fewer is light; any other is dark.
+_LIGHT_WINDOW_MAX_INK = 1
 _MIN_EDGE_POINTS = 10
 
 
@@ -26,9 +28,14 @@ def find_skew_from_top_edge(
     """Estimate the skew from where the dark surround ends at the top of the page.
 
     For sampled columns, the edge is the first row whose preceding three-row
-    window holds at most one ink pixel, so the surround above the page must be
-    ink. A line fitted through the edge points gives the angle. A found angle
-    always has good confidence; a page with too few edge points gives none.
+    window holds at most one ink pixel, in a column whose first three rows
+    hold more: the surround above the page must be ink, and it must reach the
+    top of the image. A column that is light at the top has no edge; upstream
+    takes its second row as the edge, so a page without a dark surround reads
+    as straight with good confidence there, while here it has too few edge
+    points. A line fitted through the edge points gives the angle. A found
+    angle always has good confidence; a page with too few edge points gives
+    none.
 
     Args:
         binary (NDArray[np.uint8]): 2-D image with 0 for ink and 255 for
@@ -75,12 +82,24 @@ def find_skew_from_top_edge(
 
 
 def _edge_row(ink: NDArray[np.bool_]) -> int | None:
-    """Return the first row whose last three rows hold at most one ink pixel."""
-    counts = np.cumsum(ink, dtype=np.int64)
-    for row in range(_WINDOW_ROWS - 1, len(ink)):
-        in_window = counts[row] - (
-            counts[row - _WINDOW_ROWS] if row >= _WINDOW_ROWS else 0
-        )
-        if in_window <= 1:
-            return row
-    return None
+    """Return the last row of the first light window of a column that starts dark.
+
+    Args:
+        ink (NDArray[np.bool_]): One column of the search band, True for ink.
+
+    Returns:
+        int | None: The row, or None when the column is light at the top or
+            stays dark to the end.
+    """
+    if len(ink) < _WINDOW_ROWS:
+        return None
+    counts = np.concatenate(([0], np.cumsum(ink, dtype=np.int64)))
+    # Element i is the ink count of the window ending at row i + 2.
+    window_ink = counts[_WINDOW_ROWS:] - counts[:-_WINDOW_ROWS]
+    light = window_ink <= _LIGHT_WINDOW_MAX_INK
+    if light[0]:
+        return None
+    light_windows = np.flatnonzero(light)
+    if light_windows.size == 0:
+        return None
+    return int(light_windows[0] + _WINDOW_ROWS - 1)

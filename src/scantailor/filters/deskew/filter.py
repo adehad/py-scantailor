@@ -193,16 +193,18 @@ class Filter:
         # Binarize for better skew detection
         binary = binarize_otsu(gray)
 
-        if self.content_based:
+        result = None
+        if not self.content_based:
+            result = find_skew_from_top_edge(
+                binary, max_angle=max_angle, min_angle=self.DEFAULT_MIN_ANGLE
+            )
+        if result is None or not result.is_confident():
+            # Pages without a dark surround reaching the top have no usable edge.
             result = find_skew(
                 binary,
                 max_angle=max_angle,
                 accuracy=accuracy,
                 min_angle=self.DEFAULT_MIN_ANGLE,
-            )
-        else:
-            result = find_skew_from_top_edge(
-                binary, max_angle=max_angle, min_angle=self.DEFAULT_MIN_ANGLE
             )
 
         if store_result:
