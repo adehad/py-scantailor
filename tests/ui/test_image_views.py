@@ -274,9 +274,7 @@ def _two_page_layout(split_x: float = 300.0) -> PageLayout:
     return PageLayout.two_pages(IMAGE_WIDTH, IMAGE_HEIGHT, split_x)
 
 
-def test_dragging_a_split_line_handle_reports_the_layout_in_image_pixels(
-    qtbot, make_view
-):
+def test_dragging_a_split_line_handle_tilts_the_line_in_image_pixels(qtbot, make_view):
     view = make_view(PageSplitImageView)
     view.set_page_layout(_two_page_layout())
     top_handle, _bottom = view.line_handle_positions()[0]
@@ -285,7 +283,9 @@ def test_dragging_a_split_line_handle_reports_the_layout_in_image_pixels(
         _drag(qtbot, view, top_handle, top_handle + QtCore.QPointF(40, 25))
 
     layout = moved.args[0]
-    assert layout.get_split_line_x() == pytest.approx(300 + 40 / FIT_ZOOM)
+    assert layout.cutter1 is not None
+    assert layout.cutter1[0] == pytest.approx((300 + 40 / FIT_ZOOM, 0))
+    assert layout.cutter1[1] == pytest.approx((300, IMAGE_HEIGHT))
     assert layout.outline == (0, 0, IMAGE_WIDTH, IMAGE_HEIGHT)
 
 
@@ -338,10 +338,13 @@ def test_two_cutters_of_a_page_with_offcut_move_independently(qtbot, make_view):
     with qtbot.waitSignal(view.page_layout_set_locally) as moved:
         _drag(qtbot, view, right_top, right_top + QtCore.QPointF(-20, 0))
 
-    assert moved.args[0].get_single_page_outline() is not None
-    outline = moved.args[0].get_single_page_outline()
-    assert outline[0][0] == pytest.approx(100)
-    assert outline[1][0] == pytest.approx(500 - 20 / FIT_ZOOM)
+    layout = moved.args[0]
+    assert np.array(layout.cutter1) == pytest.approx(
+        np.array(((100, 0), (100, IMAGE_HEIGHT)))
+    )
+    assert layout.cutter2 is not None
+    assert layout.cutter2[0] == pytest.approx((500 - 20 / FIT_ZOOM, 0))
+    assert layout.cutter2[1] == pytest.approx((500, IMAGE_HEIGHT))
 
 
 def test_cutters_do_not_cross(qtbot, make_view):
@@ -354,8 +357,9 @@ def test_cutters_do_not_cross(qtbot, make_view):
     with qtbot.waitSignal(view.page_layout_set_locally) as moved:
         _drag(qtbot, view, right_top, right_top + QtCore.QPointF(-200, 0))
 
-    outline = moved.args[0].get_single_page_outline()
-    assert outline[0][0] < outline[1][0]
+    layout = moved.args[0]
+    assert layout.cutter1[0][0] <= layout.cutter2[0][0]
+    assert layout.cutter1[1][0] <= layout.cutter2[1][0]
 
 
 def test_a_page_without_layout_shows_no_split_handles(make_view):
@@ -581,21 +585,6 @@ def test_a_content_box_keeps_a_minimum_size(qtbot, make_view):
     assert rect.height() >= SelectContentImageView.MIN_BOX_SIZE
 
 
-def test_double_click_creates_a_content_box_around_the_click(qtbot, make_view):
-    view = make_view(SelectContentImageView)
-    click = view.virtual_to_widget_point(QtCore.QPointF(300, 400))
-
-    with qtbot.waitSignal(view.manual_content_rect_set) as created:
-        qtbot.mouseDClick(
-            view.viewport(), QtCore.Qt.MouseButton.LeftButton, pos=_point(click)
-        )
-
-    rect = created.args[0]
-    assert rect.center().x() == pytest.approx(300, abs=2)
-    assert rect.center().y() == pytest.approx(400, abs=2)
-    assert rect.width() == pytest.approx(IMAGE_WIDTH * 0.7)
-
-
 def test_dragging_the_content_body_without_shift_pans_instead(qtbot, make_view):
     view = _content_view(make_view)
     view.set_zoom(ZOOMED_IN)
@@ -690,11 +679,14 @@ def test_dragging_outside_the_boxes_pans_and_reports_nothing(qtbot, make_view):
 # Page layout
 
 
+MARGIN = 60  # Far enough from the content box to be a different drag target
+
+
 def _layout_view(make_view) -> PageLayoutImageView:
     view = make_view(PageLayoutImageView)
     view.set_mm_per_pixel(0.1, 0.2)
     inner = QtCore.QRectF(200, 300, 200, 200)
-    middle = inner.adjusted(-20, -20, 20, 20)
+    middle = inner.adjusted(-MARGIN, -MARGIN, MARGIN, MARGIN)
     outer = middle.adjusted(-30, -30, 30, 30)
     view.set_rectangles(inner, middle, outer)
     return view
@@ -702,42 +694,43 @@ def _layout_view(make_view) -> PageLayoutImageView:
 
 def test_dragging_a_margin_reports_millimetres_per_side(qtbot, make_view):
     view = _layout_view(make_view)
-    left_edge = view.virtual_to_widget_point(QtCore.QPointF(180, 400))
+    left_edge = view.virtual_to_widget_point(QtCore.QPointF(200 - MARGIN, 400))
     zoom = view.zoom_level
 
     with qtbot.waitSignal(view.margins_set_locally) as dragged:
         _drag(qtbot, view, left_edge, left_edge + QtCore.QPointF(-15, 0))
 
     margins: Margins = dragged.args[0]
-    assert margins.left == pytest.approx((20 + 15 / zoom) * 0.1)
-    assert margins.right == pytest.approx(20 * 0.1)
-    assert margins.top == pytest.approx(20 * 0.2)
-    assert margins.bottom == pytest.approx(20 * 0.2)
+    assert margins.left == pytest.approx((MARGIN + 15 / zoom) * 0.1)
+    assert margins.right == pytest.approx(MARGIN * 0.1)
+    assert margins.top == pytest.approx(MARGIN * 0.2)
+    assert margins.bottom == pytest.approx(MARGIN * 0.2)
 
 
 def test_dragging_a_margin_corner_moves_both_of_its_sides(qtbot, make_view):
     view = _layout_view(make_view)
-    corner = view.virtual_to_widget_point(QtCore.QPointF(180, 280))
+    corner = view.virtual_to_widget_point(QtCore.QPointF(200 - MARGIN, 300 - MARGIN))
     zoom = view.zoom_level
 
     with qtbot.waitSignal(view.margins_set_locally) as dragged:
         _drag(qtbot, view, corner, corner + QtCore.QPointF(-10, -12))
 
     margins: Margins = dragged.args[0]
-    assert margins.left == pytest.approx((20 + 10 / zoom) * 0.1)
-    assert margins.top == pytest.approx((20 + 12 / zoom) * 0.2)
-    assert margins.right == pytest.approx(20 * 0.1)
-    assert margins.bottom == pytest.approx(20 * 0.2)
+    assert margins.left == pytest.approx((MARGIN + 10 / zoom) * 0.1)
+    assert margins.top == pytest.approx((MARGIN + 12 / zoom) * 0.2)
+    assert margins.right == pytest.approx(MARGIN * 0.1)
+    assert margins.bottom == pytest.approx(MARGIN * 0.2)
 
 
 def test_a_linked_margin_cannot_shrink_its_partner_inside_the_content(qtbot, make_view):
-    view = _layout_view(make_view)
+    view = make_view(PageLayoutImageView)
+    view.set_margin_links(True, False)
+    view.set_mm_per_pixel(0.1, 0.2)
     view.set_rectangles(
         QtCore.QRectF(200, 300, 200, 200),
         QtCore.QRectF(120, 280, 300, 240),
         QtCore.QRectF(120, 280, 300, 240),
     )
-    view.set_margin_links(True, False)
     left_edge = view.virtual_to_widget_point(QtCore.QPointF(120, 400))
 
     with qtbot.waitSignal(view.margins_set_locally) as dragged:
@@ -751,19 +744,19 @@ def test_a_linked_margin_cannot_shrink_its_partner_inside_the_content(qtbot, mak
 
 def test_the_vertical_margin_uses_the_vertical_scale(qtbot, make_view):
     view = _layout_view(make_view)
-    bottom_edge = view.virtual_to_widget_point(QtCore.QPointF(300, 520))
+    bottom_edge = view.virtual_to_widget_point(QtCore.QPointF(300, 500 + MARGIN))
     zoom = view.zoom_level
 
     with qtbot.waitSignal(view.margins_set_locally) as dragged:
         _drag(qtbot, view, bottom_edge, bottom_edge + QtCore.QPointF(0, 10))
 
-    assert dragged.args[0].bottom == pytest.approx((20 + 10 / zoom) * 0.2)
+    assert dragged.args[0].bottom == pytest.approx((MARGIN + 10 / zoom) * 0.2)
 
 
 def test_linked_margins_move_together(qtbot, make_view):
     view = _layout_view(make_view)
     view.set_margin_links(left_right=True, top_bottom=False)
-    left_edge = view.virtual_to_widget_point(QtCore.QPointF(180, 400))
+    left_edge = view.virtual_to_widget_point(QtCore.QPointF(200 - MARGIN, 400))
     zoom = view.zoom_level
 
     with qtbot.waitSignal(view.margins_set_locally) as dragged:
@@ -771,12 +764,12 @@ def test_linked_margins_move_together(qtbot, make_view):
 
     margins = dragged.args[0]
     assert margins.left == pytest.approx(margins.right)
-    assert margins.left == pytest.approx((20 + 15 / zoom) * 0.1)
+    assert margins.left == pytest.approx((MARGIN + 15 / zoom) * 0.1)
 
 
 def test_a_margin_cannot_shrink_below_the_content_box(qtbot, make_view):
     view = _layout_view(make_view)
-    left_edge = view.virtual_to_widget_point(QtCore.QPointF(180, 400))
+    left_edge = view.virtual_to_widget_point(QtCore.QPointF(200 - MARGIN, 400))
 
     with qtbot.waitSignal(view.margins_set_locally) as dragged:
         _drag(qtbot, view, left_edge, left_edge + QtCore.QPointF(300, 0))
@@ -787,25 +780,9 @@ def test_a_margin_cannot_shrink_below_the_content_box(qtbot, make_view):
 def test_the_view_covers_the_margins_outside_the_page(make_view):
     view = _layout_view(make_view)
 
-    assert view.virtual_display_area.left() <= 200 - 20 - 30 - 1e-6
+    assert view.virtual_display_area.left() <= 200 - MARGIN - 30 - 1e-6
     shown = view.virtual_to_widget_rect(view.virtual_display_area)
     assert shown.left() >= -1e-6
-
-
-def test_the_content_box_edges_are_not_draggable_in_the_layout_view(qtbot, make_view):
-    view = _layout_view(make_view)
-    view.set_rectangles(
-        QtCore.QRectF(200, 300, 200, 200),
-        QtCore.QRectF(200, 300, 200, 200),
-        QtCore.QRectF(150, 250, 300, 300),
-    )
-    inside = view.virtual_to_widget_point(QtCore.QPointF(300, 400))
-    reported: list[Margins] = []
-    view.margins_set_locally.connect(reported.append)
-
-    _drag(qtbot, view, inside, inside + QtCore.QPointF(10, 10))
-
-    assert reported == []
 
 
 # Fix orientation

@@ -32,9 +32,17 @@ from PySide6.QtGui import (
 
 from scantailor.app.ui.icons import icon
 from scantailor.app.ui.image_views import zone_geometry as geometry
-from scantailor.app.ui.image_views.base import ImageViewBase, numpy_to_qimage
+from scantailor.app.ui.image_views.base import (
+    DEFAULT_STATUS_TIP,
+    ImageViewBase,
+    numpy_to_qimage,
+)
 from scantailor.app.ui.image_views.despeckle_preview import DespecklePreviewer
 from scantailor.app.ui.image_views.dewarp_editor import DewarpEditor
+from scantailor.app.ui.image_views.picture_mask_overlay import (
+    MaskZone,
+    PictureMaskOverlay,
+)
 from scantailor.app.ui.theme.tokens import view_color
 from scantailor.app.ui.widgets.color_pickup import ColorPickupInteraction
 from scantailor.app.ui.widgets.picture_zone_dialog import (
@@ -89,6 +97,30 @@ _ZONE_TAB_KINDS: dict[ImageViewTab, ZoneKind] = {
     ImageViewTab.PICTURE_ZONES: ZoneKind.PICTURE,
     ImageViewTab.FILL_ZONES: ZoneKind.FILL,
 }
+
+_ZONE_DEFAULT_TIP = (
+    "Click to start creating a new zone. Ctrl+Alt+Click to copy the latest "
+    "created zone. Use Z, X and C keys to switch zone creation mode."
+)
+_VERTEX_TIP = (
+    "Drag the vertex. Hold Ctrl to make the vertex angle right. Press D to "
+    "delete the vertex."
+)
+_SEGMENT_TIP = "Click to create a new vertex here."
+_ZONE_AREA_TIP = (
+    "Right click to edit zone properties. Hold Shift to drag the zone or "
+    "Shift+Ctrl to copy. Press Del to delete this zone."
+)
+_ZONE_DRAG_TIP = "Hold left mouse button to drag the zone."
+_ZONE_COPY_TIP = "Hold left mouse button to copy and drag the zone."
+_FINISH_DRAG_TIP = "Release left mouse button to finish dragging."
+_MERGE_TIP = "Merge these two vertices."
+_MERGE_HINT_TIP = "Move the vertex to one of its neighbors to merge them."
+_PICKUP_TIP = "Click on an area to pick up its color, or ESC to cancel."
+_FINISH_RECTANGLE_TIP = "Click to finish this rectangular zone.  ESC to cancel."
+_FINISH_ZONE_TIP = "Click to finish this zone.  ESC to cancel."
+_CONNECT_TIP = "Connect first and last points to finish this zone.  ESC to cancel."
+_CREATION_MODE_TIP = "Use Z and X keys to switch zone creation mode.  ESC to cancel."
 
 _TAB_SHORTCUT_COUNT = 5
 # Colours that tell zones apart in the menu when several lie under the cursor.
@@ -267,10 +299,15 @@ class OutputImageView(ImageViewBase):
         self._dewarp = DewarpEditor(self, self.distortion_model_changed.emit)
         self._pickup = ColorPickupInteraction(self)
         self._pickup.color_picked.connect(self._apply_picked_color)
+        self._pickup.cancelled.connect(self._show_status_tip_here)
         self._pickup_zone = -1
         self._despeckle = DespecklePreviewer(self)
         self._despeckle.preview_ready.connect(self._show_despeckle_preview)
-        self._despeckle_source: tuple[NDArray[np.uint8], int] | None = None
+        self._despeckle_source: (
+            tuple[NDArray[np.uint8], int, NDArray[np.uint8] | None] | None
+        ) = None
+        self._picture_mask = PictureMaskOverlay(self, self.update)
+        self._mask_zones_key: tuple[object, ...] = ()
         self.setMouseTracking(True)
 
     # Guides
@@ -399,7 +436,10 @@ class OutputImageView(ImageViewBase):
             assert start is not None
             self.set_current_tab(start)
         else:
+            self.default_status_tip = DEFAULT_STATUS_TIP
+            self.set_status_tip("")
             self._show_tab_image(None)
+            self._update_mask_pulse()
             self.update()
 
     def tabs(self) -> list[ImageViewTab]:
@@ -444,8 +484,13 @@ class OutputImageView(ImageViewBase):
             return
         self._leave_interactions()
         self._tab = tab
+        self.default_status_tip = (
+            _ZONE_DEFAULT_TIP if tab in _ZONE_TAB_KINDS else DEFAULT_STATUS_TIP
+        )
+        self.set_status_tip("")
         self._show_tab_image(tab)
         self._update_message()
+        self._update_mask_pulse()
         self.update()
         self.tab_changed.emit(tab)
 
@@ -522,7 +567,11 @@ class OutputImageView(ImageViewBase):
     # Despeckling tab
 
     def set_despeckle_source(
-        self, binary: NDArray[np.uint8] | None, dpi: int, level: DespeckleLevel
+        self,
+        binary: NDArray[np.uint8] | None,
+        dpi: int,
+        level: DespeckleLevel,
+        page: NDArray[np.uint8] | None = None,
     ) -> None:
         """Give the despeckling tab the page as it is before despeckling.
 
@@ -531,13 +580,18 @@ class OutputImageView(ImageViewBase):
                 afterwards by the caller; None removes the preview.
             dpi (int): Resolution of the page.
             level (DespeckleLevel): The level to preview.
+            page (NDArray[np.uint8] | None): The output page whose pictures the
+                preview shows, gray or RGB; ignored when its size differs from
+                ``binary``. A white page when None.
         """
         if binary is None:
             self._despeckle_source = None
             self.set_tab_image(ImageViewTab.DESPECKLING, None)
             return
-        self._despeckle_source = (binary, dpi)
-        self._despeckle.request(binary, dpi, level)
+        if page is not None and page.shape[:2] != binary.shape:
+            page = None
+        self._despeckle_source = (binary, dpi, page)
+        self._despeckle.request(binary, dpi, level, page)
 
     def set_despeckle_level(self, level: DespeckleLevel) -> None:
         """Preview another level on the page given to ``set_despeckle_source``.
@@ -546,11 +600,66 @@ class OutputImageView(ImageViewBase):
             level (DespeckleLevel): The level to preview.
         """
         if self._despeckle_source is not None:
-            binary, dpi = self._despeckle_source
-            self._despeckle.request(binary, dpi, level)
+            binary, dpi, page = self._despeckle_source
+            self._despeckle.request(binary, dpi, level, page)
 
     def _show_despeckle_preview(self, preview: NDArray[np.uint8]) -> None:
         self.set_tab_image(ImageViewTab.DESPECKLING, preview)
+
+    # Picture mask
+
+    def set_picture_mask(self, mask: NDArray[np.bool_] | None) -> None:
+        """Show what the output keeps as pictures in the Picture Zones tab.
+
+        Args:
+            mask (NDArray[np.bool_] | None): True where a picture is kept, in the
+                pixels of the Picture Zones tab's image; None removes the mask.
+        """
+        self._mask_zones_key = ()
+        self._picture_mask.set_mask(mask)
+        self._update_mask_pulse()
+
+    def picture_mask_phase(self) -> int:
+        """Return where the picture mask's pulse is, in degrees."""
+        return self._picture_mask.phase
+
+    def _update_mask_pulse(self) -> None:
+        self._picture_mask.set_running(
+            self._tab is ImageViewTab.PICTURE_ZONES and self.isVisible()
+        )
+
+    def _sync_picture_mask_zones(self) -> None:
+        """Hand the picture zones to the mask overlay when they changed."""
+        zones = [
+            (self._layer_of(zone), tuple(zone.polygon.toList()))
+            for zone in self._zones
+            if zone.kind is ZoneKind.PICTURE
+        ]
+        key = tuple((layer, tuple((p.x(), p.y()) for p in pts)) for layer, pts in zones)
+        if key != self._mask_zones_key:
+            self._mask_zones_key = key
+            self._picture_mask.set_zones(
+                [MaskZone(QPolygonF(list(pts)), layer) for layer, pts in zones],
+                repaint=False,
+            )
+
+    def showEvent(self, event: QtGui.QShowEvent) -> None:
+        """Let the picture mask pulse again.
+
+        Args:
+            event (QtGui.QShowEvent): The show event.
+        """
+        super().showEvent(event)
+        self._update_mask_pulse()
+
+    def hideEvent(self, event: QtGui.QHideEvent) -> None:
+        """Stop the picture mask pulse while nothing is shown.
+
+        Args:
+            event (QtGui.QHideEvent): The hide event.
+        """
+        super().hideEvent(event)
+        self._picture_mask.set_running(False)
 
     # Zones
 
@@ -698,6 +807,7 @@ class OutputImageView(ImageViewBase):
             return
         self._pickup_zone = index
         self._pickup.start(self._cursor.toPoint() if self._cursor.x() >= 0 else None)
+        self.set_status_tip(_PICKUP_TIP)
 
     def color_pickup_active(self) -> bool:
         """Return whether the view waits for a colour to be clicked.
@@ -729,6 +839,7 @@ class OutputImageView(ImageViewBase):
             else FillZoneProperties(color=rgb)
         )
         self._default_fill_color = rgb
+        self._show_status_tip_here()
         self.update()
         self.zones_changed.emit()
 
@@ -778,6 +889,45 @@ class OutputImageView(ImageViewBase):
         if changed:
             self.zones_changed.emit()
         return changed
+
+    # Status tips
+
+    def _show_status_tip_here(self) -> None:
+        """Show the hint for the pointer's last position."""
+        self.set_status_tip(
+            self._status_tip_at(self._cursor, Qt.KeyboardModifier.NoModifier)
+        )
+
+    def _status_tip_at(
+        self, widget_pos: QPointF, modifiers: Qt.KeyboardModifier
+    ) -> str:
+        if self._pickup.is_active():
+            return _PICKUP_TIP
+        if self._tab is ImageViewTab.DEWARPING:
+            return self._dewarp.status_tip_at(widget_pos)
+        if not self._active_kinds():
+            return ""
+        if self._creating is not None:
+            return self._creation_tip(widget_pos)
+        pick = self._pick(widget_pos)
+        if pick is not None:
+            return _SEGMENT_TIP if pick.on_edge else _VERTEX_TIP
+        if self._zone_at(widget_pos) < 0:
+            return ""
+        if modifiers & Qt.KeyboardModifier.ShiftModifier:
+            if modifiers & Qt.KeyboardModifier.ControlModifier:
+                return _ZONE_COPY_TIP
+            return _ZONE_DRAG_TIP
+        return _ZONE_AREA_TIP
+
+    def _creation_tip(self, widget_pos: QPointF) -> str:
+        if self._creation_mode is ZoneCreationMode.RECTANGULAR:
+            return _FINISH_RECTANGLE_TIP if self._outlining else ""
+        if len(self._new_points) >= 2:
+            if self._closes_polygon(widget_pos):
+                return _FINISH_ZONE_TIP
+            return _CONNECT_TIP
+        return _CREATION_MODE_TIP
 
     # Hit testing
 
@@ -857,6 +1007,9 @@ class OutputImageView(ImageViewBase):
         if self._tab is ImageViewTab.DEWARPING:
             self._dewarp.paint(painter)
         elif not self._pickup.is_active():
+            if self._tab is ImageViewTab.PICTURE_ZONES:
+                self._sync_picture_mask_zones()
+                self._picture_mask.paint(painter, self.image_to_widget())
             kinds = self._active_kinds()
             for index, zone in enumerate(self._zones):
                 if zone.kind in kinds:
@@ -1051,6 +1204,7 @@ class OutputImageView(ImageViewBase):
             self._outlining = True
             self._outline_anchor = point
             self._new_points = [point]
+        self.set_status_tip(self._creation_tip(pos))
         self.update()
         event.accept()
         return True
@@ -1077,6 +1231,7 @@ class OutputImageView(ImageViewBase):
         corner = self._zones[pick.zone].polygon.at(vertex)
         self._drag_offset = self.widget_to_virtual_point(pos) - corner
         self._hover = None
+        self.set_status_tip(_MERGE_HINT_TIP)
         self.update()
 
     def _start_zone_drag(self, index: int, pos: QPointF, copy: bool) -> None:
@@ -1088,6 +1243,7 @@ class OutputImageView(ImageViewBase):
             index, self.widget_to_virtual_point(pos), moved=copy
         )
         self._hover = None
+        self.set_status_tip(_FINISH_DRAG_TIP)
         self.update()
 
     def _copy_latest_zone(self, kind: ZoneKind, widget_pos: QPointF) -> bool:
@@ -1154,6 +1310,7 @@ class OutputImageView(ImageViewBase):
 
         in_widget = [self.virtual_to_widget_point(c) for c in corners]
         neighbour = geometry.merge_target(in_widget, index, self.VERTEX_HIT_RADIUS)
+        self.set_status_tip(_MERGE_HINT_TIP if neighbour is None else _MERGE_TIP)
         if neighbour is not None:
             corners[index] = corners[neighbour]
             in_widget[index] = in_widget[neighbour]
@@ -1217,14 +1374,23 @@ class OutputImageView(ImageViewBase):
                 ):
                     self._new_points = []
             self._finish_zone_creation()
+            self.set_status_tip(
+                self._status_tip_at(event.position(), event.modifiers())
+            )
             event.accept()
             return
         if event.button() == Qt.MouseButton.LeftButton and self._dragged_vertex >= 0:
             self._finish_vertex_drag()
+            self.set_status_tip(
+                self._status_tip_at(event.position(), event.modifiers())
+            )
             event.accept()
             return
         if event.button() == Qt.MouseButton.LeftButton and self._zone_drag is not None:
             drag, self._zone_drag = self._zone_drag, None
+            self.set_status_tip(
+                self._status_tip_at(event.position(), event.modifiers())
+            )
             event.accept()
             if drag.moved:
                 self.zones_changed.emit()
@@ -1510,6 +1676,11 @@ class DewarpingImageView(ImageViewBase):
 
     def _paint_overlay(self, painter: QPainter) -> None:
         self._editor.paint(painter)
+
+    def _status_tip_at(
+        self, widget_pos: QPointF, modifiers: Qt.KeyboardModifier
+    ) -> str:
+        return self._editor.status_tip_at(widget_pos)
 
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
         """Pick a control point, or add one when pressing on an edge.

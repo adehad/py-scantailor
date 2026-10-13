@@ -232,9 +232,11 @@ def test_dragging_a_split_line_stores_a_manual_layout_in_source_pixels(
 
     params = project_window.stages.page_split_filter.get_params(page)
     assert params.is_manual()
-    assert params.page_layout.get_split_line_x() == pytest.approx(
+    assert params.page_layout.cutter1 is not None
+    assert params.page_layout.cutter1[0][0] == pytest.approx(
         300 + travel.x() / zoom, abs=1e-6
     )
+    assert params.page_layout.cutter1[1][0] == pytest.approx(300, abs=1e-6)
     assert params.page_layout.outline == (0, 0, PAGE_WIDTH, PAGE_HEIGHT)
     assert project_window.modified
 
@@ -253,9 +255,7 @@ def test_a_dragged_split_line_stays_where_it_was_dropped_after_the_rerender(
     qtbot.wait(50)
 
     stored = project_window.stages.page_split_filter.get_params(page).page_layout
-    assert view.page_layout.get_split_line_x() == pytest.approx(
-        stored.get_split_line_x()
-    )
+    assert np.array(view.page_layout.cutter1) == pytest.approx(np.array(stored.cutter1))
 
 
 # Deskew

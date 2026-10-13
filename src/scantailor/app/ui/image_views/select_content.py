@@ -2,11 +2,12 @@
 
 Shows the deskewed page with its content box and, when page detection is
 enabled, its page box. Boxes are resized by their corners and edges and moved
-by their body; a context menu and a double click create or remove the
-content box.
+by their body while Shift is held; a context menu creates or removes the content
+box. A double click on content adjusts the content box to it.
 """
 
 import math
+from collections.abc import Callable
 from enum import Enum, auto
 from typing import ClassVar
 
@@ -17,9 +18,19 @@ from PySide6.QtGui import QAction, QKeySequence, QPainter, QPen
 from scantailor.app.ui.image_views.base import (
     Edge,
     ImageViewBase,
+    matrix_to_qtransform,
     point_to_segment_distance,
 )
 from scantailor.app.ui.theme.tokens import view_color
+from scantailor.core.content_mask import ContentMask
+
+_CONTENT_RESIZE_TIP = "Drag lines or corners to resize the content box."
+_PAGE_RESIZE_TIP = "Drag lines or corners to resize the page box."
+_CONTENT_MOVE_TIP = "Hold left mouse button to drag the content box."
+_PAGE_MOVE_TIP = "Hold left mouse button to drag the page box."
+_FINISH_DRAG_TIP = "Release left mouse button to finish dragging."
+# Half the side, in mask pixels, of the square searched for content around a click.
+_SNAP_SEARCH_RADIUS = 15
 
 
 class BoxKind(Enum):
@@ -43,9 +54,15 @@ class SelectContentImageView(ImageViewBase):
     manual_content_rect_set = Signal(QRectF)
     manual_page_rect_set = Signal(QRectF)
 
+    default_status_tip = (
+        "Use the context menu to enable / disable the content box. Hold Shift to "
+        "drag a box. Use double-click on content to automatically adjust the "
+        "content area."
+    )
+
     CORNER_HIT_RADIUS = 10
     EDGE_HIT_DISTANCE = 8
-    MIN_BOX_SIZE = 10  # In virtual pixels
+    MIN_BOX_SIZE = 10  # In widget pixels, whatever the zoom
     NEW_BOX_FRACTION = 0.7  # Size of a new content box relative to the page
 
     _BOX_COLOR_NAMES: ClassVar[dict[BoxKind, tuple[str, str]]] = {
@@ -86,6 +103,7 @@ class SelectContentImageView(ImageViewBase):
         self._drag_moved = False
         self._page_rect_changed_by_content = False
         self._hover: tuple[BoxKind, Edge] | None = None
+        self._mask_provider: Callable[[], ContentMask | None] | None = None
         self._build_context_menus()
         self.setMouseTracking(True)
 
@@ -93,7 +111,7 @@ class SelectContentImageView(ImageViewBase):
         self._no_content_menu = QtWidgets.QMenu(self)
         create = QAction("Create Content Box", self)
         create.setShortcut(QKeySequence("Ins"))
-        create.triggered.connect(lambda: self._create_content_box(None))
+        create.triggered.connect(self._create_content_box)
         self._no_content_menu.addAction(create)
         self.addAction(create)
 
@@ -147,14 +165,26 @@ class SelectContentImageView(ImageViewBase):
             boxes.append(BoxKind.PAGE)
         return [kind for kind in boxes if not self._rects[kind].isEmpty()]
 
-    def _create_content_box(self, center: QPointF | None) -> None:
-        """Create a content box around a virtual point, or the page centre."""
+    def set_content_mask_provider(
+        self, provider: Callable[[], ContentMask | None] | None
+    ) -> None:
+        """Say where to find out what is content when the user double clicks.
+
+        Args:
+            provider (Callable[[], ContentMask | None] | None): Called on the
+                first double click that needs the mask; may return None while
+                there is none. None turns the double click off.
+        """
+        self._mask_provider = provider
+
+    def _create_content_box(self) -> None:
+        """Create a content box around the centre of the page."""
         if self._drag is not None or not self._rects[BoxKind.CONTENT].isEmpty():
             return
         area = self._virtual_display_area
         width = area.width() * self.NEW_BOX_FRACTION
         height = area.height() * self.NEW_BOX_FRACTION
-        centre = area.center() if center is None else center
+        centre = area.center()
         box = QRectF(
             centre.x() - width / 2, centre.y() - height / 2, width, height
         ).intersected(area)
@@ -263,17 +293,18 @@ class SelectContentImageView(ImageViewBase):
     def _resized(self, rect: QRectF, edges: Edge, pos: QPointF) -> QRectF:
         """Return the rectangle with the given edges moved towards a virtual point."""
         area = self._virtual_display_area
+        min_size = self.MIN_BOX_SIZE / self._zoom
         x = max(area.left(), min(area.right(), pos.x()))
         y = max(area.top(), min(area.bottom(), pos.y()))
         result = QRectF(rect)
         if edges & Edge.LEFT:
-            result.setLeft(min(x, rect.right() - self.MIN_BOX_SIZE))
+            result.setLeft(min(x, rect.right() - min_size))
         if edges & Edge.RIGHT:
-            result.setRight(max(x, rect.left() + self.MIN_BOX_SIZE))
+            result.setRight(max(x, rect.left() + min_size))
         if edges & Edge.TOP:
-            result.setTop(min(y, rect.bottom() - self.MIN_BOX_SIZE))
+            result.setTop(min(y, rect.bottom() - min_size))
         if edges & Edge.BOTTOM:
-            result.setBottom(max(y, rect.top() + self.MIN_BOX_SIZE))
+            result.setBottom(max(y, rect.top() + min_size))
         return result
 
     def _moved(self, kind: BoxKind, rect: QRectF, origin: QPointF) -> QRectF:
@@ -332,6 +363,20 @@ class SelectContentImageView(ImageViewBase):
     def _shift_held(event: QtGui.QMouseEvent) -> bool:
         return bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
 
+    def _status_tip_at(
+        self, widget_pos: QPointF, modifiers: Qt.KeyboardModifier
+    ) -> str:
+        hit = self._hit_test(
+            widget_pos, bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+        )
+        if hit is None:
+            return ""
+        kind, edges = hit
+        content = kind == BoxKind.CONTENT
+        if edges == Edge.NONE:
+            return _CONTENT_MOVE_TIP if content else _PAGE_MOVE_TIP
+        return _CONTENT_RESIZE_TIP if content else _PAGE_RESIZE_TIP
+
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
         """Pick up a box, a side or a corner.
 
@@ -346,6 +391,8 @@ class SelectContentImageView(ImageViewBase):
                 self._drag_moved = False
                 grab = self.widget_to_virtual_point(event.position())
                 self._drag_offset = self._grab_offset(self._rects[kind], edges, grab)
+                if edges == Edge.NONE:
+                    self.set_status_tip(_FINISH_DRAG_TIP)
                 event.accept()
                 return
         super().mousePressEvent(event)
@@ -397,6 +444,9 @@ class SelectContentImageView(ImageViewBase):
         if event.button() == Qt.MouseButton.LeftButton and self._drag is not None:
             kind, _edges = self._drag
             self._drag = None
+            self.set_status_tip(
+                self._status_tip_at(event.position(), event.modifiers())
+            )
             event.accept()
             self.update()
             if self._drag_moved:
@@ -411,19 +461,98 @@ class SelectContentImageView(ImageViewBase):
         super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event: QtGui.QMouseEvent) -> None:
-        """Create a content box around the click when there is none.
+        """Adjust the content box to the content under the click.
 
         Args:
             event (QtGui.QMouseEvent): The mouse event.
         """
-        if (
-            event.button() == Qt.MouseButton.LeftButton
-            and self._rects[BoxKind.CONTENT].isEmpty()
-        ):
-            self._create_content_box(self.widget_to_virtual_point(event.position()))
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._correct_content_box(event.position(), event.modifiers())
             event.accept()
             return
         super().mouseDoubleClickEvent(event)
+
+    def _content_under(self, widget_pos: QPointF) -> QRectF | None:
+        """Return the content around a widget position in virtual coordinates."""
+        provider = self._mask_provider
+        mask = None if provider is None else provider()
+        if mask is None or mask.is_null():
+            return None
+        to_content = self.widget_to_image() * matrix_to_qtransform(
+            mask.original_to_content
+        )
+        centre = to_content.map(widget_pos).toPoint()
+        found = mask.find_content_in_area(
+            centre.x() - _SNAP_SEARCH_RADIUS,
+            centre.y() - _SNAP_SEARCH_RADIUS,
+            2 * _SNAP_SEARCH_RADIUS,
+            2 * _SNAP_SEARCH_RADIUS,
+        )
+        if found is None:
+            return None
+        to_virtual = (
+            matrix_to_qtransform(mask.content_to_original) * self._image_to_virtual
+        )
+        area = to_virtual.mapRect(QRectF(*found)).intersected(
+            self._virtual_display_area
+        )
+        return None if area.isEmpty() else area
+
+    def _correct_content_box(
+        self, widget_pos: QPointF, modifiers: Qt.KeyboardModifier
+    ) -> None:
+        """Make the content box include, or meet, the content under a click.
+
+        A click outside the box grows it to the content found. A click inside
+        moves the nearest side to the content found; Ctrl restricts that to the
+        top and bottom, Shift to the left and right and both together move one
+        side of each pair.
+        """
+        content_box = self._rects[BoxKind.CONTENT]
+        if content_box.isEmpty() or self._drag is not None:
+            return
+        found = self._content_under(widget_pos)
+        if found is None:
+            return
+        click = self.widget_to_virtual_point(widget_pos)
+        if not content_box.contains(click):
+            self._rects[BoxKind.CONTENT] = content_box.united(found)
+            self._describe_content_in_page()
+        else:
+            edges = self._nearest_edges(content_box, click, modifiers)
+            moved = QPointF(
+                found.left() if edges & Edge.LEFT else found.right(),
+                found.top() if edges & Edge.TOP else found.bottom(),
+            )
+            self._rects[BoxKind.CONTENT] = self._resized(content_box, edges, moved)
+            self._describe_content_in_page()
+        self.update()
+        self.manual_content_rect_set.emit(QRectF(self._rects[BoxKind.CONTENT]))
+        self._report_page_rect_if_grown()
+
+    @staticmethod
+    def _nearest_edges(
+        box: QRectF, click: QPointF, modifiers: Qt.KeyboardModifier
+    ) -> Edge:
+        """Pick the box sides a content correction moves."""
+        top = click.y() - box.top()
+        left = click.x() - box.left()
+        bottom = box.bottom() - click.y()
+        right = box.right() - click.x()
+        # Equal distances keep the side assigned last.
+        by_distance = {top: Edge.TOP}
+        by_distance[left] = Edge.LEFT
+        by_distance[bottom] = Edge.BOTTOM
+        by_distance[right] = Edge.RIGHT
+        horizontal = Qt.KeyboardModifier.ShiftModifier
+        vertical = Qt.KeyboardModifier.ControlModifier
+        if modifiers == horizontal:
+            return by_distance[min(left, right)]
+        if modifiers == vertical:
+            return by_distance[min(top, bottom)]
+        if modifiers == (horizontal | vertical):
+            return by_distance[min(left, right)] | by_distance[min(top, bottom)]
+        return by_distance[min(by_distance)]
 
     def contextMenuEvent(self, event: QtGui.QContextMenuEvent) -> None:
         """Offer to create or remove the content box.
