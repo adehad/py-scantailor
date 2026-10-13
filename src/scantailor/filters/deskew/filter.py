@@ -16,6 +16,7 @@ from scantailor.filters.deskew.dependencies import Dependencies
 from scantailor.filters.deskew.oblique import find_oblique_degrees, rotate_mask
 from scantailor.filters.deskew.params import MAX_OBLIQUE_DEG, Params
 from scantailor.filters.deskew.settings import Detection, Settings
+from scantailor.filters.deskew.top_edge import find_skew_from_top_edge
 from scantailor.imageproc.analysis import SkewResult, find_skew
 from scantailor.imageproc.binarize import binarize_otsu
 
@@ -142,6 +143,15 @@ class Filter:
     def auto_oblique_default(self, enabled: bool) -> None:
         self._settings.set_auto_oblique_default(enabled)
 
+    @property
+    def content_based(self) -> bool:
+        """Whether the skew is found from the page content, not the top page edge."""
+        return self._settings.get_content_based()
+
+    @content_based.setter
+    def content_based(self, enabled: bool) -> None:
+        self._settings.set_content_based(enabled)
+
     def detect_skew(
         self,
         image: NDArray[np.uint8],
@@ -183,13 +193,17 @@ class Filter:
         # Binarize for better skew detection
         binary = binarize_otsu(gray)
 
-        # Detect skew
-        result = find_skew(
-            binary,
-            max_angle=max_angle,
-            accuracy=accuracy,
-            min_angle=self.DEFAULT_MIN_ANGLE,
-        )
+        if self.content_based:
+            result = find_skew(
+                binary,
+                max_angle=max_angle,
+                accuracy=accuracy,
+                min_angle=self.DEFAULT_MIN_ANGLE,
+            )
+        else:
+            result = find_skew_from_top_edge(
+                binary, max_angle=max_angle, min_angle=self.DEFAULT_MIN_ANGLE
+            )
 
         if store_result:
             self._store_detection(binary, result, page_id, dependencies)
