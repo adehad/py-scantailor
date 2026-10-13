@@ -64,7 +64,7 @@ from scantailor.core.zones import (
     PictureZoneProperties,
 )
 from scantailor.dewarping.point_mapper import DewarpingPointMapper
-from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.despeckle import DespeckleLevel, DespeckleStrength
 from scantailor.filters.output.dewarping_options import DewarpingMode
 from scantailor.filters.output.generator import applied_post_deskew_angle
 from scantailor.filters.output.params import (
@@ -894,7 +894,7 @@ class StagePanels(QtCore.QObject):
             view.set_despeckle_source(
                 extras.despeckle_source,
                 extras.despeckle_dpi,
-                params.despeckle_level,
+                DespeckleStrength(params.despeckle_strength),
                 self._stage_image,
             )
             view.set_tab_message(

@@ -21,7 +21,7 @@ from scantailor.core.zones import (
 from .binarization import BinarizationMethod, BinarizationOptions
 from .color_mode import ColorMode
 from .color_options import ColorCommonOptions
-from .despeckle import MAX_DESPECKLE_FACTOR, DespeckleLevel, DespeckleStrength
+from .despeckle import MAX_DESPECKLE_FACTOR, DespeckleLevel
 from .dewarping_options import DewarpingMode, DewarpingOptions
 from .picture_shape import PictureShapeOptions
 from .splitting_options import SplittingOptions
@@ -251,23 +251,6 @@ class Params(BaseModel):
                 "despeckle_factor": factor,
             }
         )
-
-    def for_generation(self) -> Self:
-        """Return a copy the output generator despeckles at the stored strength.
-
-        The generator asks ``despeckle_level`` for the strength; an in-between
-        factor takes its place there so that the generator needs no knowledge
-        of it.
-
-        Returns:
-            Self: ``self`` when the strength is that of a named level.
-        """
-        if self.despeckle_factor is None:
-            return self
-        if self.despeckle_factor == self.despeckle_level.to_factor():
-            return self
-        strength = DespeckleStrength(self.despeckle_factor)
-        return self.model_copy(update={"despeckle_level": strength})
 
     def with_black_on_white(self, black_on_white: bool) -> Self:
         """Create a copy with different black_on_white setting."""
