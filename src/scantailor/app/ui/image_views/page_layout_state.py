@@ -8,7 +8,10 @@ the guides". They hold one instance of this object and listen to its signals.
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, QSettings, Signal
+
+LEFT_RIGHT_LINKED_KEY = "margins/leftRightLinked"
+TOP_BOTTOM_LINKED_KEY = "margins/topBottomLinked"
 
 
 @dataclass(eq=False)
@@ -40,14 +43,24 @@ class PageLayoutState(QObject):
     middle_rect_shown_changed = Signal()
 
     def __init__(self, parent: QObject | None = None) -> None:
-        """Start with unlinked margins, no guides and the hard margins shown.
+        """Start with the links the user last chose, no guides and the margins shown.
+
+        The links are linked when the user never chose. Only a user's choice is
+        stored, by ``remember_left_right_link`` and ``remember_top_bottom_link``,
+        so a pair released because a page has unequal margins stays linked in the
+        next session.
 
         Args:
             parent (QObject | None): Owner of this object.
         """
         super().__init__(parent)
-        self._left_right_linked = False
-        self._top_bottom_linked = False
+        settings = QSettings()
+        self._left_right_linked = bool(
+            settings.value(LEFT_RIGHT_LINKED_KEY, True, type=bool)
+        )
+        self._top_bottom_linked = bool(
+            settings.value(TOP_BOTTOM_LINKED_KEY, True, type=bool)
+        )
         self._guides: list[Guide] = []
         self._middle_rect_shown = True
 
@@ -72,6 +85,16 @@ class PageLayoutState(QObject):
         if linked != self._top_bottom_linked:
             self._top_bottom_linked = linked
             self.links_changed.emit()
+
+    @staticmethod
+    def remember_left_right_link(linked: bool) -> None:
+        """Keep the user's choice for the left and right link for later sessions."""
+        QSettings().setValue(LEFT_RIGHT_LINKED_KEY, linked)
+
+    @staticmethod
+    def remember_top_bottom_link(linked: bool) -> None:
+        """Keep the user's choice for the top and bottom link for later sessions."""
+        QSettings().setValue(TOP_BOTTOM_LINKED_KEY, linked)
 
     @property
     def middle_rect_shown(self) -> bool:

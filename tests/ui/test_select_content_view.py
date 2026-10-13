@@ -5,6 +5,7 @@ import pytest
 from PySide6 import QtCore, QtGui, QtWidgets
 from pytestqt.qtbot import QtBot
 
+from scantailor.app.ui.image_views.base import Edge
 from scantailor.app.ui.image_views.select_content import SelectContentImageView
 from scantailor.core.content_mask import ContentMask
 from scantailor.core.models import Dpi
@@ -188,6 +189,43 @@ class TestDoubleClickOnContent:
         assert rect.top() == pytest.approx(230, abs=4)
         assert rect.right() == pytest.approx(CONTENT.right())
 
+    def test_a_tie_between_a_vertical_and_a_horizontal_distance_keeps_the_key_axis(
+        self, qtbot, view
+    ):
+        # Fifty from the top and from the left of the 300 by 400 box.
+        click = QtCore.QPointF(CONTENT.left() + 50, CONTENT.top() + 50)
+        view.set_content_mask_provider(lambda: _mask((120, 230, 360, 560)))
+
+        with qtbot.waitSignal(view.manual_content_rect_set) as vertical:
+            _double_click(qtbot, view, click, CONTROL)
+
+        rect = vertical.args[0]
+        assert rect.top() == pytest.approx(230, abs=4)
+        assert rect.left() == pytest.approx(CONTENT.left())
+
+    def test_a_tie_with_both_keys_moves_the_top_and_the_left_side(self, qtbot, view):
+        click = QtCore.QPointF(CONTENT.left() + 50, CONTENT.top() + 50)
+        view.set_content_mask_provider(lambda: _mask((120, 230, 360, 560)))
+
+        with qtbot.waitSignal(view.manual_content_rect_set) as both:
+            _double_click(qtbot, view, click, CONTROL | SHIFT)
+
+        rect = both.args[0]
+        assert rect.top() == pytest.approx(230, abs=4)
+        assert rect.left() == pytest.approx(120, abs=4)
+        assert rect.right() == pytest.approx(CONTENT.right())
+        assert rect.bottom() == pytest.approx(CONTENT.bottom())
+
+    def test_the_nearest_side_without_keys_is_the_smallest_distance(self):
+        box = QtCore.QRectF(0, 0, 300, 400)
+        nearest = SelectContentImageView._nearest_edges
+
+        no_keys = QtCore.Qt.KeyboardModifier.NoModifier
+        assert nearest(box, QtCore.QPointF(50, 50), no_keys) == Edge.TOP
+        assert nearest(box, QtCore.QPointF(250, 200), no_keys) == Edge.RIGHT
+        assert nearest(box, QtCore.QPointF(150, 390), no_keys) == Edge.BOTTOM
+        assert nearest(box, QtCore.QPointF(10, 200), no_keys) == Edge.LEFT
+
     def test_nothing_happens_when_the_click_is_not_near_content(self, qtbot, view):
         view.set_content_mask_provider(lambda: _mask((120, 230, 160, 260)))
         reported: list[QtCore.QRectF] = []
@@ -293,3 +331,16 @@ class TestHints:
         _hover(view, view.virtual_to_widget_point(QtCore.QPointF(50, 450)))
 
         assert view.status_tip_text == "Drag lines or corners to resize the page box."
+
+
+def test_nearest_edges_tie_between_left_and_bottom_goes_to_left_without_modifier() -> (
+    None
+):
+    """Equal distances resolve in the order top, left, bottom, right."""
+    box = QtCore.QRectF(0, 0, 300, 400)
+
+    edges = SelectContentImageView._nearest_edges(
+        box, QtCore.QPointF(50, 350), QtCore.Qt.KeyboardModifier.NoModifier
+    )
+
+    assert edges == Edge.LEFT
