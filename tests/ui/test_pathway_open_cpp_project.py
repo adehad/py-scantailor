@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from conftest import FileDialogStub
-
     from scantailor.app.ui.MainWindow import MainWindowManager
 
 FIXTURES = pathlib.Path(__file__).parents[1] / "fixtures" / "xml_projects"
@@ -40,6 +39,7 @@ def warnings(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 def _copy_fixture(tmp_path: pathlib.Path, name: str) -> pathlib.Path:
     target = tmp_path / name
     shutil.copytree(FIXTURES / name, target)
+    (target / "out").mkdir(exist_ok=True)
     return target / f"{name}.ScanTailor"
 
 

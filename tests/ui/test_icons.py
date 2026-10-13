@@ -367,8 +367,8 @@ def test_binder_applies_the_tint_property(scheme_app, qtbot):
 def test_final_icon_set_is_shipped_with_no_legacy_glyphs():
     top_level = [p.name for p in (RESOURCES / "icons").iterdir()]
     assert sorted(top_level) == ["custom", "lucide"]
-    assert len(list((RESOURCES / "icons/lucide").glob("*.svg"))) == 48
-    assert len(list((RESOURCES / "icons/custom").glob("*.svg"))) == 19
+    assert len(list((RESOURCES / "icons/lucide").glob("*.svg"))) == 52
+    assert len(list((RESOURCES / "icons/custom").glob("*.svg"))) == 21
     assert not (SRC_ROOT / "app/ui/theme/legacy_icons.py").exists()
 
 

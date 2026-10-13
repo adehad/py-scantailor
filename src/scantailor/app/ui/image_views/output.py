@@ -13,7 +13,7 @@ from itertools import pairwise
 import numpy as np
 from numpy.typing import NDArray
 from PySide6 import QtGui, QtWidgets
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal, Slot
+from PySide6.QtCore import QLineF, QPointF, QRectF, QSettings, Qt, Signal, Slot
 from PySide6.QtGui import (
     QColor,
     QPainter,
@@ -26,6 +26,7 @@ from PySide6.QtWidgets import QTabWidget
 from scantailor.app.ui.icons import icon
 from scantailor.app.ui.image_views.base import ImageViewBase
 from scantailor.app.ui.theme.tokens import view_color
+from scantailor.core.settings import ApplicationSettings, ZoneCreationMode
 from scantailor.dewarping.page_dewarper import dewarper_from_polylines
 from scantailor.filters.output.params import DistortionModelSpec
 from scantailor.math.spline import XSpline
@@ -207,9 +208,16 @@ class ViewZone:
 class OutputImageView(ImageViewBase):
     """Image view of the Output stage with picture and fill zone editing.
 
-    Zones are polygons in virtual coordinates. A zone is created by clicking
-    its corners and finishing with a double click or Enter, selected by
-    clicking it, reshaped by dragging its corners and deleted with Delete.
+    Zones are polygons in virtual coordinates. A zone is created in one of
+    three modes, chosen with Z (polygonal), X (lasso) and C (rectangular): by
+    clicking its corners and finishing with a double click or Enter, by
+    dragging a freehand outline, or by dragging a rectangle. It is selected by
+    clicking it, reshaped by dragging its corners and deleted with Delete. The
+    mode a new view starts in is the application's default zone creation mode.
+
+    Optional guides, a dashed cross through the centre of the view, help to
+    judge the alignment of the output. The choice is kept in the application
+    settings under ``SHOW_GUIDES_KEY``.
 
     Signals:
         zones_changed: The user created, reshaped or removed a zone.
@@ -217,8 +225,11 @@ class OutputImageView(ImageViewBase):
 
     zones_changed = Signal()
 
+    SHOW_GUIDES_KEY = "output/showGuides"
+
     VERTEX_HIT_RADIUS = 8
     MIN_ZONE_VERTICES = 3
+    LASSO_STEP = 4
     SELECTED_FILL_ALPHA = 80
     FILL_PREVIEW_ALPHA = 128
 
@@ -233,10 +244,36 @@ class OutputImageView(ImageViewBase):
         self._selected = -1
         self._creating: ZoneKind | None = None
         self._new_points: list[QPointF] = []
+        self._creation_mode = (
+            ApplicationSettings.get_instance().default_zone_creation_mode
+        )
+        self._outlining = False
+        self._outline_anchor = QPointF()
         self._dragged_vertex = -1
         self._drag_offset = QPointF()
         self._drag_moved = False
+        self._show_guides = bool(
+            QSettings().value(self.SHOW_GUIDES_KEY, False, type=bool)
+        )
         self.setMouseTracking(True)
+
+    def guides_shown(self) -> bool:
+        """Return whether the centre guides are drawn.
+
+        Returns:
+            bool: True while the guides show.
+        """
+        return self._show_guides
+
+    def set_guides_shown(self, shown: bool) -> None:
+        """Show or hide the centre guides and remember the choice.
+
+        Args:
+            shown (bool): True to draw the guides.
+        """
+        self._show_guides = shown
+        QSettings().setValue(self.SHOW_GUIDES_KEY, shown)
+        self.update()
 
     def set_zones(self, zones: list[ViewZone]) -> None:
         """Show zones without reporting a change.
@@ -257,6 +294,33 @@ class OutputImageView(ImageViewBase):
         """
         return [zone.copy() for zone in self._zones]
 
+    def creation_mode(self) -> ZoneCreationMode:
+        """Return how new zones are drawn.
+
+        Returns:
+            ZoneCreationMode: The mode the next zone is created in.
+        """
+        return self._creation_mode
+
+    def set_creation_mode(self, mode: ZoneCreationMode) -> None:
+        """Choose how new zones are drawn and make it the application default.
+
+        A zone being drawn in another mode is dropped.
+
+        Args:
+            mode (ZoneCreationMode): The mode for the zones created from now on.
+        """
+        if mode is self._creation_mode:
+            return
+        self._creation_mode = mode
+        if self._creating is not None:
+            self._new_points = []
+            self._outlining = False
+            self.update()
+        settings = ApplicationSettings.get_instance()
+        settings.default_zone_creation_mode = mode
+        settings.save()
+
     def start_zone_creation(self, kind: ZoneKind) -> None:
         """Start collecting the corners of a new zone.
 
@@ -271,6 +335,7 @@ class OutputImageView(ImageViewBase):
         """Drop the zone being created."""
         self._creating = None
         self._new_points = []
+        self._outlining = False
         self.setCursor(Qt.CursorShape.ArrowCursor)
         self.update()
 
@@ -323,6 +388,21 @@ class OutputImageView(ImageViewBase):
             self._paint_zone(painter, zone, index == self._selected)
         if self._creating is not None and self._new_points:
             self._paint_new_zone(painter)
+        if self._show_guides:
+            self._paint_guides(painter)
+
+    def _paint_guides(self, painter: QPainter) -> None:
+        viewport = self.viewport()
+        assert viewport is not None
+        centre = QPointF(viewport.width() / 2, viewport.height() / 2)
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+        pen = QPen(view_color("guide"))
+        pen.setStyle(Qt.PenStyle.DashLine)
+        painter.setPen(pen)
+        painter.drawLine(QLineF(centre.x(), 0, centre.x(), viewport.height()))
+        painter.drawLine(QLineF(0, centre.y(), viewport.width(), centre.y()))
+        painter.restore()
 
     @staticmethod
     def _zone_colors(kind: ZoneKind) -> tuple[QColor, QColor]:
@@ -363,10 +443,11 @@ class OutputImageView(ImageViewBase):
         if len(points) >= 2:
             painter.setPen(QPen(border.lighter(), 1, Qt.PenStyle.DotLine))
             painter.drawLine(points[-1], points[0])
-        painter.setBrush(view_color("zone_vertex"))
-        painter.setPen(Qt.PenStyle.NoPen)
-        for point in points:
-            painter.drawEllipse(point, 5, 5)
+        if self._creation_mode is not ZoneCreationMode.LASSO:
+            painter.setBrush(view_color("zone_vertex"))
+            painter.setPen(Qt.PenStyle.NoPen)
+            for point in points:
+                painter.drawEllipse(point, 5, 5)
         painter.restore()
 
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
@@ -378,7 +459,13 @@ class OutputImageView(ImageViewBase):
         if event.button() == Qt.MouseButton.LeftButton:
             pos = event.position()
             if self._creating is not None:
-                self._new_points.append(self.widget_to_virtual_point(pos))
+                point = self.widget_to_virtual_point(pos)
+                if self._creation_mode is ZoneCreationMode.POLYGONAL:
+                    self._new_points.append(point)
+                else:
+                    self._outlining = True
+                    self._outline_anchor = point
+                    self._new_points = [point]
                 self.update()
                 event.accept()
                 return
@@ -404,11 +491,15 @@ class OutputImageView(ImageViewBase):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
-        """Move the picked corner.
+        """Extend the outline being drawn, or move the picked corner.
 
         Args:
             event (QtGui.QMouseEvent): The mouse event.
         """
+        if self._outlining:
+            self._extend_outline(self.widget_to_virtual_point(event.position()))
+            event.accept()
+            return
         if self._dragged_vertex >= 0:
             point = self.widget_to_virtual_point(event.position()) - self._drag_offset
             polygon = self._zones[self._selected].polygon
@@ -422,12 +513,39 @@ class OutputImageView(ImageViewBase):
             return
         super().mouseMoveEvent(event)
 
+    def _extend_outline(self, point: QPointF) -> None:
+        if self._creation_mode is ZoneCreationMode.RECTANGULAR:
+            anchor = self._outline_anchor
+            self._new_points = [
+                anchor,
+                QPointF(point.x(), anchor.y()),
+                point,
+                QPointF(anchor.x(), point.y()),
+            ]
+        else:
+            last = self.virtual_to_widget_point(self._new_points[-1])
+            here = self.virtual_to_widget_point(point)
+            if math.hypot(here.x() - last.x(), here.y() - last.y()) >= self.LASSO_STEP:
+                self._new_points.append(point)
+        self.update()
+
     def mouseReleaseEvent(self, event: QtGui.QMouseEvent) -> None:
-        """Drop the corner and report the new shape.
+        """Finish a dragged outline, or drop the corner and report the shape.
 
         Args:
             event (QtGui.QMouseEvent): The mouse event.
         """
+        if event.button() == Qt.MouseButton.LeftButton and self._outlining:
+            self._outlining = False
+            if self._creation_mode is ZoneCreationMode.RECTANGULAR:
+                corners = self._new_points
+                if len(corners) == 4 and (
+                    corners[0].x() == corners[2].x() or corners[0].y() == corners[2].y()
+                ):
+                    self._new_points = []
+            self._finish_zone_creation()
+            event.accept()
+            return
         if event.button() == Qt.MouseButton.LeftButton and self._dragged_vertex >= 0:
             self._dragged_vertex = -1
             event.accept()
@@ -451,11 +569,15 @@ class OutputImageView(ImageViewBase):
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
         """Finish, cancel, deselect or delete with Enter, Escape and Delete.
 
+        Z, X and C choose the polygonal, lasso and rectangular creation modes.
+
         Args:
             event (QtGui.QKeyEvent): The key event.
         """
         key = event.key()
-        if key == Qt.Key.Key_Escape and self._creating is not None:
+        if key in _MODE_KEYS and not event.modifiers():
+            self.set_creation_mode(_MODE_KEYS[key])
+        elif key == Qt.Key.Key_Escape and self._creating is not None:
             self.cancel_zone_creation()
         elif key == Qt.Key.Key_Escape and self._selected >= 0:
             self._selected = -1
@@ -495,7 +617,19 @@ class OutputImageView(ImageViewBase):
             if self._zones:
                 menu.addSeparator()
                 menu.addAction("Clear All Zones", self.clear_zones)
+        menu.addSeparator()
+        guides = menu.addAction(icon("crosshair"), "Show guides")
+        guides.setCheckable(True)
+        guides.setChecked(self._show_guides)
+        guides.toggled.connect(self.set_guides_shown)
         menu.exec(event.globalPos())
+
+
+_MODE_KEYS = {
+    Qt.Key.Key_Z: ZoneCreationMode.POLYGONAL,
+    Qt.Key.Key_X: ZoneCreationMode.LASSO,
+    Qt.Key.Key_C: ZoneCreationMode.RECTANGULAR,
+}
 
 
 def _nearest_on_segment(

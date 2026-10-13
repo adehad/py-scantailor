@@ -42,6 +42,7 @@ from scantailor.dewarping.text_lines import trace_text_lines
 from scantailor.filters.deskew.dependencies import Dependencies as DeskewDependencies
 from scantailor.filters.deskew.filter import Filter as DeskewFilter
 from scantailor.filters.deskew.params import Params as DeskewParams
+from scantailor.filters.fix_orientation.image_trim import merge_with_trim
 from scantailor.filters.output.dewarping_options import DewarpingMode
 from scantailor.filters.output.generator import DewarperSource, OutputResult
 from scantailor.filters.output.params import (
@@ -128,6 +129,8 @@ class _PageState:
         # Content rectangle in source coordinates, set by the page layout stage;
         # kept there because the later transformation changes the view's frame.
         self.content_polygon_source: NDArray[np.float64] | None = None
+        # Region Fix Orientation's manual trim keeps, in source coordinates.
+        self.trim_area: NDArray[np.float64] | None = None
 
     def _new_transformation(self, source: NDArray[np.uint8]) -> ImageTransformation:
         height, width = source.shape[:2]
@@ -138,6 +141,7 @@ class _PageState:
         self.source = source
         self.xform = self._new_transformation(source)
         self.content_polygon_source = None
+        self.trim_area = None
         self._view = None
 
     def view(self) -> NDArray[np.uint8]:
@@ -333,13 +337,22 @@ def _process_fix_orientation(
 
     The rotation is applied to the pixels directly: an orthogonal rotation is
     lossless, and every later stage then works in the upright image's coordinates.
+    The manual trim becomes the transformation's first crop, which Page Split
+    narrows further.
     """
     filter_ = sequence.fix_orientation_filter
     rotation = filter_.get_rotation(page_id.image_id)
+    metadata: dict[str, object] = {"rotation_degrees": rotation.degrees}
 
     if not options.detect_only:
         state.replace_source(filter_.process_image(state.source, page_id.image_id))
-    return {"rotation_degrees": rotation.degrees}
+        height, width = state.source.shape[:2]
+        trim_area = filter_.trim_crop_area(page_id.image_id, (width, height))
+        if trim_area is not None:
+            state.trim_area = trim_area
+            state.crop_to(trim_area)
+            metadata["trim_area"] = trim_area.tolist()
+    return metadata
 
 
 def _process_page_split(
@@ -383,6 +396,7 @@ def _process_page_split(
 
     area = _clip_to_image(outline, state.source.shape)
     if area is not None:
+        area = merge_with_trim(area, state.trim_area)
         state.crop_to(area)
         metadata["crop_area"] = area.tolist()
     return metadata
@@ -468,6 +482,7 @@ def _process_select_content(
             dpi=options.dpi,
             outside=_outside_source_mask(state),
             page_outline=_polygon_points(state.xform.resulting_pre_crop_area),
+            view_transform=state.xform.transform,
         )
     else:
         params = filter_.get_params(page_id)

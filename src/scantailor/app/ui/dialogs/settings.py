@@ -6,6 +6,7 @@ from loguru import logger
 from PySide6 import QtCore, QtWidgets
 
 from scantailor.app.ui import embed_ui, load_ui_widget
+from scantailor.app.ui.icons import icon
 from scantailor.app.ui.theme import AUTO, SETTINGS_KEY, apply_theme
 from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.app.ui.utils import get_cwidget
@@ -14,6 +15,7 @@ from scantailor.core.settings import (
     DeviationSettings,
     TiffCompression,
     Units,
+    ZoneCreationMode,
 )
 
 _UI_FOLDER = Path(__file__).parent
@@ -111,6 +113,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self._color_scheme_box = get_cwidget(ui, combo, "colorSchemeBox")
         self._language_box = get_cwidget(ui, combo, "languageBox")
         self._units_box = get_cwidget(ui, combo, "unitsBox")
+        self._zone_mode_box = get_cwidget(ui, combo, "zoneCreationModeBox")
 
         self._thumbnail_quality_sb = get_cwidget(ui, spin, "thumbnailQualitySB")
         self._thumbnail_size_sb = get_cwidget(ui, spin, "thumbnailSizeSB")
@@ -158,6 +161,13 @@ class SettingsDialog(QtWidgets.QDialog):
         ):
             self._units_box.addItem(text, units)
 
+        for text, zone_mode, glyph in (
+            ("Polygonal", ZoneCreationMode.POLYGONAL, "zone-polygon"),
+            ("Lasso", ZoneCreationMode.LASSO, "lasso"),
+            ("Rectangular", ZoneCreationMode.RECTANGULAR, "square-dashed"),
+        ):
+            self._zone_mode_box.addItem(icon(glyph), text, zone_mode)
+
         for code in available_languages():
             name = QtCore.QLocale.languageToString(QtCore.QLocale(code).language())
             self._language_box.addItem(name, code)
@@ -193,6 +203,7 @@ class SettingsDialog(QtWidgets.QDialog):
         )
         self._select_data(self._units_box, settings.units)
         self._select_data(self._language_box, settings.language)
+        self._select_data(self._zone_mode_box, settings.default_zone_creation_mode)
 
         self._thumbnail_quality_sb.setValue(settings.thumbnail_quality_width)
         self._thumbnail_size_sb.setValue(int(settings.max_thumbnail_width))
@@ -275,6 +286,9 @@ class SettingsDialog(QtWidgets.QDialog):
         settings.auto_save_project = self._auto_save_cb.isChecked()
         settings.units = Units(self._units_box.currentData())
         settings.language = self._language_box.currentData()
+        settings.default_zone_creation_mode = ZoneCreationMode(
+            self._zone_mode_box.currentData()
+        )
 
         quality = self._thumbnail_quality_sb.value()
         settings.thumbnail_quality_width = quality
