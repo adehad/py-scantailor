@@ -17,7 +17,9 @@ corner of the content box sets the margin from the other end: the page moves so
 that the side stays under the pointer. Hold **Ctrl** and drag the content to move it
 up or down, **Shift** to move it left or right, or both to move it freely; it stays
 inside the hard margins rectangle. The link buttons next to the margins keep the two
-opposite sides equal; switching one on makes an unequal pair equal at once.
+opposite sides equal; switching one on makes an unequal pair equal at once. Both
+pairs start linked, and a link you switch off or on is remembered for the next
+session.
 
 .. screenshot:: stage5_margins_guides
    :alt: Margins with a vertical and a horizontal guide as dashed lines

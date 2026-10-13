@@ -63,8 +63,10 @@ from scantailor.core.zones import (
     PictureLayer,
     PictureZoneProperties,
 )
+from scantailor.dewarping.point_mapper import DewarpingPointMapper
 from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.output.dewarping_options import DewarpingMode
+from scantailor.filters.output.generator import applied_post_deskew_angle
 from scantailor.filters.output.params import (
     ColorMode,
     DistortionModelSpec,
@@ -200,6 +202,34 @@ def _to_display(pixels: NDArray[np.uint8]) -> NDArray[np.uint8]:
     return pixels
 
 
+_MAPPER_ERRORS = (ValueError, ArithmeticError, np.linalg.LinAlgError, IndexError)
+
+
+def _fill_zone_mapper(
+    params: OutputParams,
+    xform: ImageTransformation,
+    scale: NDArray[np.float64],
+    output: NDArray[np.uint8],
+) -> DewarpingPointMapper | None:
+    """Make the mapper between the page and its dewarped output, if it is dewarped."""
+    if not params.needs_dewarping() or not params.distortion_model.is_defined():
+        return None
+    model = _model_in_view_pixels(params.distortion_model, xform, scale)
+    try:
+        return DewarpingPointMapper(
+            model.top,
+            model.bottom,
+            params.depth_perception,
+            (output.shape[1], output.shape[0]),
+            applied_post_deskew_angle(params),
+        )
+    except _MAPPER_ERRORS as error:
+        logger.warning(
+            "Fill zones are shown on the page, the model is unusable: {}", error
+        )
+        return None
+
+
 def _model_in_view_pixels(
     model: DistortionModelSpec,
     xform: ImageTransformation,
@@ -287,6 +317,9 @@ class StagePanels(QtCore.QObject):
         self._output_transformation: ImageTransformation | None = None
         # Output pixels per transformation pixel; the Output stage resamples.
         self._output_scale = np.ones(2)
+        # Carries fill zones between the page and the dewarped output they are
+        # drawn on; None when the output is not dewarped.
+        self._fill_zone_mapper: DewarpingPointMapper | None = None
         self._extras: OutputExtras | None = None
         self._fed_extras: OutputExtras | None = None
         self._fed_model: tuple[DistortionModelSpec, float] | None = None
@@ -586,6 +619,7 @@ class StagePanels(QtCore.QObject):
         elif isinstance(view, OutputImageView):
             view.set_zones([])
             self._output_transformation = None
+            self._fill_zone_mapper = None
             self._extras = None
             self._fed_extras = None
             self._fed_model = None
@@ -823,11 +857,13 @@ class StagePanels(QtCore.QObject):
         self._output_transformation = xform
         self._output_scale = scale
         params = self.sequence.output_filter.get_params(page)
+        mapper = _fill_zone_mapper(params, xform, scale, image)
+        self._fill_zone_mapper = mapper
         zones = [
             self._view_zone(spec, ZoneKind.PICTURE, xform, scale)
             for spec in params.picture_zones
         ] + [
-            self._view_zone(spec, ZoneKind.FILL, xform, scale)
+            self._view_zone(spec, ZoneKind.FILL, xform, scale, mapper)
             for spec in params.fill_zones
         ]
         view.set_zones(zones)
@@ -851,11 +887,7 @@ class StagePanels(QtCore.QObject):
             shown = None if view._fit_mode else _ViewState.of(view)
             view.set_tab_image(ImageViewTab.DEWARPING, page)
             view.set_tab_image(ImageViewTab.PICTURE_ZONES, page)
-            # The zones lie on the page as it is before dewarping, which is not
-            # what the dewarped output shows.
-            view.set_tab_image(
-                ImageViewTab.FILL_ZONES, page if params.needs_dewarping() else None
-            )
+            view.set_tab_image(ImageViewTab.FILL_ZONES, None)
             if shown is not None:
                 shown.apply_to(view)
             view.set_picture_mask(extras.picture_mask)
@@ -905,8 +937,11 @@ class StagePanels(QtCore.QObject):
         kind: ZoneKind,
         xform: ImageTransformation,
         scale: NDArray[np.float64],
+        mapper: DewarpingPointMapper | None = None,
     ) -> ViewZone:
         points = xform.map_polygon(np.asarray(spec.points, dtype=np.float64)) * scale
+        if mapper is not None:
+            points = mapper.to_dewarped(points)
         polygon = QtGui.QPolygonF([QtCore.QPointF(x, y) for x, y in points])
         properties = spec.properties
         color = (
@@ -1008,6 +1043,8 @@ class StagePanels(QtCore.QObject):
             corners = np.array(
                 [[p.x(), p.y()] for p in zone.polygon.toList()], dtype=np.float64
             )
+            if zone.kind == ZoneKind.FILL and self._fill_zone_mapper is not None:
+                corners = self._fill_zone_mapper.to_warped(corners)
             points = tuple(
                 (float(x), float(y))
                 for x, y in xform.map_polygon_back(corners / self._output_scale)
