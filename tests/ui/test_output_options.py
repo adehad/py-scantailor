@@ -181,10 +181,11 @@ class TestControlsWriteParams:
     def test_wiener_controls_set_coefficient_and_window(self, gray: _Widget):
         gray.find(QtWidgets.QDoubleSpinBox, "wienerCoefSpinBox").setValue(0.5)
         gray.find(QtWidgets.QSpinBox, "wienerWindowSpinBox").setValue(9)
+        gray.widget.flush_pending_reload()
 
         assert gray.params.color_common.wiener_coef == pytest.approx(0.5)
         assert gray.params.color_common.wiener_window_size == 9
-        assert len(gray.changed) == 2
+        assert gray.changed == [PAGE]
 
     def test_savitzky_golay_and_morphological_toggles(self, bw: _Widget):
         bw.set_check("savitzkyGolaySmoothingCB", False)
@@ -396,6 +397,8 @@ class TestBinarization:
             (BinarizationMethod.SAUVOLA, "sauvolaCoefSpinBox", 0.5, "sauvola_coef"),
             (BinarizationMethod.WOLF, "wolfCoefSpinBox", 0.4, "wolf_coef"),
             (BinarizationMethod.BRADLEY, "bradleyCoefSpinBox", 0.2, "bradley_coef"),
+            (BinarizationMethod.EDGEPLUS, "edgePlusCoefSpinBox", 0.6, "edge_div_kep"),
+            (BinarizationMethod.BLURDIV, "blurDivCoefSpinBox", 0.4, "edge_div_kbd"),
             (BinarizationMethod.EDGEDIV, "edgeDivKepSpinBox", 0.7, "edge_div_kep"),
             (BinarizationMethod.EDGEDIV, "edgeDivKbdSpinBox", 0.3, "edge_div_kbd"),
         ],
@@ -426,6 +429,8 @@ class TestBinarization:
             "Window",
             "Bradley",
             "Grad",
+            "EdgePlus",
+            "BlurDiv",
             "EdgeDiv",
         ]
 
@@ -493,7 +498,9 @@ class TestBinarization:
             (BinarizationMethod.WINDOW, 2),
             (BinarizationMethod.BRADLEY, 3),
             (BinarizationMethod.GRAD, 2),
-            (BinarizationMethod.EDGEDIV, 4),
+            (BinarizationMethod.EDGEPLUS, 4),
+            (BinarizationMethod.BLURDIV, 5),
+            (BinarizationMethod.EDGEDIV, 6),
         ],
     )
     def test_each_method_shows_its_own_options_page(

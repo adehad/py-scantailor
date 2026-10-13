@@ -95,6 +95,9 @@ class OutputResult:
             drawn. None otherwise.
         split: Layers of the page when split output is on, always with black
             text on a white page whatever ``black_on_white`` says; None otherwise.
+        despeckle_source: Only when asked for with ``keep_despeckle_source`` and
+            the page is binarised: the text as a 0 (ink) and 255 bilevel page
+            just before despeckling, whatever the despeckle level. None otherwise.
     """
 
     image: NDArray[np.uint8]
@@ -103,6 +106,7 @@ class OutputResult:
     picture_mask: NDArray[np.bool_] | None = None
     ink_mask: NDArray[np.bool_] | None = None
     split: SplitImages | None = None
+    despeckle_source: NDArray[np.uint8] | None = None
 
 
 @dataclass(frozen=True)
@@ -130,6 +134,7 @@ class _PageLayout:
         render: RenderParams,
         content_polygon: Polygon | None,
         page_outline: Polygon | None,
+        source_outline: Polygon | None = None,
     ) -> "_PageLayout":
         """Rasterise the page outline and the mask of the area to keep.
 
@@ -140,6 +145,10 @@ class _PageLayout:
             page_outline (Polygon | None): Page outline; ignored when
                 ``render.fill_outside_page_box`` is set, so that nothing is
                 taken from the page area alone.
+            source_outline (Polygon | None): Where the input has source pixels.
+                Everything outside it is filled with the margin colour, and the
+                background colour is sampled inside it. None means the whole
+                image.
 
         Returns:
             _PageLayout: The layout.
@@ -151,6 +160,10 @@ class _PageLayout:
         if render.fill_margins and content_polygon is not None:
             content = polygon_mask(shape, content_polygon)
             keep = content if keep is None else keep & content
+        source = None if source_outline is None else polygon_mask(shape, source_outline)
+        if source is not None and not source.all():
+            keep = source if keep is None else keep & source
+            page = source if page is None else page & source
         return cls(page_outline, page, keep)
 
 
@@ -164,6 +177,8 @@ def generate_output(
     page_outline: Polygon | None = None,
     picture_zones: Sequence[Zone] = (),
     fill_zones: Sequence[Zone] = (),
+    keep_despeckle_source: bool = False,
+    source_outline: Polygon | None = None,
 ) -> OutputResult:
     """Generate the output image according to parameters.
 
@@ -189,6 +204,12 @@ def generate_output(
         picture_zones (Sequence[Zone]): Manual picture zones, used by mixed mode.
         fill_zones (Sequence[Zone]): Fill zones, painted with their own colour
             after everything else.
+        keep_despeckle_source (bool): Also return the page as it was before
+            despeckling, for the despeckling preview.
+        source_outline (Polygon | None): Outline of the source image in the
+            coordinates of ``image``. Pixels outside it have nothing behind
+            them and are always filled with the margin colour. None means
+            ``image`` is all source.
 
     Returns:
         OutputResult with the processed image.
@@ -198,19 +219,33 @@ def generate_output(
     render = RenderParams.from_params(params)
 
     page = _PageGeometry.build(
-        image, params, render, content_polygon, page_outline, picture_zones, fill_zones
+        image,
+        params,
+        render,
+        content_polygon,
+        page_outline,
+        picture_zones,
+        fill_zones,
+        source_outline,
     )
     if params.needs_dewarping() and dewarper is not None:
         page = _dewarp_page(page, params, render, dewarper)
 
     if params.color_mode == ColorMode.BLACK_AND_WHITE:
-        result = _generate_binary_output(page.image, params, render, page.layout)
+        result = _generate_binary_output(
+            page.image, params, render, page.layout, keep_despeckle_source
+        )
     elif params.color_mode == ColorMode.COLOR_GRAYSCALE:
         result = _generate_grayscale_output(page.image, params, render, page.layout)
     else:
         assert page.picture_layers is not None
         result = _generate_mixed_output(
-            page.image, params, render, page.layout, page.picture_layers
+            page.image,
+            params,
+            render,
+            page.layout,
+            page.picture_layers,
+            keep_despeckle_source,
         )
 
     if page.fill_zones:
@@ -275,12 +310,15 @@ class _PageGeometry:
         page_outline: Polygon | None,
         picture_zones: Sequence[Zone],
         fill_zones: Sequence[Zone],
+        source_outline: Polygon | None = None,
     ) -> "_PageGeometry":
         """Rasterise the layout and zones on the input image's grid."""
         shape = image.shape[:2]
         return cls(
             image=image,
-            layout=_PageLayout.build(shape, render, content_polygon, page_outline),
+            layout=_PageLayout.build(
+                shape, render, content_polygon, page_outline, source_outline
+            ),
             picture_layers=(
                 rasterize_picture_zones(picture_zones, shape)
                 if params.color_mode == ColorMode.MIXED
@@ -346,12 +384,7 @@ def _dewarp_page(
         logger.warning("Dewarping skipped, the distortion model is unusable: {}", error)
         return replace(page, layout=replace(page.layout, normalized=normalized))
 
-    options = params.dewarping
-    angle = (
-        options.post_deskew_angle
-        if options.post_deskew and options.mode in _POST_DESKEW_MODES
-        else 0.0
-    )
+    angle = applied_post_deskew_angle(params)
 
     def warp(array: NDArray[np.uint8], background: int) -> NDArray[np.uint8]:
         warped = remap_with_maps(array, maps, background)
@@ -390,6 +423,22 @@ def _dewarp_page(
     )
 
 
+def applied_post_deskew_angle(params: Params) -> float:
+    """Return the rotation a dewarped page gets after dewarping, in degrees.
+
+    Args:
+        params (Params): Output parameters.
+
+    Returns:
+        float: The angle; positive turns the page clockwise. Zero unless the
+            dewarping mode and options ask for it.
+    """
+    options = params.dewarping
+    if options.post_deskew and options.mode in _POST_DESKEW_MODES:
+        return options.post_deskew_angle
+    return 0.0
+
+
 def _apply_post_deskew(
     image: NDArray[np.uint8],
     angle: float,
@@ -423,6 +472,7 @@ def _generate_binary_output(
     params: Params,
     render: RenderParams,
     layout: _PageLayout,
+    keep_despeckle_source: bool = False,
 ) -> OutputResult:
     """Generate black and white output.
 
@@ -431,6 +481,8 @@ def _generate_binary_output(
         params (Params): Output parameters.
         render (RenderParams): Flags derived from ``params``.
         layout (_PageLayout): Page and fill areas.
+        keep_despeckle_source (bool): Keep the page before despeckling in the
+            result.
 
     Returns:
         OutputResult: Binary image (uint8, 0 or 255) of the input's height and width.
@@ -453,16 +505,18 @@ def _generate_binary_output(
         binary = _morphological_smooth(binary)
 
     # Despeckling stays the last step that changes which pixels are ink.
+    source = binary.copy() if keep_despeckle_source else None
     if params.despeckle_level.is_enabled():
         binary = _despeckle(binary, params.despeckle_level, params.output_dpi)
 
     if color_page is not None:
-        return _colored_binary_output(color_page, binary, params, render, layout)
-
-    if not params.black_on_white:
-        binary = 255 - binary
-
-    return OutputResult(image=binary, is_binary=True)
+        result = _colored_binary_output(color_page, binary, params, render, layout)
+    else:
+        if not params.black_on_white:
+            binary = 255 - binary
+        result = OutputResult(image=binary, is_binary=True)
+    result.despeckle_source = source
+    return result
 
 
 def _segmentation_source(
@@ -581,6 +635,7 @@ def _generate_mixed_output(
     render: RenderParams,
     layout: _PageLayout,
     picture_layers: PictureLayers,
+    keep_despeckle_source: bool = False,
 ) -> OutputResult:
     """Generate mixed output: pictures keep their grays or colours, text is binarised.
 
@@ -595,6 +650,8 @@ def _generate_mixed_output(
         render (RenderParams): Flags derived from ``params``.
         layout (_PageLayout): Page and fill areas.
         picture_layers (PictureLayers): Rasterised manual picture zones.
+        keep_despeckle_source (bool): Keep the text before despeckling in the
+            result.
 
     Returns:
         OutputResult: New uint8 array with the shape of the input. Text pixels
@@ -632,8 +689,11 @@ def _generate_mixed_output(
     )
     layer = build_mixed_layer(image, normalized_page, render, color_options)
     ink: NDArray[np.bool_] | None = None
+    source: NDArray[np.uint8] | None = None
     if render.need_binarization:
         ink = raw_ink
+        if keep_despeckle_source:
+            source = np.where(raw_ink & text_region, 0, 255).astype(np.uint8)
         if params.despeckle_level.is_enabled():
             speckled = np.where(ink, 0, 255).astype(np.uint8)
             ink = _despeckle(speckled, params.despeckle_level, dpi) == 0
@@ -654,6 +714,7 @@ def _generate_mixed_output(
         is_binary=False,
         picture_mask=~text_region,
         ink_mask=None if ink is None else ink & text_region,
+        despeckle_source=source,
     )
 
 
@@ -752,13 +813,7 @@ def _apply_fill_zones(
         snapped = 0 if level < _BILEVEL_GRAY_SPLIT else 255
         image[inside & ~bilevel] = _match_channels(exact, image)
         image[inside & bilevel] = _per_channel(snapped, image)
-    return OutputResult(
-        image=image,
-        is_binary=result.is_binary,
-        was_dewarped=result.was_dewarped,
-        picture_mask=result.picture_mask,
-        ink_mask=result.ink_mask,
-    )
+    return replace(result, image=image)
 
 
 def _match_channels(
@@ -962,12 +1017,10 @@ def _binarize(
             k=options.bradley_coef,
             delta=adjustment,
         )
+    kep = 0.0 if options.method == BinarizationMethod.BLURDIV else options.edge_div_kep
+    kbd = 0.0 if options.method == BinarizationMethod.EDGEPLUS else options.edge_div_kbd
     return binarize_edge_div(
-        gray,
-        window_size=options.window_size,
-        kep=options.edge_div_kep,
-        kbd=options.edge_div_kbd,
-        delta=adjustment,
+        gray, window_size=options.window_size, kep=kep, kbd=kbd, delta=adjustment
     )
 
 

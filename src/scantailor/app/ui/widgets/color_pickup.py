@@ -1,354 +1,263 @@
-"""Color pickup interaction widget for fill zone editing.
+"""Picking a fill colour from what an image view shows.
 
-Provides a tool for picking colors from the image to use as fill colors
-in fill zones. The picker shows a circular area around the cursor and
-takes the median color from pixels within that area.
+The picker samples a small circle around the cursor and takes the median of its
+colours. The view owns the mouse and paint events, so it forwards them to the
+interaction, which reports whether it consumed them.
 """
 
 import numpy as np
+from numpy.typing import NDArray
 from PySide6 import QtCore, QtGui, QtWidgets
-from PySide6.QtCore import QRect, Qt, Signal
-from PySide6.QtGui import QColor, QCursor, QImage, QPainter, QPen
+from PySide6.QtCore import QPoint, QRect, Qt, Signal
+from PySide6.QtGui import QColor, QImage, QPainter, QPen
+
+PICKUP_RADIUS = 7  # The sampled square is 15 by 15 pixels, odd so it has a centre.
+_BITS_PER_CHANNEL = 8
+_CHANNELS = 3
+
+
+def bit_mix(rgb: NDArray[np.uint8]) -> NDArray[np.uint32]:
+    """Interleave the bits of the colour channels, most significant first.
+
+    Sorting by the mixed value orders colours by their coarse tone before their
+    fine detail, so the median of the mixed values is a colour that is really
+    present and typical, unlike a median taken per channel.
+
+    Args:
+        rgb (NDArray[np.uint8]): Colours as rows of (red, green, blue), any
+            leading shape.
+
+    Returns:
+        NDArray[np.uint32]: One 24 bit value per colour, with the red bit of
+            each triple first.
+    """
+    channels = rgb.astype(np.uint32)
+    mixed = np.zeros(rgb.shape[:-1], dtype=np.uint32)
+    for bit in range(_BITS_PER_CHANNEL):
+        source = _BITS_PER_CHANNEL - 1 - bit
+        for channel in range(_CHANNELS):
+            target = 3 * (_BITS_PER_CHANNEL - bit) - 1 - channel
+            mixed |= ((channels[..., channel] >> source) & 1) << target
+    return mixed
+
+
+def bit_unmix(mixed: int) -> tuple[int, int, int]:
+    """Undo ``bit_mix`` for one value.
+
+    Args:
+        mixed (int): A bit mixed colour.
+
+    Returns:
+        tuple[int, int, int]: Red, green and blue.
+    """
+    channels = [0, 0, 0]
+    for bit in range(_BITS_PER_CHANNEL):
+        target = _BITS_PER_CHANNEL - 1 - bit
+        for channel in range(_CHANNELS):
+            source = 3 * (_BITS_PER_CHANNEL - bit) - 1 - channel
+            if mixed >> source & 1:
+                channels[channel] |= 1 << target
+    return channels[0], channels[1], channels[2]
+
+
+def median_color(rgb: NDArray[np.uint8]) -> tuple[int, int, int] | None:
+    """Return the median colour of the pixels inside the pickup circle.
+
+    Args:
+        rgb (NDArray[np.uint8]): Square patch of shape (size, size, 3) with an
+            odd size; the circle is centred on it.
+
+    Returns:
+        tuple[int, int, int] | None: Red, green and blue of the median, None
+            when the patch holds no pixel.
+    """
+    height, width = rgb.shape[:2]
+    y_center, x_center = height // 2, width // 2
+    rows, columns = np.ogrid[:height, :width]
+    inside = (rows - y_center) ** 2 + (columns - x_center) ** 2 <= x_center * y_center
+    mixed = bit_mix(rgb[inside])
+    if mixed.size == 0:
+        return None
+    middle = mixed.size // 2
+    return bit_unmix(int(np.partition(mixed, middle)[middle]))
 
 
 class ColorPickupInteraction(QtCore.QObject):
-    """Interactive color picker for fill zones.
+    """Lets the user click a colour in an image view.
 
-    When activated, shows a circular pickup area that follows the cursor.
-    Clicking picks the median color from pixels within the circle.
-
-    The bit-mixing technique is used to get a perceptually better median
-    color by interleaving the bits of RGB channels before sorting.
+    While active the cursor is a cross and a red circle marks the sampled area.
+    A left click picks the median colour under the circle; Escape cancels.
 
     Signals:
-        color_picked: Emitted when a color is picked (QColor).
-        cancelled: Emitted when the interaction is cancelled.
+        color_picked: A colour was picked (QColor).
+        cancelled: The pickup ended without a colour.
     """
 
     color_picked = Signal(QColor)
     cancelled = Signal()
 
-    # Pickup circle size (odd for symmetry)
-    PICKUP_RADIUS = 7  # 15x15 pixel area
-
     def __init__(
-        self,
-        image_view: QtWidgets.QWidget,
-        parent: QtCore.QObject | None = None,
+        self, view: QtWidgets.QAbstractScrollArea, parent: QtCore.QObject | None = None
     ) -> None:
-        """Initialize the color pickup interaction.
+        """Create the interaction.
 
         Args:
-            image_view: The image view widget to pick colors from.
-            parent: Parent QObject.
+            view (QtWidgets.QAbstractScrollArea): The view whose viewport is
+                sampled and drawn on.
+            parent (QtCore.QObject | None): Parent object.
         """
-        super().__init__(parent)
-
-        self._image_view = image_view
+        super().__init__(parent or view)
+        self._view = view
         self._active = False
-        self._dont_draw_circle = False
-
-        # Install event filter on the image view
-        self._image_view.installEventFilter(self)
-
-        # Set up escape shortcut
-        self._escape_shortcut = QtGui.QShortcut(
-            QtGui.QKeySequence(Qt.Key.Key_Escape), self._image_view
-        )
-        self._escape_shortcut.setAutoRepeat(False)
-        self._escape_shortcut.setEnabled(False)
-        self._escape_shortcut.activated.connect(self._cancel)
-
-    def start(self) -> None:
-        """Start the color pickup interaction."""
-        self._active = True
-        self._escape_shortcut.setEnabled(True)
-        self._image_view.setCursor(Qt.CursorShape.CrossCursor)
-        self._image_view.setMouseTracking(True)
-        self._image_view.update()
-
-    def stop(self) -> None:
-        """Stop the color pickup interaction."""
-        self._active = False
-        self._escape_shortcut.setEnabled(False)
-        self._image_view.setCursor(Qt.CursorShape.ArrowCursor)
-        self._image_view.update()
+        self._sampling = False
+        self._cursor = QPoint()
 
     def is_active(self) -> bool:
-        """Check if the interaction is active.
+        """Return whether a colour is being picked.
 
         Returns:
-            True if active.
+            bool: True between ``start`` and the pick or cancel.
         """
         return self._active
 
-    def _cancel(self) -> None:
-        """Cancel the interaction."""
-        self.stop()
-        self.cancelled.emit()
+    def start(self, cursor: QPoint | None = None) -> None:
+        """Begin picking.
 
-    def _get_target_rect(self) -> QRect:
-        """Get the pickup circle bounding rectangle.
+        Args:
+            cursor (QPoint | None): Where the circle starts, in viewport
+                coordinates; the current cursor position when None.
+        """
+        viewport = self._viewport()
+        self._cursor = (
+            cursor
+            if cursor is not None
+            else viewport.mapFromGlobal(QtGui.QCursor.pos())
+        )
+        self._active = True
+        viewport.setCursor(Qt.CursorShape.CrossCursor)
+        viewport.update()
+
+    def cancel(self) -> None:
+        """Stop without a colour."""
+        if self._active:
+            self._finish()
+            self.cancelled.emit()
+
+    def pick_at(self, center: QPoint) -> QColor | None:
+        """Sample the viewport around a point and report the median colour.
+
+        Args:
+            center (QPoint): Centre of the circle in viewport coordinates.
 
         Returns:
-            Rectangle centered on the cursor position.
+            QColor | None: The colour, also sent with ``color_picked``; None when
+                nothing could be sampled, in which case the pickup goes on.
         """
-        mouse_pos = self._image_view.mapFromGlobal(QCursor.pos())
-        size = self.PICKUP_RADIUS * 2 + 1  # Odd size for symmetry
-        rect = QRect(0, 0, size, size)
-        rect.moveCenter(mouse_pos)
-        return rect
-
-    def _take_color(self) -> None:
-        """Pick the color from the current cursor position."""
-        self._dont_draw_circle = True
-
-        rect = self._get_target_rect()
-
-        # Grab the pixels from the image view
-        pixmap = self._image_view.grab(rect)
-        if pixmap.isNull():
-            self._dont_draw_circle = False
-            return
-
-        image = pixmap.toImage().convertToFormat(QImage.Format.Format_RGB32)
-
-        width = rect.width()
-        height = rect.height()
-        x_center = width // 2
-        y_center = height // 2
-        sqdist_threshold = x_center * y_center
-
-        # Extract pixel data
-        ptr = image.constBits()
-        if ptr is None:
-            self._dont_draw_circle = False
-            return
-
-        # Convert to numpy array for easier manipulation
-        arr = np.frombuffer(ptr, dtype=np.uint8).reshape((height, width, 4))
-
-        # Collect colors from pixels within the circle
-        bitmixed_colors: list[int] = []
-
-        for y in range(height):
-            dy = y - y_center
-            dy_sq = dy * dy
-            for x in range(width):
-                dx = x - x_center
-                dx_sq = dx * dx
-                sqdist = dy_sq + dx_sq
-                if sqdist <= sqdist_threshold:
-                    # BGRA format in Qt
-                    b, g, r = arr[y, x, 0], arr[y, x, 1], arr[y, x, 2]
-                    color = (r << 16) | (g << 8) | b
-                    bitmixed_colors.append(self._bit_mix_color(color))
-
-        self._dont_draw_circle = False
-
-        if not bitmixed_colors:
-            return
-
-        # Find median using bit-mixed values
-        bitmixed_colors.sort()
-        median_mixed = bitmixed_colors[len(bitmixed_colors) // 2]
-        unmixed = self._bit_unmix_color(median_mixed)
-
-        r = (unmixed >> 16) & 0xFF
-        g = (unmixed >> 8) & 0xFF
-        b = unmixed & 0xFF
-
-        color = QColor(r, g, b)
-        self.stop()
+        rgb = self._sample(center)
+        picked = None if rgb is None else median_color(rgb)
+        if picked is None:
+            return None
+        color = QColor(*picked)
+        self._finish()
         self.color_picked.emit(color)
+        return color
 
-    @staticmethod
-    def _bit_mix_color(color: int) -> int:
-        """Mix the bits of RGB channels for better median calculation.
-
-        This interleaves the bits of R, G, B channels so that sorting
-        by the mixed value gives a perceptually better median.
+    def handle_mouse_press(self, event: QtGui.QMouseEvent) -> bool:
+        """Pick on a left click.
 
         Args:
-            color: RGB color as 0x00RRGGBB.
+            event (QtGui.QMouseEvent): The press.
 
         Returns:
-            Bit-mixed value.
+            bool: True when the interaction used the event.
         """
-        r = (color >> 16) & 0xFF
-        g = (color >> 8) & 0xFF
-        b = color & 0xFF
-
-        result = 0
-        for bit in range(8):
-            bit_mask = 1 << (7 - bit)
-            if r & bit_mask:
-                result |= 1 << (23 - bit * 3)
-            if g & bit_mask:
-                result |= 1 << (22 - bit * 3)
-            if b & bit_mask:
-                result |= 1 << (21 - bit * 3)
-
-        return result
-
-    @staticmethod
-    def _bit_unmix_color(mixed: int) -> int:
-        """Unmix the bits back to RGB channels.
-
-        Args:
-            mixed: Bit-mixed value.
-
-        Returns:
-            RGB color as 0x00RRGGBB.
-        """
-        r = 0
-        g = 0
-        b = 0
-
-        for bit in range(8):
-            r_bit = 23 - bit * 3
-            g_bit = 22 - bit * 3
-            b_bit = 21 - bit * 3
-            out_bit = 7 - bit
-
-            if mixed & (1 << r_bit):
-                r |= 1 << out_bit
-            if mixed & (1 << g_bit):
-                g |= 1 << out_bit
-            if mixed & (1 << b_bit):
-                b |= 1 << out_bit
-
-        return (r << 16) | (g << 8) | b
-
-    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
-        """Filter events on the image view.
-
-        Args:
-            watched: The watched object.
-            event: The event.
-
-        Returns:
-            True if the event was handled.
-        """
-        if not self._active or watched is not self._image_view:
+        if not self._active:
             return False
+        if event.buttons() == Qt.MouseButton.LeftButton:
+            self.pick_at(event.position().toPoint())
+        event.accept()
+        return True
 
-        if event.type() == QtCore.QEvent.Type.MouseButtonPress:
-            if (
-                isinstance(event, QtGui.QMouseEvent)
-                and event.button() == Qt.MouseButton.LeftButton
-            ):
-                self._take_color()
-                return True
+    def handle_mouse_move(self, event: QtGui.QMouseEvent) -> bool:
+        """Move the circle with the cursor.
 
-        elif event.type() == QtCore.QEvent.Type.MouseMove:
-            self._image_view.update()
-            return False  # Don't consume, allow view to update
+        Args:
+            event (QtGui.QMouseEvent): The move.
 
-        elif event.type() == QtCore.QEvent.Type.Paint:
-            # We need to draw our overlay after the view paints
-            # This is handled differently - we call paint_overlay from the view
-            pass
+        Returns:
+            bool: True when the interaction used the event.
+        """
+        if not self._active:
+            return False
+        self._cursor = event.position().toPoint()
+        self._viewport().update()
+        event.accept()
+        return True
 
+    def handle_key_press(self, event: QtGui.QKeyEvent) -> bool:
+        """Cancel on Escape.
+
+        Args:
+            event (QtGui.QKeyEvent): The key press.
+
+        Returns:
+            bool: True when the interaction used the event.
+        """
+        if self._active and event.key() == Qt.Key.Key_Escape:
+            self.cancel()
+            event.accept()
+            return True
         return False
 
     def paint_overlay(self, painter: QPainter) -> None:
-        """Paint the pickup circle overlay.
-
-        This should be called from the image view's paint event.
+        """Draw the circle; call it last in the view's paint.
 
         Args:
-            painter: The painter to draw with.
+            painter (QPainter): Painter on the viewport.
         """
-        if not self._active or self._dont_draw_circle:
+        if not self._active or self._sampling:
             return
-
         painter.save()
-        painter.setWorldTransform(QtGui.QTransform())  # Reset transform
+        painter.setWorldTransform(QtGui.QTransform())
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-
         pen = QPen(Qt.GlobalColor.red)
         pen.setWidthF(1.5)
         painter.setPen(pen)
         painter.setBrush(Qt.BrushStyle.NoBrush)
-
-        rect = self._get_target_rect()
-        painter.drawEllipse(rect)
-
+        painter.drawEllipse(self._target_rect(self._cursor))
         painter.restore()
 
+    def _viewport(self) -> QtWidgets.QWidget:
+        viewport = self._view.viewport()
+        assert viewport is not None
+        return viewport
 
-class ColorPickerButton(QtWidgets.QPushButton):
-    """Button that shows the current color and opens a color picker dialog.
+    def _finish(self) -> None:
+        self._active = False
+        viewport = self._viewport()
+        viewport.setCursor(Qt.CursorShape.ArrowCursor)
+        viewport.update()
 
-    Also supports color pickup from the image via ColorPickupInteraction.
+    @staticmethod
+    def _target_rect(center: QPoint) -> QRect:
+        rect = QRect(0, 0, 2 * PICKUP_RADIUS + 1, 2 * PICKUP_RADIUS + 1)
+        rect.moveCenter(center)
+        return rect
 
-    Signals:
-        color_changed: Emitted when the color changes (QColor).
-    """
-
-    color_changed = Signal(QColor)
-
-    def __init__(
-        self,
-        initial_color: QColor = QColor(255, 255, 255),
-        parent: QtWidgets.QWidget | None = None,
-    ) -> None:
-        """Initialize the color picker button.
-
-        Args:
-            initial_color: Initial color to display.
-            parent: Parent widget.
-        """
-        super().__init__(parent)
-
-        self._color = initial_color
-        self._update_button_style()
-
-        self.clicked.connect(self._show_color_dialog)
-
-    @property
-    def color(self) -> QColor:
-        """Get the current color."""
-        return self._color
-
-    def set_color(self, color: QColor) -> None:
-        """Set the current color.
-
-        Args:
-            color: The new color.
-        """
-        if color != self._color:
-            self._color = color
-            self._update_button_style()
-            self.color_changed.emit(color)
-
-    def _update_button_style(self) -> None:
-        """Update the button appearance based on current color."""
-        # Calculate a contrasting text color
-        luminance = (
-            0.299 * self._color.red()
-            + 0.587 * self._color.green()
-            + 0.114 * self._color.blue()
-        )
-        text_color = "black" if luminance > 128 else "white"
-
-        self.setStyleSheet(
-            f"background-color: {self._color.name()}; "
-            f"color: {text_color}; "
-            f"border: 1px solid gray; "
-            f"padding: 4px 8px; "
-            f"min-width: 60px;"
-        )
-        self.setText(self._color.name().upper())
-
-    def _show_color_dialog(self) -> None:
-        """Show the color picker dialog."""
-        color = QtWidgets.QColorDialog.getColor(
-            self._color,
-            self,
-            "Select Color",
-            QtWidgets.QColorDialog.ColorDialogOption.ShowAlphaChannel,
-        )
-        if color.isValid():
-            self.set_color(color)
+    def _sample(self, center: QPoint) -> NDArray[np.uint8] | None:
+        """Grab what the viewport shows around a point, without the circle."""
+        rect = self._target_rect(center)
+        self._sampling = True
+        try:
+            pixmap = self._viewport().grab(rect)
+        finally:
+            self._sampling = False
+        if pixmap.isNull():
+            return None
+        image = pixmap.toImage().convertToFormat(QImage.Format.Format_RGB888)
+        width, height = image.width(), image.height()
+        if width != rect.width() or height != rect.height():
+            return None
+        pixels = np.frombuffer(image.constBits(), dtype=np.uint8)
+        rows = pixels.reshape(height, image.bytesPerLine())[:, : width * _CHANNELS]
+        return rows.reshape(height, width, _CHANNELS).copy()
