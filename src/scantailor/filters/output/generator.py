@@ -26,8 +26,11 @@ from scantailor.imageproc.background_color import dominant_background_color
 from scantailor.imageproc.binarize import (
     binarize_bradley,
     binarize_edge_div,
+    binarize_fox,
+    binarize_grad,
     binarize_otsu,
     binarize_sauvola,
+    binarize_window,
     binarize_wolf,
 )
 from scantailor.imageproc.despeckle import despeckle as despeckle_image
@@ -134,11 +137,15 @@ class _PageLayout:
             shape (tuple[int, int]): (height, width) of the image.
             render (RenderParams): Decides which fills are on.
             content_polygon (Polygon | None): Content area.
-            page_outline (Polygon | None): Page outline.
+            page_outline (Polygon | None): Page outline; ignored when
+                ``render.fill_outside_page_box`` is set, so that nothing is
+                taken from the page area alone.
 
         Returns:
             _PageLayout: The layout.
         """
+        if render.fill_outside_page_box:
+            page_outline = None
         page = None if page_outline is None else polygon_mask(shape, page_outline)
         keep = page if render.fill_offcut else None
         if render.fill_margins and content_polygon is not None:
@@ -902,6 +909,14 @@ def _margin_color(
 # all masked out does not turn entirely black or white.
 _OTSU_BOUNDS = (30, 225)
 
+# Methods that take the Wolf coefficient and bounds of the options.
+_WOLF_FAMILY = {
+    BinarizationMethod.WOLF: binarize_wolf,
+    BinarizationMethod.FOX: binarize_fox,
+    BinarizationMethod.WINDOW: binarize_window,
+    BinarizationMethod.GRAD: binarize_grad,
+}
+
 
 def _binarize(
     gray: NDArray[np.uint8],
@@ -910,8 +925,8 @@ def _binarize(
     """Apply binarization to a grayscale image.
 
     The threshold adjustment shifts the global Otsu threshold (clamped to
-    30..225) and is the ``delta`` added to the local thresholds of the other
-    methods.
+    30..225) and is the ``delta`` of the local methods, each of which applies it
+    as described in ``scantailor.imageproc.binarize``.
 
     Args:
         gray (NDArray[np.uint8]): 2-D gray image. Not modified.
@@ -930,8 +945,9 @@ def _binarize(
             k=options.sauvola_coef,
             delta=adjustment,
         )
-    if options.method == BinarizationMethod.WOLF:
-        return binarize_wolf(
+    wolf_family = _WOLF_FAMILY.get(options.method)
+    if wolf_family is not None:
+        return wolf_family(
             gray,
             window_size=options.window_size,
             k=options.wolf_coef,

@@ -6,6 +6,15 @@ stops and diacritics therefore survive, while isolated specks are removed.
 
 Distances use the metric ``dx^2 + (2 * dy)^2`` when assigning pixels to their
 nearest component, so horizontal proximity counts for more than vertical.
+
+A second Voronoi pass looks again at components whose only close neighbours are
+too small to anchor them. The ink of components that are already kept counts as
+its own source there, so a speck beside a kept component can attach to it even
+when a nearer small neighbour claimed the territory in between. The original C++
+code measures those pixels against a sentinel coordinate far outside the image,
+which makes its second pass unable to attach anything to a kept component. The
+extra pass is deliberate: it keeps the dots of Arabic letters, the dots of i and
+j and full stops, which the stricter C++ result removes.
 """
 
 import cv2
