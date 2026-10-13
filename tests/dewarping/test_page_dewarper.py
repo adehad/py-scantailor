@@ -10,17 +10,12 @@ from scantailor.dewarping.page_dewarper import (
     dewarper_from_polylines,
     marginal_dewarper,
 )
-from tests.dewarping.synthetic import (
-    BACKGROUND,
-    PAGE_DPI,
-    PAGE_HEIGHT,
-    PAGE_WIDTH,
-    curved_text_page,
-)
+from tests.dewarping.book_pages import bent_book_page
 
 TOP = [(0.0, 10.0), (50.0, 5.0), (100.0, 10.0)]
 BOTTOM = [(0.0, 90.0), (50.0, 85.0), (100.0, 90.0)]
-CONTENT = (100.0, 100.0, 1000.0, 1400.0)
+CONTENT = (160.0, 200.0, 890.0, 1090.0)
+DPI = (200.0, 200.0)
 
 
 class TestManual:
@@ -55,19 +50,26 @@ class TestManual:
 class TestDetected:
     """Dewarpers found from page content."""
 
-    def test_curved_page_gives_a_dewarper_around_the_text(self) -> None:
-        dewarper = auto_dewarper(curved_text_page(), (PAGE_DPI, PAGE_DPI), CONTENT, 2.0)
+    def test_a_bent_page_gives_a_dewarper_around_the_text(self) -> None:
+        page = bent_book_page()
+
+        dewarper = auto_dewarper(page.image, DPI, CONTENT, 2.0)
 
         assert dewarper is not None
         left, top, right, bottom = dewarper.directrix_bounding_box()
-        assert 80.0 < left < 140.0
+        assert 90.0 < left < 200.0
         assert right > 1000.0
         assert top < bottom
 
-    def test_blank_page_gives_none(self) -> None:
-        blank = np.full((PAGE_HEIGHT, PAGE_WIDTH), BACKGROUND, dtype=np.uint8)
+    def test_the_resolution_may_be_given_as_one_number(self) -> None:
+        page = bent_book_page()
 
-        assert auto_dewarper(blank, (PAGE_DPI, PAGE_DPI), CONTENT, 2.0) is None
+        assert auto_dewarper(page.image, 200.0, CONTENT, 2.0) is not None
+
+    def test_a_blank_page_gives_none(self) -> None:
+        blank = np.full((1600, 1200), 235, dtype=np.uint8)
+
+        assert auto_dewarper(blank, DPI, CONTENT, 2.0) is None
 
     def test_marginal_dewarper_is_built_for_a_page_with_paper_edges(self) -> None:
         page = np.full((300, 400), 220, dtype=np.uint8)
