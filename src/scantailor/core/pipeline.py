@@ -37,7 +37,7 @@ from scantailor.core.transformation import (
 from scantailor.core.zones import Zone, ZoneSpline
 from scantailor.dewarping.auto_model import build_auto_distortion_model
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
-from scantailor.dewarping.distortion_model import DistortionModel
+from scantailor.dewarping.distortion_model import Curve, DistortionModel
 from scantailor.dewarping.marginal_model import build_marginal_model
 from scantailor.dewarping.page_dewarper import (
     dewarper_from_model,
@@ -62,6 +62,7 @@ from scantailor.filters.page_layout.page_rect import (
     rect_size_mm,
 )
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
+from scantailor.imageproc.filters import bgr_to_gray
 
 from .stage_sequence import FilterStage, StageSequence
 
@@ -758,13 +759,37 @@ def _detected_model(
     dpi: tuple[float, float],
     content: tuple[float, float, float, float],
     spine_on_right: bool,
+    black_on_white: bool,
+    state: _PageState,
 ) -> DistortionModel | None:
     """Fit the page curvature to its text lines and page edges.
 
-    Returns None when the curves give no valid model; the page is then left
-    undewarped.
+    Text lines are traced on ``gray``, the page as laid out for output. The
+    page edges are traced on the source image, where the paper still meets its
+    surroundings; the view shows margins only. The model comes back in the
+    view's pixels. Returns None when the curves give no valid model; the page
+    is then left undewarped.
     """
-    return build_auto_distortion_model(gray, dpi, content, spine_on_right)
+    rect = state.xform.resulting_rect
+    view_to_resulting = np.array(
+        [[1.0, 0.0, rect.x], [0.0, 1.0, rect.y], [0.0, 0.0, 1.0]]
+    )
+    to_source = state.xform.transform_back @ view_to_resulting
+    source_gray = bgr_to_gray(state.source)
+    model = build_auto_distortion_model(
+        gray,
+        dpi,
+        content,
+        spine_on_right,
+        edge_gray=source_gray if black_on_white else 255 - source_gray,
+        to_edge_image=to_source[:2],
+    )
+    if model is None or model.top_curve is None or model.bottom_curve is None:
+        return None
+    return DistortionModel(
+        top_curve=Curve.from_polyline(state.to_view(model.top_curve.polyline)),
+        bottom_curve=Curve.from_polyline(state.to_view(model.bottom_curve.polyline)),
+    )
 
 
 def _polygon_points(polygon: NDArray[np.float64]) -> list[tuple[float, float]]:
@@ -800,7 +825,8 @@ def _dewarper_source(
 
     Automatic and marginal models are detected on the illumination-normalised
     gray page that the output generator hands to the returned function; the
-    model that works is left in ``found``.
+    automatic one also reads the page edges off the source. The model that
+    works is left in ``found``.
     """
     if options.dewarper is not None:
         return options.dewarper
@@ -834,7 +860,10 @@ def _dewarper_source(
         dpi = (params.output_dpi.horizontal, params.output_dpi.vertical)
         spine_on_right = page_id.sub_page != SubPage.RIGHT_PAGE
         return lambda gray: found.dewarper_for(
-            _detected_model(gray, dpi, content, spine_on_right), depth
+            _detected_model(
+                gray, dpi, content, spine_on_right, params.black_on_white, state
+            ),
+            depth,
         )
     if mode == DewarpingMode.MARGINAL:
         spine_on_right = page_id.sub_page != SubPage.RIGHT_PAGE
