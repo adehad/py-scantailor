@@ -4,7 +4,7 @@ This module provides storage for per-page layout parameters.
 """
 
 import threading
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from typing import NamedTuple
 
 from pydantic import BaseModel, Field, PrivateAttr
@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field, PrivateAttr
 from scantailor.core.models import Margins, PageId
 from scantailor.filters.page_layout.alignment import Alignment
 from scantailor.filters.page_layout.params import ContentRect, ContentSize, Params
+
+MARGIN_SIDES: tuple[str, ...] = ("top", "bottom", "left", "right")
 
 
 class ContentSizeUpdate(NamedTuple):
@@ -40,6 +42,9 @@ class Settings(BaseModel):
     alignment, and content size. This class also calculates aggregate
     sizes across all aligned pages.
 
+    The aggregate size can be frozen: it then stays at the size it had when it
+    was frozen, whatever happens to the pages, until it is released.
+
     This class is thread-safe for concurrent access.
     """
 
@@ -48,6 +53,7 @@ class Settings(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
 
     _lock: threading.Lock = PrivateAttr(default_factory=threading.Lock)
+    _frozen_aggregate_mm: ContentSize | None = PrivateAttr(default=None)
 
     def get_params(self, page_id: PageId) -> Params:
         """Get the parameters for a page.
@@ -117,18 +123,28 @@ class Settings(BaseModel):
                 self.params[page_id] = params
 
     def apply_margins_to_pages(
-        self, page_ids: Iterable[PageId], margins: Margins
+        self,
+        page_ids: Iterable[PageId],
+        margins: Margins,
+        sides: Collection[str] = MARGIN_SIDES,
     ) -> None:
         """Set the margins for multiple pages.
 
         Args:
             page_ids: The pages to set margins for.
             margins: The margins in millimeters.
+            sides: Names of the sides taken from ``margins`` (``"top"``,
+                ``"bottom"``, ``"left"``, ``"right"``); the other sides of each
+                page keep their own value.
         """
+        chosen = {
+            side: getattr(margins, side) for side in MARGIN_SIDES if side in sides
+        }
         with self._lock:
             for page_id in page_ids:
                 existing = self.params.get(page_id, Params())
-                self.params[page_id] = existing.with_margins(margins)
+                merged = existing.hard_margins_mm.model_copy(update=chosen)
+                self.params[page_id] = existing.with_margins(merged)
 
     def apply_alignment_to_pages(
         self, page_ids: Iterable[PageId], alignment: Alignment
@@ -145,9 +161,10 @@ class Settings(BaseModel):
                 self.params[page_id] = existing.with_alignment(alignment)
 
     def clear(self) -> None:
-        """Clear all stored parameters."""
+        """Clear all stored parameters and release the frozen aggregate size."""
         with self._lock:
             self.params.clear()
+            self._frozen_aggregate_mm = None
 
     def clear_page(self, page_id: PageId) -> None:
         """Clear the parameters for a specific page.
@@ -162,13 +179,50 @@ class Settings(BaseModel):
         """Calculate the aggregate hard size across all aligned pages.
 
         This is the maximum width and height among all pages that
-        participate in alignment (alignment.is_null is False).
+        participate in alignment (alignment.is_null is False), or the frozen
+        size while the aggregate size is frozen.
 
         Returns:
             The aggregate size in millimeters.
         """
         with self._lock:
             return self._aggregate_hard_size_locked()
+
+    def is_aggregate_hard_size_frozen(self) -> bool:
+        """Return True while the aggregate hard size is held at a fixed value."""
+        with self._lock:
+            return self._frozen_aggregate_mm is not None
+
+    def get_frozen_aggregate_hard_size_mm(self) -> ContentSize | None:
+        """Return the size the aggregate is held at, or None when it is not frozen."""
+        with self._lock:
+            return self._frozen_aggregate_mm
+
+    def restore_frozen_aggregate_hard_size_mm(self, size: ContentSize | None) -> None:
+        """Hold the aggregate at a size saved earlier, or release it.
+
+        Args:
+            size: The size from ``get_frozen_aggregate_hard_size_mm``; None releases.
+        """
+        with self._lock:
+            self._frozen_aggregate_mm = size
+
+    def set_aggregate_hard_size_frozen(self, frozen: bool) -> None:
+        """Hold the aggregate hard size at its current value, or release it.
+
+        Freezing keeps the size other pages are matched to from changing while
+        pages are edited; freezing an already frozen aggregate keeps the size it
+        was frozen at.
+
+        Args:
+            frozen: True to freeze at the current aggregate size, False to
+                release and follow the pages again.
+        """
+        with self._lock:
+            if not frozen:
+                self._frozen_aggregate_mm = None
+            elif self._frozen_aggregate_mm is None:
+                self._frozen_aggregate_mm = self._computed_aggregate_locked()
 
     def update_content_size_and_get_aggregate(
         self,
@@ -268,7 +322,13 @@ class Settings(BaseModel):
             )
 
     def _aggregate_hard_size_locked(self) -> ContentSize:
-        """Aggregate hard size; the caller must hold the lock."""
+        """Aggregate hard size, frozen or not; the caller must hold the lock."""
+        if self._frozen_aggregate_mm is not None:
+            return self._frozen_aggregate_mm
+        return self._computed_aggregate_locked()
+
+    def _computed_aggregate_locked(self) -> ContentSize:
+        """Aggregate hard size of the pages; the caller must hold the lock."""
         max_width = 0.0
         max_height = 0.0
         for params in self.params.values():

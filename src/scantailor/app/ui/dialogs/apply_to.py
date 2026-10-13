@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 
 from PySide6 import QtWidgets
 
+from scantailor.app.ui.icons import icon
 from scantailor.core.models import PageId
 from scantailor.core.propagation import ApplyScope, select_pages
 from scantailor.filters.output.params import ApplyGroup
@@ -44,6 +45,22 @@ DESKEW_OPTIONS: dict[str, str] = {
     "deskew": "Deskew angle and mode",
     "oblique": "Oblique angle and mode",
 }
+MARGINS_TITLE = "Apply Margins"
+MARGINS_OPTIONS_TITLE = "Apply margins"
+# Which sides of the margins are copied, as option key to label, in the order shown.
+MARGIN_SIDE_OPTIONS: dict[str, str] = {
+    "left": "Left",
+    "right": "Right",
+    "top": "Top",
+    "bottom": "Bottom",
+}
+# Each side is marked with the edge the margin lies along.
+MARGIN_SIDE_ICONS: dict[str, str] = {
+    "left": "arrow-left-to-line",
+    "right": "arrow-right-to-line",
+    "top": "arrow-up-to-line",
+    "bottom": "arrow-down-to-line",
+}
 _SELECTION_SCOPES = (ApplyScope.SELECTED_PAGES, ApplyScope.EVERY_OTHER_SELECTED)
 
 
@@ -62,6 +79,8 @@ class ApplyToDialog(QtWidgets.QDialog):
         parent: QtWidgets.QWidget | None = None,
         title: str = "Apply to",
         options: Mapping[str, str] | None = None,
+        option_icons: Mapping[str, str] | None = None,
+        options_title: str | None = None,
     ) -> None:
         """Build the dialog.
 
@@ -73,6 +92,10 @@ class ApplyToDialog(QtWidgets.QDialog):
             title (str): Window title.
             options (Mapping[str, str] | None): Extra check boxes, as option key
                 to label; all start checked.
+            option_icons (Mapping[str, str] | None): Glyph name shown beside the
+                check box of an option key.
+            options_title (str | None): When given, the extra check boxes sit side
+                by side in a group box with this title instead of one per line.
         """
         super().__init__(parent)
         self.setWindowTitle(title)
@@ -108,10 +131,22 @@ class ApplyToDialog(QtWidgets.QDialog):
         layout.addWidget(group)
 
         self._options: dict[str, QtWidgets.QCheckBox] = {}
+        option_parent: QtWidgets.QWidget = self
+        option_layout: QtWidgets.QBoxLayout = layout
+        if options and options_title is not None:
+            options_group = QtWidgets.QGroupBox(self.tr(options_title), self)
+            options_group.setObjectName("optionsGroup")
+            option_layout = QtWidgets.QHBoxLayout(options_group)
+            layout.addWidget(options_group)
+            option_parent = options_group
         for key, label in (options or {}).items():
-            box = QtWidgets.QCheckBox(label, self)
+            box = QtWidgets.QCheckBox(label, option_parent)
+            box.setObjectName(f"{key}Option")
             box.setChecked(True)
-            layout.addWidget(box)
+            glyph = (option_icons or {}).get(key)
+            if glyph is not None:
+                box.setIcon(icon(glyph))
+            option_layout.addWidget(box)
             self._options[key] = box
 
         buttons = QtWidgets.QDialogButtonBox(
@@ -149,6 +184,10 @@ class ApplyToDialog(QtWidgets.QDialog):
         return select_pages(
             self.scope, self._current_page, self._all_pages, self._selected_pages
         )
+
+    def checked_options(self) -> set[str]:
+        """Return the keys of the extra options that are checked."""
+        return {key for key, box in self._options.items() if box.isChecked()}
 
     def option_checked(self, key: str) -> bool:
         """Return whether an extra option is checked.
