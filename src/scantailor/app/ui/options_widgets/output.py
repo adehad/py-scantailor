@@ -7,7 +7,7 @@ filling, despeckling and dewarping.
 
 from collections.abc import Callable
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
     QBoxLayout,
@@ -42,6 +42,7 @@ from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.output.dewarping_options import DewarpingMode
 from scantailor.filters.output.filter import Filter
 from scantailor.filters.output.params import ApplyGroup, DistortionModelSpec, Params
+from scantailor.filters.output.picture_shape import PictureShape
 
 _DEPTH_PERCEPTION_SCALE = 10  # Slider steps per unit of depth perception.
 _DESPECKLE_LEVELS = (
@@ -64,8 +65,15 @@ _METHOD_LABELS = {
     BinarizationMethod.WINDOW: "Window",
     BinarizationMethod.BRADLEY: "Bradley",
     BinarizationMethod.GRAD: "Grad",
+    BinarizationMethod.EDGEPLUS: "EdgePlus",
+    BinarizationMethod.BLURDIV: "BlurDiv",
     BinarizationMethod.EDGEDIV: "EdgeDiv",
 }
+_PICTURE_SHAPES = (
+    (PictureShape.OFF, "Off"),
+    (PictureShape.FREE, "Free"),
+    (PictureShape.RECTANGULAR, "Rectangular"),
+)
 # Methods that share the controls of another method's page.
 _SHARED_METHOD_PAGE = {
     BinarizationMethod.FOX: BinarizationMethod.WOLF,
@@ -191,8 +199,10 @@ class OptionsWidget(QWidget):
     """Options widget for the Output filter.
 
     Every control writes the parameters of the current page and emits
-    ``params_changed`` so the page renders again. Which controls show depends on
-    the colour mode and on whether the dewarping tab of the image view is active.
+    ``params_changed`` so the page renders again. Controls that take a number
+    wait ``RELOAD_DELAY_MS`` after the last change before they emit, so that
+    dragging or typing renders once. Which controls show depends on the colour
+    mode and on whether the dewarping tab of the image view is active.
 
     Signals:
         params_changed: Emitted when any parameter changes.
@@ -200,10 +210,17 @@ class OptionsWidget(QWidget):
         apply_group_requested: Emitted when the user clicks the "Apply to..."
             button of an option group.
             Args: group (ApplyGroup)
+        despeckle_level_changed: Emitted at once when the user picks another
+            despeckle level, so that the despeckling tab can preview it before
+            the page renders again.
+            Args: level (DespeckleLevel)
     """
 
     params_changed = Signal(PageId)
     apply_group_requested = Signal(object)
+    despeckle_level_changed = Signal(object)
+
+    RELOAD_DELAY_MS = 750
 
     def __init__(
         self,
@@ -222,7 +239,13 @@ class OptionsWidget(QWidget):
         self._current_page_id: PageId | None = None
         self._updating = False  # Prevent signal loops
         self._dewarping_tab_active = False
+        self._despeckle_tab_active = False
         self._apply_buttons: dict[ApplyGroup, QPushButton] = {}
+        self._pending_page_id: PageId | None = None
+        self._reload_timer = QTimer(self)
+        self._reload_timer.setSingleShot(True)
+        self._reload_timer.setInterval(self.RELOAD_DELAY_MS)
+        self._reload_timer.timeout.connect(self.flush_pending_reload)
 
         self._setup_ui()
         self._connect_signals()
@@ -240,6 +263,7 @@ class OptionsWidget(QWidget):
         self._build_binarization_group(layout)
         self._build_segmentation_group(layout)
         self._build_posterization_group(layout)
+        self._build_picture_shape_group(layout)
         self._build_despeckle_group(layout)
         self._build_dewarping_group(layout)
         self._build_depth_group(layout)
@@ -454,6 +478,12 @@ class OptionsWidget(QWidget):
         self._edge_div_kbd_spinbox = _double_spin_box(
             "edgeDivKbdSpinBox", 0.0, 1.0, 0.05
         )
+        self._edge_plus_coef_spinbox = _double_spin_box(
+            "edgePlusCoefSpinBox", 0.0, 1.0, 0.05
+        )
+        self._blur_div_coef_spinbox = _double_spin_box(
+            "blurDivCoefSpinBox", 0.0, 1.0, 0.05
+        )
 
         pages: dict[BinarizationMethod, list[tuple[str, QWidget]]] = {
             BinarizationMethod.OTSU: [],
@@ -464,6 +494,10 @@ class OptionsWidget(QWidget):
                 ("Upper bound:", self._wolf_upper_spinbox),
             ],
             BinarizationMethod.BRADLEY: [("Coefficient:", self._bradley_coef_spinbox)],
+            BinarizationMethod.EDGEPLUS: [
+                ("Coefficient:", self._edge_plus_coef_spinbox)
+            ],
+            BinarizationMethod.BLURDIV: [("Coefficient:", self._blur_div_coef_spinbox)],
             BinarizationMethod.EDGEDIV: [
                 ("Edge weight:", self._edge_div_kep_spinbox),
                 ("Blur weight:", self._edge_div_kbd_spinbox),
@@ -558,6 +592,39 @@ class OptionsWidget(QWidget):
         poster_layout.addWidget(self._posterize_options)
 
         layout.addWidget(self._posterization_group)
+
+    def _build_picture_shape_group(self, layout: QVBoxLayout) -> None:
+        self._picture_shape_group = CollapsibleGroupBox("Picture Shape", self)
+        self._picture_shape_group.setObjectName("pictureShapeOptions")
+        shape_layout = QVBoxLayout(self._picture_shape_group)
+
+        selector_layout = QHBoxLayout()
+        selector_layout.addItem(_spacer())
+        self._picture_shape_combo = QComboBox()
+        self._picture_shape_combo.setObjectName("pictureShapeSelector")
+        for shape, label in _PICTURE_SHAPES:
+            self._picture_shape_combo.addItem(label, shape)
+        selector_layout.addWidget(self._picture_shape_combo)
+        selector_layout.addItem(_spacer())
+        shape_layout.addLayout(selector_layout)
+
+        self._picture_sensitivity_row = QWidget()
+        self._picture_sensitivity_row.setObjectName("pictureShapeSensitivityOptions")
+        sensitivity_layout = QHBoxLayout(self._picture_sensitivity_row)
+        sensitivity_layout.setContentsMargins(0, 0, 0, 0)
+        sensitivity_layout.addWidget(QLabel("Sensitivity (%):"))
+        self._picture_sensitivity_spinbox = _spin_box(
+            "pictureShapeSensitivitySB", 0, 100
+        )
+        sensitivity_layout.addWidget(self._picture_sensitivity_spinbox)
+        sensitivity_layout.addItem(_spacer())
+        shape_layout.addWidget(self._picture_sensitivity_row)
+
+        self._higher_search_check = _check_box(
+            "higherSearchSensitivityCB", "Higher search sensitivity"
+        )
+        shape_layout.addWidget(self._higher_search_check)
+        layout.addWidget(self._picture_shape_group)
 
     def _build_despeckle_group(self, layout: QVBoxLayout) -> None:
         self._despeckle_group = CollapsibleGroupBox("Despeckle", self)
@@ -670,10 +737,12 @@ class OptionsWidget(QWidget):
             lambda on: self._edit_binarization(morphological_smoothing=on)
         )
         self._wiener_coef_spinbox.valueChanged.connect(
-            lambda value: self._edit_color_common(wiener_coef=value)
+            lambda value: self._edit_color_common(delayed=True, wiener_coef=value)
         )
         self._wiener_window_spinbox.valueChanged.connect(
-            lambda value: self._edit_color_common(wiener_window_size=value)
+            lambda value: self._edit_color_common(
+                delayed=True, wiener_window_size=value
+            )
         )
         self._filling_color_combo.currentIndexChanged.connect(self._on_filling_changed)
 
@@ -691,9 +760,11 @@ class OptionsWidget(QWidget):
         self._threshold_slider.valueChanged.connect(self._on_threshold_changed)
         self._threshold_slider.sliderReleased.connect(self._commit_threshold)
         self._window_size_spinbox.valueChanged.connect(
-            lambda value: self._edit_binarization(window_size=value)
+            lambda value: self._edit_binarization(delayed=True, window_size=value)
         )
         for spinbox, field in (
+            (self._edge_plus_coef_spinbox, "edge_div_kep"),
+            (self._blur_div_coef_spinbox, "edge_div_kbd"),
             (self._sauvola_coef_spinbox, "sauvola_coef"),
             (self._wolf_coef_spinbox, "wolf_coef"),
             (self._wolf_lower_spinbox, "wolf_lower_bound"),
@@ -703,36 +774,54 @@ class OptionsWidget(QWidget):
             (self._edge_div_kbd_spinbox, "edge_div_kbd"),
         ):
             spinbox.valueChanged.connect(
-                lambda value, field=field: self._edit_binarization(**{field: value})
+                lambda value, field=field: self._edit_binarization(
+                    delayed=True, **{field: value}
+                )
             )
 
         self._color_segmentation_check.toggled.connect(
             lambda on: self._edit_segmenter(enabled=on)
         )
         self._reduce_noise_spinbox.valueChanged.connect(
-            lambda value: self._edit_segmenter(noise_reduction=value)
+            lambda value: self._edit_segmenter(delayed=True, noise_reduction=value)
         )
         self._red_adjustment_spinbox.valueChanged.connect(
-            lambda value: self._edit_segmenter(red_threshold_adjustment=value)
+            lambda value: self._edit_segmenter(
+                delayed=True, red_threshold_adjustment=value
+            )
         )
         self._green_adjustment_spinbox.valueChanged.connect(
-            lambda value: self._edit_segmenter(green_threshold_adjustment=value)
+            lambda value: self._edit_segmenter(
+                delayed=True, green_threshold_adjustment=value
+            )
         )
         self._blue_adjustment_spinbox.valueChanged.connect(
-            lambda value: self._edit_segmenter(blue_threshold_adjustment=value)
+            lambda value: self._edit_segmenter(
+                delayed=True, blue_threshold_adjustment=value
+            )
         )
 
         self._posterize_check.toggled.connect(
             lambda on: self._edit_posterization(enabled=on)
         )
         self._posterize_level_spinbox.valueChanged.connect(
-            lambda value: self._edit_posterization(level=value)
+            lambda value: self._edit_posterization(delayed=True, level=value)
         )
         self._posterize_normalize_check.toggled.connect(
             lambda on: self._edit_posterization(normalization_enabled=on)
         )
         self._posterize_force_bw_check.toggled.connect(
             lambda on: self._edit_posterization(force_black_and_white=on)
+        )
+
+        self._picture_shape_combo.currentIndexChanged.connect(
+            self._on_picture_shape_changed
+        )
+        self._picture_sensitivity_spinbox.valueChanged.connect(
+            lambda value: self._edit_picture_shape(delayed=True, sensitivity=value)
+        )
+        self._higher_search_check.toggled.connect(
+            lambda on: self._edit_picture_shape(higher_search_sensitivity=on)
         )
 
         self._despeckle_slider.valueChanged.connect(self._on_despeckle_changed)
@@ -753,11 +842,22 @@ class OptionsWidget(QWidget):
     def set_current_page(self, page_id: PageId) -> None:
         """Set the current page being edited.
 
+        A reload still waiting for the previous page is sent first.
+
         Args:
             page_id (PageId): The page ID to edit.
         """
+        if self._pending_page_id not in (None, page_id):
+            self.flush_pending_reload()
         self._current_page_id = page_id
         self._update_ui()
+
+    def flush_pending_reload(self) -> None:
+        """Emit ``params_changed`` now for edits that are waiting for the delay."""
+        self._reload_timer.stop()
+        page_id, self._pending_page_id = self._pending_page_id, None
+        if page_id is not None:
+            self.params_changed.emit(page_id)
 
     def set_dewarping_tab_active(self, active: bool) -> None:
         """Switch between the layout for the dewarping tab and the other tabs.
@@ -770,6 +870,17 @@ class OptionsWidget(QWidget):
         """
         self._dewarping_tab_active = active
         self._update_ui()
+
+    def set_despeckle_tab_active(self, active: bool) -> None:
+        """Tell the panel whether the despeckling tab of the image view is shown.
+
+        That tab previews every level as it is chosen, so the page then renders
+        again only after the delay.
+
+        Args:
+            active (bool): True while the despeckling tab shows.
+        """
+        self._despeckle_tab_active = active
 
     def set_distortion_model(self, model: DistortionModelSpec) -> None:
         """Store a manually edited distortion model for the current page.
@@ -792,13 +903,20 @@ class OptionsWidget(QWidget):
         self._update_ui()
         self.params_changed.emit(page_id)
 
-    def _edit(self, change: Callable[[Params], Params], refresh: bool = False) -> None:
+    def _edit(
+        self,
+        change: Callable[[Params], Params],
+        refresh: bool = False,
+        delayed: bool = False,
+    ) -> None:
         """Apply a change to the current page's parameters and report it.
 
         Args:
             change (Callable[[Params], Params]): Returns the changed parameters.
             refresh (bool): Update the controls afterwards, for changes that
                 alter which controls apply.
+            delayed (bool): Report after ``RELOAD_DELAY_MS`` without further
+                edits instead of at once. The parameters are stored at once.
         """
         page_id = self._current_page_id
         if page_id is None or self._updating:
@@ -806,36 +924,55 @@ class OptionsWidget(QWidget):
         self._filter.set_params(page_id, change(self._filter.get_params(page_id)))
         if refresh:
             self._update_ui()
-        self.params_changed.emit(page_id)
+        if delayed:
+            self._pending_page_id = page_id
+            self._reload_timer.start()
+        else:
+            self._reload_timer.stop()
+            self._pending_page_id = None
+            self.params_changed.emit(page_id)
 
-    def _edit_binarization(self, **fields: object) -> None:
+    def _edit_binarization(self, delayed: bool = False, **fields: object) -> None:
         self._edit(
-            lambda p: p.with_binarization(p.binarization.model_copy(update=fields))
+            lambda p: p.with_binarization(p.binarization.model_copy(update=fields)),
+            delayed=delayed,
         )
 
-    def _edit_segmenter(self, **fields: object) -> None:
+    def _edit_segmenter(self, delayed: bool = False, **fields: object) -> None:
         def change(params: Params) -> Params:
             segmenter = params.binarization.color_segmenter.model_copy(update=fields)
             return params.with_binarization(
                 params.binarization.model_copy(update={"color_segmenter": segmenter})
             )
 
-        self._edit(change, refresh=True)
+        self._edit(change, refresh=True, delayed=delayed)
 
-    def _edit_color_common(self, refresh: bool = False, **fields: object) -> None:
+    def _edit_color_common(
+        self, refresh: bool = False, delayed: bool = False, **fields: object
+    ) -> None:
         self._edit(
             lambda p: p.with_color_common(p.color_common.model_copy(update=fields)),
             refresh=refresh,
+            delayed=delayed,
         )
 
-    def _edit_posterization(self, **fields: object) -> None:
+    def _edit_posterization(self, delayed: bool = False, **fields: object) -> None:
         def change(params: Params) -> Params:
             posterization = params.color_common.posterization.model_copy(update=fields)
             return params.with_color_common(
                 params.color_common.model_copy(update={"posterization": posterization})
             )
 
-        self._edit(change, refresh=True)
+        self._edit(change, refresh=True, delayed=delayed)
+
+    def _edit_picture_shape(
+        self, delayed: bool = False, refresh: bool = False, **fields: object
+    ) -> None:
+        self._edit(
+            lambda p: p.with_picture_shape(p.picture_shape.model_copy(update=fields)),
+            refresh=refresh,
+            delayed=delayed,
+        )
 
     def _edit_splitting(self, **fields: object) -> None:
         self._edit(
@@ -858,6 +995,7 @@ class OptionsWidget(QWidget):
             self._show_splitting(params)
             self._show_binarization(params)
             self._show_segmentation_and_posterization(params)
+            self._show_picture_shape(params)
             self._show_despeckle_and_dewarping(params)
         finally:
             self._updating = False
@@ -949,6 +1087,8 @@ class OptionsWidget(QWidget):
         self._bradley_coef_spinbox.setValue(options.bradley_coef)
         self._edge_div_kep_spinbox.setValue(options.edge_div_kep)
         self._edge_div_kbd_spinbox.setValue(options.edge_div_kbd)
+        self._edge_plus_coef_spinbox.setValue(options.edge_div_kep)
+        self._blur_div_coef_spinbox.setValue(options.edge_div_kbd)
 
     def _show_segmentation_and_posterization(self, params: Params) -> None:
         threshold = params.needs_binarization()
@@ -970,6 +1110,19 @@ class OptionsWidget(QWidget):
         self._posterize_level_spinbox.setValue(poster.level)
         self._posterize_normalize_check.setChecked(poster.normalization_enabled)
         self._posterize_force_bw_check.setChecked(poster.force_black_and_white)
+
+    def _show_picture_shape(self, params: Params) -> None:
+        options = params.picture_shape
+        self._picture_shape_group.setVisible(params.color_mode == ColorMode.MIXED)
+        self._picture_shape_combo.setCurrentIndex(
+            self._picture_shape_combo.findData(options.shape)
+        )
+        self._picture_sensitivity_spinbox.setValue(options.sensitivity)
+        self._picture_sensitivity_row.setVisible(
+            options.shape == PictureShape.RECTANGULAR
+        )
+        self._higher_search_check.setChecked(options.higher_search_sensitivity)
+        self._higher_search_check.setVisible(options.shape != PictureShape.OFF)
 
     def _show_despeckle_and_dewarping(self, params: Params) -> None:
         threshold = params.needs_binarization()
@@ -999,6 +1152,12 @@ class OptionsWidget(QWidget):
         }
         mode = mode_map.get(button, ColorMode.BLACK_AND_WHITE)
         self._edit(lambda p: p.with_color_mode(mode), refresh=True)
+
+    def _on_picture_shape_changed(self, index: int) -> None:
+        # Qt hands a str-valued enum member back as a plain str.
+        value = self._picture_shape_combo.itemData(index)
+        if value is not None:
+            self._edit_picture_shape(refresh=True, shape=PictureShape(value))
 
     def _on_black_on_white_changed(self, checked: bool) -> None:
         self._edit(lambda p: p.with_black_on_white(checked))
@@ -1058,8 +1217,13 @@ class OptionsWidget(QWidget):
             self._commit_despeckle()
 
     def _commit_despeckle(self) -> None:
+        if self._current_page_id is None or self._updating:
+            return
         level = _DESPECKLE_LEVELS[self._despeckle_slider.value()][0]
-        self._edit(lambda p: p.with_despeckle_level(level))
+        self.despeckle_level_changed.emit(level)
+        self._edit(
+            lambda p: p.with_despeckle_level(level), delayed=self._despeckle_tab_active
+        )
 
     def _on_dewarping_changed(self, button: QPushButton) -> None:
         mode = next(

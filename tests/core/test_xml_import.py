@@ -598,7 +598,7 @@ class TestOutput:
             (110.0, 68.0),
         )
 
-    def test_edgeplus_method_becomes_edge_div_with_only_the_edge_weight(
+    def test_edgeplus_method_keeps_its_name_and_reads_the_coefficient_as_edge_weight(
         self, tmp_path: Path
     ):
         project = _load(tmp_path, "split_and_mixed").project
@@ -606,22 +606,29 @@ class TestOutput:
             _page(project, 1)
         ].binarization
 
-        assert binarization.method is BinarizationMethod.EDGEDIV
+        assert binarization.method is BinarizationMethod.EDGEPLUS
         assert binarization.edge_div_kep == pytest.approx(0.25)
-        assert binarization.edge_div_kbd == 0.0
         assert binarization.threshold_adjustment == -10
         assert not binarization.morphological_smoothing
 
     @pytest.mark.parametrize(
-        ("method", "kep", "kbd"),
-        [("blurdiv", 0.0, 0.25), ("edgediv", 0.25, 0.25)],
+        ("name", "method", "kep", "kbd"),
+        [
+            ("blurdiv", BinarizationMethod.BLURDIV, 0.5, 0.25),
+            ("edgediv", BinarizationMethod.EDGEDIV, 0.25, 0.25),
+        ],
     )
-    def test_blurdiv_and_edgediv_methods_split_the_coefficient_like_c_plus_plus(
-        self, tmp_path: Path, method: str, kep: float, kbd: float
+    def test_blurdiv_and_edgediv_methods_read_the_coefficient_like_c_plus_plus(
+        self,
+        tmp_path: Path,
+        name: str,
+        method: BinarizationMethod,
+        kep: float,
+        kbd: float,
     ):
         project_file = _fixture(tmp_path, "split_and_mixed")
         text = project_file.read_text(encoding="utf-8").replace(
-            'binarizationMethod="edgeplus"', f'binarizationMethod="{method}"'
+            'binarizationMethod="edgeplus"', f'binarizationMethod="{name}"'
         )
 
         project = import_xml_project(project_file, text).project
@@ -629,7 +636,7 @@ class TestOutput:
         binarization = _params(project, "output", OutputParams)[
             _page(project, 1)
         ].binarization
-        assert binarization.method is BinarizationMethod.EDGEDIV
+        assert binarization.method is method
         assert (binarization.edge_div_kep, binarization.edge_div_kbd) == (kep, kbd)
 
     def test_colour_page_keeps_filling_posterization_and_wiener_options(
