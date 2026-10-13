@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, PrivateAttr
 
 from scantailor.core.models import Margins, PageId
 from scantailor.filters.page_layout.alignment import Alignment
+from scantailor.filters.page_layout.guide import Guide
 from scantailor.filters.page_layout.params import ContentRect, ContentSize, Params
 
 MARGIN_SIDES: tuple[str, ...] = ("top", "bottom", "left", "right")
@@ -54,6 +55,8 @@ class Settings(BaseModel):
 
     _lock: threading.Lock = PrivateAttr(default_factory=threading.Lock)
     _frozen_aggregate_mm: ContentSize | None = PrivateAttr(default=None)
+    _guides: tuple[Guide, ...] = PrivateAttr(default=())
+    _middle_rect_shown: bool = PrivateAttr(default=True)
 
     def get_params(self, page_id: PageId) -> Params:
         """Get the parameters for a page.
@@ -223,6 +226,34 @@ class Settings(BaseModel):
                 self._frozen_aggregate_mm = None
             elif self._frozen_aggregate_mm is None:
                 self._frozen_aggregate_mm = self._computed_aggregate_locked()
+
+    def get_guides(self) -> tuple[Guide, ...]:
+        """Return the alignment guides, which belong to the project, not to a page."""
+        with self._lock:
+            return self._guides
+
+    def set_guides(self, guides: Iterable[Guide]) -> None:
+        """Replace the alignment guides.
+
+        Args:
+            guides: The guides to keep, in the order they were added.
+        """
+        with self._lock:
+            self._guides = tuple(guides)
+
+    def is_middle_rect_shown(self) -> bool:
+        """Return True while the hard margins rectangle is shown in the view."""
+        with self._lock:
+            return self._middle_rect_shown
+
+    def set_middle_rect_shown(self, shown: bool) -> None:
+        """Show or hide the hard margins rectangle in the view.
+
+        Args:
+            shown: True to show it.
+        """
+        with self._lock:
+            self._middle_rect_shown = shown
 
     def update_content_size_and_get_aggregate(
         self,

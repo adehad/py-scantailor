@@ -22,8 +22,13 @@ def read_rotations(
 ) -> list[StageParamsEntry]:
     """Read the per-image rotations and trims of the ``<fix-orientation>`` element.
 
-    The element's ``<image-settings>`` (a per-page binarization threshold and
-    black-on-white flag) have no counterpart in the port and are not read.
+    The element's ``<image-settings>`` hold, per page, the Otsu threshold of
+    the page's pixels and a black-on-white flag. They are not read on purpose:
+    C++ caches the threshold so that later stages need not compute it, and
+    the port computes it from the pixels each time it detects (the user's
+    black-on-white choice is Output's, read from the Output settings). A stored
+    threshold is only ever an input to detections that the port reruns itself
+    whenever their dependencies change.
 
     Args:
         filter_element (ET.Element | None): The ``<fix-orientation>`` element.

@@ -1,8 +1,12 @@
 """Dependencies tracking for cache invalidation."""
 
+import numpy as np
 from pydantic import BaseModel
 
 from .detection import ContentDetectionMode, PageDetectionMode
+
+# Outline coordinates are pixels; anything below this is float noise.
+_OUTLINE_TOLERANCE_PX = 1e-3
 
 
 class Dependencies(BaseModel):
@@ -21,6 +25,21 @@ class Dependencies(BaseModel):
     rotated_page_outline: list[tuple[float, float]] = []
     view_transform: list[list[float]] = []
 
+    def same_outline(self, other: "Dependencies") -> bool:
+        """Tell whether both outlines describe the same polygon, up to float noise."""
+        if len(self.rotated_page_outline) != len(other.rotated_page_outline):
+            return False
+        if not self.rotated_page_outline:
+            return True
+        return bool(
+            np.allclose(
+                np.asarray(self.rotated_page_outline, dtype=np.float64),
+                np.asarray(other.rotated_page_outline, dtype=np.float64),
+                rtol=0.0,
+                atol=_OUTLINE_TOLERANCE_PX,
+            )
+        )
+
     def needs_content_update(self, other: "Dependencies") -> bool:
         """Check if content box needs to be recomputed.
 
@@ -30,9 +49,7 @@ class Dependencies(BaseModel):
         """
         if self.content_detection_mode != other.content_detection_mode:
             return True
-        if self.rotated_page_outline != other.rotated_page_outline:
-            return True
-        return False
+        return not self.same_outline(other)
 
     def needs_page_update(self, other: "Dependencies") -> bool:
         """Check if page box needs to be recomputed.
@@ -44,7 +61,7 @@ class Dependencies(BaseModel):
         """
         if self.page_detection_mode != other.page_detection_mode:
             return True
-        if self.rotated_page_outline != other.rotated_page_outline:
+        if not self.same_outline(other):
             return True
         if (
             self.page_detection_mode == PageDetectionMode.AUTO

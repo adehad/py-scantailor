@@ -9,6 +9,7 @@ from scantailor.core.models import PageId
 
 from .content_box import ContentBox, PageBox, PhysicalSize
 from .content_finder import ContentDetectionResult, find_content_box, find_page_edges
+from .dependencies import Dependencies
 from .detection import ContentDetectionMode, PageDetectionMode
 from .params import Params
 from .settings import Settings
@@ -74,6 +75,15 @@ def _mapped_page_box(
     if mapped.is_empty():
         return PageBox.from_image_size(width, height)
     return PageBox(x=mapped.x, y=mapped.y, width=mapped.width, height=mapped.height)
+
+
+def _content_within_page(params: Params) -> bool:
+    """Tell whether the stored content box lies inside the stored page box."""
+    if params.content_box.is_empty() or params.page_box.is_empty():
+        return True
+    return params.content_box.intersection(params.page_box.to_content_box()) == (
+        params.content_box
+    )
 
 
 class Filter:
@@ -199,6 +209,43 @@ class Filter:
 
         return page_box
 
+    def update_needs(
+        self,
+        page_id: PageId,
+        page_outline: Sequence[tuple[float, float]] | None,
+    ) -> tuple[bool, bool]:
+        """Tell which detections the stored boxes no longer match.
+
+        The stored boxes stay valid while the page outline and the detection
+        modes they were made under are the ones now; a mode switched since,
+        or an outline that moved (the split, the rotation or the page's
+        trim changed), makes them stale.
+
+        Args:
+            page_id (PageId): The page.
+            page_outline (Sequence[tuple[float, float]] | None): Outline of the
+                page in the coordinates of the image being processed; None
+                when unknown, which makes every box stale.
+
+        Returns:
+            tuple[bool, bool]: Whether the content box and whether the page box
+                must be made again.
+        """
+        if page_outline is None or not self.is_params_set(page_id):
+            return True, True
+        params = self.get_params(page_id)
+        current = Dependencies(
+            content_detection_mode=params.content_detection_mode,
+            page_detection_mode=params.page_detection_mode,
+            fine_tune_corners=params.fine_tune_corners,
+            rotated_page_outline=list(page_outline),
+        )
+        stored = params.dependencies
+        return (
+            stored.needs_content_update(current),
+            stored.needs_page_update(current),
+        )
+
     def process(
         self,
         image: NDArray[np.uint8],
@@ -212,6 +259,9 @@ class Filter:
         """Process an image to detect content and page boundaries.
 
         Respects detection modes - only runs auto-detection when mode is AUTO.
+        When ``page_outline`` is given, detection also runs only when the
+        stored boxes no longer match the outline and modes they were made
+        under (see ``update_needs``); otherwise it runs every time.
         Hand-drawn boxes stay on the content they were drawn around: when the
         view has changed since they were drawn (a split cutter or the deskew
         angle moved), each is mapped from the old view into the new one and
@@ -239,11 +289,14 @@ class Filter:
         h, w = image.shape[:2]
         outline = [] if page_outline is None else list(page_outline)
         to_new_view = _view_change(params.dependencies.view_transform, view_transform)
+        update_content, update_page = self.update_needs(page_id, page_outline)
 
         # Handle page detection
         if params.is_page_auto():
-            self.detect_page(image, page_id, dpi=dpi)
-            params = self.get_params(page_id)
+            if update_page:
+                self.detect_page(image, page_id, dpi=dpi)
+                params = self.get_params(page_id)
+                update_content = update_content or not _content_within_page(params)
         elif params.is_page_disabled():
             page_box = PageBox.from_image_size(w, h)
             params = params.with_page_box(page_box, PageDetectionMode.DISABLED)
@@ -264,15 +317,16 @@ class Filter:
 
         # Handle content detection
         if params.is_content_auto():
-            self.detect_content(
-                image,
-                page_id,
-                dpi=dpi,
-                outside=outside,
-                page_box=params.page_box.to_content_box(),
-                outside_key=outside_key,
-            )
-            params = self.get_params(page_id)
+            if update_content:
+                self.detect_content(
+                    image,
+                    page_id,
+                    dpi=dpi,
+                    outside=outside,
+                    page_box=params.page_box.to_content_box(),
+                    outside_key=outside_key,
+                )
+                params = self.get_params(page_id)
         elif params.is_content_disabled():
             # Use page box as content
             content_box = params.page_box.to_content_box()

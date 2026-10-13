@@ -38,7 +38,8 @@ from scantailor.core.xml_reader import (
 from scantailor.filters.deskew.xml_import import read_deskew
 from scantailor.filters.fix_orientation.xml_import import read_rotations
 from scantailor.filters.output.xml_import import read_output
-from scantailor.filters.page_layout.xml_import import read_page_layout
+from scantailor.filters.page_layout.guide import Guide
+from scantailor.filters.page_layout.xml_import import read_page_layout_stage
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.page_split.xml_import import read_page_split
 from scantailor.filters.select_content.xml_import import read_select_content
@@ -65,12 +66,17 @@ class XmlStageDefaults:
             from that box, as a fraction.
         deskew_content_based (bool): False when Deskew finds the skew from the
             top page edge rather than from the content.
+        page_layout_middle_rect_shown (bool): Whether Page Layout shows the hard
+            margins rectangle.
+        page_layout_guides (tuple[Guide, ...]): Page Layout's alignment guides.
     """
 
     page_split_layout_type: LayoutType = LayoutType.AUTO_LAYOUT_TYPE
     page_detection_box: tuple[float, float] = (0.0, 0.0)
     page_detection_tolerance: float = 0.1
     deskew_content_based: bool = True
+    page_layout_middle_rect_shown: bool = True
+    page_layout_guides: tuple[Guide, ...] = ()
 
     def as_project_defaults(self) -> dict[str, object]:
         """Return the values in the form ``Project.stage_defaults`` stores."""
@@ -79,6 +85,10 @@ class XmlStageDefaults:
             "page_detection_box": list(self.page_detection_box),
             "page_detection_tolerance": self.page_detection_tolerance,
             "deskew_content_based": self.deskew_content_based,
+            "page_layout_middle_rect_shown": self.page_layout_middle_rect_shown,
+            "page_layout_guides": [
+                guide.model_dump(mode="json") for guide in self.page_layout_guides
+            ],
         }
 
 
@@ -224,6 +234,9 @@ def apply_xml_stage_defaults(
     select_content.set_page_detection_box(*defaults.page_detection_box)
     select_content.set_page_detection_tolerance(defaults.page_detection_tolerance)
     stages.deskew_filter.content_based = defaults.deskew_content_based
+    layout = stages.page_layout_filter.settings
+    layout.set_middle_rect_shown(defaults.page_layout_middle_rect_shown)
+    layout.set_guides(defaults.page_layout_guides)
 
 
 def _read_version(root: ET.Element) -> int:
@@ -393,6 +406,7 @@ def _read_filters(
     """Read the ``<filters>`` element: per-page parameters and stage defaults."""
     page_split = read_page_split(child(element, "page-split"), context)
     select_content = read_select_content(child(element, "select-content"), context)
+    page_layout = read_page_layout_stage(child(element, "page-layout"), context)
     per_stage: dict[FilterStage, list[StageParamsEntry]] = {
         FilterStage.FIX_ORIENTATION: read_rotations(
             child(element, "fix-orientation"), context
@@ -400,9 +414,7 @@ def _read_filters(
         FilterStage.PAGE_SPLIT: page_split.entries,
         FilterStage.DESKEW: read_deskew(child(element, "deskew"), context),
         FilterStage.SELECT_CONTENT: select_content.entries,
-        FilterStage.PAGE_LAYOUT: read_page_layout(
-            child(element, "page-layout"), context
-        ),
+        FilterStage.PAGE_LAYOUT: page_layout.entries,
         FilterStage.OUTPUT: read_output(child(element, "output"), context),
     }
     stage_params = {
@@ -415,6 +427,8 @@ def _read_filters(
         page_detection_tolerance=select_content.page_detection_tolerance,
         # Absent means on; the C++ reader only checks for an explicit "0".
         deskew_content_based=attr_text(deskew_element, "algoContentBased") != "0",
+        page_layout_middle_rect_shown=page_layout.middle_rect_shown,
+        page_layout_guides=page_layout.guides,
     )
     return stage_params, defaults
 
