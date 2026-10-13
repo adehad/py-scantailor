@@ -19,6 +19,7 @@ from tests.dewarping.synthetic import (
     PAGE_DPI,
     PAGE_HEIGHT,
     PAGE_WIDTH,
+    justified_text_page,
     row_profile_variance,
     straight_text_page,
 )
@@ -175,7 +176,7 @@ class TestAutoDewarpAcceptance:
 
     @staticmethod
     def _first_lines(count: int) -> np.ndarray:
-        source = straight_text_page()
+        source = justified_text_page()
         page = np.full_like(source, BACKGROUND)
         for index in range(count):
             baseline = 170 + 48 * index
@@ -191,11 +192,11 @@ class TestAutoDewarpAcceptance:
         assert result.metadata["OUTPUT"]["was_dewarped"] is False
         assert result.distortion_model is None
 
-    def test_two_lines_are_enough_for_a_model(self):
+    def test_three_text_lines_give_the_two_traced_lines_a_model_needs(self):
         page = _page()
         sequence = _dewarp_sequence(page, DewarpingMode.AUTO)
 
-        result = _run(self._first_lines(2), page, sequence)
+        result = _run(self._first_lines(3), page, sequence)
 
         assert result.distortion_model is not None
 

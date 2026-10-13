@@ -1,25 +1,28 @@
 """Distortion model for marginal dewarping.
 
 Marginal dewarping corrects only the strip of page next to the binding. The top
-and bottom curves follow the content rectangle, except near the spine side
-where their control points move out to the page's top and bottom edges.
+and bottom curves are X-splines along the content rectangle's top and bottom
+edges. All seven control points of each curve, the two ends and the five near
+the binding, are moved out to the page's top and bottom margins, found as the
+first run of 16 paper pixels in the column when searching in from the image edge.
 """
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.interpolate import PchipInterpolator
 
 from scantailor.dewarping.distortion_model import Curve, DistortionModel
+from scantailor.dewarping.spline_fit import sample_spline
 
 # Gray levels below this are page background or ink; paper is brighter.
 _PAPER_THRESHOLD = 64
-# A page edge counts once this many pixels in a row, going inwards, are paper.
-_EDGE_RUN = 16
-# The content width is split into this many parts; the spine strip is the
-# outermost `_SPINE_POINTS` of them.
+# A margin starts where this many pixels in a row, going inwards, are paper.
+_MARGIN_RUN = 16
+# The content width is split into this many parts; five control points sit
+# at the parts nearest the binding.
 _WIDTH_PARTS = 29
-_SPINE_POINTS = 5
-_CURVE_SAMPLES = 30
+_BINDING_POINTS = 5
+_END_TENSION = 0.0
+_INNER_TENSION = 1.0
 
 
 def build_marginal_model(
@@ -27,7 +30,7 @@ def build_marginal_model(
     content_rect: tuple[float, float, float, float],
     spine_on_right: bool,
 ) -> DistortionModel | None:
-    """Build a model whose curves bend toward the page edges near the spine.
+    """Build a model whose curves bend towards the page edges near the binding.
 
     Args:
         gray (NDArray[np.uint8]): 2-D gray page, the coordinates of the model.
@@ -37,76 +40,100 @@ def build_marginal_model(
             on the right.
 
     Returns:
-        DistortionModel | None: The model, or None if the content rectangle is
-            empty or the result is not a valid model.
+        DistortionModel | None: The model, or None when the content rectangle
+            is empty or the result is not a valid model (which the C++ code
+            replaces with the model that leaves the content as it is).
     """
     x, y, width, height = content_rect
     if width <= 0 or height <= 0:
         return None
     paper = gray >= _PAPER_THRESHOLD
 
-    if spine_on_right:
-        fractions = range(_WIDTH_PARTS - _SPINE_POINTS, _WIDTH_PARTS)
-    else:
-        fractions = range(1, _SPINE_POINTS + 1)
-    xs = np.array(
-        [x]
-        + [x + width * fraction / _WIDTH_PARTS for fraction in fractions]
-        + [x + width]
-    )
-    columns = np.clip(xs.astype(int), 0, gray.shape[1] - 1)
+    xs = _control_point_xs(x, width, spine_on_right)
+    top_ys = _top_margin(paper, xs, np.full(len(xs), float(y)))
+    bottom_ys = _bottom_margin(paper, xs, np.full(len(xs), float(y + height)))
 
-    top_ys = _move_to_edge(paper, columns, np.full(len(xs), y), from_top=True)
-    bottom_ys = _move_to_edge(
-        paper, columns, np.full(len(xs), y + height), from_top=False
-    )
     model = DistortionModel(
-        top_curve=Curve.from_polyline(_smooth_curve(xs, top_ys)),
-        bottom_curve=Curve.from_polyline(_smooth_curve(xs, bottom_ys)),
+        top_curve=_curve(xs, top_ys),
+        bottom_curve=_curve(xs, bottom_ys),
     )
     return model if model.is_valid() else None
 
 
-def _move_to_edge(
-    paper: NDArray[np.bool_],
-    columns: NDArray[np.int_],
-    ys: NDArray[np.float64],
-    from_top: bool,
+def _control_point_xs(
+    x: float, width: float, spine_on_right: bool
 ) -> NDArray[np.float64]:
-    """Move each point to the first page edge between the image border and it.
+    """X of the seven control points of a curve along the content's width.
 
     Args:
-        paper (NDArray[np.bool_]): True for paper pixels.
-        columns (NDArray[np.int_]): Column of every point.
-        ys (NDArray[np.float64]): Starting y of every point.
-        from_top (bool): True to search downwards from row 0 up to the point,
-            False to search upwards from the last row down to the point.
+        x (float): Left side of the content.
+        width (float): Width of the content.
+        spine_on_right (bool): True when the binding is on the right.
 
     Returns:
-        NDArray[np.float64]: New y of every point; unchanged where no edge is found.
+        NDArray[np.float64]: The two ends and, between them, the five points
+            nearest the binding. The inner points are interpolated the way a
+            point on a line is, so a column that falls on a whole number is
+            reached from below, as in the C++ code, and picks the pixel before it.
     """
-    height = paper.shape[0]
-    strip = paper[:, columns] if from_top else paper[::-1, columns]
-    padded = np.vstack(
-        [np.zeros((1, strip.shape[1]), dtype=np.int32), strip.cumsum(axis=0)]
+    if spine_on_right:
+        fractions = range(_WIDTH_PARTS - _BINDING_POINTS, _WIDTH_PARTS)
+    else:
+        fractions = range(1, _BINDING_POINTS + 1)
+    right = x + width
+    return np.array(
+        [x]
+        + [x + (right - x) * (fraction / _WIDTH_PARTS) for fraction in fractions]
+        + [right]
     )
-    runs = padded[_EDGE_RUN:] - padded[:-_EDGE_RUN]
-    # runs[j] counts the paper pixels in rows j .. j + _EDGE_RUN - 1.
-    full_run = np.zeros(strip.shape, dtype=bool)
-    full_run[: len(runs)] = runs == _EDGE_RUN
-
-    rows = np.arange(height)[:, None]
-    limit = ys[None, :] if from_top else (height - 1 - ys)[None, :]
-    candidates = full_run & (rows < limit)
-    found = candidates.any(axis=0)
-    first = candidates.argmax(axis=0)
-    edge = first if from_top else height - 1 - first
-    return np.where(found, edge, ys).astype(np.float64)
 
 
-def _smooth_curve(
-    xs: NDArray[np.float64], ys: NDArray[np.float64]
+def _curve(xs: NDArray[np.float64], ys: NDArray[np.float64]) -> Curve:
+    """The X-spline through control points, with tension 0 at the ends and 1 inside."""
+    positions = np.column_stack([xs, ys])
+    tensions = np.full(len(xs), _INNER_TENSION)
+    tensions[0] = tensions[-1] = _END_TENSION
+    return Curve.from_polyline(sample_spline(positions, tensions)[1])
+
+
+def _top_margin(
+    paper: NDArray[np.bool_], xs: NDArray[np.float64], ys: NDArray[np.float64]
 ) -> NDArray[np.float64]:
-    """Interpolate control points with a curve that does not overshoot them."""
-    samples = np.linspace(xs[0], xs[-1], _CURVE_SAMPLES)
-    return np.column_stack([samples, PchipInterpolator(xs, ys)(samples)])
+    """Move each point up to the first paper run above it, searching down from row 0."""
+    moved = ys.copy()
+    height, width = paper.shape
+    for index, (px, py) in enumerate(zip(xs, ys, strict=True)):
+        column = int(px)
+        if not 0 <= column < width:
+            continue
+        for row in range(0, int(np.ceil(py))):
+            if row >= height:
+                break
+            if paper[row, column] and _is_run(paper[row : row + _MARGIN_RUN, column]):
+                moved[index] = row
+                break
+    return moved
+
+
+def _bottom_margin(
+    paper: NDArray[np.bool_], xs: NDArray[np.float64], ys: NDArray[np.float64]
+) -> NDArray[np.float64]:
+    """Move each point down to the first paper run below it, searching up."""
+    moved = ys.copy()
+    height, width = paper.shape
+    for index, (px, py) in enumerate(zip(xs, ys, strict=True)):
+        column = int(px)
+        if not 0 <= column < width:
+            continue
+        for row in range(height - 1, int(np.floor(py)), -1):
+            if paper[row, column] and _is_run(
+                paper[max(0, row - _MARGIN_RUN + 1) : row + 1, column]
+            ):
+                moved[index] = row
+                break
+    return moved
+
+
+def _is_run(pixels: NDArray[np.bool_]) -> bool:
+    """True when the slice is a full run of paper; one cut off by the image is not."""
+    return len(pixels) == _MARGIN_RUN and bool(pixels.all())
