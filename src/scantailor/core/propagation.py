@@ -6,7 +6,7 @@ boxes flow from Select Content into the Page Layout sizes that Output needs.
 The ``apply_*`` functions implement "Apply to..." for each stage.
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from enum import Enum, auto
 
 import numpy as np
@@ -17,6 +17,7 @@ from scantailor.core.pipeline import PipelineOptions, fix_aggregate_page_size
 from scantailor.core.project import ImageInfo, ImageMetadata, Project
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.output.params import ApplyGroup
+from scantailor.filters.page_layout.settings import MARGIN_SIDES
 from scantailor.filters.page_split.dependencies import (
     Dependencies as SplitDependencies,
 )
@@ -277,15 +278,14 @@ def _forget_geometry(stages: StageSequence, page: PageId) -> None:
 def apply_orientation(
     stages: StageSequence, source: PageId, targets: Iterable[PageId]
 ) -> None:
-    """Give the targets' images the rotation of the source page's image.
+    """Give the targets' images the rotation and trim of the source page's image.
 
     Args:
         stages (StageSequence): The stages whose settings are updated.
-        source (PageId): The page whose rotation is copied.
-        targets (Iterable[PageId]): Pages that receive it.
+        source (PageId): The page whose rotation and trim are copied.
+        targets (Iterable[PageId]): Pages that receive them.
     """
-    filter_ = stages.fix_orientation_filter
-    filter_.apply_to_pages(list(targets), filter_.get_rotation(source.image_id))
+    stages.fix_orientation_filter.apply_current_to_pages(source.image_id, targets)
 
 
 def apply_page_split(
@@ -382,18 +382,26 @@ def apply_select_content(
 
 
 def apply_margins(
-    stages: StageSequence, source: PageId, targets: Iterable[PageId]
+    stages: StageSequence,
+    source: PageId,
+    targets: Iterable[PageId],
+    sides: Collection[str] = MARGIN_SIDES,
 ) -> None:
     """Copy the source page's margins, and whether they follow the content.
 
     Margins that follow the content are worked out again when a target is
     processed, so the targets keep their own hard margins and lose their
-    measured size until then.
+    measured size until then; the chosen sides do not apply to them. The source
+    page already holds its own margins, so it is left as it is even when it is
+    among the targets.
 
     Args:
         stages (StageSequence): The stages whose settings are updated.
         source (PageId): The page whose margins are copied.
         targets (Iterable[PageId]): Pages that receive them.
+        sides (Collection[str]): Names of the sides copied (``"top"``,
+            ``"bottom"``, ``"left"``, ``"right"``); every other side of a target
+            keeps its own margin.
     """
     settings = stages.page_layout_filter.settings
     params = settings.get_params(source)
@@ -403,7 +411,7 @@ def apply_margins(
             settings.set_params(page, settings.get_params(page).with_auto_margins())
             settings.invalidate_content_size(page)
     else:
-        settings.apply_margins_to_pages(pages, params.hard_margins_mm)
+        settings.apply_margins_to_pages(pages, params.hard_margins_mm, sides)
 
 
 def apply_alignment(

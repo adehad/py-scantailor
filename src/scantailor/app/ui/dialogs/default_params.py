@@ -87,6 +87,7 @@ _METHOD_PAGES = {
     "Sauvola": 1,
     "Wolf": 2,
     "Bradley": 1,
+    "Grad": 2,
     "EdgePlus": 1,
     "BlurDiv": 1,
     "EdgeDiv": 1,
@@ -96,6 +97,7 @@ _METHODS = {
     "Sauvola": BinarizationMethod.SAUVOLA,
     "Wolf": BinarizationMethod.WOLF,
     "Bradley": BinarizationMethod.BRADLEY,
+    "Grad": BinarizationMethod.GRAD,
     "EdgePlus": None,
     "BlurDiv": None,
     "EdgeDiv": BinarizationMethod.EDGEDIV,
@@ -804,7 +806,7 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         method = _METHODS[method_name] or base.binarization.method
         window_widget = (
             "wolfWindowSize"
-            if method is BinarizationMethod.WOLF
+            if method in (BinarizationMethod.WOLF, BinarizationMethod.GRAD)
             else "sauvolaWindowSize"
         )
         binarization = base.binarization.model_copy(

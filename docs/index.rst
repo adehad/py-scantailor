@@ -9,6 +9,7 @@ guide follows a page through the program from a new project to a finished PDF.
    :caption: User guide
 
    getting_started
+   pages
    stages/index
    batch
    export_pdf

@@ -289,6 +289,7 @@ class StagePanels(QtCore.QObject):
             case FilterStage.FIX_ORIENTATION:
                 widget = fix_orientation.OptionsWidget(sequence.fix_orientation_filter)
                 widget.rotation_changed.connect(forward)
+                widget.trim_changed.connect(forward)
             case FilterStage.PAGE_SPLIT:
                 widget = page_split.OptionsWidget(sequence.page_split_filter)
                 widget.layout_type_changed.connect(forward)
@@ -398,6 +399,9 @@ class StagePanels(QtCore.QObject):
         self._source = _Source(image_id, pixels, dpi)
         if isinstance(self.options, page_layout.OptionsWidget):
             self.options.set_page_dpi(dpi, dpi)
+        if isinstance(self.options, fix_orientation.OptionsWidget):
+            height, width = pixels.shape[:2]
+            self.options.set_image_size(width, height)
         self._present()
 
     @QtCore.Slot(int, object, str)
@@ -486,6 +490,7 @@ class StagePanels(QtCore.QObject):
             if self._already_shown((self.stage, source.image_id), source):
                 return
             view.set_rotation(rotation)
+            view.set_trim(self.sequence.fix_orientation_filter.get_trim(page.image_id))
             view.set_image(
                 _to_display(source.pixels),
                 transformation=ImageTransformation.from_size(
@@ -525,6 +530,7 @@ class StagePanels(QtCore.QObject):
 
         if isinstance(view, FixOrientationImageView):
             view.set_rotation(self._rotation(page))
+            view.set_trim(sequence.fix_orientation_filter.get_trim(page.image_id))
             return
         if self._stage_image is None:
             return

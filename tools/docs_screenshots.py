@@ -32,7 +32,13 @@ SHOT_NAMES = (
     "welcome",
     "new_project",
     *STAGE_SHOTS,
+    "stage1_fix_orientation_trim",
     "stage3_deskew_oblique",
+    "stage5_margins_apply",
+    "stage6_output_options",
+    "stage6_output_guides",
+    "thumbnails_sorting",
+    "tools_menu",
     "settings",
     "default_parameters",
     "batch_progress",
@@ -42,7 +48,7 @@ SHOT_NAMES = (
 _PAGE_COUNT = 4
 _PAGE_SIZE = (1275, 1650)
 _PAGE_DPI = 300
-_WINDOW_SIZE = (1440, 1000)
+_WINDOW_SIZE = (1440, 1100)
 _RENDER_TIMEOUT_S = 90.0
 _BATCH_TIMEOUT_S = 300.0
 
@@ -162,6 +168,8 @@ def _capture(scheme: str, out_dir: Path) -> None:
     from scantailor.app._ui import resources_rc
     from scantailor.app.ui import MainWindow as mw
     from scantailor.app.ui.theme import apply_theme
+    from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
+    from scantailor.core.stage_sequence import FilterStage
 
     apply_theme(app)
     resources_rc.qInitResources()
@@ -202,6 +210,21 @@ def _capture(scheme: str, out_dir: Path) -> None:
         QtCore.QTimer.singleShot(300, shoot)
         trigger()
 
+    def save_sorting_panel(name: str) -> None:
+        """Save the thumbnail column with its sort controls, as part of the window.
+
+        A child grabbed on its own loses the window's background, so the window is
+        grabbed and cropped.
+        """
+        widget = manager.pauseSortingBtn.parentWidget()
+        while widget is not None and widget.height() < _WINDOW_SIZE[1] // 2:
+            widget = widget.parentWidget()
+        assert widget is not None
+        origin = widget.mapTo(manager.ui, QtCore.QPoint(0, 0))
+        manager.ui.grab(QtCore.QRect(origin, widget.size())).save(
+            str(shots / f"{name}.png")
+        )
+
     manager = mw.MainWindowManager()
     manager.settings.setValue(mw._LAST_INPUT_DIR_KEY, str(sample_dir))
     manager.ui.resize(*_WINDOW_SIZE)
@@ -240,9 +263,44 @@ def _capture(scheme: str, out_dir: Path) -> None:
         pump(settle_s)
         save(manager.ui, name or STAGE_SHOTS[index - 1])
 
+    def finish_render() -> None:
+        pump(0.5)
+        pump_until(
+            lambda: not manager._render_pending, _RENDER_TIMEOUT_S, "the page render"
+        )
+        pump(1.5)
+
+    def options_child[T: QtWidgets.QWidget](kind: type[T], name: str) -> T:
+        found = manager.filterOptions.findChild(kind, name)
+        assert found is not None, name
+        return found
+
+    def capture_trim() -> None:
+        enable = options_child(QtWidgets.QCheckBox, "trimEnabledCheck")
+        enable.setChecked(True)
+        for name, pixels in (
+            ("trimLeftSpin", 90),
+            ("trimTopSpin", 100),
+            ("trimRightSpin", 90),
+            ("trimBottomSpin", 100),
+        ):
+            spin = options_child(QtWidgets.QSpinBox, name)
+            spin.setValue(pixels)
+        finish_render()
+        save(manager.ui, "stage1_fix_orientation_trim")
+        enable.setChecked(False)
+        finish_render()
+
     manager.current_page = manager.pages()[0]
     for index in range(1, 6):
         show_stage(index)
+        if index == 1:
+            capture_trim()
+        if index == 5:
+            in_modal(
+                "stage5_margins_apply",
+                lambda: manager.show_apply_dialog(FilterStage.PAGE_LAYOUT, "margins"),
+            )
 
     manager.startBatchProcessing()
     pump_until(
@@ -253,6 +311,45 @@ def _capture(scheme: str, out_dir: Path) -> None:
         save(manager.batch_dialog, "batch_progress")
         manager.batch_dialog.close()
     show_stage(6)
+
+    method = options_child(QtWidgets.QComboBox, "methodCombo")
+    fill_outside = options_child(QtWidgets.QCheckBox, "fillOutsidePageBoxCB")
+    previous_method = method.currentIndex()
+    method.setCurrentIndex(method.findText("Window"))
+    fill_outside.setChecked(True)
+    # Collapsed so that the Options and Binarization panels fit in one screenshot.
+    folded = [
+        options_child(CollapsibleGroupBox, name) for name in ("dpiGroup", "modeGroup")
+    ]
+    for group in folded:
+        group.set_collapsed(True)
+    finish_render()
+    save(manager.ui, "stage6_output_options")
+    for group in folded:
+        group.set_collapsed(False)
+    fill_outside.setChecked(False)
+    method.setCurrentIndex(previous_method)
+    finish_render()
+
+    output_view = manager._panels.view
+    output_view.set_guides_shown(True)
+    pump(0.5)
+    save(manager.ui, "stage6_output_guides")
+    output_view.set_guides_shown(False)
+
+    manager.sortOptions.setCurrentIndex(1)
+    manager.pauseSortingBtn.setChecked(True)
+    pump(0.5)
+    save_sorting_panel("thumbnails_sorting")
+    manager.pauseSortingBtn.setChecked(False)
+    manager.sortOptions.setCurrentIndex(0)
+
+    tools = manager.ui.findChild(QtWidgets.QMenu, "menuDebug")
+    assert tools is not None
+    tools.popup(manager.ui.mapToGlobal(QtCore.QPoint(60, 30)))
+    pump(0.5)
+    save(tools, "tools_menu")
+    tools.hide()
 
     manager.stages.deskew_filter.set_manual_oblique(manager.current_page, 2.0)
     show_stage(3, "stage3_deskew_oblique", settle_s=6.0)

@@ -9,6 +9,10 @@ Settings
 .. screenshot:: settings
    :alt: The Settings dialog
 
+**Default zone creation mode** is how new zones in the Output view are drawn:
+polygonal, lasso (freehand) or rectangular. The **Z**, **X** and **C** keys switch
+it while editing.
+
 .. admonition:: TODO
    :class: attention
 

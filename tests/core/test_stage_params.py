@@ -15,9 +15,11 @@ from scantailor.core.stage_params import (
 )
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.deskew.params import Params as DeskewParams
+from scantailor.filters.fix_orientation.image_trim import ImageTrim
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.output.params import Params as OutputParams
+from scantailor.filters.page_layout.params import ContentSize
 from scantailor.filters.page_layout.params import Params as PageLayoutParams
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.page_split.params import Params as PageSplitParams
@@ -222,3 +224,76 @@ class TestStageDefaults:
     def test_invalid_stored_value_is_rejected(self):
         with pytest.raises(ValueError):
             apply_stage_defaults(StageSequence(), {"output_color_mode": "no-such-mode"})
+
+
+class TestUpstreamSettingsPersistence:
+    """Trims, the top-edge deskew flag and the frozen aggregate size survive a save."""
+
+    def test_trim_is_exported_beside_the_rotation_and_restored(
+        self, pages: list[PageId]
+    ):
+        trim = ImageTrim(enabled=True, left=4, top=5, right=6, bottom=7)
+        stages = StageSequence()
+        orientation = stages.fix_orientation_filter.settings
+        orientation.set_trim(pages[0].image_id, trim)
+        orientation.apply_rotation(pages[0].image_id, OrthogonalRotation(degrees=90))
+
+        exported = collect_stage_params(stages, pages)
+        restored = StageSequence()
+        apply_stage_params(restored, exported)
+
+        (entry,) = exported[STAGE_KEYS[FilterStage.FIX_ORIENTATION]]
+        assert entry.params["trim"]["left"] == 4
+        restored_settings = restored.fix_orientation_filter.settings
+        assert restored_settings.get_trim(pages[0].image_id) == trim
+        assert restored_settings.get_rotation_for(pages[0].image_id).degrees == 90
+
+    def test_a_trim_only_image_restores_without_a_rotation(self, pages: list[PageId]):
+        stages = StageSequence()
+        stages.fix_orientation_filter.settings.set_trim(
+            pages[0].image_id, ImageTrim(enabled=True, left=3)
+        )
+
+        restored = StageSequence()
+        apply_stage_params(restored, collect_stage_params(stages, pages))
+
+        settings = restored.fix_orientation_filter.settings
+        assert settings.get_trim(pages[0].image_id).left == 3
+        assert not settings.is_rotation_set(pages[0].image_id)
+
+    def test_top_edge_deskew_flag_round_trips(self):
+        stages = StageSequence()
+        stages.deskew_filter.content_based = False
+
+        restored = StageSequence()
+        apply_stage_defaults(restored, collect_stage_defaults(stages))
+
+        assert restored.deskew_filter.content_based is False
+
+    def test_a_file_without_the_flag_keeps_content_based_deskew(self):
+        stages = StageSequence()
+
+        apply_stage_defaults(stages, {})
+
+        assert stages.deskew_filter.content_based is True
+
+    def test_frozen_aggregate_size_round_trips(self):
+        size = ContentSize(width_mm=120.0, height_mm=180.0)
+        stages = StageSequence()
+        stages.page_layout_filter.settings.restore_frozen_aggregate_hard_size_mm(size)
+
+        defaults = collect_stage_defaults(stages)
+        restored = StageSequence()
+        apply_stage_defaults(restored, defaults)
+
+        settings = restored.page_layout_filter.settings
+        assert settings.get_frozen_aggregate_hard_size_mm() == size
+
+    def test_an_unfrozen_aggregate_stays_unfrozen(self):
+        defaults = collect_stage_defaults(StageSequence())
+        restored = StageSequence()
+
+        apply_stage_defaults(restored, defaults)
+
+        assert defaults["page_layout_frozen_aggregate_size"] is None
+        assert not restored.page_layout_filter.settings.is_aggregate_hard_size_frozen()

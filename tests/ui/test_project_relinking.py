@@ -401,9 +401,10 @@ def test_relinking_the_output_folder_updates_the_project_and_marks_it_modified(
     assert main_window.modified
 
 
-def test_missing_output_folder_alone_is_recreated_without_asking(
+def test_missing_output_folder_alone_offers_relinking(
     main_window: MainWindowManager,
     file_dialogs: FileDialogStub,
+    respond_to_modal: Callable[..., None],
     page_images: PageImages,
     tmp_path: pathlib.Path,
 ):
@@ -412,11 +413,55 @@ def test_missing_output_folder_alone_is_recreated_without_asking(
     shutil.rmtree(project.output_directory)
     script = RelinkingScript()
     main_window.relinking_dialog_factory = script
+    respond_to_modal(accept=True)
 
     _open(main_window, file_dialogs, project_file)
 
-    assert script.offered == []
+    assert script.offered == [[project.output_directory]]
     assert project.output_directory.is_dir()
+
+
+def test_missing_output_folder_can_be_pointed_elsewhere_on_open(
+    main_window: MainWindowManager,
+    file_dialogs: FileDialogStub,
+    respond_to_modal: Callable[..., None],
+    page_images: PageImages,
+    tmp_path: pathlib.Path,
+):
+    project_file = tmp_path / "book.ScanTailor"
+    project = _save_project(page_images.paths, project_file)
+    shutil.rmtree(project.output_directory)
+    new_out = tmp_path / "results"
+    new_out.mkdir()
+    main_window.relinking_dialog_factory = RelinkingScript(
+        {project.output_directory: new_out}
+    )
+    respond_to_modal(accept=True)
+
+    _open(main_window, file_dialogs, project_file)
+
+    assert main_window.project is not None
+    assert main_window.project.output_directory == new_out
+    assert main_window.modified
+
+
+def test_cancelling_the_output_folder_relinking_leaves_the_project_closed(
+    main_window: MainWindowManager,
+    file_dialogs: FileDialogStub,
+    respond_to_modal: Callable[..., None],
+    page_images: PageImages,
+    tmp_path: pathlib.Path,
+):
+    project_file = tmp_path / "book.ScanTailor"
+    project = _save_project(page_images.paths, project_file)
+    shutil.rmtree(project.output_directory)
+    main_window.relinking_dialog_factory = RelinkingScript()
+    respond_to_modal(accept=False)
+
+    _open(main_window, file_dialogs, project_file)
+
+    assert main_window.project is None
+    assert not project.output_directory.exists()
 
 
 def test_relinking_action_always_lists_the_output_folder_with_the_image_folders(

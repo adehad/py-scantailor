@@ -135,6 +135,37 @@
             </item>
            </layout>
           </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_zoneMode">
+            <item>
+             <widget class="QLabel" name="zoneCreationModeLabel">
+              <property name="text">
+               <string>Default zone creation mode: </string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="zoneCreationModeBox">
+              <property name="toolTip">
+               <string>How new zones in the Output view are drawn. Use Z, X and C keys to switch the mode while editing.</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_zoneMode">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>1</width>
+                <height>1</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
          </layout>
          <zorder>enableOpenglCb</zorder>
          <zorder>autoSaveProjectCB</zorder>
