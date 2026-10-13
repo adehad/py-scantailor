@@ -1,0 +1,86 @@
+"""Skew from the top page edge, for scans with a dark background around the page."""
+
+import math
+
+import numpy as np
+from numpy.typing import NDArray
+
+from scantailor.imageproc.analysis import (
+    DEFAULT_MAX_ANGLE,
+    DEFAULT_MIN_ANGLE,
+    SkewResult,
+)
+
+_MIN_SIDE_PX = 10
+_MAX_SEARCH_ROWS = 200
+_SAMPLE_COLUMNS = 80
+_WINDOW_ROWS = 3
+_MIN_EDGE_POINTS = 10
+
+
+def find_skew_from_top_edge(
+    binary: NDArray[np.uint8],
+    max_angle: float = DEFAULT_MAX_ANGLE,
+    min_angle: float = DEFAULT_MIN_ANGLE,
+) -> SkewResult:
+    """Estimate the skew from where the dark surround ends at the top of the page.
+
+    For sampled columns, the edge is the first row whose preceding three-row
+    window holds at most one ink pixel, so the surround above the page must be
+    ink. A line fitted through the edge points gives the angle. A found angle
+    always has good confidence; a page with too few edge points gives none.
+
+    Args:
+        binary (NDArray[np.uint8]): 2-D image with 0 for ink and 255 for
+            background.
+        max_angle (float): The fitted angle is clamped to this many degrees.
+        min_angle (float): Angles smaller than this are reported as 0.
+
+    Returns:
+        SkewResult: Angle with the sign :func:`scantailor.imageproc.analysis.find_skew`
+            uses, so the correction is its negation. That is the slope of the
+            edge in degrees (y pointing down), which is the opposite of upstream's
+            ``findSkewFromTopEdge``; upstream turns the page the wrong way.
+    """
+    height, width = binary.shape
+    if width < _MIN_SIDE_PX or height < _MIN_SIDE_PX:
+        return SkewResult(angle=0.0, confidence=0.0)
+
+    search_rows = min(height // 3, _MAX_SEARCH_ROWS)
+    step = max(1, width // _SAMPLE_COLUMNS)
+    xs: list[float] = []
+    ys: list[float] = []
+    for column in range(step, width - step, step):
+        edge_row = _edge_row(binary[:search_rows, column] == 0)
+        if edge_row is not None:
+            xs.append(float(column))
+            ys.append(float(edge_row))
+    if len(xs) < _MIN_EDGE_POINTS:
+        return SkewResult(angle=0.0, confidence=0.0)
+
+    x = np.asarray(xs)
+    y = np.asarray(ys)
+    count = float(len(xs))
+    denominator = count * float(np.sum(x * x)) - float(np.sum(x)) ** 2
+    if abs(denominator) < 1e-10:
+        return SkewResult(angle=0.0, confidence=0.0)
+    slope = (count * float(np.sum(x * y)) - float(np.sum(x)) * float(np.sum(y))) / (
+        denominator
+    )
+    angle = math.degrees(math.atan(slope))
+    angle = max(-max_angle, min(max_angle, angle))
+    if abs(angle) < min_angle:
+        return SkewResult(angle=0.0, confidence=SkewResult.GOOD_CONFIDENCE)
+    return SkewResult(angle=angle, confidence=SkewResult.GOOD_CONFIDENCE)
+
+
+def _edge_row(ink: NDArray[np.bool_]) -> int | None:
+    """Return the first row whose last three rows hold at most one ink pixel."""
+    counts = np.cumsum(ink, dtype=np.int64)
+    for row in range(_WINDOW_ROWS - 1, len(ink)):
+        in_window = counts[row] - (
+            counts[row - _WINDOW_ROWS] if row >= _WINDOW_ROWS else 0
+        )
+        if in_window <= 1:
+            return row
+    return None

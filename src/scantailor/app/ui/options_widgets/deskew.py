@@ -116,6 +116,16 @@ class OptionsWidget(QWidget):
         )
         group_layout.addLayout(angle_layout)
 
+        self._top_edge_check = QCheckBox(self.tr("Top page edge (book scans)"))
+        self._top_edge_check.setObjectName("topEdgeCheckBox")
+        self._top_edge_check.setToolTip(
+            self.tr(
+                "Use the top page edge for deskew "
+                "(recommended for book scans with dark background)."
+            )
+        )
+        group_layout.addWidget(self._top_edge_check)
+
         self._auto_oblique_check = QCheckBox(self.tr("Automatic oblique correction"))
         self._auto_oblique_check.setObjectName("autoObliqueCheckBox")
         self._auto_oblique_check.setToolTip(
@@ -194,6 +204,7 @@ class OptionsWidget(QWidget):
         self._auto_btn.clicked.connect(self._on_auto_clicked)
         self._manual_btn.clicked.connect(self._on_manual_clicked)
         self._angle_spinbox.valueChanged.connect(self._on_angle_changed)
+        self._top_edge_check.toggled.connect(self._on_top_edge_toggled)
         self._auto_oblique_check.toggled.connect(self._on_auto_oblique_toggled)
         self._oblique_auto_btn.clicked.connect(self._on_oblique_auto_clicked)
         self._oblique_manual_btn.clicked.connect(self._on_oblique_manual_clicked)
@@ -204,6 +215,7 @@ class OptionsWidget(QWidget):
         """Show a fresh page: automatic rotation, oblique per the default."""
         self._updating = True
         try:
+            self._top_edge_check.setChecked(not self._filter.content_based)
             self._auto_oblique_check.setChecked(self._filter.auto_oblique_default)
             self._show_oblique_mode(self._filter.auto_oblique_default)
         finally:
@@ -238,6 +250,7 @@ class OptionsWidget(QWidget):
             # Enable/disable spinbox based on mode
             self._angle_spinbox.setEnabled(params.is_manual())
 
+            self._top_edge_check.setChecked(not self._filter.content_based)
             self._auto_oblique_check.setChecked(self._filter.auto_oblique_default)
             self._show_oblique_mode(params.is_oblique_auto())
             if self._oblique_spinbox.value() != params.oblique_angle_deg:
@@ -298,6 +311,23 @@ class OptionsWidget(QWidget):
             self._updating = False
 
         self.angle_changed.emit(self._current_page_id, value, True)
+
+    def _on_top_edge_toggled(self, checked: bool) -> None:
+        """Choose the detection method, and detect the current page again if automatic.
+
+        Args:
+            checked: True to find the skew from the top page edge.
+        """
+        if self._updating:
+            return
+
+        self._filter.content_based = not checked
+        page_id = self._current_page_id
+        if page_id is None or not self._filter.get_params(page_id).is_auto():
+            return
+        self._filter.redetect_rotation(page_id)
+        self.refresh()
+        self.angle_changed.emit(page_id, self._filter.get_deskew_angle(page_id), False)
 
     def _on_auto_oblique_toggled(self, enabled: bool) -> None:
         """Change the default for new pages, and the page itself while it is automatic.
