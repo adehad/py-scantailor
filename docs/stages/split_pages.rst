@@ -9,6 +9,16 @@ buttons choose a single page, a single page with an offcut, or two pages. The la
 under them reads **Auto detected** until you change the layout yourself with
 **Change ...**.
 
+How the layout is detected
+==========================
+
+**Auto** looks for a folding line or dark spine first, and otherwise for the
+white gap between two pages of text. A spread that is tilted gets a tilted split
+line. With **Single page with an offcut**, the page is cut where its text starts,
+or at the image edge when no edge can be told apart. Text in the scan's margin
+that belongs to a neighbouring page is treated as an offcut only for two-page and
+offcut layouts.
+
 The split lines
 ===============
 
