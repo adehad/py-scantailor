@@ -1,5 +1,7 @@
 """Tests for page background estimation and illumination normalisation."""
 
+import time
+
 import numpy as np
 import pytest
 
@@ -217,3 +219,95 @@ class TestWorkingSize:
         estimate_background(np.full(shape, PAPER, dtype=np.uint8))
 
         assert seen == [expected]
+
+
+def _raised_by_division(gray: np.ndarray, background: np.ndarray) -> np.ndarray:
+    """Direct evaluation of ``round(gray * 255 / background)``, 255 at or above it."""
+    src = gray.astype(np.uint32)
+    bg = background.astype(np.uint32)
+    scaled = np.minimum((src * 255 + bg // 2) // np.maximum(bg, 1), 255)
+    return np.where(bg.astype(np.int32) - src.astype(np.int32) < 1, 255, scaled).astype(
+        np.uint8
+    )
+
+
+def _normalized_through_a_full_render(gray: np.ndarray) -> np.ndarray:
+    return _raised_by_division(gray, estimate_background(gray).render(gray.shape))
+
+
+def _noisy_page(height: int, width: int, seed: int) -> np.ndarray:
+    rng = np.random.default_rng(seed)
+    page = rng.integers(150, 235, size=(height, width)).astype(np.uint8)
+    page[height // 4 : height // 2, width // 4 : width // 2] = INK
+    return page
+
+
+class TestMatchesTheDirectEvaluation:
+    """Table lookup and banded rendering change no pixel."""
+
+    def test_every_gray_and_background_pair_gives_the_same_level(self):
+        gray = np.tile(np.arange(256, dtype=np.uint8), (256, 1))
+        background = np.repeat(np.arange(256, dtype=np.uint8), 256).reshape(256, 256)
+
+        assert np.array_equal(
+            raise_above_background(gray, background),
+            _raised_by_division(gray, background),
+        )
+
+    @pytest.mark.parametrize(
+        "shape", [(333, 257), (31, 1000), (1, 50), (70, 1), (65, 65), (500, 40)]
+    )
+    def test_normalised_page_is_identical_for_any_page_shape(self, shape):
+        page = _noisy_page(*shape, seed=sum(shape))
+
+        assert np.array_equal(
+            normalize_illumination_gray(page), _normalized_through_a_full_render(page)
+        )
+
+    def test_normalised_page_is_identical_when_a_polygon_limits_the_fit(self):
+        page = _noisy_page(400, 300, seed=5)
+        polygon = [(20.0, 30.0), (280.0, 40.0), (270.0, 380.0), (30.0, 360.0)]
+
+        expected = _raised_by_division(
+            page, estimate_background(page, polygon).render(page.shape)
+        )
+
+        assert np.array_equal(normalize_illumination_gray(page, polygon), expected)
+
+    def test_non_contiguous_input_is_normalised_like_a_copy(self):
+        page = _noisy_page(200, 300, seed=2)
+        view = page[::-1, ::2]
+
+        assert np.array_equal(
+            normalize_illumination_gray(view),
+            normalize_illumination_gray(np.ascontiguousarray(view)),
+        )
+
+    def test_input_page_is_not_modified(self):
+        page = _noisy_page(120, 90, seed=9)
+        before = page.copy()
+
+        normalize_illumination_gray(page)
+
+        assert np.array_equal(page, before)
+
+
+@pytest.mark.slow
+class TestSpeed:
+    def test_normalising_is_faster_than_rendering_the_whole_surface(self):
+        page = _noisy_page(3500, 2500, seed=1)
+        normalize_illumination_gray(page[:64, :64])  # compile
+
+        timings = {}
+        for name, run in (
+            ("banded", lambda: normalize_illumination_gray(page)),
+            ("whole", lambda: _normalized_through_a_full_render(page)),
+        ):
+            best = float("inf")
+            for _ in range(2):
+                start = time.perf_counter()
+                run()
+                best = min(best, time.perf_counter() - start)
+            timings[name] = best
+
+        assert timings["banded"] < timings["whole"]

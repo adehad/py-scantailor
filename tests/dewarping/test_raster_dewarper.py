@@ -1,5 +1,6 @@
 """Tests for raster dewarping functions."""
 
+import time
 from types import SimpleNamespace
 
 import numpy as np
@@ -9,6 +10,7 @@ from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
 from scantailor.dewarping.raster_dewarper import (
     InterpolationMethod,
     _compute_dewarp_maps,
+    compute_dewarp_maps,
     compute_dewarped_size,
     dewarp_image,
 )
@@ -322,3 +324,75 @@ class TestComputeDewarpMaps:
         assert np.allclose(map_y[:, -1], 1.0 + 0.5 * (50.0 + 0.975 - 1.0))
         np.testing.assert_allclose(map_x, expected[0], rtol=0, atol=1e-3)
         np.testing.assert_allclose(map_y, expected[1], rtol=0, atol=1e-3)
+
+
+def _broadcast_maps_reference(dewarper, width, height, left, top, right, bottom):
+    """Whole-grid NumPy evaluation of the maps, shifted to pixel centres."""
+    batch = dewarper.map_generatrices(
+        left + (np.arange(width) + 0.5) * ((right - left) / width)
+    )
+    directions = batch.end - batch.start
+    homographies = batch.pln2img_1d
+    model_y = (top + (np.arange(height) + 0.5) * ((bottom - top) / height))[:, None]
+    numerator = homographies[:, 0, 0] * model_y + homographies[:, 0, 1]
+    denominator = homographies[:, 1, 0] * model_y + homographies[:, 1, 1]
+    degenerate = np.abs(denominator) < 1e-10
+    along = np.where(
+        degenerate, 0.5, numerator / np.where(degenerate, 1.0, denominator)
+    )
+    half = np.float32(0.5)
+    return (
+        (batch.start[:, 0] + along * directions[:, 0]).astype(np.float32) - half,
+        (batch.start[:, 1] + along * directions[:, 1]).astype(np.float32) - half,
+    )
+
+
+class TestMapsMatchBroadcastEvaluation:
+    """The compiled kernel reproduces the whole-grid NumPy evaluation exactly."""
+
+    @pytest.mark.parametrize(
+        "size, bounds",
+        [
+            ((64, 48), (0.0, 0.0, 1.0, 1.0)),
+            ((37, 501), (-0.1, -0.2, 1.2, 1.3)),
+            ((301, 17), (0.2, 0.1, 0.8, 0.9)),
+        ],
+        ids=["unit-square", "tall-extrapolated", "wide-inner"],
+    )
+    def test_maps_are_bit_identical(self, curved_dewarper, size, bounds):
+        width, height = size
+        expected = _broadcast_maps_reference(curved_dewarper, width, height, *bounds)
+
+        actual = compute_dewarp_maps(curved_dewarper, size, bounds)
+
+        assert np.array_equal(actual[0], expected[0])
+        assert np.array_equal(actual[1], expected[1])
+
+    def test_degenerate_columns_are_bit_identical(self):
+        dewarper = _DegenerateGeneratrices()
+        expected = _broadcast_maps_reference(dewarper, 20, 15, 0.0, 0.0, 1.0, 1.0)
+
+        actual = compute_dewarp_maps(dewarper, (20, 15), (0.0, 0.0, 1.0, 1.0))
+
+        assert np.array_equal(actual[0], expected[0])
+        assert np.array_equal(actual[1], expected[1])
+
+    def test_kernel_is_faster_than_the_broadcast_evaluation(self, curved_dewarper):
+        size, bounds = (1500, 2000), (0.0, 0.0, 1.0, 1.0)
+        compute_dewarp_maps(curved_dewarper, (8, 8), bounds)  # compile
+        timings = {}
+        for name, run in (
+            ("kernel", lambda: compute_dewarp_maps(curved_dewarper, size, bounds)),
+            (
+                "broadcast",
+                lambda: _broadcast_maps_reference(curved_dewarper, *size, *bounds),
+            ),
+        ):
+            best = float("inf")
+            for _ in range(3):
+                start = time.perf_counter()
+                run()
+                best = min(best, time.perf_counter() - start)
+            timings[name] = best
+
+        assert timings["kernel"] < timings["broadcast"]

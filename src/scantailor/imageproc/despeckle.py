@@ -17,13 +17,29 @@ extra pass is deliberate: it keeps the dots of Arabic letters, the dots of i and
 j and full stops, which the stricter C++ result removes.
 """
 
+from concurrent.futures import ThreadPoolExecutor
+
 import cv2
 import numpy as np
+from numba import njit
 from numpy.typing import NDArray
 
 # Vertical offsets count double so that marks beside a word are preferred over
 # marks above or below it.
 _VERTICAL_SCALE = 2
+
+# Background kept around the ink when cells are assigned, in attach radii. Cells
+# of marks near the page edge extend into it.
+_BORDER_RADII = 2
+
+# Initial capacity of the border pair buffers, in pairs.
+_INITIAL_PAIR_CAPACITY = 1 << 16
+
+# Most threads that share the cell assignment of one image.
+_MAX_BAND_THREADS = 8
+# A band of rows is only worth a thread when it is this many times taller than
+# the rows it shares with its neighbours.
+_MIN_BAND_HEIGHT_IN_BORDERS = 2
 
 _REFERENCE_DPI = 300.0
 _DEFAULT_DPI = 300
@@ -46,6 +62,11 @@ class _Thresholds:
         self.min_relative_parent_weight = (0.05 * level + 0.075) * dpi_factor
         self.pixels_to_sq_dist = int((0.25 * level**2 - 4.25 * level + 14) ** 2)
         self.big_object_size = int(np.floor((5 * level + 2) * dpi_factor + 0.5))
+
+    @property
+    def attach_radius(self) -> int:
+        """Longest distance in pixels over which any small component may attach."""
+        return int(np.ceil(self.big_object_size * np.sqrt(self.pixels_to_sq_dist)))
 
 
 def despeckle(
@@ -75,33 +96,45 @@ def despeckle(
     thresholds = _Thresholds(level, dpi if dpi > 0 else _DEFAULT_DPI)
 
     ink = binary == 0
-    count, labels, stats, _ = cv2.connectedComponentsWithStats(
-        ink.view(np.uint8), connectivity=8
-    )
-    if count == 1:
+    left, top, width, height = cv2.boundingRect(ink.view(np.uint8))
+    if width == 0:
         return binary.copy()
+    # Everything but the Voronoi borders is decided inside the ink's bounding box.
+    box = (slice(top, top + height), slice(left, left + width))
+    count, component_map, stats, _ = cv2.connectedComponentsWithStats(
+        np.ascontiguousarray(ink[box]).view(np.uint8), connectivity=8
+    )
+    labels: NDArray[np.int32] = np.asarray(component_map, dtype=np.int32)
 
     # Every big component becomes node 0; small ones get nodes 1..m.
-    width = stats[:, cv2.CC_STAT_WIDTH]
-    height = stats[:, cv2.CC_STAT_HEIGHT]
-    is_big = (width >= thresholds.big_object_size) | (
-        height >= thresholds.big_object_size
+    component_width = stats[:, cv2.CC_STAT_WIDTH]
+    component_height = stats[:, cv2.CC_STAT_HEIGHT]
+    is_big = (component_width >= thresholds.big_object_size) | (
+        component_height >= thresholds.big_object_size
     )
     is_big[0] = False
     small_labels = np.flatnonzero(~is_big)[1:]
     node_of_label = np.zeros(count, dtype=np.int32)
     node_of_label[small_labels] = np.arange(1, small_labels.size + 1, dtype=np.int32)
     node_of_label[0] = -1
+    cropped = binary[box]
     if not is_big.any():
         keep = np.zeros(small_labels.size + 1, dtype=bool)
-        return _remove_unkept(binary, node_of_label, labels, keep)
+        return _paste(binary, box, _remove_unkept(cropped, node_of_label, labels, keep))
 
-    nodes = node_of_label[labels]
     node_pixels = np.empty(small_labels.size + 1, dtype=np.float64)
     node_pixels[0] = binary.size  # Never too small to be a target.
     node_pixels[1:] = stats[small_labels, cv2.CC_STAT_AREA]
 
-    lo, hi, sq_dist = _nearest_neighbour_distances(nodes, ink)
+    nodes = _pad_with_background(
+        node_of_label[labels],
+        binary.shape,
+        box,
+        _BORDER_RADII * thresholds.attach_radius,
+    )
+    border = _BORDER_RADII * thresholds.attach_radius
+    everyone = np.ones(node_pixels.size, dtype=bool)
+    lo, hi, sq_dist = _nearest_neighbour_distances(nodes, everyone, False, border)
     near_small, near_big = _anchor_tags(
         lo, hi, sq_dist, node_pixels, thresholds, node_pixels.size
     )
@@ -111,9 +144,7 @@ def despeckle(
         # Voronoi cells of nearer components can hide a bigger neighbour, so
         # components with only small neighbours look again with the others
         # fixed in place.
-        second = _nearest_neighbour_distances(
-            nodes, ink & only_small[nodes], fixed=ink & ~only_small[nodes]
-        )
+        second = _nearest_neighbour_distances(nodes, only_small, True, border)
         lo, hi, sq_dist = _min_per_pair(
             np.concatenate([lo, second[0]]),
             np.concatenate([hi, second[1]]),
@@ -122,7 +153,44 @@ def despeckle(
         )
 
     keep = _reachable_from_big(lo, hi, sq_dist, node_pixels, thresholds)
-    return _remove_unkept(binary, node_of_label, labels, keep)
+    return _paste(binary, box, _remove_unkept(cropped, node_of_label, labels, keep))
+
+
+def _paste(
+    binary: NDArray[np.uint8],
+    box: tuple[slice, slice],
+    cropped_result: NDArray[np.uint8],
+) -> NDArray[np.uint8]:
+    """Return a copy of ``binary`` with ``cropped_result`` in place of ``box``."""
+    result = binary.copy()
+    result[box] = cropped_result
+    return result
+
+
+def _pad_with_background(
+    nodes: NDArray[np.int32],
+    image_shape: tuple[int, ...],
+    box: tuple[slice, slice],
+    border: int,
+) -> NDArray[np.int32]:
+    """Surround the nodes of ``box`` with the background the image has there.
+
+    Args:
+        nodes (NDArray[np.int32]): Node ids of the pixels of ``box``.
+        image_shape (tuple[int, ...]): Shape of the whole image.
+        box (tuple[slice, slice]): Rows and columns of the image that ``nodes`` cover.
+        border (int): Most background pixels to add on each side; fewer where the
+            image ends sooner.
+
+    Returns:
+        NDArray[np.int32]: Node ids with -1 for background in the padding.
+    """
+    rows, cols = box
+    pad = (
+        (min(border, rows.start), min(border, image_shape[0] - rows.stop)),
+        (min(border, cols.start), min(border, image_shape[1] - cols.stop)),
+    )
+    return np.pad(nodes, pad, constant_values=-1)
 
 
 def _remove_unkept(
@@ -143,8 +211,9 @@ def _remove_unkept(
 
 def _nearest_neighbour_distances(
     nodes: NDArray[np.int32],
-    sources: NDArray[np.bool_],
-    fixed: NDArray[np.bool_] | None = None,
+    claims: NDArray[np.bool_],
+    rest_is_fixed: bool,
+    halo: int,
 ) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
     """Find the closest approach between components that share a Voronoi border.
 
@@ -153,18 +222,64 @@ def _nearest_neighbour_distances(
     different components, the squared plain Euclidean distance between their
     two source pixels is a candidate for the distance between those components.
 
+    The rows are cut into bands that threads work on side by side. Each band
+    sees ``halo`` rows beyond its own, which settles the cells of every pixel
+    that has a source within twice that many pixels; borders farther from their
+    sources than that are not seen.
+
     Args:
         nodes (NDArray[np.int32]): Node id per pixel, -1 for background.
-        sources (NDArray[np.bool_]): Pixels that claim territory.
-        fixed (NDArray[np.bool_] | None): Pixels that keep their own node and
-            never claim territory, for example ink of components that were
-            already resolved.
+        claims (NDArray[np.bool_]): Per node, whether its ink claims territory.
+        rest_is_fixed (bool): Whether the ink of nodes that do not claim keeps
+            its own node as an unclaiming obstacle, for example because those
+            components were already resolved.
+        halo (int): Rows of context around a band.
 
     Returns:
         tuple: ``(lo, hi, sq_dist)`` with one entry per component pair, node
             ids ``lo < hi`` and the minimum squared distance found.
     """
+    rows = nodes.shape[0]
+    workers = min(cv2.getNumThreads(), _MAX_BAND_THREADS)
+    band_count = max(1, min(workers, rows // (_MIN_BAND_HEIGHT_IN_BORDERS * halo)))
+    edges = np.linspace(0, rows, band_count + 1).astype(int)
+
+    def band(index: int) -> tuple[NDArray[np.int64], ...]:
+        return _band_pairs(
+            nodes, claims, rest_is_fixed, halo, edges[index], edges[index + 1]
+        )
+
+    if band_count == 1:
+        parts = [band(0)]
+    else:
+        with ThreadPoolExecutor(max_workers=band_count) as pool:
+            parts = list(pool.map(band, range(band_count)))
+    return _min_per_pair(
+        np.concatenate([part[0] for part in parts]),
+        np.concatenate([part[1] for part in parts]),
+        np.concatenate([part[2] for part in parts]),
+        claims.size,
+    )
+
+
+def _band_pairs(
+    nodes: NDArray[np.int32],
+    claims: NDArray[np.bool_],
+    rest_is_fixed: bool,
+    halo: int,
+    first_row: int,
+    stop_row: int,
+) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
+    """Return the border pairs of the pixel pairs that start in a band of rows."""
     scale = _VERTICAL_SCALE
+    top = max(0, first_row - halo)
+    window = nodes[top : min(nodes.shape[0], stop_row + halo + 1)]
+    ink = window >= 0
+    sources = ink & claims[window]
+    if not sources.any():
+        empty = np.empty(0, dtype=np.int64)
+        return empty, empty, empty
+
     # Stretching rows makes the Euclidean transform use the scaled metric. Row
     # r of the stretched grid shows row r // scale of the image.
     stretched = np.repeat(np.where(sources, 0, 255).astype(np.uint8), scale, 0)
@@ -181,59 +296,110 @@ def _nearest_neighbour_distances(
     table_node = np.full_like(table_x, -1)
     table_x[cell_ids] = np.repeat(source_x, scale)
     table_y[cell_ids] = np.repeat(source_y, scale)
-    table_node[cell_ids] = np.repeat(nodes[source_y, source_x], scale)
+    table_node[cell_ids] = np.repeat(window[source_y, source_x], scale)
 
-    cell_node = table_node[cells]
-    if fixed is not None:
-        fixed_stretched = np.repeat(fixed, scale, 0)
-        cell_node[fixed_stretched] = np.repeat(nodes, scale, 0)[fixed_stretched]
-
-    # Only the first of the stretched rows that show an image row is compared, so
-    # the neighbours are the 4-connected pixels of the original image.
-    parts_a, parts_b, parts_d = [], [], []
-    comparisons = (
-        (cell_node[::scale, :-1], cell_node[::scale, 1:], (scale, 1), (0, 1)),
-        (cell_node[:-scale:scale], cell_node[scale::scale], (scale, 1), (scale, 0)),
+    own = ink & ~sources if rest_is_fixed else np.zeros(window.shape, dtype=bool)
+    lo, hi, sq_dist = _border_pairs(
+        cells,
+        scale,
+        table_x,
+        table_y,
+        table_node,
+        window,
+        own,
+        first_row - top,
+        stop_row - top,
     )
-    for first, second, step, offset in comparisons:
-        i, j = np.nonzero(first != second)
-        row_a, col_a = i * step[0], j * step[1]
-        row_b, col_b = row_a + offset[0], col_a + offset[1]
-        x_a, y_a = _source_points(cells, table_x, table_y, fixed, row_a, col_a)
-        x_b, y_b = _source_points(cells, table_x, table_y, fixed, row_b, col_b)
-        parts_a.append(first[i, j].astype(np.int64))
-        parts_b.append(second[i, j].astype(np.int64))
-        parts_d.append((x_a - x_b) ** 2 + (y_a - y_b) ** 2)
-
-    node_a = np.concatenate(parts_a)
-    node_b = np.concatenate(parts_b)
-    sq_dist = np.concatenate(parts_d)
-    valid = (node_a >= 0) & (node_b >= 0)
-    return _min_per_pair(
-        np.minimum(node_a, node_b)[valid],
-        np.maximum(node_a, node_b)[valid],
-        sq_dist[valid],
-        int(nodes.max()) + 1,
-    )
+    return _min_per_pair(lo, hi, sq_dist, claims.size)
 
 
-def _source_points(
+@njit(cache=True, nogil=True)
+def _border_pairs(
     cells: NDArray[np.int32],
+    scale: int,
     table_x: NDArray[np.int32],
     table_y: NDArray[np.int32],
-    fixed: NDArray[np.bool_] | None,
-    rows: NDArray[np.intp],
-    cols: NDArray[np.intp],
-) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
-    """Image coordinates of the source pixel that owns each stretched position."""
-    cell = cells[rows, cols]
-    x = table_x[cell].astype(np.int64)
-    y = table_y[cell].astype(np.int64)
-    if fixed is not None:
-        own = fixed[rows // _VERTICAL_SCALE, cols]
-        x = np.where(own, cols, x)
-        y = np.where(own, rows // _VERTICAL_SCALE, y)
-    return x, y
+    table_node: NDArray[np.int32],
+    nodes: NDArray[np.int32],
+    own: NDArray[np.bool_],
+    row_start: int,
+    row_stop: int,
+) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
+    """List the squared source distance at every border between two components.
+
+    Only the first of the stretched rows that show an image row is looked at, so
+    the neighbours compared are the 4-connected pixels of the image. A pixel in
+    ``own`` belongs to its own node and is its own source; any other pixel
+    belongs to the source of its cell. A pixel is compared with its left and its
+    upper neighbour, for the rows ``row_start`` to ``row_stop`` exclusive.
+
+    Returns:
+        tuple: Parallel arrays of the lower node, the higher node and the squared
+            distance, one entry per border pixel pair between components.
+    """
+    width = nodes.shape[1]
+    capacity = _INITIAL_PAIR_CAPACITY
+    lows = np.empty(capacity, dtype=np.int64)
+    highs = np.empty(capacity, dtype=np.int64)
+    dists = np.empty(capacity, dtype=np.int64)
+    count = 0
+    above_node = np.full(width, -1, dtype=np.int32)
+    if row_start > 0:
+        for col in range(width):
+            if own[row_start - 1, col]:
+                above_node[col] = nodes[row_start - 1, col]
+            else:
+                above_node[col] = table_node[cells[(row_start - 1) * scale, col]]
+    for row in range(row_start, row_stop):
+        stretched_row = row * scale
+        left_node = np.int32(-1)
+        for col in range(width):
+            if own[row, col]:
+                node = nodes[row, col]
+            else:
+                node = table_node[cells[stretched_row, col]]
+            for neighbour in range(2):
+                if neighbour == 0:
+                    if col == 0:
+                        continue
+                    other = left_node
+                    other_row, other_col = row, col - 1
+                else:
+                    if row == 0:
+                        continue
+                    other = above_node[col]
+                    other_row, other_col = row - 1, col
+                if node == other or node < 0 or other < 0:
+                    continue
+                if own[row, col]:
+                    x_a, y_a = col, row
+                else:
+                    cell = cells[stretched_row, col]
+                    x_a, y_a = table_x[cell], table_y[cell]
+                if own[other_row, other_col]:
+                    x_b, y_b = other_col, other_row
+                else:
+                    cell = cells[other_row * scale, other_col]
+                    x_b, y_b = table_x[cell], table_y[cell]
+                if count == capacity:
+                    capacity *= 2
+                    lows = _grown(lows, capacity)
+                    highs = _grown(highs, capacity)
+                    dists = _grown(dists, capacity)
+                lows[count] = min(node, other)
+                highs[count] = max(node, other)
+                dists[count] = np.int64(x_a - x_b) ** 2 + np.int64(y_a - y_b) ** 2
+                count += 1
+            left_node = node
+            above_node[col] = node
+    return lows[:count], highs[:count], dists[:count]
+
+
+@njit(cache=True, nogil=True)
+def _grown(array: NDArray[np.int64], capacity: int) -> NDArray[np.int64]:
+    bigger = np.empty(capacity, dtype=np.int64)
+    bigger[: array.size] = array
+    return bigger
 
 
 def _min_per_pair(
