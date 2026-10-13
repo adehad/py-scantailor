@@ -326,6 +326,45 @@ class TestRenderTransformed:
         assert np.all(result[:, :40] == 0)
         assert np.all(result[:, 40:] == 255)
 
+    def test_concave_pre_crop_whitens_the_notch(self) -> None:
+        """An L-shaped pre-crop leaves the notch white instead of filling its hull."""
+        image = np.zeros((60, 80), dtype=np.uint8)
+        xform = ImageTransformation.from_size(80, 60, Dpi.uniform(300))
+        xform.set_pre_crop_area(
+            np.array(
+                [[0, 0], [80, 0], [80, 30], [40, 30], [40, 60], [0, 60]], dtype=float
+            )
+        )
+        xform.set_post_crop_area(
+            np.array([[0, 0], [80, 0], [80, 60], [0, 60]], dtype=float)
+        )
+
+        result = render_transformed(image, xform)
+
+        assert np.all(result[:30, :] == 0)
+        assert np.all(result[30:, :40] == 0)
+        assert np.all(result[32:, 42:] == 255)
+
+    def test_rgb_pre_crop_matches_each_channel_rendered_alone(self) -> None:
+        """A slanted pre-crop whitens all three channels of a colour page alike."""
+        rng = np.random.default_rng(7)
+        rgb = rng.integers(0, 200, size=(60, 80, 3), dtype=np.uint8)
+        xform = ImageTransformation.from_size(80, 60, Dpi.uniform(300))
+        xform.set_pre_crop_area(
+            np.array([[10, 0], [80, 10], [70, 60], [0, 50]], dtype=float)
+        )
+        xform.set_post_rotation(5.0)
+
+        result = render_transformed(rgb, xform)
+
+        assert result.shape[2] == 3
+        assert result[0, 0].tolist() == [255, 255, 255]
+        for channel in range(3):
+            np.testing.assert_array_equal(
+                result[..., channel],
+                render_transformed(np.ascontiguousarray(rgb[..., channel]), xform),
+            )
+
     def test_rotation_expands_canvas_and_fills_corners_white(self) -> None:
         """Rotating a black page leaves white wedges at the corners."""
         image = np.zeros((60, 80), dtype=np.uint8)

@@ -260,3 +260,105 @@ def test_geometry_survives_a_json_round_trip_and_builds_the_same_job(
     source = tmp_path / "source.pdf"
     assert restored.job(source, 0, DPI) == geometry.job(source, 0, DPI)
     assert geometry.job(source, 0, DPI).rect_width == WIDTH_PX
+
+
+BOOK_LINES = [
+    "The quick brown fox jumps over",
+    "a lazy dog while the afternoon",
+    "light slides across the pages of",
+    "an old and much loved volume",
+    "that nobody has opened for years",
+    "Pack my box with five dozen jugs",
+    "of liquor before the long winter",
+    "sets in and the roads are closed",
+]
+
+
+def _write_book_page(path: Path) -> Path:
+    """A page of text lines that spans the width between the curved edges."""
+    pdf = pikepdf.Pdf.new()
+    font = pdf.make_indirect(
+        Dictionary(Type=Name.Font, Subtype=Name.Type1, BaseFont=Name.Helvetica)
+    )
+    page = pdf.add_blank_page(page_size=(PAGE_WIDTH_PT, PAGE_HEIGHT_PT))
+    page.Resources = Dictionary(Font=Dictionary(F1=font))
+    first_baseline, pitch = 250, 26
+    content = "".join(
+        f"BT /F1 11 Tf 22 {first_baseline - n * pitch} Td ({line}) Tj ET\n"
+        for n, line in enumerate(BOOK_LINES)
+    )
+    page.Contents = pdf.make_stream(content.encode())
+    pdf.save(path)
+    return path
+
+
+def _character_boxes_px(path: Path) -> np.ndarray:
+    """Left, top, right and bottom, in output pixels, of every visible character."""
+    document = pdfium.PdfDocument(str(path))
+    try:
+        textpage = document[0].get_textpage()
+        text = textpage.get_text_range()
+        boxes = [
+            textpage.get_charbox(i, loose=True)
+            for i, char in enumerate(text)
+            if not char.isspace()
+        ]
+    finally:
+        document.close()
+    scale = DPI.horizontal / 72
+    left, bottom, right, top = np.array(boxes).T
+    return (
+        np.column_stack([left, PAGE_HEIGHT_PT - top, right, PAGE_HEIGHT_PT - bottom])
+        * scale
+    )
+
+
+def _ink_offsets_from_boxes(ink: np.ndarray, boxes: np.ndarray) -> np.ndarray:
+    """Vertical distance of the ink under each character box from the box centre."""
+    offsets = []
+    for left, top, right, bottom in boxes:
+        centre = (top + bottom) / 2
+        rows, _cols = np.nonzero(
+            ink[
+                max(int(centre) - 22, 0) : int(centre) + 23,
+                max(int(left), 0) : int(right) + 1,
+            ]
+        )
+        if rows.size >= 3:
+            offsets.append(rows.mean() + max(int(centre) - 22, 0) - centre)
+    return np.array(offsets)
+
+
+def test_text_of_a_curved_book_page_follows_the_dewarped_lines(
+    tmp_path: Path,
+) -> None:
+    source = _write_book_page(tmp_path / "book.pdf")
+    dewarper = dewarper_from_polylines(SPEC.top, SPEC.bottom, DEPTH)
+    assert dewarper is not None
+    maps = compute_dewarp_maps(
+        dewarper,
+        (WIDTH_PX, HEIGHT_PX),
+        output_model_domain(dewarper, (WIDTH_PX, HEIGHT_PX)),
+    )
+    ink = remap_with_maps(_render_gray(source), maps, 255) < 128
+    dewarped = build_text_layer(
+        source, 0, _identity(), DPI, DPI, dewarped=True, dewarp=SPEC
+    )
+    flat = build_text_layer(source, 0, _identity(), DPI, DPI)
+    assert dewarped is not None
+    assert flat is not None
+    _output_pdf(tmp_path / "dewarped.pdf", dewarped)
+    _output_pdf(tmp_path / "flat.pdf", flat)
+
+    through_dewarp = _ink_offsets_from_boxes(
+        ink, _character_boxes_px(tmp_path / "dewarped.pdf")
+    )
+    without_dewarp = _ink_offsets_from_boxes(
+        ink, _character_boxes_px(tmp_path / "flat.pdf")
+    )
+
+    # The ink sits at a fixed height inside a character box, so a layer that
+    # follows the lines leaves a constant offset and one that does not, a drifting one.
+    assert through_dewarp.size > 150
+    assert through_dewarp.std() < 2.5
+    assert without_dewarp.std() > 2 * through_dewarp.std()

@@ -1,13 +1,9 @@
 """Batch processing lower panel for batch operation controls."""
 
-from pathlib import Path
-
 from PySide6 import QtWidgets
 from PySide6.QtCore import Signal
 
 from scantailor.app.ui.panels.system_load import SystemLoadWidget
-
-_UI_FOLDER = Path(__file__).parent
 
 
 class BatchProcessingLowerPanel(QtWidgets.QWidget):
@@ -34,57 +30,48 @@ class BatchProcessingLowerPanel(QtWidgets.QWidget):
             parent: Parent widget.
         """
         super().__init__(parent)
-
-        # Load UI - note: the UI references SystemLoadWidget as a custom widget
-        # We need to manually create it since QUiLoader won't know about it
-        self._setup_ui()
-        self._connect_signals()
-
-    def _setup_ui(self) -> None:
-        """Set up the UI manually since we have a custom widget."""
-        # Create main layout
         layout = QtWidgets.QGridLayout(self)
 
-        # Create system load widget
+        # SystemLoadWidget loads its own form, and a QUiLoader that instantiates it
+        # invalidates the Python wrappers it holds, so it is created here instead.
         self._system_load_widget = SystemLoadWidget(parent=self)
+        self._system_load_widget.setObjectName("systemLoadWidget")
         layout.addWidget(self._system_load_widget, 0, 0, 1, 4)
 
-        # Add spacers and checkbox
-        layout.addItem(
-            QtWidgets.QSpacerItem(
-                1,
-                1,
-                QtWidgets.QSizePolicy.Policy.Expanding,
-                QtWidgets.QSizePolicy.Policy.Minimum,
-            ),
-            1,
-            0,
-        )
-
-        self._beep_checkbox = QtWidgets.QCheckBox("Beep when finished", self)
+        # Spacers on both sides centre the checkbox.
+        self._add_horizontal_spacer(layout, column=0)
+        self._beep_checkbox = QtWidgets.QCheckBox(self.tr("Beep when finished"), self)
+        self._beep_checkbox.setObjectName("beepWhenFinished")
         layout.addWidget(self._beep_checkbox, 1, 1)
+        self._add_horizontal_spacer(layout, column=2)
 
-        layout.addItem(
-            QtWidgets.QSpacerItem(
-                1,
-                1,
-                QtWidgets.QSizePolicy.Policy.Expanding,
-                QtWidgets.QSizePolicy.Policy.Minimum,
-            ),
-            1,
-            2,
-        )
-
-    def _connect_signals(self) -> None:
-        """Connect widget signals."""
         self._system_load_widget.load_changed.connect(self.load_changed.emit)
         self._beep_checkbox.toggled.connect(self.beep_setting_changed.emit)
+
+    @staticmethod
+    def _add_horizontal_spacer(layout: QtWidgets.QGridLayout, column: int) -> None:
+        """Add an expanding spacer to the checkbox row.
+
+        Args:
+            layout (QtWidgets.QGridLayout): The panel layout.
+            column (int): Grid column of the spacer.
+        """
+        layout.addItem(
+            QtWidgets.QSpacerItem(
+                1,
+                1,
+                QtWidgets.QSizePolicy.Policy.Expanding,
+                QtWidgets.QSizePolicy.Policy.Minimum,
+            ),
+            1,
+            column,
+        )
 
     def get_load(self) -> int:
         """Get the current system load value.
 
         Returns:
-            Current load value (number of threads to use).
+            int: Number of pages processed at once.
         """
         return self._system_load_widget.get_load()
 
@@ -92,7 +79,7 @@ class BatchProcessingLowerPanel(QtWidgets.QWidget):
         """Set the system load value.
 
         Args:
-            value: Load value to set.
+            value (int): Number of pages to process at once.
         """
         self._system_load_widget.set_load(value)
 
@@ -100,7 +87,7 @@ class BatchProcessingLowerPanel(QtWidgets.QWidget):
         """Check if beep on finish is enabled.
 
         Returns:
-            True if beep is enabled.
+            bool: True if the panel will beep when the batch finishes.
         """
         return self._beep_checkbox.isChecked()
 
@@ -108,6 +95,6 @@ class BatchProcessingLowerPanel(QtWidgets.QWidget):
         """Set the beep on finish setting.
 
         Args:
-            enabled: Whether to beep when finished.
+            enabled (bool): Whether to beep when finished.
         """
         self._beep_checkbox.setChecked(enabled)

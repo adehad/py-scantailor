@@ -10,6 +10,7 @@ import pytest
 from pikepdf import Dictionary, Name, OutlineItem
 
 from scantailor.app.ui.pdf_worker import (
+    SOURCE_FILE_NAME,
     PagePlan,
     PdfExportRequest,
     PdfSource,
@@ -199,7 +200,19 @@ def test_a_cancelled_import_leaves_an_earlier_import_in_the_folder(
         import_pdf_pages(pdf, pages, 100, lambda *_: cancel.set(), cancel)
 
     assert {p.name: p.read_bytes() for p in pages.glob("page_*.png")} == before
-    assert PdfSource.load(pages) == first.source
+
+
+def test_an_import_leaves_the_mapping_to_the_project_not_a_sidecar_file(
+    tmp_path: Path,
+) -> None:
+    pdf = _source(tmp_path / "book.pdf")
+    pages = tmp_path / "pages"
+
+    imported = import_pdf_pages(pdf, pages, 72, lambda *_: None, threading.Event())
+
+    assert imported.source.pdf_path == pdf
+    assert imported.source.pages == {p.name: n for n, p in enumerate(imported.images)}
+    assert not (pages / SOURCE_FILE_NAME).exists()
 
 
 def test_import_reports_the_pages_as_they_are_rendered(tmp_path: Path) -> None:
