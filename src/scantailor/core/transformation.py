@@ -160,9 +160,13 @@ def _rotation_matrix(degrees: float) -> NDArray[np.float64]:
 
 
 def _shear_matrix(oblique_degrees: float) -> NDArray[np.float64]:
-    """Create the horizontal shear x' = x - tan(oblique / 2) * y about the origin."""
+    """Create the horizontal shear x' = x - tan(oblique) * y about the origin.
+
+    A vertical line leaning right by ``oblique`` degrees going down comes out
+    vertical; heights and horizontal distances are kept.
+    """
     m = np.eye(3, dtype=np.float64)
-    m[0, 1] = -math.tan(math.radians(oblique_degrees) * 0.5)
+    m[0, 1] = -math.tan(math.radians(oblique_degrees))
     return m
 
 
@@ -487,11 +491,12 @@ class ImageTransformation:
     def set_post_oblique(self, degrees: float) -> None:
         """Set the oblique (shear) correction, resetting subsequent steps.
 
-        The shear is applied after the deskew rotation: x' = x - tan(degrees / 2) * y.
-        Half the angle keeps the page's proportions.
+        The shear is applied after the deskew rotation: x' = x - tan(degrees) * y.
 
         Args:
-            degrees (float): Oblique angle in degrees; zero means no shear.
+            degrees (float): Lean of the page's vertical axis in degrees, positive
+                when it drifts right going down; the shear removes exactly that
+                lean. Zero means no shear.
         """
         self._post_oblique = degrees
         self._post_rotate_xform = self._calc_post_rotate_xform(
