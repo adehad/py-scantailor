@@ -296,6 +296,12 @@ class OutputImageView(ImageViewBase):
         self._message.setWordWrap(True)
         self._message.setAutoFillBackground(True)
         self._message.hide()
+        self._dewarp_note = QtWidgets.QLabel(self)
+        self._dewarp_note.setObjectName("dewarpMetricsNote")
+        self._dewarp_note.setWordWrap(True)
+        self._dewarp_note.setAutoFillBackground(True)
+        self._dewarp_note.setMargin(4)
+        self._dewarp_note.hide()
         self._dewarp = DewarpEditor(self, self.distortion_model_changed.emit)
         self._pickup = ColorPickupInteraction(self)
         self._pickup.color_picked.connect(self._apply_picked_color)
@@ -490,6 +496,7 @@ class OutputImageView(ImageViewBase):
         self.set_status_tip("")
         self._show_tab_image(tab)
         self._update_message()
+        self._update_dewarp_note()
         self._update_mask_pulse()
         self.update()
         self.tab_changed.emit(tab)
@@ -519,8 +526,36 @@ class OutputImageView(ImageViewBase):
         super().resizeEvent(event)
         self._tab_bar.setGeometry(0, 0, self.width(), self._tab_bar.height())
         self._update_message()
+        self._update_dewarp_note()
 
     # Dewarping tab
+
+    def set_dewarp_note(self, text: str | None) -> None:
+        """Show a line about the automatic model along the bottom of the dewarping tab.
+
+        Args:
+            text (str | None): What automatic dewarping found on the page; None
+                or empty shows nothing.
+        """
+        self._dewarp_note.setText(text or "")
+        self._update_dewarp_note()
+
+    def dewarp_note(self) -> str:
+        """Return the line shown about the automatic model, empty when none.
+
+        Returns:
+            str: The text of the note.
+        """
+        return self._dewarp_note.text()
+
+    def _update_dewarp_note(self) -> None:
+        note = self._dewarp_note
+        shown = self._tab is ImageViewTab.DEWARPING and bool(note.text())
+        note.setVisible(shown)
+        if shown:
+            height = note.heightForWidth(self.width())
+            note.setGeometry(0, self.height() - height, self.width(), height)
+            note.raise_()
 
     def set_distortion_model(
         self,

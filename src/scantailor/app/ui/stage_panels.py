@@ -500,6 +500,11 @@ class StagePanels(QtCore.QObject):
             extras (OutputExtras): What the render of the current page made.
         """
         self._extras = extras
+        metrics = extras.dewarp_metrics
+        if isinstance(self.options, output.OptionsWidget):
+            self.options.set_dewarp_metrics(metrics)
+        if isinstance(self.view, OutputImageView):
+            self.view.set_dewarp_note(None if metrics is None else metrics.describe())
 
     def _on_option_edited(self, *_args: object) -> None:
         # The widgets have already stored the new values, so the signal
@@ -629,6 +634,7 @@ class StagePanels(QtCore.QObject):
             view.set_picture_mask(None)
             view.set_despeckle_source(None, 0, DespeckleLevel.OFF)
             view.set_tab_message(ImageViewTab.DESPECKLING, None)
+            view.set_dewarp_note(None)
 
     def _present(self) -> None:
         """Show the page's image once the source and the render have arrived."""

@@ -10,15 +10,23 @@ The tracers and the model builder are the C++ ones. A page whose curves give no
 valid model gets none, where the C++ output stage substitutes the model of the
 content rectangle, which leaves the content as it is. ``trivial_distortion_model``
 builds that model for callers that need it.
+
+Unlike upstream, a model whose two curves lie close together is refused: the
+builder extends the pair over the whole page, so two neighbouring lines turn a
+wobble of a pixel into an error of dozens of pixels at the far end of the page.
+``DewarpMetrics`` records what the tracing found and why a page got no model.
 """
 
 import math
+from dataclasses import dataclass
+from enum import Enum
 
 import cv2
 import numpy as np
 from numpy.typing import NDArray
 
 from scantailor.core.models import Dpi
+from scantailor.dewarping import DEFAULT_MIN_SPAN_PERCENT
 from scantailor.dewarping.distortion_model import Curve, DistortionModel
 from scantailor.dewarping.distortion_model_builder import DistortionModelBuilder
 from scantailor.dewarping.line_geometry import q_round
@@ -30,6 +38,105 @@ ContentRect = tuple[float, float, float, float]
 # The outer border may lean this many degrees before a curve is extended.
 _MAX_BORDER_SKEW_DEG = 2.75
 _WARM_UP_SIZE = (720, 520)
+
+
+class ModelOutcome(Enum):
+    """Whether a page got an automatic model, and if not, why.
+
+    NO_TEXT: neither text lines nor page edges were found.
+    TOO_FEW_CURVES: fewer than two curves survived the tracers' filters.
+    NO_PAIR: no pair of curves gives a workable dewarper.
+    SPAN_TOO_SMALL: the chosen curves lie closer together than the minimum.
+    """
+
+    BUILT = "built"
+    NO_TEXT = "no_text"
+    TOO_FEW_CURVES = "too_few_curves"
+    NO_PAIR = "no_pair"
+    SPAN_TOO_SMALL = "span_too_small"
+
+
+@dataclass(frozen=True)
+class DewarpMetrics:
+    """What automatic dewarping found on a page.
+
+    Attributes:
+        lines_traced (int): Text lines the tracer found before its filters.
+        lines_kept (int): Text lines left after the filters.
+        edges_traced (int): Page edges found, 0 to 2.
+        outcome (ModelOutcome): Whether a model was built, or why not.
+        min_span_percent (float): The minimum span the page was held to.
+        span_percent (float | None): Distance between the chosen curves as a
+            percentage of the content height; None when no pair was chosen.
+        top_from_edge (bool | None): True when the top curve is a page edge,
+            False when it is a text line; None when no pair was chosen.
+        bottom_from_edge (bool | None): The same for the bottom curve.
+    """
+
+    lines_traced: int
+    lines_kept: int
+    edges_traced: int
+    outcome: ModelOutcome
+    min_span_percent: float
+    span_percent: float | None = None
+    top_from_edge: bool | None = None
+    bottom_from_edge: bool | None = None
+
+    def describe(self) -> str:
+        """Say in a sentence or two what was found and what became of it.
+
+        Returns:
+            str: Plain words for the Output stage's dewarping controls.
+        """
+        if self.outcome is ModelOutcome.NO_TEXT:
+            return "No text lines or page edges found, so the page is left as is."
+        found = (
+            f"{self.lines_kept} of {self.lines_traced} lines kept, "
+            f"{_edges(self.edges_traced)}"
+        )
+        if self.outcome is ModelOutcome.TOO_FEW_CURVES:
+            return f"{found}: fewer than two curves, so the page is left as is."
+        if self.outcome is ModelOutcome.NO_PAIR:
+            return (
+                f"{found}, but no pair of curves gives a usable model, "
+                "so the page is left as is."
+            )
+        assert self.span_percent is not None
+        span = f"Curves span {self.span_percent:.0f}% of the text"
+        if self.outcome is ModelOutcome.SPAN_TOO_SMALL:
+            return (
+                f"{found}. {span}. Below the {self.min_span_percent:.0f}% minimum, "
+                f"so the page is left as is; a minimum of "
+                f"{math.floor(self.span_percent):.0f}% or less would use them."
+            )
+        return (
+            f"{found}. {span}, top from {_source(self.top_from_edge)}, "
+            f"bottom from {_source(self.bottom_from_edge)}."
+        )
+
+
+def _edges(count: int) -> str:
+    if count == 0:
+        return "no page edge"
+    return f"{count} page edge" if count == 1 else f"{count} page edges"
+
+
+def _source(from_edge: bool | None) -> str:
+    return "the page edge" if from_edge else "a text line"
+
+
+@dataclass(frozen=True)
+class AutoModelResult:
+    """A detected model, or none, and the metrics behind it.
+
+    Attributes:
+        model (DistortionModel | None): The model, None when the page gets none.
+        metrics (DewarpMetrics): What was found and why the model was or was
+            not built.
+    """
+
+    model: DistortionModel | None
+    metrics: DewarpMetrics
 
 
 def warm_up_kernels() -> None:
@@ -86,8 +193,11 @@ def build_auto_distortion_model(
     spine_on_right: bool = True,
     edge_gray: NDArray[np.uint8] | None = None,
     to_edge_image: NDArray[np.float64] | None = None,
+    min_span_percent: float = DEFAULT_MIN_SPAN_PERCENT,
 ) -> DistortionModel | None:
     """Detect the page's curvature from its text lines and page edges.
+
+    ``detect_distortion_model`` does the same and also tells what it found.
 
     Args:
         gray (NDArray[np.uint8]): 2-D gray page as laid out for output, dark text
@@ -103,10 +213,40 @@ def build_auto_distortion_model(
         to_edge_image (NDArray[np.float64] | None): Affine ``(2, 3)`` or
             ``(3, 3)`` matrix from ``gray`` pixels to ``edge_gray`` pixels.
             Required with ``edge_gray``.
+        min_span_percent (float): A model whose curves lie closer together
+            than this share of the content height, in percent, is refused.
 
     Returns:
         DistortionModel | None: The model in the pixels of ``edge_gray`` (or
-            ``gray``), or None when the curves give no valid model.
+            ``gray``), or None when the curves give no valid model or the model
+            is refused.
+    """
+    return detect_distortion_model(
+        gray,
+        dpi,
+        content_rect,
+        spine_on_right,
+        edge_gray,
+        to_edge_image,
+        min_span_percent,
+    ).model
+
+
+def detect_distortion_model(
+    gray: NDArray[np.uint8],
+    dpi: Dpi | tuple[float, float] | float,
+    content_rect: ContentRect,
+    spine_on_right: bool = True,
+    edge_gray: NDArray[np.uint8] | None = None,
+    to_edge_image: NDArray[np.float64] | None = None,
+    min_span_percent: float = DEFAULT_MIN_SPAN_PERCENT,
+) -> AutoModelResult:
+    """Detect the page's curvature and report what the tracing found.
+
+    The arguments are those of ``build_auto_distortion_model``.
+
+    Returns:
+        AutoModelResult: The model, or None with the reason in the metrics.
     """
     if (edge_gray is None) != (to_edge_image is None):
         raise ValueError("edge_gray and to_edge_image go together")
@@ -118,26 +258,70 @@ def build_auto_distortion_model(
         q_round(content_rect[3]),
     )
     traced = trace_text_lines(gray, dpi, rect)
+    lines_traced = traced.traced_count
+    lines_kept = len(traced.lines)
     bounds = traced.vertical_bounds
-    if bounds is None:
-        return None
-
+    edges: list[NDArray[np.float64]] = []
     builder = DistortionModelBuilder((0.0, 1.0))
-    builder.set_vertical_bounds(bounds.first, bounds.second)
-    for line in traced.lines:
-        builder.add_horizontal_curve(line)
-    if to_edge_image is not None:
-        builder.transform(to_edge_image)
+    if bounds is not None:
+        builder.set_vertical_bounds(bounds.first, bounds.second)
+        for line in traced.lines:
+            builder.add_horizontal_curve(line)
+        if to_edge_image is not None:
+            builder.transform(to_edge_image)
+        edge_image = gray if edge_gray is None else edge_gray
+        edges = trace_top_bottom_edges(edge_image, builder.vertical_bounds())
+        for edge in edges:
+            builder.add_horizontal_curve(edge)
 
-    edge_image = gray if edge_gray is None else edge_gray
-    for edge in trace_top_bottom_edges(edge_image, builder.vertical_bounds()):
-        builder.add_horizontal_curve(edge)
+    def result(
+        outcome: ModelOutcome,
+        model: DistortionModel | None = None,
+        span_percent: float | None = None,
+        top_from_edge: bool | None = None,
+        bottom_from_edge: bool | None = None,
+    ) -> AutoModelResult:
+        return AutoModelResult(
+            model,
+            DewarpMetrics(
+                lines_traced=lines_traced,
+                lines_kept=lines_kept,
+                edges_traced=len(edges),
+                outcome=outcome,
+                min_span_percent=min_span_percent,
+                span_percent=span_percent,
+                top_from_edge=top_from_edge,
+                bottom_from_edge=bottom_from_edge,
+            ),
+        )
 
-    model = builder.try_build_model()
+    if lines_traced == 0 and not edges:
+        return result(ModelOutcome.NO_TEXT)
+    built = builder.build()
+    if built.top_index is None or built.bottom_index is None:
+        if lines_kept + len(edges) < 2:
+            return result(ModelOutcome.TOO_FEW_CURVES)
+        return result(ModelOutcome.NO_PAIR)
+    span_percent = 100.0 * built.span / max(1, rect[3])
+    # Edges were added after the text lines.
+    top_from_edge = built.top_index >= lines_kept
+    bottom_from_edge = built.bottom_index >= lines_kept
+    if span_percent < min_span_percent:
+        return result(
+            ModelOutcome.SPAN_TOO_SMALL,
+            None,
+            span_percent,
+            top_from_edge,
+            bottom_from_edge,
+        )
+    model = straighten_outer_border(built.model, spine_on_right)
     if not model.is_valid():
-        return None
-    model = straighten_outer_border(model, spine_on_right)
-    return model if model.is_valid() else None
+        return result(
+            ModelOutcome.NO_PAIR, None, span_percent, top_from_edge, bottom_from_edge
+        )
+    return result(
+        ModelOutcome.BUILT, model, span_percent, top_from_edge, bottom_from_edge
+    )
 
 
 def straighten_outer_border(

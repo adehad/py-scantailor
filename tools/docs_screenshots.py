@@ -49,6 +49,7 @@ SHOT_NAMES = (
     "stage6_output_guides",
     "stage6_output_edge_methods",
     "stage6_output_picture_shape",
+    "stage6_dewarping_metrics",
     "stage6_tab_picture_zones",
     "stage6_tab_fill_zones",
     "stage6_tab_dewarping",
@@ -470,12 +471,22 @@ def _capture(scheme: str, out_dir: Path) -> None:
     options_child(QtWidgets.QAbstractButton, "bwBtn").click()
     finish_render()
 
+    options_child(QtWidgets.QAbstractButton, "dewarpAutoBtn").click()
+    finish_render()
+    reveal(options_child(QtWidgets.QWidget, "dewarpingGroup"))
+    save(manager.ui, "stage6_dewarping_metrics")
+    output_view().set_current_tab(ImageViewTab.DEWARPING)
+    pump(3.0)
+    save(manager.ui, "stage6_tab_dewarping")
+    output_view().set_current_tab(ImageViewTab.OUTPUT)
+    options_child(QtWidgets.QAbstractButton, "dewarpOffBtn").click()
+    finish_render()
+
     add_sample_zones()
     view = output_view()
     for tab_name, shot in (
         ("PICTURE_ZONES", "stage6_tab_picture_zones"),
         ("FILL_ZONES", "stage6_tab_fill_zones"),
-        ("DEWARPING", "stage6_tab_dewarping"),
         ("DESPECKLING", "stage6_tab_despeckling"),
     ):
         view.set_current_tab(ImageViewTab[tab_name])

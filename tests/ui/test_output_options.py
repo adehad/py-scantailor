@@ -627,6 +627,7 @@ class TestVisibilityPerMode:
         assert not mixed.shown("modeGroup")
         assert not mixed.shown("despeckleGroup")
         assert mixed.shown("depthPerceptionGroup")
+        assert mixed.shown("dewarpingGroup")
 
         mixed.widget.set_dewarping_tab_active(False)
 

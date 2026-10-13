@@ -52,11 +52,34 @@ class TracedCurve:
             bound to the right one, shape ``(m, 2)``.
         order (float): Position along the down direction; smaller values lie
             higher on the page.
+        index (int): Position of the curve among those added to the builder.
     """
 
     trimmed: NDArray[np.float64]
     extended: NDArray[np.float64]
     order: float
+    index: int
+
+
+@dataclass(frozen=True)
+class BuiltModel:
+    """A model together with where its curves came from.
+
+    Attributes:
+        model (DistortionModel): The model; invalid, with no curves, when none
+            could be built.
+        top_index (int | None): Index, in the order the curves were added, of
+            the curve that became the top one; None without a model.
+        bottom_index (int | None): The same for the bottom curve.
+        span (float): Distance between the centroids of the two chosen curves
+            along the down direction, in the pixels the builder was created
+            in; a later ``transform`` does not change it. Zero without a model.
+    """
+
+    model: DistortionModel
+    top_index: int | None = None
+    bottom_index: int | None = None
+    span: float = 0.0
 
 
 class DistortionModelBuilder:
@@ -133,20 +156,29 @@ class DistortionModelBuilder:
                 fewer than two curves were added, a bound is a point, or no pair
                 of curves gives a workable dewarper.
         """
+        return self.build().model
+
+    def build(self) -> BuiltModel:
+        """Build a model and tell which of the added curves it is made of.
+
+        Returns:
+            BuiltModel: The model, invalid under the conditions
+                ``try_build_model`` lists, with the chosen curves and their span.
+        """
         if (
             len(self._curves) < 2
             or self._bound1[0] == self._bound1[1]
             or self._bound2[0] == self._bound2[1]
         ):
-            return DistortionModel()
+            return BuiltModel(DistortionModel())
 
         curves = []
-        for polyline in self._curves:
-            curve = self._polyline_to_curve(polyline)
+        for index, polyline in enumerate(self._curves):
+            curve = self._polyline_to_curve(polyline, index)
             if curve is not None:
                 curves.append(curve)
         if not curves:
-            return DistortionModel()
+            return BuiltModel(DistortionModel())
         curves.sort(key=lambda curve: curve.order)
 
         assessor = _RansacAssessor(curves)
@@ -166,13 +198,25 @@ class DistortionModelBuilder:
 
         best = assessor.best
         if best is None:
-            return DistortionModel()
-        return DistortionModel(
-            top_curve=Curve.from_polyline(curves[best[0]].extended),
-            bottom_curve=Curve.from_polyline(curves[best[1]].extended),
+            return BuiltModel(DistortionModel())
+        top, bottom = curves[best[0]], curves[best[1]]
+        # ``order`` is a projection on the down vector, whose length is the
+        # scale any transformation applied; dividing by its square measures the
+        # span in the builder's original pixels.
+        down_sqnorm = self._down[0] ** 2 + self._down[1] ** 2
+        return BuiltModel(
+            model=DistortionModel(
+                top_curve=Curve.from_polyline(top.extended),
+                bottom_curve=Curve.from_polyline(bottom.extended),
+            ),
+            top_index=top.index,
+            bottom_index=bottom.index,
+            span=(bottom.order - top.order) / down_sqnorm,
         )
 
-    def _polyline_to_curve(self, polyline: NDArray[np.float64]) -> TracedCurve | None:
+    def _polyline_to_curve(
+        self, polyline: NDArray[np.float64], index: int
+    ) -> TracedCurve | None:
         """Trim a polyline to the bounds and extend it with a fitted spline.
 
         Returns:
@@ -188,6 +232,7 @@ class DistortionModelBuilder:
             trimmed=trimmed,
             extended=spline.to_polyline(),
             order=centroid[0] * self._down[0] + centroid[1] * self._down[1],
+            index=index,
         )
 
     def _front_back_bounds(self, polyline: NDArray[np.float64]) -> tuple[Line, Line]:

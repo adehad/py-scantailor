@@ -119,6 +119,45 @@ editing the grid of a page whose dewarping is **Auto** or **Marginal** makes it
 .. screenshot:: stage6_tab_dewarping
    :alt: The Dewarping tab with the distortion grid
 
+Automatic dewarping
+-------------------
+
+**Auto** traces the text lines of the page and the top and bottom edges of the
+paper, and takes as the model the pair of curves that leaves all the lines
+straightest. Once the page has rendered, the **Dewarping** panel says what it
+found, in a line such as "2 of 33 lines kept, no page edge. Curves span 7% of
+the text. Below the 40% minimum, so the page is left as is; a minimum of 7% or
+less would use them.": how many text lines were traced and how many survived the
+filters that drop short, stray and doubly bent ones, how many page edges were
+found, how far apart the two chosen curves lie as a share of the content height,
+whether each came from a text line or a page edge, and, when the page gets no
+model, why. The Dewarping tab shows the same line along its bottom edge.
+
+.. screenshot:: stage6_dewarping_metrics
+   :alt: The Dewarping panel with the minimum span and what auto dewarping found
+
+Two behaviours deviate from ScanTailor Advanced 1.2.1 on purpose:
+
+* **Minimum span (%)** refuses a model whose two curves lie closer together
+  than this share of the content height, and leaves the page as it is. The
+  model is stretched over the whole page from those two curves, so when only
+  two neighbouring lines survive, as on a page of short centred lines, a
+  wobble of a pixel in one of them becomes an error of dozens of pixels at the
+  far end of the page. The original accepts any pair. The default of 40% was
+  measured on a 197-page book: of the 162 pages that got a model, 33 had a
+  span below 40%, and the model bent the text lines of 19 of them further than
+  the plain page while helping none; above 40% the models that helped began at
+  49% and were not refused. Set the minimum to 0 to accept every model, as the
+  original does. **Apply to ...** copies it with the other dewarping options.
+* A page edge that hugs the first or the last row of the scan (within 1.5% of
+  the image height) and is straight (bending by at most 2 pixels at the size
+  the edges are traced at, about 6 pixels on a 300 dpi scan) is taken for the
+  scanner's own border and ignored. The original accepts it as the page edge
+  and then often prefers it to the last text line, so the model treats the
+  bottom of the page as flat and corrects the lower half too little. On the
+  same book this rule removed 43 such borders and kept the 11 edges that lie further in.
+  A paper edge further in, or one that bends, still counts.
+
 The **Despeckling** tab shows the page before despeckling, with the specks the
 chosen level removes in red and a halo of red around each, fading with the
 distance, that shows how far from the text a speck has to be to go. The pictures of
