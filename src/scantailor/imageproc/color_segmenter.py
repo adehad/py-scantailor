@@ -11,6 +11,7 @@ from numba import njit
 from numpy.typing import NDArray
 
 from .background_color import otsu_threshold
+from .filters import gray_histogram
 
 _LEVELS = 256
 _COLOR_CHANNELS = 3
@@ -156,7 +157,7 @@ def _label_color_classes(
 
 def _dark_channel(channel: NDArray[np.uint8], adjustment: int) -> NDArray[np.bool_]:
     """True where a channel is below its adjusted Otsu threshold."""
-    histogram = np.bincount(channel.ravel(), minlength=_LEVELS).astype(np.int64)
+    histogram = gray_histogram(channel)
     threshold = otsu_threshold(histogram) + adjustment
     return channel < min(max(threshold, _MIN_THRESHOLD), _MAX_THRESHOLD)
 

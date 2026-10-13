@@ -25,7 +25,18 @@ a = Analysis(
     ],
     # QtSvg gives PyInstaller's hook the qsvg image-format plugin that draws the
     # glyphs; resources_rc is the compiled Qt resource module.
-    hiddenimports=["PySide6.QtSvg", "scantailor.app._ui.resources_rc"],
+    #
+    # The numba kernels cannot ship precompiled: numba keys its cache by the
+    # source path and, in a frozen build, by a hash of the executable, and writes
+    # it to the user's cache directory (%LOCALAPPDATA%\numba, ~/.cache/numba).
+    # numba_warmup compiles every kernel once on tiny input, so the first run
+    # pays the compile in the background (one kernel took 2.5 s in a frozen
+    # test build, 0.3 s once cached) and every later run loads the cache.
+    hiddenimports=[
+        "PySide6.QtSvg",
+        "scantailor.app._ui.resources_rc",
+        "scantailor.imageproc.numba_warmup",
+    ],
     hookspath=None,
     runtime_hooks=None,
     excludes=None,

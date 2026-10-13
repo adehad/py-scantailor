@@ -802,6 +802,11 @@ def _split_area(
     return replace(area, bottom=kept_edge), replace(area, top=gap_edge + 1)
 
 
+def _relative(part: slice, whole: slice) -> slice:
+    """Express ``part`` of an axis relative to the start of ``whole``."""
+    return slice(part.start - whole.start, part.stop - whole.start)
+
+
 def _trim(
     content: NDArray[np.bool_],
     blocks: NDArray[np.bool_],
@@ -845,15 +850,24 @@ def _trim(
         bias += (1.0 - bias) * influence * text_pixels / total
         bias = min(max(bias, 0.0), 1.0)
 
-    remaining = np.zeros_like(content)
-    window = kept.window()
-    remaining[window] = content[window] & blocks[window]
+    # Only ``area`` is measured: the remaining ink and the pixels asked about
+    # both lie inside it, and a distance to ink does not depend on the rest.
+    area_rows, area_columns = area.window()
+    remaining = np.zeros((area.height, area.width), dtype=bool)
+    kept_rows, kept_columns = kept.window()
+    remaining[
+        _relative(kept_rows, area_rows), _relative(kept_columns, area_columns)
+    ] = content[kept_rows, kept_columns] & blocks[kept_rows, kept_columns]
     to_others = _distance_to_ink(remaining)
 
     removed_window = removed.window()
     in_blocks = blocks[removed_window]
     to_garbage_sum = float(garbage.distance()[removed_window][in_blocks].sum())
-    to_others_sum = float(to_others[removed_window][in_blocks].sum())
+    removed_rows, removed_columns = removed_window
+    to_others_removed = to_others[
+        _relative(removed_rows, area_rows), _relative(removed_columns, area_columns)
+    ]
+    to_others_sum = float(to_others_removed[in_blocks].sum())
     if to_garbage_sum * bias < to_others_sum * (1.0 - bias):
         garbage.add(content, removed)
         return kept, False

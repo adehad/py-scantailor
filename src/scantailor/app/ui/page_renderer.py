@@ -24,6 +24,7 @@ __all__ = [
     "render_page",
     "render_page_with_model",
     "render_thumbnail",
+    "warm_up_qt_image_types",
 ]
 
 # One more than the pool needs for the render the user waits for: a render that
@@ -32,6 +33,26 @@ _MAX_THREADS = 3
 
 # Longest a thumbnail worker waits for the render the user is waiting for.
 THUMBNAIL_YIELD_SECONDS = 30.0
+
+
+def warm_up_qt_image_types() -> None:
+    """Resolve the PySide types that thumbnail workers touch, on this thread.
+
+    PySide creates enum and value types on first use, and two threads that
+    first use one at the same moment can see it half made (``QImage`` has no
+    attribute ``Format``). Calling this once on the GUI thread, before any
+    worker starts, makes every later use a plain lookup.
+    """
+    for pixel_format in (
+        QtGui.QImage.Format.Format_Grayscale8,
+        QtGui.QImage.Format.Format_RGB888,
+    ):
+        QtGui.QImage(1, 1, pixel_format).copy()
+    QtCore.QSize(1, 1).width()
+
+
+# Importing happens on the GUI thread, before the thumbnail pool exists.
+warm_up_qt_image_types()
 
 
 def render_page(

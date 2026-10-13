@@ -17,11 +17,15 @@ mean is ``sum * (1 / area)`` like the C++ integral image code, so thresholds
 agree with it to the last bit.
 """
 
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+
 import cv2
 import numpy as np
 from numpy.typing import NDArray
 
 from .background_color import otsu_threshold
+from .filters import gray_histogram
 
 _GRAY_LEVELS = 256
 # Divisor of the local deviation in Sauvola's formula.
@@ -182,7 +186,21 @@ def binarize_otsu(
             background.
     """
     threshold = _adjusted_otsu_threshold(image, adjustment, bounds)
-    return np.where(image < threshold, 0, 255).astype(np.uint8)
+    return _ink_below_level(image, threshold)
+
+
+def _ink_below_level(image: NDArray[np.uint8], level: int) -> NDArray[np.uint8]:
+    """Return 0 where ``image`` is below the gray ``level`` and 255 elsewhere."""
+    if level <= 0:
+        return np.full(image.shape, 255, dtype=np.uint8)
+    # OpenCV's binary threshold is strict, so "below level" is "not above level - 1".
+    _, ink = cv2.threshold(
+        np.ascontiguousarray(image),
+        min(level, _GRAY_LEVELS) - 1,
+        255,
+        cv2.THRESH_BINARY,
+    )
+    return np.asarray(ink, dtype=np.uint8)
 
 
 def _adjusted_otsu_threshold(
@@ -191,7 +209,7 @@ def _adjusted_otsu_threshold(
     bounds: tuple[int, int],
 ) -> int:
     """Otsu threshold of ``image`` plus ``adjustment``, clamped to ``bounds``."""
-    histogram = np.bincount(image.ravel(), minlength=_GRAY_LEVELS).astype(np.int64)
+    histogram = gray_histogram(image)
     low, high = bounds
     return int(np.clip(otsu_threshold(histogram) + adjustment, low, high))
 
@@ -258,10 +276,19 @@ def binarize_wolf(
     if max_deviation <= 0.0:
         max_deviation = 1.0
     darkest = float(image.min())
-    base = _single_precision(mean) - darkest
-    contrast = _single_precision(deviation) / max_deviation + delta / _SAUVOLA_RANGE
-    threshold = base * (1.0 - k * (1.0 - contrast)) + darkest
-    return _ink_within_bounds(image, threshold, lower_bound, upper_bound)
+    ink = np.empty(image.shape, dtype=np.uint8)
+
+    def band(first: int, stop: int) -> None:
+        rows = slice(first, stop)
+        base = _single_precision(mean[rows]) - darkest
+        contrast = (
+            _single_precision(deviation[rows]) / max_deviation + delta / _SAUVOLA_RANGE
+        )
+        threshold = base * (1.0 - k * (1.0 - contrast)) + darkest
+        ink[rows] = _ink_within_bounds(image[rows], threshold, lower_bound, upper_bound)
+
+    run_in_row_bands(image.shape[0], band)
+    return ink
 
 
 def binarize_edge_div(
@@ -322,7 +349,7 @@ def binarize_edge_div(
     # Clip to valid range and convert back to uint8
     result = np.clip(result, 0, 255).astype(np.uint8)
 
-    histogram = np.bincount(result.ravel(), minlength=_GRAY_LEVELS).astype(np.int64)
+    histogram = gray_histogram(result)
     threshold = int(np.clip(int(otsu_threshold(histogram) + delta), 0, _GRAY_LEVELS))
     return np.where(result < threshold, 0, 255).astype(np.uint8)
 
@@ -548,6 +575,27 @@ def _ink_below(
     return np.where(image < threshold, 0, 255).astype(np.uint8)
 
 
+# Fewest rows worth a thread of their own in the banded window statistics.
+_MIN_BAND_ROWS = 128
+
+
+def run_in_row_bands(rows: int, band: Callable[[int, int], None]) -> None:
+    """Call ``band(first, stop)`` for consecutive row ranges, on threads.
+
+    Args:
+        rows (int): Number of rows to cover.
+        band (Callable[[int, int], None]): Handles rows ``first`` up to ``stop``;
+            ranges are disjoint, so it may write its own rows of shared arrays.
+    """
+    count = max(1, min(cv2.getNumThreads(), rows // _MIN_BAND_ROWS))
+    edges = np.linspace(0, rows, count + 1).astype(int)
+    if count == 1:
+        band(0, rows)
+        return
+    with ThreadPoolExecutor(max_workers=count) as pool:
+        list(pool.map(lambda i: band(edges[i], edges[i + 1]), range(count)))
+
+
 def _window_statistics(
     image: NDArray[np.uint8],
     window_size: int,
@@ -562,11 +610,28 @@ def _window_statistics(
         tuple[NDArray[np.float64], NDArray[np.float64]]: Local mean and standard
             deviation, both float64 and of the image's shape.
     """
-    gray = image.astype(np.float64)
-    reciprocal = _reciprocal_window_area(image.shape, window_size)
-    mean = _window_sum(gray, window_size) * reciprocal
-    variance = _window_sum(gray * gray, window_size) * reciprocal - mean * mean
-    return mean, np.sqrt(np.abs(variance))
+    rows, columns = image.shape
+    mean = np.empty(image.shape, dtype=np.float64)
+    deviation = np.empty(image.shape, dtype=np.float64)
+    row_extent = _window_extent(rows, window_size)
+    column_extent = _window_extent(columns, window_size)
+
+    def band(first: int, stop: int) -> None:
+        # Sums of whole numbers are exact in any order, so a band that reads a
+        # window's reach of rows beyond its own matches the whole image.
+        top = max(0, first - window_size)
+        bottom = min(rows, stop + window_size)
+        gray = image[top:bottom].astype(np.float64)
+        inside = slice(first - top, stop - top)
+        reciprocal = 1.0 / np.multiply.outer(row_extent[first:stop], column_extent)
+        band_mean = _window_sum(gray, window_size)[inside] * reciprocal
+        squares = _window_sum(gray * gray, window_size)[inside]
+        variance = squares * reciprocal - band_mean * band_mean
+        mean[first:stop] = band_mean
+        deviation[first:stop] = np.sqrt(np.abs(variance))
+
+    run_in_row_bands(rows, band)
+    return mean, deviation
 
 
 def _window_mean(image: NDArray[np.uint8], window_size: int) -> NDArray[np.float64]:
@@ -581,16 +646,19 @@ def _reciprocal_window_area(
     shape: tuple[int, ...], window_size: int
 ) -> NDArray[np.float64]:
     """One over the number of image pixels in the window around each pixel."""
+    return 1.0 / np.multiply.outer(
+        _window_extent(shape[0], window_size), _window_extent(shape[1], window_size)
+    )
+
+
+def _window_extent(length: int, window_size: int) -> NDArray[np.float64]:
+    """Number of the ``length`` positions that the window around each one covers."""
     before = window_size >> 1
     after = window_size - before
-
-    def extent(length: int) -> NDArray[np.float64]:
-        centre = np.arange(length)
-        return (
-            np.minimum(length, centre + after) - np.maximum(0, centre - before)
-        ).astype(np.float64)
-
-    return 1.0 / np.multiply.outer(extent(shape[0]), extent(shape[1]))
+    centre = np.arange(length)
+    return (np.minimum(length, centre + after) - np.maximum(0, centre - before)).astype(
+        np.float64
+    )
 
 
 def _window_sum(values: NDArray[np.float64], window_size: int) -> NDArray[np.float64]:
