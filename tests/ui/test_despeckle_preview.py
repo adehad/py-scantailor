@@ -10,7 +10,8 @@ from scantailor.app.ui.image_views.despeckle_preview import (
     DespecklePreviewer,
     despeckle_preview,
 )
-from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.despeckle import DespeckleLevel, DespeckleStrength
+from scantailor.imageproc.despeckle import despeckle
 
 DPI = 300
 SPECK = (slice(20, 22), slice(20, 22))
@@ -68,6 +69,22 @@ class TestPreview:
         assert counts == sorted(counts)
         assert counts[0] == 0
         assert counts[-1] > 0
+
+    @pytest.mark.parametrize("factor", [0.5, 1.7, 2.3, 3.5])
+    def test_an_in_between_strength_marks_what_the_generator_removes(self, factor):
+        page = _page()
+        page[200:204, 100:104] = 0
+
+        preview = despeckle_preview(page, DPI, DespeckleStrength(factor))
+
+        removed = (page == 0) & (despeckle(page, DPI, factor) != 0)
+        marked = np.all(preview == SPECKLE_RGB, axis=-1)
+        assert np.array_equal(marked, removed)
+
+    def test_a_zero_strength_marks_nothing(self):
+        preview = despeckle_preview(_page(), DPI, DespeckleStrength(0.0))
+
+        assert not np.any(np.all(preview == SPECKLE_RGB, axis=-1))
 
     def test_the_page_is_not_modified(self):
         page = _page()

@@ -417,6 +417,7 @@ def _process_page_split(
             rotation_degrees=sequence.fix_orientation_filter.get_rotation(
                 page_id.image_id
             ).degrees,
+            trim_area=state.trim_area,
         )
 
     params = filter_.get_params(page_id)
@@ -679,7 +680,7 @@ def _process_output(
         )
     result = generate_output(
         view,
-        params.for_generation(),
+        params,
         dewarper=source,
         color_options=params.color_common,
         content_polygon=content_polygon,

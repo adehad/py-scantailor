@@ -5,11 +5,14 @@ found. Otherwise the page is binarised at 300 dpi, cleaned of shadows and
 garbage, deskewed and reduced to 150 dpi, and the layout follows from the
 vertical bands of content and whitespace.
 
-Coordinates are those of the input image, which is already upright.
+Coordinates are those of the input image, which is already upright. A region of
+it can be analysed alone; the layout is still in the coordinates of the whole
+image.
 """
 
 import math
 from dataclasses import dataclass
+from itertools import pairwise
 
 import cv2
 import numpy as np
@@ -45,6 +48,9 @@ _ACCEPTABLE_BALANCE_FRACTION = 0.90
 _EDGE_SPAN_FRACTION = 15
 _SINGLE_SPAN_CLEARANCE = 15
 _OFFCUT_CUT_MARGIN = 20
+_OFFCUT_MAX_WIDTH_FRACTION = 4
+_MIN_OFFCUT_GUTTER = 20
+_OFFCUT_GUTTER_RATIO = 2
 _SKEW_ACCURACY = 0.5
 
 _Matrix = NDArray[np.float64]
@@ -63,6 +69,7 @@ def estimate_page_layout(
     layout_type: LayoutType,
     dpi: float,
     bw_threshold: int | None = None,
+    region: tuple[int, int, int, int] | None = None,
 ) -> PageLayout:
     """Detect how an upright page image divides into pages.
 
@@ -74,22 +81,66 @@ def estimate_page_layout(
         layout_type (LayoutType): Requested layout.
         dpi (float): Resolution of the image, the same on both axes.
         bw_threshold (int | None): Gray level below which a pixel is black. By
-            default Otsu's threshold of ``gray``.
+            default Otsu's threshold of the analysed part of ``gray``.
+        region (tuple[int, int, int, int] | None): ``(x, y, width, height)`` of
+            the only part of ``gray`` to analyse, such as what a manual trim
+            keeps. It is clipped to the image. By default the whole image.
 
     Returns:
-        PageLayout: The layout, with cutter lines spanning the image height.
+        PageLayout: The layout of the whole image, with cutter lines spanning
+        its height.
     """
-    height, width = gray.shape
+    full_height, full_width = gray.shape
+    x0, y0, x1, y1 = _clip_region(region, full_width, full_height)
+    analysed = gray[y0:y1, x0:x1]
+    height, width = analysed.shape
     if layout_type == LayoutType.SINGLE_PAGE_UNCUT:
+        return PageLayout.single_page_uncut(full_width, full_height)
+
+    folding = _try_cut_at_folding_line(layout_type, analysed, dpi)
+    if folding is not None:
+        layout = _to_page_layout(folding, width, height)
+    else:
+        if bw_threshold is None:
+            bw_threshold = otsu_threshold(analysed)
+        layout = _cut_at_whitespace(layout_type, analysed, dpi, bw_threshold)
+    if (x0, y0, width, height) == (0, 0, full_width, full_height):
+        return layout
+    return _in_whole_image(layout, x0, y0, full_width, full_height)
+
+
+def _clip_region(
+    region: tuple[int, int, int, int] | None, width: int, height: int
+) -> tuple[int, int, int, int]:
+    """Return the region as ``(left, top, right, bottom)`` inside the image."""
+    if region is None:
+        return 0, 0, width, height
+    x, y, region_width, region_height = region
+    left, top = min(max(x, 0), width - 1), min(max(y, 0), height - 1)
+    right = min(max(x + region_width, left + 1), width)
+    bottom = min(max(y + region_height, top + 1), height)
+    return left, top, right, bottom
+
+
+def _in_whole_image(
+    layout: PageLayout, x: int, y: int, width: int, height: int
+) -> PageLayout:
+    """Move a layout found in a region to the coordinates of the whole image."""
+    if layout.layout_type == PageLayoutType.SINGLE_PAGE_UNCUT:
         return PageLayout.single_page_uncut(width, height)
 
-    folding = _try_cut_at_folding_line(layout_type, gray, dpi)
-    if folding is not None:
-        return _to_page_layout(folding, width, height)
+    def moved(line: Line | None) -> Line | None:
+        if line is None:
+            return None
+        (x1, y1), (x2, y2) = line
+        return _across_height(((x1 + x, y1 + y), (x2 + x, y2 + y)), height)
 
-    if bw_threshold is None:
-        bw_threshold = otsu_threshold(gray)
-    return _cut_at_whitespace(layout_type, gray, dpi, bw_threshold)
+    return PageLayout(
+        outline=(0.0, 0.0, float(width), float(height)),
+        layout_type=layout.layout_type,
+        cutter1=moved(layout.cutter1),
+        cutter2=moved(layout.cutter2),
+    )
 
 
 def _num_pages(layout_type: LayoutType, width: int, height: int) -> int:
@@ -188,13 +239,15 @@ def _single_page_from_lines(
     layout_type: LayoutType, lines: list[Line], width: int, height: int
 ) -> _Cutters | None:
     center = 0.5 * width
+    # With no line the whitespace analysis decides, which is what can find an
+    # offcut; it returns an uncut layout when there is none.
+    if not lines:
+        return None
     if layout_type != LayoutType.PAGE_PLUS_OFFCUT and _lines_leave_page_uncut(
         lines, center
     ):
         return _Cutters(PageLayoutType.SINGLE_PAGE_UNCUT)
 
-    if not lines:
-        return None
     if len(lines) > 1:
         return _Cutters(PageLayoutType.SINGLE_PAGE_CUT, (lines[0], lines[-1]))
     line = lines[0]
@@ -460,7 +513,10 @@ def _left_cut_position(spans: list[Span], width: int) -> float | None:
         # Most likely the page's content; the garbage is at the other side.
         return None
     if len(spans) > 1:
-        return Span.between(spans[0], spans[1]).center
+        gutter = Span.between(first, spans[1])
+        if not _is_offcut_strip(first, gutter, spans[1:], width):
+            return None
+        return gutter.center
     return float(min(first.end + _OFFCUT_CUT_MARGIN, width))
 
 
@@ -474,8 +530,42 @@ def _right_cut_position(spans: list[Span], width: int) -> float | None:
     if last.width > width // 2:
         return None
     if len(spans) > 1:
-        return Span.between(spans[-2], spans[-1]).center
+        gutter = Span.between(spans[-2], last)
+        if not _is_offcut_strip(last, gutter, spans[:-1], width):
+            return None
+        return gutter.center
     return float(max(last.begin - _OFFCUT_CUT_MARGIN, 0))
+
+
+def _is_offcut_strip(
+    strip: Span, gutter: Span, content: list[Span], width: int
+) -> bool:
+    """Tell a neighbour's strip at the image edge from the page's own text.
+
+    Upstream cuts at the first gap before any edge span narrower than half the
+    page, which takes the last word of a page whose text runs off the scan for
+    an offcut. A neighbour's strip is narrow, and the gutter between it and the
+    content is a real margin: wider than any word gap inside the content.
+
+    Args:
+        strip (Span): The span touching the image edge.
+        gutter (Span): The whitespace between the strip and the content.
+        content (list[Span]): The remaining spans, in column order.
+        width (int): Width of the image.
+
+    Returns:
+        bool: True when the strip should be cut off.
+    """
+    if strip.width > width // _OFFCUT_MAX_WIDTH_FRACTION:
+        return False
+    widest_inside = max(
+        (Span.between(left, right).width for left, right in pairwise(content)),
+        default=0,
+    )
+    return (
+        gutter.width >= _MIN_OFFCUT_GUTTER
+        and gutter.width >= _OFFCUT_GUTTER_RATIO * widest_inside
+    )
 
 
 def _process_spans_two_pages(spans: list[Span], width: int) -> _Cutters:

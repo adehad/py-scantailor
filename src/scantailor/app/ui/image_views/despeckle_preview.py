@@ -12,7 +12,7 @@ import numpy as np
 from numpy.typing import NDArray
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, Signal
 
-from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.despeckle import DespeckleLevel, DespeckleStrength
 from scantailor.imageproc.despeckle import despeckle
 
 SPECKLE_RGB = (255, 0, 0)
@@ -30,7 +30,7 @@ _NO_SPECKS_ALPHA = 0.3
 def despeckle_preview(
     binary: NDArray[np.uint8],
     dpi: int,
-    level: DespeckleLevel,
+    level: DespeckleLevel | DespeckleStrength,
     page: NDArray[np.uint8] | None = None,
 ) -> NDArray[np.uint8]:
     """Draw a page with the ink that despeckling would remove in red.
@@ -39,7 +39,8 @@ def despeckle_preview(
         binary (NDArray[np.uint8]): Bilevel page before despeckling, 0 is ink.
             Not modified.
         dpi (int): Resolution of ``binary``; the smaller of both axes.
-        level (DespeckleLevel): The level to preview.
+        level (DespeckleLevel | DespeckleStrength): The level or in-between strength
+            to preview.
         page (NDArray[np.uint8] | None): The output page, gray or RGB, of the
             same height and width. Its pictures show through and the ink of
             ``binary`` is drawn black over it. A white page when None. Not
@@ -100,7 +101,7 @@ class _Job(QRunnable):
         token: int,
         binary: NDArray[np.uint8],
         dpi: int,
-        level: DespeckleLevel,
+        level: DespeckleLevel | DespeckleStrength,
         page: NDArray[np.uint8] | None,
         signals: _Signals,
     ) -> None:
@@ -144,7 +145,7 @@ class DespecklePreviewer(QObject):
         self,
         binary: NDArray[np.uint8],
         dpi: int,
-        level: DespeckleLevel,
+        level: DespeckleLevel | DespeckleStrength,
         page: NDArray[np.uint8] | None = None,
     ) -> None:
         """Start a preview; any earlier one that is still running is dropped.
@@ -153,7 +154,8 @@ class DespecklePreviewer(QObject):
             binary (NDArray[np.uint8]): Page before despeckling; the caller must
                 not change it while the job runs.
             dpi (int): Resolution of the page.
-            level (DespeckleLevel): The level to preview.
+            level (DespeckleLevel | DespeckleStrength): The level or in-between
+                strength to preview.
             page (NDArray[np.uint8] | None): The output page to show the pictures
                 of; the caller must not change it while the job runs.
         """

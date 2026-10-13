@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import pytest
 
-from scantailor.imageproc.skew_finder import Skew, find_skew_binary
+from scantailor.imageproc.skew_finder import Skew, _ShearScorer, find_skew_binary
 from tests.filters.page_split import cpp_reference as cpp
 
 
@@ -27,7 +27,7 @@ def _text_page(
     return rotated > 127
 
 
-@pytest.mark.parametrize("angle", [0.0, 1.7, -2.4, 4.0, -6.5])
+@pytest.mark.parametrize("angle", [1.7, -2.4, 4.0, -6.5])
 @pytest.mark.parametrize(
     ("coarse", "fine", "accuracy"),
     [(0, 0, 0.5), (0, 0, 0.1), (2, 1, 0.1), (1, 1, 0.25)],
@@ -44,6 +44,16 @@ def test_matches_upstream(
     want_angle, want_confidence = cpp.find_skew(page, coarse, fine, accuracy)
     assert got.angle == pytest.approx(want_angle, abs=1e-9)
     assert got.confidence == pytest.approx(want_confidence, rel=1e-9)
+
+
+@pytest.mark.parametrize("coarse", [0, 1])
+def test_a_level_text_page_is_not_reported_as_skewed(coarse: int) -> None:
+    page = _text_page(0.0, seed=7)
+
+    got = find_skew_binary(page, coarse_reduction=coarse, fine_reduction=0)
+
+    assert got.angle == 0.0
+    assert got.confidence >= Skew.GOOD_CONFIDENCE
 
 
 def test_a_coarse_only_search_matches_upstream() -> None:
@@ -96,20 +106,46 @@ def test_a_page_with_no_skew_reports_zero_with_good_confidence() -> None:
     assert skew.confidence >= Skew.GOOD_CONFIDENCE
 
 
-def test_equal_scores_either_side_of_the_best_coarse_angle_pick_the_lower_one() -> None:
-    """Upstream stops the bisection on a tie and keeps the angle below the optimum.
-
-    Perfectly mirrored bars score the same at +0.5 and -0.5 degrees, so the
-    result is a half degree skew although the bars are exactly horizontal.
+def test_a_flat_top_the_bisection_narrows_onto_one_side_of_is_centred() -> None:
+    """The aligned bars score the same from -0.25 to 0.25 degrees but less at
+    -0.5 than at 0.5, so the bisection ties on [0, 0.25]. The answer is the
+    centre of the whole flat stretch, not of that bracket.
     """
+    page = _aligned_bars(np.random.default_rng(5))
+    scorer = _ShearScorer(page, 1.0)
+    assert scorer.score(-0.5) < scorer.score(0.5) < scorer.score(0.0)
+    assert scorer.score(-0.25) == scorer.score(0.0) == scorer.score(0.25)
+
+    skew = find_skew_binary(page, coarse_reduction=0, fine_reduction=0, accuracy=0.1)
+
+    assert skew.angle == 0.0
+    assert skew.confidence >= Skew.GOOD_CONFIDENCE
+
+
+def _mirrored_bars() -> np.ndarray:
+    """11 level bars, 6 rows tall, bar i being 120 + 5i pixels long."""
     page = np.zeros((200, 200), dtype=bool)
     for i, y in enumerate(range(20, 180, 14)):
         page[y : y + 6, 10 : 120 + i * 5] = True
+    return page
 
-    skew = find_skew_binary(page, coarse_reduction=0, fine_reduction=0, accuracy=0.1)
-    want_angle, _ = cpp.find_skew(page, 0, 0, 0.1)
 
-    assert skew.angle == want_angle == 0.5
+def test_equal_scores_either_side_of_the_best_coarse_angle_pick_the_middle() -> None:
+    """Shearing level bars by +0.5 and -0.5 degrees scores the same, so the
+    coarse winner, 0 degrees, is the answer.
+    """
+    skew = find_skew_binary(
+        _mirrored_bars(), coarse_reduction=0, fine_reduction=0, accuracy=0.1
+    )
+
+    assert skew.angle == 0.0
+    assert skew.confidence >= Skew.GOOD_CONFIDENCE
+
+
+def test_the_tie_differs_from_upstream_which_reports_half_a_degree() -> None:
+    upstream_angle, _ = cpp.find_skew(_mirrored_bars(), 0, 0, 0.1)
+
+    assert upstream_angle == 0.5
 
 
 def test_negative_reductions_are_rejected() -> None:

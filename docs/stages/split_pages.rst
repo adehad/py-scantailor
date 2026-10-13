@@ -15,9 +15,10 @@ How the layout is detected
 **Auto** looks for a folding line or dark spine first, and otherwise for the
 white gap between two pages of text. A spread that is tilted gets a tilted split
 line. With **Single page with an offcut**, the page is cut where its text starts,
-or at the image edge when no edge can be told apart. Text in the scan's margin
-that belongs to a neighbouring page is treated as an offcut only for two-page and
-offcut layouts.
+or at the image edge when no edge can be told apart. Under **Auto**, a narrow
+strip of a neighbouring page's text along the edge of a single-page scan is cut
+off when a clear gutter separates it from the page's text; text of the page
+itself that runs off the scan is left alone.
 
 The split lines
 ===============

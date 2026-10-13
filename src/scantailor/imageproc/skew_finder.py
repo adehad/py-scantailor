@@ -103,8 +103,9 @@ def find_skew_binary(
         coarse_scorer if fine is coarse else _ShearScorer(fine, resolution_ratio)
     )
 
-    angle_plus = best_coarse_angle + 0.5 * _COARSE_STEP
-    angle_minus = best_coarse_angle - 0.5 * _COARSE_STEP
+    bracket_high = best_coarse_angle + 0.5 * _COARSE_STEP
+    bracket_low = best_coarse_angle - 0.5 * _COARSE_STEP
+    angle_plus, angle_minus = bracket_high, bracket_low
     score_plus = fine_scorer.score(angle_plus)
     score_minus = fine_scorer.score(angle_minus)
     fine_score_1, fine_score_2 = score_plus, score_minus
@@ -120,8 +121,19 @@ def find_skew_binary(
 
     if score_plus > score_minus:
         best_angle, best_score = angle_plus, score_plus
-    else:
+    elif score_plus < score_minus:
         best_angle, best_score = angle_minus, score_minus
+    else:
+        # Both ends sit on a flat top of the score profile. The bisection may
+        # have narrowed onto one side of it, so find where the flat stretch
+        # ends on each side and report its centre.
+        best_score = score_plus
+        best_angle = 0.5 * (
+            _flat_top_edge(fine_scorer, angle_minus, bracket_low, best_score, accuracy)
+            + _flat_top_edge(
+                fine_scorer, angle_plus, bracket_high, best_score, accuracy
+            )
+        )
 
     if abs(best_angle) < min_angle:
         return Skew(0.0, Skew.GOOD_CONFIDENCE)
@@ -135,6 +147,37 @@ def find_skew_binary(
             num_coarse + 2
         )
     return Skew(-best_angle, confidence - 1.0)
+
+
+def _flat_top_edge(
+    scorer: "_ShearScorer",
+    inside: float,
+    outside: float,
+    top_score: float,
+    accuracy: float,
+) -> float:
+    """Bisect for where a flat top of the score profile ends.
+
+    Args:
+        scorer (_ShearScorer): Scores shear angles of the fine image.
+        inside (float): An angle known to score ``top_score``.
+        outside (float): The end of the search bracket on that side.
+        top_score (float): The score on the flat top.
+        accuracy (float): Allowed error of the edge in degrees.
+
+    Returns:
+        float: The angle furthest from ``inside`` towards ``outside`` that still
+            scores ``top_score``, to within ``accuracy``.
+    """
+    if inside == outside or scorer.score(outside) == top_score:
+        return outside
+    while abs(outside - inside) > accuracy:
+        middle = 0.5 * (inside + outside)
+        if scorer.score(middle) == top_score:
+            inside = middle
+        else:
+            outside = middle
+    return inside
 
 
 class _ShearScorer:

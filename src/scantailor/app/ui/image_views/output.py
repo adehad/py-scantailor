@@ -56,7 +56,7 @@ from scantailor.core.zones import (
     PictureLayer,
     PictureZoneProperties,
 )
-from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.despeckle import DespeckleLevel, DespeckleStrength
 from scantailor.filters.output.params import DistortionModelSpec
 
 
@@ -570,7 +570,7 @@ class OutputImageView(ImageViewBase):
         self,
         binary: NDArray[np.uint8] | None,
         dpi: int,
-        level: DespeckleLevel,
+        level: DespeckleLevel | DespeckleStrength,
         page: NDArray[np.uint8] | None = None,
     ) -> None:
         """Give the despeckling tab the page as it is before despeckling.
@@ -579,7 +579,8 @@ class OutputImageView(ImageViewBase):
             binary (NDArray[np.uint8] | None): Bilevel page, 0 is ink, not changed
                 afterwards by the caller; None removes the preview.
             dpi (int): Resolution of the page.
-            level (DespeckleLevel): The level to preview.
+            level (DespeckleLevel | DespeckleStrength):
+                The level or in-between strength to preview.
             page (NDArray[np.uint8] | None): The output page whose pictures the
                 preview shows, gray or RGB; ignored when its size differs from
                 ``binary``. A white page when None.
@@ -593,11 +594,12 @@ class OutputImageView(ImageViewBase):
         self._despeckle_source = (binary, dpi, page)
         self._despeckle.request(binary, dpi, level, page)
 
-    def set_despeckle_level(self, level: DespeckleLevel) -> None:
+    def set_despeckle_level(self, level: DespeckleLevel | DespeckleStrength) -> None:
         """Preview another level on the page given to ``set_despeckle_source``.
 
         Args:
-            level (DespeckleLevel): The level to preview.
+            level (DespeckleLevel | DespeckleStrength):
+                The level or in-between strength to preview.
         """
         if self._despeckle_source is not None:
             binary, dpi, page = self._despeckle_source
