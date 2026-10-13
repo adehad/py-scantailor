@@ -49,14 +49,29 @@ def _crossings(
     return cpp.x_at(line, 0.0), cpp.x_at(line, float(height))
 
 
+def _upstream_layout(page: NDArray[np.uint8], requested: LayoutType, dpi: float):
+    """Upstream's layout, with the whitespace analysis a single automatic page skips.
+
+    Upstream returns "uncut" for a single automatic page without folding lines
+    before the whitespace analysis can look for an offcut; the port runs it.
+    """
+    upstream_type = UPSTREAM_TYPES[requested]
+    height, width = page.shape
+    folding = cpp.try_cut_at_folding_line(upstream_type, page, dpi)
+    no_lines = not cpp.vert_line_finder(page, dpi, 8)
+    single_auto_page = requested is LayoutType.AUTO_LAYOUT_TYPE and height > width
+    if single_auto_page and no_lines:
+        assert folding is not None and folding[0] == cpp.UNCUT
+        return cpp.cut_at_whitespace(upstream_type, page, dpi, cpp.otsu_threshold(page))
+    return cpp.estimate_page_layout(upstream_type, page, dpi)
+
+
 def assert_matches_upstream(
     page: NDArray[np.uint8], requested: LayoutType, dpi: float
 ) -> PageLayout:
     height = page.shape[0]
     layout = detect_split(page, requested, dpi).layout
-    kind, upstream1, upstream2 = cpp.estimate_page_layout(
-        UPSTREAM_TYPES[requested], page, dpi
-    )
+    kind, upstream1, upstream2 = _upstream_layout(page, requested, dpi)
 
     assert layout.layout_type.value == kind
     if upstream1 is None:

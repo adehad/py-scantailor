@@ -171,8 +171,8 @@ class TestPageSplitStage:
 
         assert _bounds(left.transformation.pre_crop_area) == (0, 0, 200, 300)
 
-    def test_the_trim_does_not_change_the_recorded_split_dependencies(self):
-        """Detection runs on the whole image; upstream keys it on size and rotation."""
+    def test_the_trim_is_recorded_in_the_split_dependencies(self):
+        """Detection runs on the trimmed region, so the trim keys the layout."""
         page = _page(SubPage.RIGHT_PAGE)
         recorded = []
         for trim in (ImageTrim(), TRIM):
@@ -181,8 +181,9 @@ class TestPageSplitStage:
             _run(sequence, SubPage.RIGHT_PAGE, FilterStage.PAGE_SPLIT)
             recorded.append(sequence.page_split_filter.get_params(page).dependencies)
 
-        assert recorded[0] == recorded[1]
-        assert recorded[0].image_size == (WIDTH, HEIGHT)
+        assert recorded[0].trim is None
+        assert recorded[1].trim == (20, 10, 350, 280)
+        assert recorded[0].image_size == recorded[1].image_size == (WIDTH, HEIGHT)
 
 
 class TestDeskewStage:

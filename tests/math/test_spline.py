@@ -1,6 +1,7 @@
 """Tests for X-Spline implementation."""
 
 import numpy as np
+import pytest
 
 from scantailor.math.spline import ControlPoint, PointAndDerivatives, XSpline
 
@@ -475,3 +476,62 @@ class TestXSplineComplexCurves:
         # Should be able to generate polyline
         polyline = spline.to_polyline()
         assert len(polyline) >= 20  # At least as many as control points
+
+
+_CONTROL_POSITIONS = [(0, 0), (30, 12), (55, -8), (90, 20), (120, 5), (150, 40)]
+_TENSION_PATTERNS = [(-1.0,), (0.0,), (1.0,), (-1.0, 0.0, 1.0), (0.5, -0.5)]
+# Away from the points where a blend function changes form, so that a finite
+# difference does not straddle a kink of the second derivative.
+_SEGMENT_FRACTIONS = (0.2, 0.35, 0.7, 0.85)
+
+
+def _spline(count: int, tensions: tuple[float, ...]) -> XSpline:
+    spline = XSpline()
+    for i in range(count):
+        spline.append_control_point(
+            _CONTROL_POSITIONS[i], tension=tensions[i % len(tensions)]
+        )
+    return spline
+
+
+class TestXSplineDerivativesAgainstFiniteDifferences:
+    """Derivatives are with respect to t, which spans all segments."""
+
+    @pytest.mark.parametrize("count", [2, 3, 4, 6])
+    @pytest.mark.parametrize("tensions", _TENSION_PATTERNS)
+    def test_point_and_both_derivatives_agree_with_the_curve(
+        self, count: int, tensions: tuple[float, ...]
+    ) -> None:
+        spline = _spline(count, tensions)
+        step = 1e-4
+
+        for segment in range(spline.num_segments):
+            for fraction in _SEGMENT_FRACTIONS:
+                t = (segment + fraction) / spline.num_segments
+                got = spline.point_and_derivs_at(t)
+                ahead = spline.point_at(t + step)
+                behind = spline.point_at(t - step)
+                here = spline.point_at(t)
+
+                first = (ahead - behind) / (2 * step)
+                second = (ahead - 2 * here + behind) / step**2
+                np.testing.assert_allclose(got.point, here, atol=1e-9)
+                np.testing.assert_allclose(
+                    got.first_deriv,
+                    first,
+                    rtol=1e-4,
+                    atol=1e-4 * (1 + abs(first).max()),
+                )
+                np.testing.assert_allclose(
+                    got.second_deriv,
+                    second,
+                    rtol=1e-3,
+                    atol=1e-3 * (1 + abs(second).max()),
+                )
+
+    def test_the_last_control_point_is_counted_once_in_the_last_segment(self) -> None:
+        spline = _spline(3, (0.0,))
+
+        pd = spline.point_and_derivs_at(0.9)
+
+        np.testing.assert_allclose(pd.point, spline.point_at(0.9), atol=1e-9)
