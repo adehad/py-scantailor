@@ -1,0 +1,95 @@
+"""Exit codes and stdout/stderr discipline of scantailor-cli's main()."""
+
+import json
+from pathlib import Path
+
+import pytest
+
+from scantailor.cli.errors import ExitCode
+from scantailor.cli.main import main
+
+
+def test_status_prints_json_on_stdout_and_exits_zero(
+    project_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = main(["status", str(project_path)])
+
+    captured = capsys.readouterr()
+    assert code == ExitCode.OK
+    assert json.loads(captured.out)["page_count"] == 2
+    assert captured.err == ""
+
+
+def test_missing_project_exits_with_project_code_and_prints_no_json(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = main(["status", str(tmp_path / "absent.json")])
+
+    captured = capsys.readouterr()
+    assert code == ExitCode.PROJECT == 3
+    assert captured.out == ""
+    assert "no project file" in captured.err
+
+
+def test_bad_option_value_exits_with_option_code(
+    project_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = main(["options", "set", str(project_path), "output_color_mode", "nope"])
+
+    assert code == ExitCode.OPTION
+    assert "error:" in capsys.readouterr().err
+
+
+def test_export_before_run_exits_with_nothing_to_export_code(
+    project_path: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = main(["export", "pdf", str(project_path), str(tmp_path / "b.pdf")])
+
+    assert code == ExitCode.NOTHING_TO_EXPORT == 6
+    assert capsys.readouterr().out == ""
+
+
+def test_source_without_images_exits_with_input_code(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    folder = tmp_path / "empty"
+    folder.mkdir()
+
+    code = main(["create", str(folder), str(tmp_path / "p.json")])
+
+    assert code == ExitCode.INPUT == 4
+    assert "no image files" in capsys.readouterr().err
+
+
+def test_unknown_command_is_a_usage_error(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(["explode"])
+
+    assert raised.value.code == ExitCode.USAGE
+    assert "invalid choice" in capsys.readouterr().err
+
+
+@pytest.mark.slow
+def test_run_exits_zero_and_prints_batch_report(
+    project_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = main(["run", str(project_path), "--workers", "1"])
+
+    report = json.loads(capsys.readouterr().out)
+    assert code == ExitCode.OK
+    assert report["written"] == 2
+    assert report["failed"] == {}
+
+
+@pytest.mark.slow
+def test_run_with_a_missing_source_exits_failed_and_names_the_page(
+    project_path: Path, sample_scans: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (sample_scans / "page_02.png").unlink()
+
+    code = main(["run", str(project_path), "--workers", "1"])
+
+    report = json.loads(capsys.readouterr().out)
+    assert code == ExitCode.FAILED == 1
+    assert report["written"] == 1
+    assert list(report["failed"]) == ["page_02.png"]

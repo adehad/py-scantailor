@@ -21,6 +21,9 @@ readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
 dynamic = ["version"]
 
+[project.scripts]
+scantailor-cli = "scantailor.cli.main:main"
+
 [project.gui-scripts]
 scantailor = "scantailor.__main__:main"
 
