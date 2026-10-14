@@ -12,7 +12,7 @@ Each zone has:
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import numpy as np
@@ -20,7 +20,7 @@ from numpy.typing import NDArray
 from pydantic import BaseModel
 
 
-class ZoneCategory(str, Enum):
+class ZoneCategory(StrEnum):
     """How the zone was created.
 
     MANUAL: User-defined zone.
@@ -31,7 +31,7 @@ class ZoneCategory(str, Enum):
     AUTO = "auto"
 
 
-class PictureLayer(str, Enum):
+class PictureLayer(StrEnum):
     """Layer assignment for picture zones.
 
     Controls how the zone interacts with binarization in mixed mode.
@@ -109,8 +109,8 @@ class ZoneSpline:
             u = np.linspace(0, 1, num_samples)
             x, y = splev(u, tck)
             return np.column_stack([x, y])
-        except Exception:
-            # Fall back to polygon
+        except ValueError, TypeError:
+            # splprep rejects repeated or too few points; draw the polygon instead.
             return self.points.copy()
 
 
@@ -161,124 +161,3 @@ class Zone:
     def is_fill_zone(self) -> bool:
         """Return True if this is a fill zone."""
         return isinstance(self.properties, FillZoneProperties)
-
-
-class ZoneSet(BaseModel):
-    """A collection of zones.
-
-    Supports iteration and provides methods for adding/removing zones.
-    """
-
-    model_config = {"arbitrary_types_allowed": True}
-
-    _picture_zones: list[Zone] = []
-    _fill_zones: list[Zone] = []
-
-    def __init__(self, **data) -> None:
-        """Initialize with empty picture and fill zone lists."""
-        super().__init__(**data)
-        object.__setattr__(self, "_picture_zones", [])
-        object.__setattr__(self, "_fill_zones", [])
-
-    @property
-    def picture_zones(self) -> list[Zone]:
-        """Get all picture zones."""
-        return list(self._picture_zones)
-
-    @property
-    def fill_zones(self) -> list[Zone]:
-        """Get all fill zones."""
-        return list(self._fill_zones)
-
-    def add_picture_zone(
-        self,
-        spline: ZoneSpline,
-        layer: PictureLayer = PictureLayer.NOOP,
-        category: ZoneCategory = ZoneCategory.MANUAL,
-    ) -> Zone:
-        """Add a picture zone.
-
-        Args:
-            spline: Zone boundary.
-            layer: Layer assignment.
-            category: Zone category.
-
-        Returns:
-            The created zone.
-        """
-        props = PictureZoneProperties(layer=layer, category=category)
-        zone = Zone(spline=spline, properties=props)
-        self._picture_zones.append(zone)
-        return zone
-
-    def add_fill_zone(
-        self,
-        spline: ZoneSpline,
-        color: tuple[int, int, int] = (255, 255, 255),
-        category: ZoneCategory = ZoneCategory.MANUAL,
-    ) -> Zone:
-        """Add a fill zone.
-
-        Args:
-            spline: Zone boundary.
-            color: Fill color as (R, G, B).
-            category: Zone category.
-
-        Returns:
-            The created zone.
-        """
-        props = FillZoneProperties(color=color, category=category)
-        zone = Zone(spline=spline, properties=props)
-        self._fill_zones.append(zone)
-        return zone
-
-    def remove_picture_zone(self, zone: Zone) -> bool:
-        """Remove a picture zone.
-
-        Args:
-            zone: The zone to remove.
-
-        Returns:
-            True if zone was found and removed.
-        """
-        try:
-            self._picture_zones.remove(zone)
-            return True
-        except ValueError:
-            return False
-
-    def remove_fill_zone(self, zone: Zone) -> bool:
-        """Remove a fill zone.
-
-        Args:
-            zone: The zone to remove.
-
-        Returns:
-            True if zone was found and removed.
-        """
-        try:
-            self._fill_zones.remove(zone)
-            return True
-        except ValueError:
-            return False
-
-    def clear_picture_zones(self) -> None:
-        """Remove all picture zones."""
-        self._picture_zones.clear()
-
-    def clear_fill_zones(self) -> None:
-        """Remove all fill zones."""
-        self._fill_zones.clear()
-
-    def clear_all(self) -> None:
-        """Remove all zones."""
-        self._picture_zones.clear()
-        self._fill_zones.clear()
-
-    def is_empty(self) -> bool:
-        """Return True if there are no zones."""
-        return len(self._picture_zones) == 0 and len(self._fill_zones) == 0
-
-    def __len__(self) -> int:
-        """Return total number of zones."""
-        return len(self._picture_zones) + len(self._fill_zones)

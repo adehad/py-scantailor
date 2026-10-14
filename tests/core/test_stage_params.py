@@ -1,11 +1,13 @@
 """Tests for exporting and restoring per-page stage parameters."""
 
+import json
 from pathlib import Path
+from typing import Any, ClassVar
 
 import pytest
 
 from scantailor.core.models import Dpi, ImageId, Margins, OrthogonalRotation, PageId
-from scantailor.core.project import Project
+from scantailor.core.project import Project, StageParamsEntry
 from scantailor.core.stage_params import (
     STAGE_KEYS,
     apply_stage_defaults,
@@ -14,16 +16,26 @@ from scantailor.core.stage_params import (
     collect_stage_params,
 )
 from scantailor.core.stage_sequence import FilterStage, StageSequence
+from scantailor.filters.deskew.params import AutoManualMode
 from scantailor.filters.deskew.params import Params as DeskewParams
 from scantailor.filters.fix_orientation.image_trim import ImageTrim
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.output.dewarping_options import DewarpingMode
 from scantailor.filters.output.params import Params as OutputParams
+from scantailor.filters.output.picture_shape import PictureShape
+from scantailor.filters.page_layout.alignment import (
+    HorizontalAlignment,
+    VerticalAlignment,
+)
 from scantailor.filters.page_layout.params import ContentSize
 from scantailor.filters.page_layout.params import Params as PageLayoutParams
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.page_split.params import Params as PageSplitParams
-from scantailor.filters.select_content.detection import ContentDetectionMode
+from scantailor.filters.select_content.detection import (
+    ContentDetectionMode,
+    PageDetectionMode,
+)
 from scantailor.filters.select_content.params import Params as SelectContentParams
 
 
@@ -157,6 +169,80 @@ def test_apply_rejects_entries_that_do_not_match_the_stage_params(
 
     with pytest.raises(ValueError, match="deskew_angle_deg"):
         apply_stage_params(StageSequence(), collected)
+
+
+class TestEnumValuesInProjectFiles:
+    """Mode and level choices are stored as their plain values, as before."""
+
+    STORED: ClassVar[dict[FilterStage, dict[str, Any]]] = {
+        FilterStage.DESKEW: {"mode": "manual", "oblique_mode": "auto"},
+        FilterStage.SELECT_CONTENT: {
+            "content_detection_mode": "disabled",
+            "page_detection_mode": "auto",
+        },
+        FilterStage.PAGE_LAYOUT: {
+            "alignment": {"vertical": "bottom", "horizontal": "right"}
+        },
+        FilterStage.OUTPUT: {
+            "color_mode": "mixed",
+            "despeckle_level": "aggressive",
+            "dewarping": {"mode": "marginal"},
+            "picture_shape": {"shape": "rectangular"},
+        },
+    }
+
+    def _write_existing_file(self, path: Path, page: PageId) -> None:
+        stage_params = {
+            STAGE_KEYS[stage]: [StageParamsEntry(page=page, params=params)]
+            for stage, params in self.STORED.items()
+        }
+        Project(stage_params=stage_params).save(path)
+
+    def test_a_file_with_plain_values_loads_every_choice(
+        self, pages: list[PageId], tmp_path: Path
+    ):
+        project_file = tmp_path / "p.ScanTailor"
+        self._write_existing_file(project_file, pages[0])
+        stages = StageSequence()
+
+        apply_stage_params(stages, Project.load(project_file).stage_params)
+
+        page = pages[0]
+        deskew = stages.deskew_filter.settings.get_params(page)
+        assert deskew.mode is AutoManualMode.MANUAL
+        assert deskew.oblique_mode is AutoManualMode.AUTO
+        content = stages.select_content_filter.settings.get_params(page)
+        assert content.content_detection_mode is ContentDetectionMode.DISABLED
+        assert content.page_detection_mode is PageDetectionMode.AUTO
+        alignment = stages.page_layout_filter.settings.get_params(page).alignment
+        assert alignment.vertical is VerticalAlignment.BOTTOM
+        assert alignment.horizontal is HorizontalAlignment.RIGHT
+        output = stages.output_filter.settings.get_params(page)
+        assert output.color_mode is ColorMode.MIXED
+        assert output.despeckle_level is DespeckleLevel.AGGRESSIVE
+        assert output.dewarping.mode is DewarpingMode.MARGINAL
+        assert output.picture_shape.shape is PictureShape.RECTANGULAR
+
+    def test_saving_the_loaded_choices_writes_the_same_plain_values(
+        self, pages: list[PageId], tmp_path: Path
+    ):
+        first = tmp_path / "first.ScanTailor"
+        self._write_existing_file(first, pages[0])
+        stages = StageSequence()
+        apply_stage_params(stages, Project.load(first).stage_params)
+        second = tmp_path / "second.ScanTailor"
+
+        Project(stage_params=collect_stage_params(stages, pages)).save(second)
+
+        saved = json.loads(second.read_text(encoding="utf-8"))["stage_params"]
+        for stage, stored in self.STORED.items():
+            params = saved[STAGE_KEYS[stage]][0]["params"]
+            for key, value in stored.items():
+                if isinstance(value, dict):
+                    assert {k: params[key][k] for k in value} == value
+                else:
+                    assert params[key] == value
+        assert "ColorMode" not in second.read_text(encoding="utf-8")
 
 
 def test_stage_keys_cover_all_stages_with_unique_names():
