@@ -496,6 +496,10 @@ class StagePanels(QtCore.QObject):
         if isinstance(self.options, output.OptionsWidget):
             self.options.set_dewarping_tab_active(tab is ImageViewTab.DEWARPING)
             self.options.set_despeckle_tab_active(tab is ImageViewTab.DESPECKLING)
+        view, page, xform = self.view, self._page, self._output_transformation
+        if isinstance(view, OutputImageView) and page and xform is not None:
+            params = self.sequence.output_filter.get_params(page)
+            self._feed_distortion_model(view, params, xform, self._output_scale)
 
     def set_output_extras(self, extras: OutputExtras) -> None:
         """Take the pictures the Output view's tabs show besides the output page.
@@ -918,6 +922,28 @@ class StagePanels(QtCore.QObject):
                 and params.color_mode == ColorMode.COLOR_GRAYSCALE
                 else None,
             )
+        self._feed_distortion_model(view, params, xform, scale)
+
+    def _feed_distortion_model(
+        self,
+        view: OutputImageView,
+        params: OutputParams,
+        xform: ImageTransformation,
+        scale: NDArray[np.float64],
+    ) -> None:
+        """Give the dewarping grid its model once the Dewarping tab is shown.
+
+        Laying out the grid's curves takes a good part of a second on a large
+        page, so it waits until someone opens the tab.
+
+        Args:
+            view (OutputImageView): The Output view.
+            params (OutputParams): The page's output parameters.
+            xform (ImageTransformation): Source to output transformation.
+            scale (NDArray[np.float64]): Output pixels per transformation pixel.
+        """
+        if view.current_tab() is not ImageViewTab.DEWARPING:
+            return
         model = (params.distortion_model, params.depth_perception)
         if model != self._fed_model:
             self._fed_model = model

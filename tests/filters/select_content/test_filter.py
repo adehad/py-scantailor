@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from scantailor.core.models import ImageId, PageId, SubPage
 from scantailor.filters.select_content.content_box import ContentBox, PageBox
@@ -236,6 +237,48 @@ class TestFilterProcess:
 
         # At 300 DPI, 300 pixels should be about 25.4 mm
         assert result.content_size_mm.width_mm > 0
+
+    def test_an_image_function_is_not_called_when_nothing_is_detected(self):
+        filter = Filter()
+        page_id = make_page_id("test")
+        filter.set_params(
+            page_id,
+            Params(
+                page_detection_mode=PageDetectionMode.DISABLED,
+                content_detection_mode=ContentDetectionMode.DISABLED,
+            ),
+        )
+
+        def image() -> np.ndarray:
+            raise AssertionError("the image was made")
+
+        result = filter.process(image, page_id, image_size=(300, 200))
+
+        assert (result.page_box.width, result.page_box.height) == (300, 200)
+
+    def test_an_image_function_gives_the_same_boxes_as_the_image(self):
+        image = np.full((200, 300), 255, dtype=np.uint8)
+        image[60:140, 80:220] = 0
+        made: list[bool] = []
+
+        def make() -> np.ndarray:
+            made.append(True)
+            return image
+
+        from_array = Filter().process(image, make_page_id("test"))
+        from_function = Filter().process(
+            make, make_page_id("test"), image_size=(300, 200)
+        )
+
+        assert made
+        assert from_function.content_box == from_array.content_box
+        assert from_function.page_box == from_array.page_box
+
+    def test_an_image_function_without_a_size_is_refused(self):
+        with pytest.raises(ValueError, match="image_size"):
+            Filter().process(
+                lambda: np.zeros((10, 10), dtype=np.uint8), make_page_id("test")
+            )
 
 
 class TestFilterManualOperations:
