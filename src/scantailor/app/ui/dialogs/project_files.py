@@ -130,7 +130,11 @@ def _run_pdf_job(
     progress.deleteLater()
     job.deleteLater()
     if "error" in outcome:
-        QtWidgets.QMessageBox.warning(parent, "PDF", str(outcome["error"]))
+        QtWidgets.QMessageBox.warning(
+            parent,
+            QtCore.QCoreApplication.translate("ProjectFilesDialog", "PDF"),
+            str(outcome["error"]),
+        )
         return None
     result = outcome.get("result")
     return result if isinstance(result, ImportedPdf) else None
@@ -157,7 +161,11 @@ def extract_pdf_pages(
     try:
         total = page_count(pdf_path)
     except ValueError as error:
-        QtWidgets.QMessageBox.warning(parent, "PDF", str(error))
+        QtWidgets.QMessageBox.warning(
+            parent,
+            QtCore.QCoreApplication.translate("ProjectFilesDialog", "PDF"),
+            str(error),
+        )
         return None
     destination = pages_folder_of(pdf_path)
     prompt = PdfExtractDialog(pdf_path, total, destination, default_dpi, parent)
@@ -188,7 +196,11 @@ def extract_pdf_pages(
             clear_existing=replace,
         )
 
-    return _run_pdf_job("Extract pages", work, parent)
+    return _run_pdf_job(
+        QtCore.QCoreApplication.translate("ProjectFilesDialog", "Extract pages"),
+        work,
+        parent,
+    )
 
 
 class ProjectFilesDialog(QtWidgets.QDialog):
@@ -390,10 +402,14 @@ class ProjectFilesDialog(QtWidgets.QDialog):
     def _pdf_label(self, pdf_path: Path, name: str) -> str:
         """Name a PDF with its page count, and whether its pages are extracted."""
         pages = self._page_count_of(pdf_path)
-        label = f"{name} ({pages} {'page' if pages == 1 else 'pages'}"
+        count = (
+            self.tr("1 page")
+            if pages == 1
+            else self.tr("{count} pages").format(count=pages)
+        )
         if rendered_pages(pages_folder_of(pdf_path)):
-            label += ", extracted"
-        return label + ")"
+            return self.tr("{name} ({count}, extracted)").format(name=name, count=count)
+        return f"{name} ({count})"
 
     @staticmethod
     def _resolve(entry: str | Path, input_dir: Path | None) -> Path:
@@ -430,7 +446,7 @@ class ProjectFilesDialog(QtWidgets.QDialog):
         current = self._input_dir_line.text() or str(Path.home())
         directory = QtWidgets.QFileDialog.getExistingDirectory(
             self,
-            "Select Input Directory",
+            self.tr("Select Input Directory"),
             current,
         )
         if directory:
@@ -441,7 +457,7 @@ class ProjectFilesDialog(QtWidgets.QDialog):
         current = self._output_dir_line.text() or str(Path.home())
         directory = QtWidgets.QFileDialog.getExistingDirectory(
             self,
-            "Select Output Directory",
+            self.tr("Select Output Directory"),
             current,
         )
         if directory:
@@ -451,7 +467,7 @@ class ProjectFilesDialog(QtWidgets.QDialog):
         """Add a PDF from any folder to the left list; its pages are extracted later."""
         current = self._input_dir_line.text() or str(Path.home())
         chosen, _selected_filter = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Add PDF", current, "PDF (*.pdf)"
+            self, self.tr("Add PDF"), current, self.tr("PDF (*.pdf)")
         )
         if chosen:
             self._extra_pdfs.add(Path(chosen))
