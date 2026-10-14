@@ -1270,7 +1270,7 @@ def otsu_threshold(gray):
 
 def estimate_page_layout(layout_type, gray, dpi, threshold=None):
     """Return (kind, cutter1, cutter2); cutters are raw ((x1, y1), (x2, y2))."""
-    h, w = gray.shape
+    _h, _w = gray.shape
     if layout_type == SINGLE_UNCUT:
         return (UNCUT, None, None)
     layout = try_cut_at_folding_line(layout_type, gray, dpi)

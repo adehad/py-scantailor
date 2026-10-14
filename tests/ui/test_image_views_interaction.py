@@ -722,8 +722,9 @@ def test_split_lines_follow_the_page_after_a_page_switch(
         project_window.page_selected(other_image_page)
 
     qtbot.waitUntil(
-        lambda: view.page_layout is not None
-        and view.page_layout.get_split_line_x() == 420,
+        lambda: (
+            view.page_layout is not None and view.page_layout.get_split_line_x() == 420
+        ),
         timeout=RENDER_TIMEOUT_MS,
     )
 

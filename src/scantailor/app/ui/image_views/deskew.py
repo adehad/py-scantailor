@@ -44,7 +44,7 @@ def format_angle(degrees: float) -> str:
         a value that rounds to zero carries no minus sign.
     """
     locale = QLocale()
-    text = locale.toString(degrees, ord("f"), 2)
+    text = locale.toString(degrees, "f", 2)
     if not any(digit in text for digit in "123456789"):
         text = text.removeprefix(locale.negativeSign())
     return f"{text}°"

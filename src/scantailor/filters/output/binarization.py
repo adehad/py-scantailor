@@ -36,7 +36,7 @@ class BinarizationMethod(Enum):
     EDGEDIV = "edgediv"
 
     @classmethod
-    def from_string(cls, value: str) -> "BinarizationMethod":
+    def from_string(cls, value: str) -> BinarizationMethod:
         """Parse a BinarizationMethod from its string value."""
         for method in cls:
             if method.value == value:
@@ -122,14 +122,14 @@ class BinarizationOptions(BaseModel):
         default_factory=ColorSegmenterOptions
     )
 
-    def with_method(self, method: BinarizationMethod) -> "BinarizationOptions":
+    def with_method(self, method: BinarizationMethod) -> BinarizationOptions:
         """Create a copy with a different binarization method."""
         return self.model_copy(update={"method": method})
 
-    def with_threshold_adjustment(self, adjustment: int) -> "BinarizationOptions":
+    def with_threshold_adjustment(self, adjustment: int) -> BinarizationOptions:
         """Create a copy with a different threshold adjustment."""
         return self.model_copy(update={"threshold_adjustment": adjustment})
 
-    def with_window_size(self, size: int) -> "BinarizationOptions":
+    def with_window_size(self, size: int) -> BinarizationOptions:
         """Create a copy with a different window size."""
         return self.model_copy(update={"window_size": size})

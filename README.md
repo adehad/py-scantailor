@@ -86,7 +86,7 @@ and assembling multi-page documents are out of scope of this project.
 
 The first launch of a new build compiles the image-processing kernels in the background and caches them under `%LOCALAPPDATA%\numba`; later launches load that cache.
 
-**From source** (Windows, Linux or macOS) needs Python 3.12 and [PDM](https://pdm-project.org):
+**From source** (Windows, Linux or macOS) needs Python 3.14 and [PDM](https://pdm-project.org):
 
 ```bash
 pdm install

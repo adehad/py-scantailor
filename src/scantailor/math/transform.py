@@ -43,7 +43,7 @@ class AffineTransform(BaseModel):
         return v
 
     @classmethod
-    def identity(cls) -> "AffineTransform":
+    def identity(cls) -> AffineTransform:
         """Create an identity transformation.
 
         Returns:
@@ -52,7 +52,7 @@ class AffineTransform(BaseModel):
         return cls(matrix=np.array([[1, 0, 0], [0, 1, 0]], dtype=np.float64))
 
     @classmethod
-    def translation(cls, tx: float, ty: float) -> "AffineTransform":
+    def translation(cls, tx: float, ty: float) -> AffineTransform:
         """Create a translation transformation.
 
         Args:
@@ -67,7 +67,7 @@ class AffineTransform(BaseModel):
     @classmethod
     def rotation(
         cls, angle: float, center: tuple[float, float] = (0, 0)
-    ) -> "AffineTransform":
+    ) -> AffineTransform:
         """Create a rotation transformation.
 
         Args:
@@ -83,7 +83,7 @@ class AffineTransform(BaseModel):
     @classmethod
     def scaling(
         cls, sx: float, sy: float | None = None, center: tuple[float, float] = (0, 0)
-    ) -> "AffineTransform":
+    ) -> AffineTransform:
         """Create a scaling transformation.
 
         Args:
@@ -105,7 +105,7 @@ class AffineTransform(BaseModel):
         return cls(matrix=matrix)
 
     @classmethod
-    def shear(cls, shx: float = 0, shy: float = 0) -> "AffineTransform":
+    def shear(cls, shx: float = 0, shy: float = 0) -> AffineTransform:
         """Create a shearing transformation.
 
         Args:
@@ -156,7 +156,7 @@ class AffineTransform(BaseModel):
         result = cv2.transform(points_reshaped, self.matrix.astype(np.float32))
         return result.reshape((-1, 2)).astype(np.float64)
 
-    def compose(self, other: "AffineTransform") -> "AffineTransform":
+    def compose(self, other: AffineTransform) -> AffineTransform:
         """Compose this transformation with another.
 
         The resulting transformation applies 'other' first, then 'self'.
@@ -174,7 +174,7 @@ class AffineTransform(BaseModel):
         composed = m1 @ m2
         return AffineTransform(matrix=composed[:2, :])
 
-    def inverse(self) -> "AffineTransform":
+    def inverse(self) -> AffineTransform:
         """Compute the inverse transformation.
 
         Returns:

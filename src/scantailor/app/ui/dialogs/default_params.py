@@ -351,7 +351,8 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         self._w(QtWidgets.QPushButton, "profileDeleteButton").setEnabled(delete)
         tabs = self._w(QtWidgets.QTabWidget, "tabWidget")
         for index in range(tabs.count()):
-            tabs.widget(index).setEnabled(editable)
+            if (page := tabs.widget(index)) is not None:
+                page.setEnabled(editable)
 
     def _on_profile_changed(self, index: int) -> None:
         box = self._profile_box()

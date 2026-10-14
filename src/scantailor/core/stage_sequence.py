@@ -76,15 +76,15 @@ class StageSequence:
     """
 
     # Individual filter instances (lazy initialization supported)
-    _fix_orientation_filter: "FixOrientationFilter | None" = field(default=None)
-    _page_split_filter: "PageSplitFilter | None" = field(default=None)
-    _deskew_filter: "DeskewFilter | None" = field(default=None)
-    _select_content_filter: "SelectContentFilter | None" = field(default=None)
-    _page_layout_filter: "PageLayoutFilter | None" = field(default=None)
-    _output_filter: "OutputFilter | None" = field(default=None)
+    _fix_orientation_filter: FixOrientationFilter | None = field(default=None)
+    _page_split_filter: PageSplitFilter | None = field(default=None)
+    _deskew_filter: DeskewFilter | None = field(default=None)
+    _select_content_filter: SelectContentFilter | None = field(default=None)
+    _page_layout_filter: PageLayoutFilter | None = field(default=None)
+    _output_filter: OutputFilter | None = field(default=None)
 
     @property
-    def fix_orientation_filter(self) -> "FixOrientationFilter":
+    def fix_orientation_filter(self) -> FixOrientationFilter:
         """Get the Fix Orientation filter."""
         if self._fix_orientation_filter is None:
             from scantailor.filters.fix_orientation.filter import Filter
@@ -93,12 +93,12 @@ class StageSequence:
         return self._fix_orientation_filter
 
     @fix_orientation_filter.setter
-    def fix_orientation_filter(self, value: "FixOrientationFilter") -> None:
+    def fix_orientation_filter(self, value: FixOrientationFilter) -> None:
         """Set the Fix Orientation filter."""
         self._fix_orientation_filter = value
 
     @property
-    def page_split_filter(self) -> "PageSplitFilter":
+    def page_split_filter(self) -> PageSplitFilter:
         """Get the Page Split filter."""
         if self._page_split_filter is None:
             from scantailor.filters.page_split.filter import Filter
@@ -107,12 +107,12 @@ class StageSequence:
         return self._page_split_filter
 
     @page_split_filter.setter
-    def page_split_filter(self, value: "PageSplitFilter") -> None:
+    def page_split_filter(self, value: PageSplitFilter) -> None:
         """Set the Page Split filter."""
         self._page_split_filter = value
 
     @property
-    def deskew_filter(self) -> "DeskewFilter":
+    def deskew_filter(self) -> DeskewFilter:
         """Get the Deskew filter."""
         if self._deskew_filter is None:
             from scantailor.filters.deskew.filter import Filter
@@ -121,12 +121,12 @@ class StageSequence:
         return self._deskew_filter
 
     @deskew_filter.setter
-    def deskew_filter(self, value: "DeskewFilter") -> None:
+    def deskew_filter(self, value: DeskewFilter) -> None:
         """Set the Deskew filter."""
         self._deskew_filter = value
 
     @property
-    def select_content_filter(self) -> "SelectContentFilter":
+    def select_content_filter(self) -> SelectContentFilter:
         """Get the Select Content filter."""
         if self._select_content_filter is None:
             from scantailor.filters.select_content.filter import Filter
@@ -135,12 +135,12 @@ class StageSequence:
         return self._select_content_filter
 
     @select_content_filter.setter
-    def select_content_filter(self, value: "SelectContentFilter") -> None:
+    def select_content_filter(self, value: SelectContentFilter) -> None:
         """Set the Select Content filter."""
         self._select_content_filter = value
 
     @property
-    def page_layout_filter(self) -> "PageLayoutFilter":
+    def page_layout_filter(self) -> PageLayoutFilter:
         """Get the Page Layout filter."""
         if self._page_layout_filter is None:
             from scantailor.filters.page_layout.filter import Filter
@@ -149,12 +149,12 @@ class StageSequence:
         return self._page_layout_filter
 
     @page_layout_filter.setter
-    def page_layout_filter(self, value: "PageLayoutFilter") -> None:
+    def page_layout_filter(self, value: PageLayoutFilter) -> None:
         """Set the Page Layout filter."""
         self._page_layout_filter = value
 
     @property
-    def output_filter(self) -> "OutputFilter":
+    def output_filter(self) -> OutputFilter:
         """Get the Output filter."""
         if self._output_filter is None:
             from scantailor.filters.output.filter import Filter
@@ -163,7 +163,7 @@ class StageSequence:
         return self._output_filter
 
     @output_filter.setter
-    def output_filter(self, value: "OutputFilter") -> None:
+    def output_filter(self, value: OutputFilter) -> None:
         """Set the Output filter."""
         self._output_filter = value
 

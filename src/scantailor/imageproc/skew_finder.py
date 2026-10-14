@@ -150,7 +150,7 @@ def find_skew_binary(
 
 
 def _flat_top_edge(
-    scorer: "_ShearScorer",
+    scorer: _ShearScorer,
     inside: float,
     outside: float,
     top_score: float,

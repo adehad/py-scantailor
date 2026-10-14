@@ -134,7 +134,7 @@ class _PageLayout:
         content_polygon: Polygon | None,
         page_outline: Polygon | None,
         source_outline: Polygon | None = None,
-    ) -> "_PageLayout":
+    ) -> _PageLayout:
         """Rasterise the page outline and the mask of the area to keep.
 
         Args:
@@ -316,7 +316,7 @@ class _PageGeometry:
         picture_zones: Sequence[Zone],
         fill_zones: Sequence[Zone],
         source_outline: Polygon | None = None,
-    ) -> "_PageGeometry":
+    ) -> _PageGeometry:
         """Rasterise the layout and zones on the input image's grid."""
         shape = image.shape[:2]
         return cls(
@@ -687,7 +687,7 @@ def _generate_mixed_output(
     if render.morphological_smoothing:
         binary = _morphological_smooth(binary)
 
-    raw_ink = binary == 0
+    raw_ink: NDArray[np.bool_] = binary == 0
     text_region, _ = apply_picture_layers(~picture, raw_ink, picture_layers)
     if layout.keep is not None:
         text_region |= ~layout.keep

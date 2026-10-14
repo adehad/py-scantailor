@@ -218,9 +218,7 @@ def import_xml_project_file(path: Path) -> XmlProjectImport | None:
     return import_xml_project(path, content)
 
 
-def apply_xml_stage_defaults(
-    stages: "StageSequence", defaults: XmlStageDefaults
-) -> None:
+def apply_xml_stage_defaults(stages: StageSequence, defaults: XmlStageDefaults) -> None:
     """Install the stage-wide values of a C++ project into the stages.
 
     Args:

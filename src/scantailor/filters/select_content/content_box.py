@@ -58,7 +58,7 @@ class ContentBox(BaseModel):
         """Return True if the point is inside the box."""
         return self.left <= x <= self.right and self.top <= y <= self.bottom
 
-    def intersects(self, other: "ContentBox") -> bool:
+    def intersects(self, other: ContentBox) -> bool:
         """Return True if this box overlaps with another."""
         return not (
             self.right < other.left
@@ -67,7 +67,7 @@ class ContentBox(BaseModel):
             or self.top > other.bottom
         )
 
-    def intersection(self, other: "ContentBox") -> Self:
+    def intersection(self, other: ContentBox) -> ContentBox:
         """Return the intersection of this box with another."""
         left = max(self.left, other.left)
         top = max(self.top, other.top)
@@ -79,7 +79,7 @@ class ContentBox(BaseModel):
 
         return ContentBox(x=left, y=top, width=right - left, height=bottom - top)
 
-    def union(self, other: "ContentBox") -> Self:
+    def union(self, other: ContentBox) -> ContentBox:
         """Return the smallest box containing both boxes."""
         if self.is_empty():
             return other.model_copy()
@@ -93,7 +93,7 @@ class ContentBox(BaseModel):
 
         return ContentBox(x=left, y=top, width=right - left, height=bottom - top)
 
-    def expanded(self, margin: float) -> Self:
+    def expanded(self, margin: float) -> ContentBox:
         """Return a new box expanded by the given margin on all sides."""
         return ContentBox(
             x=self.x - margin,

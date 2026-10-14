@@ -75,7 +75,7 @@ class LinearFunction:
         self.b += other.b
         return self
 
-    def __add__(self, other: Self) -> Self:
+    def __add__(self, other: Self) -> LinearFunction:
         """Add two linear functions."""
         if self.num_vars != other.num_vars:
             msg = "Cannot add functions with different number of variables"
@@ -88,11 +88,11 @@ class LinearFunction:
         self.b *= scalar
         return self
 
-    def __mul__(self, scalar: float) -> Self:
+    def __mul__(self, scalar: float) -> LinearFunction:
         """Multiply by a scalar."""
         return LinearFunction(a=self.a * scalar, b=self.b * scalar)
 
-    def __rmul__(self, scalar: float) -> Self:
+    def __rmul__(self, scalar: float) -> LinearFunction:
         """Right multiply by a scalar."""
         return self * scalar
 
@@ -246,7 +246,7 @@ class QuadraticFunction:
         self.c += other.c
         return self
 
-    def __add__(self, other: Self) -> Self:
+    def __add__(self, other: Self) -> QuadraticFunction:
         """Add two quadratic functions."""
         if self.num_vars != other.num_vars:
             msg = "Cannot add functions with different number of variables"
@@ -262,12 +262,12 @@ class QuadraticFunction:
         self.c *= scalar
         return self
 
-    def __mul__(self, scalar: float) -> Self:
+    def __mul__(self, scalar: float) -> QuadraticFunction:
         """Multiply by a scalar."""
         return QuadraticFunction(
             A=self.A * scalar, b=self.b * scalar, c=self.c * scalar
         )
 
-    def __rmul__(self, scalar: float) -> Self:
+    def __rmul__(self, scalar: float) -> QuadraticFunction:
         """Right multiply by a scalar."""
         return self * scalar

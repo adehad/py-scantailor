@@ -61,7 +61,7 @@ class Filter:
         """Get the settings storage."""
         return self._settings
 
-    def get_params(self, page_id: "PageId") -> Params:
+    def get_params(self, page_id: PageId) -> Params:
         """Get the current parameters for a page.
 
         Args:
@@ -72,7 +72,7 @@ class Filter:
         """
         return self._settings.get_params(page_id)
 
-    def set_params(self, page_id: "PageId", params: Params) -> None:
+    def set_params(self, page_id: PageId, params: Params) -> None:
         """Set the parameters for a page.
 
         Args:
@@ -81,11 +81,11 @@ class Filter:
         """
         self._settings.set_params(page_id, params)
 
-    def is_params_set(self, page_id: "PageId") -> bool:
+    def is_params_set(self, page_id: PageId) -> bool:
         """Check if parameters have been set for a page."""
         return self._settings.is_params_set(page_id)
 
-    def get_output_dpi(self, page_id: "PageId") -> Dpi:
+    def get_output_dpi(self, page_id: PageId) -> Dpi:
         """Get the output DPI for a page.
 
         Args:
@@ -96,7 +96,7 @@ class Filter:
         """
         return self.get_params(page_id).output_dpi
 
-    def set_output_dpi(self, page_id: "PageId", dpi: Dpi) -> Params:
+    def set_output_dpi(self, page_id: PageId, dpi: Dpi) -> Params:
         """Set the output DPI for a page.
 
         Args:
@@ -111,7 +111,7 @@ class Filter:
         return params
 
     def store_distortion_model(
-        self, page_id: "PageId", model: DistortionModelSpec
+        self, page_id: PageId, model: DistortionModelSpec
     ) -> bool:
         """Keep the edges that automatic or marginal dewarping found for a page.
 
@@ -135,7 +135,7 @@ class Filter:
         self._settings.set_params(page_id, params.with_distortion_model(model))
         return True
 
-    def get_color_mode(self, page_id: "PageId") -> ColorMode:
+    def get_color_mode(self, page_id: PageId) -> ColorMode:
         """Get the color mode for a page.
 
         Args:
@@ -146,7 +146,7 @@ class Filter:
         """
         return self.get_params(page_id).color_mode
 
-    def set_color_mode(self, page_id: "PageId", mode: ColorMode) -> Params:
+    def set_color_mode(self, page_id: PageId, mode: ColorMode) -> Params:
         """Set the color mode for a page.
 
         Args:
@@ -160,7 +160,7 @@ class Filter:
         self._settings.set_params(page_id, params)
         return params
 
-    def get_despeckle_level(self, page_id: "PageId") -> DespeckleLevel:
+    def get_despeckle_level(self, page_id: PageId) -> DespeckleLevel:
         """Get the despeckle level for a page.
 
         Args:
@@ -171,7 +171,7 @@ class Filter:
         """
         return self.get_params(page_id).despeckle_level
 
-    def set_despeckle_level(self, page_id: "PageId", level: DespeckleLevel) -> Params:
+    def set_despeckle_level(self, page_id: PageId, level: DespeckleLevel) -> Params:
         """Set the despeckle level for a page.
 
         Args:
@@ -185,7 +185,7 @@ class Filter:
         self._settings.set_params(page_id, params)
         return params
 
-    def get_binarization_method(self, page_id: "PageId") -> BinarizationMethod:
+    def get_binarization_method(self, page_id: PageId) -> BinarizationMethod:
         """Get the binarization method for a page.
 
         Args:
@@ -197,7 +197,7 @@ class Filter:
         return self.get_params(page_id).binarization.method
 
     def set_binarization_method(
-        self, page_id: "PageId", method: BinarizationMethod
+        self, page_id: PageId, method: BinarizationMethod
     ) -> Params:
         """Set the binarization method for a page.
 
@@ -213,7 +213,7 @@ class Filter:
         return params
 
     def set_binarization_options(
-        self, page_id: "PageId", options: BinarizationOptions
+        self, page_id: PageId, options: BinarizationOptions
     ) -> Params:
         """Set the binarization options for a page.
 
@@ -228,7 +228,7 @@ class Filter:
         self._settings.set_params(page_id, params)
         return params
 
-    def apply_to_pages(self, page_ids: list["PageId"], params: Params) -> None:
+    def apply_to_pages(self, page_ids: list[PageId], params: Params) -> None:
         """Apply parameters to multiple pages.
 
         Args:
@@ -240,7 +240,7 @@ class Filter:
     def process(
         self,
         image: NDArray[np.uint8],
-        page_id: "PageId",
+        page_id: PageId,
     ) -> OutputResult:
         """Process an image and generate final output.
 

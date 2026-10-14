@@ -271,7 +271,7 @@ def _render_from_reduced_source(
     max_size: QtCore.QSize,
     memo: ThumbnailMemo,
     source_key: Hashable,
-    digests: "_ParamDigests",
+    digests: _ParamDigests,
 ) -> QtGui.QImage | None:
     """Render from the kept shrunk source when no stage would detect.
 
@@ -365,7 +365,7 @@ class _ParamDigests:
         sequence: StageSequence,
         end_stage: FilterStage,
         source_key: Hashable,
-    ) -> "_ParamDigests":
+    ) -> _ParamDigests:
         """Read the parameters a render of a page up to ``end_stage`` uses."""
         digest = hashlib.blake2b(repr((source_key, page_id)).encode(), digest_size=16)
         orientation = sequence.fix_orientation_filter
@@ -453,7 +453,7 @@ class _RenderTask(QtCore.QRunnable):
         signals: _RenderSignals,
         sources: SourceCache,
         pixels: bool,
-        finished: Callable[["_RenderTask"], None],
+        finished: Callable[[_RenderTask], None],
         extras: bool = False,
     ) -> None:
         super().__init__()

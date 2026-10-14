@@ -26,7 +26,7 @@ extensions = [
 ]
 
 intersphinx_mapping = {
-    "python": ("https://docs.python.org/3.12", None),
+    "python": ("https://docs.python.org/3.14", None),
     "numpy": ("https://numpy.org/doc/stable", None),
     "pydantic": ("https://docs.pydantic.dev/latest", None),
     "pikepdf": ("https://pikepdf.readthedocs.io/en/latest", None),
@@ -64,6 +64,8 @@ nitpick_ignore = [
     ("py:class", "numpy.int64"),
     ("py:class", "numpy.float32"),
     ("py:class", "numpy.float64"),
+    # numpy 2.5 defines NDArray as a type alias in a private module its inventory omits.
+    ("py:class", "numpy._typing._array_like.NDArray"),
 ]
 
 # Add any paths that contain templates here, relative to this directory.

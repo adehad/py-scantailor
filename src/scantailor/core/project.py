@@ -10,7 +10,7 @@ import os
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from enum import IntEnum
 from pathlib import Path
-from typing import Any, Literal, Self
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -551,7 +551,7 @@ class Project(BaseModel):
         path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     @classmethod
-    def load(cls, path: Path) -> Self:
+    def load(cls, path: Path) -> Project:
         """Load a project from a file.
 
         Automatically detects JSON or XML format.
@@ -583,7 +583,7 @@ class Project(BaseModel):
         raise ValueError(msg)
 
     @classmethod
-    def _load_xml(cls, path: Path, content: str) -> Self:
+    def _load_xml(cls, path: Path, content: str) -> Project:
         """Load a project from C++ ScanTailor XML format.
 
         Args:

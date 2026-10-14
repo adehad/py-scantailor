@@ -26,10 +26,10 @@ class Settings:
         self._default_layout_type: LayoutType = LayoutType.AUTO_LAYOUT_TYPE
 
     @staticmethod
-    def _key(page_id: "PageId") -> PageId:
+    def _key(page_id: PageId) -> PageId:
         return PageId(image_id=page_id.image_id)
 
-    def get_params(self, page_id: "PageId") -> Params:
+    def get_params(self, page_id: PageId) -> Params:
         """Get parameters for a page.
 
         Args:
@@ -45,7 +45,7 @@ class Settings:
             return Params(layout_type=default_layout_type)
         return params
 
-    def set_params(self, page_id: "PageId", params: Params) -> None:
+    def set_params(self, page_id: PageId, params: Params) -> None:
         """Set parameters for a page.
 
         Args:
@@ -55,7 +55,7 @@ class Settings:
         with self._lock:
             self._params[self._key(page_id)] = params
 
-    def is_params_set(self, page_id: "PageId") -> bool:
+    def is_params_set(self, page_id: PageId) -> bool:
         """Check if parameters have been explicitly set for a page.
 
         Args:
@@ -67,7 +67,7 @@ class Settings:
         with self._lock:
             return self._key(page_id) in self._params
 
-    def clear_params(self, page_id: "PageId") -> None:
+    def clear_params(self, page_id: PageId) -> None:
         """Clear parameters for a page, reverting to defaults.
 
         Args:
@@ -90,7 +90,7 @@ class Settings:
         with self._lock:
             self._default_layout_type = layout_type
 
-    def apply_params_to_pages(self, page_ids: list["PageId"], params: Params) -> None:
+    def apply_params_to_pages(self, page_ids: list[PageId], params: Params) -> None:
         """Apply the same parameters to multiple pages.
 
         Args:

@@ -1279,7 +1279,7 @@ class MainWindowManager:
             if profile != settings.current_profile:
                 settings.current_profile = profile
                 settings.save()
-        except (ProfileError, OSError):
+        except ProfileError, OSError:
             _LOG.exception("The oblique default could not be stored")
 
     def _discard_panels(self) -> None:

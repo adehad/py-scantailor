@@ -8,7 +8,7 @@ import shiboken6
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from scantailor.app.ui import theme
-from scantailor.app.ui.theme import fonts
+from scantailor.app.ui.theme import fonts, stylesheet
 from scantailor.app.ui.theme.tokens import DARK, LIGHT
 
 SRC_ROOT = pathlib.Path(theme.__file__).resolve().parents[3]
@@ -227,6 +227,18 @@ def test_spin_boxes_use_tabular_figures(app, qtbot):
     spin.ensurePolished()
     assert spin.font().isFeatureSet(QtGui.QFont.Tag("tnum"))
     assert spin.font().featureValue(QtGui.QFont.Tag("tnum")) == 1
+
+
+def test_spin_box_text_starts_inside_the_field_padding(app, qtbot):
+    theme.apply_theme(app, "light")
+    spin = QtWidgets.QDoubleSpinBox()
+    qtbot.addWidget(spin)
+    spin.resize(130, stylesheet.CONTROL_HEIGHT)
+    spin.show()
+    qtbot.waitExposed(spin)
+    editor = spin.lineEdit()
+    text_left = editor.x() + editor.textMargins().left()
+    assert text_left == stylesheet.FIELD_BORDER + stylesheet.FIELD_PADDING_X
 
 
 def test_line_edits_keep_proportional_figures(app, qtbot):

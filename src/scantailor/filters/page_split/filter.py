@@ -65,7 +65,7 @@ class Filter:
         """Get the settings storage."""
         return self._settings
 
-    def get_params(self, page_id: "PageId") -> Params:
+    def get_params(self, page_id: PageId) -> Params:
         """Get the current parameters for a page.
 
         Args:
@@ -76,7 +76,7 @@ class Filter:
         """
         return self._settings.get_params(page_id)
 
-    def set_params(self, page_id: "PageId", params: Params) -> None:
+    def set_params(self, page_id: PageId, params: Params) -> None:
         """Set the parameters for a page.
 
         Args:
@@ -85,11 +85,11 @@ class Filter:
         """
         self._settings.set_params(page_id, params)
 
-    def is_params_set(self, page_id: "PageId") -> bool:
+    def is_params_set(self, page_id: PageId) -> bool:
         """Check if parameters have been set for a page."""
         return self._settings.is_params_set(page_id)
 
-    def get_layout_type(self, page_id: "PageId") -> LayoutType:
+    def get_layout_type(self, page_id: PageId) -> LayoutType:
         """Get the layout type for a page.
 
         Args:
@@ -100,7 +100,7 @@ class Filter:
         """
         return self.get_params(page_id).layout_type
 
-    def set_layout_type(self, page_id: "PageId", layout_type: LayoutType) -> Params:
+    def set_layout_type(self, page_id: PageId, layout_type: LayoutType) -> Params:
         """Request a layout type for a page.
 
         A stored layout of another type is dropped so that the next run detects
@@ -123,7 +123,7 @@ class Filter:
         self._settings.set_params(page_id, params)
         return params
 
-    def retype_layout(self, page_id: "PageId", layout_type: LayoutType) -> Params:
+    def retype_layout(self, page_id: PageId, layout_type: LayoutType) -> Params:
         """Change the type of the stored layout in place, keeping its cutters.
 
         For a single uncut page or for two pages when the split line was placed
@@ -146,7 +146,7 @@ class Filter:
         self._settings.set_params(page_id, params)
         return params
 
-    def get_page_layout(self, page_id: "PageId") -> PageLayout | None:
+    def get_page_layout(self, page_id: PageId) -> PageLayout | None:
         """Get the page layout for a page.
 
         Args:
@@ -160,7 +160,7 @@ class Filter:
     def detect_split(
         self,
         image: NDArray[np.uint8],
-        page_id: "PageId",
+        page_id: PageId,
         dpi: float = 300.0,
         store_result: bool = True,
         rotation_degrees: int = 0,
@@ -204,7 +204,7 @@ class Filter:
 
     def set_manual_split(
         self,
-        page_id: "PageId",
+        page_id: PageId,
         split_x: float,
         width: float,
         height: float,
@@ -232,7 +232,7 @@ class Filter:
 
     def set_manual_cutters(
         self,
-        page_id: "PageId",
+        page_id: PageId,
         left_x: float,
         right_x: float,
         width: float,
@@ -261,7 +261,7 @@ class Filter:
         return params
 
     def set_manual_layout(
-        self, page_id: "PageId", layout: PageLayout, rotation_degrees: int = 0
+        self, page_id: PageId, layout: PageLayout, rotation_degrees: int = 0
     ) -> Params:
         """Store a layout placed by hand, keeping the page's requested type.
 
@@ -286,7 +286,7 @@ class Filter:
 
     def _with_manual_layout_of_type(
         self,
-        page_id: "PageId",
+        page_id: PageId,
         layout: PageLayout,
         layout_type: LayoutType,
         rotation_degrees: int,
@@ -302,7 +302,7 @@ class Filter:
             .model_copy(update={"dependencies": dependencies})
         )
 
-    def reset_to_auto(self, page_id: "PageId") -> None:
+    def reset_to_auto(self, page_id: PageId) -> None:
         """Reset a page to auto mode.
 
         This clears any manual settings and reverts to auto-detection.
@@ -315,8 +315,8 @@ class Filter:
 
     def apply_layout_type(
         self,
-        source: "PageId",
-        targets: list["PageId"],
+        source: PageId,
+        targets: list[PageId],
         layout_type: LayoutType,
         *,
         apply_cut: bool,
@@ -388,7 +388,7 @@ class Filter:
             trim=trim,
         )
 
-    def clear_detection(self, page_id: "PageId") -> None:
+    def clear_detection(self, page_id: PageId) -> None:
         """Forget the layout and split line mode but keep the requested type.
 
         The next run detects the layout again.
@@ -402,7 +402,7 @@ class Filter:
     def process(
         self,
         image: NDArray[np.uint8],
-        page_id: "PageId",
+        page_id: PageId,
         dpi: float = 300.0,
         rotation_degrees: int = 0,
         bw_threshold: int | None = None,
@@ -472,7 +472,7 @@ class Filter:
     def _detect(
         self,
         image: NDArray[np.uint8],
-        page_id: "PageId",
+        page_id: PageId,
         dpi: float,
         rotation_degrees: int,
         bw_threshold: int | None,
@@ -488,7 +488,7 @@ class Filter:
         )
         return self.get_params(page_id)
 
-    def get_sub_page_count(self, page_id: "PageId") -> int:
+    def get_sub_page_count(self, page_id: PageId) -> int:
         """Get the number of sub-pages for an image.
 
         Args:

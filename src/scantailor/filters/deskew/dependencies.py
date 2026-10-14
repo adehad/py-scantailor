@@ -25,7 +25,7 @@ class Dependencies(BaseModel):
     @classmethod
     def of(
         cls, page_outline: NDArray[np.float64], rotation_degrees: int
-    ) -> "Dependencies":
+    ) -> Dependencies:
         """Build from a polygon given as an (N, 2) array of (x, y)."""
         return cls(
             page_outline=tuple((float(x), float(y)) for x, y in page_outline),
@@ -36,7 +36,7 @@ class Dependencies(BaseModel):
         """Return True when nothing is known about the original detection."""
         return not self.page_outline
 
-    def matches(self, other: "Dependencies") -> bool:
+    def matches(self, other: Dependencies) -> bool:
         """Tell whether both describe the same upstream geometry."""
         if self.rotation_degrees != other.rotation_degrees:
             return False
