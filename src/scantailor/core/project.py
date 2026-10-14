@@ -12,7 +12,7 @@ from enum import IntEnum
 from pathlib import Path
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 from scantailor.core.pdf_source import PdfSource
@@ -155,7 +155,7 @@ class OutputFileLabel(BaseModel):
     outputs keep their names.
 
     Args:
-        file_path (Path): The source file.
+        file_path (pathlib.Path): The source file.
         label (int): Zero for the first file of a name, then counting up.
     """
 
@@ -172,13 +172,14 @@ def assign_output_file_labels(
     with the same name, or zero when it is the first of its name.
 
     Args:
-        files (Iterable[Path]): Source files in project order; the order decides
+        files (Iterable[pathlib.Path]): Source files in project order; the order decides
             which colliding file gets which new label.
-        known (Mapping[Path, int] | None): Labels to keep, for instance those
+        known (Mapping[pathlib.Path, int] | None): Labels to keep, for instance those
             written by an earlier session.
 
     Returns:
-        dict[Path, int]: The known labels plus a label for each file in ``files``.
+        dict[pathlib.Path, int]:
+            The known labels plus a label for each file in ``files``.
     """
     labels = dict(known or {})
     highest: dict[str, int] = {}
@@ -196,8 +197,8 @@ class Project(BaseModel):
 
     Args:
         version (int): Project file format version.
-        output_directory (Path): Directory for output files.
-        layout_direction (LayoutDirection): Text layout direction (LTR or RTL).
+        output_directory (pathlib.Path): Directory for output files.
+        layout_direction (str): Text layout direction (LTR or RTL).
         images (list[ImageInfo]): List of images in the project.
         selected_page (PageId | None): Currently selected page.
         stage_params (dict[str, list[StageParamsEntry]]): Explicitly set per-page
@@ -206,7 +207,7 @@ class Project(BaseModel):
             back to (see ``core.stage_params.collect_stage_defaults``).
         output_file_labels (list[OutputFileLabel]): Labels that keep output file
             names stable; see ``batch.output_file_names``.
-        pdf_source (PdfSource | None): The PDF the pages were rendered from.
+        pdf_sources (list[PdfSource]): The PDFs the pages were rendered from.
         text_geometry (list[PageTextGeometry]): Geometry of pages written by a
             batch, so that their source text can be carried over in a later
             session.
@@ -220,8 +221,41 @@ class Project(BaseModel):
     stage_params: dict[str, list[StageParamsEntry]] = Field(default_factory=dict)
     stage_defaults: dict[str, Any] = Field(default_factory=dict)
     output_file_labels: list[OutputFileLabel] = Field(default_factory=list)
-    pdf_source: PdfSource | None = None
+    pdf_sources: list[PdfSource] = Field(default_factory=list)
     text_geometry: list[PageTextGeometry] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _lift_single_pdf_source(cls, data: Any) -> Any:
+        """Read the single ``pdf_source`` that earlier versions wrote as a list.
+
+        Args:
+            data (Any): Raw project data before validation.
+
+        Returns:
+            Any: The data with ``pdf_sources`` set from the old field.
+        """
+        if not isinstance(data, dict) or "pdf_source" not in data:
+            return data
+        data = dict(data)
+        legacy = data.pop("pdf_source")
+        if legacy is not None and not data.get("pdf_sources"):
+            data["pdf_sources"] = [legacy]
+        return data
+
+    def source_of(self, image_file: Path) -> PdfSource | None:
+        """Return the source PDF that rendered an image file, if any.
+
+        Args:
+            image_file (pathlib.Path): Image file of the project, with its folder.
+
+        Returns:
+            PdfSource | None: The first source that rendered the file.
+        """
+        for source in self.pdf_sources:
+            if source.page_index(image_file) is not None:
+                return source
+        return None
 
     def get_pages(self) -> list[PageId]:
         """Get all page IDs in the project, respecting layout direction.
@@ -470,7 +504,8 @@ class Project(BaseModel):
         """Replace the file path of every image, including in stored parameters.
 
         Args:
-            remap (Callable[[Path], Path]): Maps an image file path to its new path.
+            remap (Callable[[pathlib.Path], pathlib.Path]):
+                Maps an image file path to its new path.
         """
 
         def remap_id(image_id: ImageId) -> ImageId:
@@ -507,7 +542,7 @@ class Project(BaseModel):
         they can be, so a project moved together with its images still opens.
 
         Args:
-            path (Path): Path to save the project to.
+            path (pathlib.Path): Path to save the project to.
         """
         self.register_output_file_labels()
         data = self.model_dump(mode="json")
@@ -522,7 +557,7 @@ class Project(BaseModel):
         Automatically detects JSON or XML format.
 
         Args:
-            path (Path): Path to the project file.
+            path (pathlib.Path): Path to the project file.
 
         Returns:
             Project: The loaded project.
@@ -552,7 +587,8 @@ class Project(BaseModel):
         """Load a project from C++ ScanTailor XML format.
 
         Args:
-            path (Path): Path to the project file (for resolving relative paths).
+            path (pathlib.Path):
+                Path to the project file (for resolving relative paths).
             content (str): XML content.
 
         Returns:
@@ -576,9 +612,9 @@ def _to_stored_path(path: Path, base: Path) -> str:
     """Express ``path`` relative to ``base`` with forward slashes when possible.
 
     Args:
-        path (Path): Path to store; relative paths are taken relative to the
+        path (pathlib.Path): Path to store; relative paths are taken relative to the
             working directory.
-        base (Path): Absolute directory of the project file.
+        base (pathlib.Path): Absolute directory of the project file.
 
     Returns:
         str: The relative path, or the absolute path when none exists (e.g. on
@@ -598,7 +634,7 @@ def _from_stored_path(stored: str, base: Path) -> str:
 
     Args:
         stored (str): Absolute path, or one relative to ``base``.
-        base (Path): Absolute directory of the project file.
+        base (pathlib.Path): Absolute directory of the project file.
 
     Returns:
         str: The absolute, normalised path.
@@ -625,9 +661,9 @@ def _path_holders(data: dict[str, Any]) -> Iterator[tuple[dict[str, Any], str]]:
     image_ids = [info.get("id") for info in _dicts(data.get("images"))]
     pages = [data.get("selected_page")]
     pages.extend(entry.get("page") for entry in _dicts(data.get("text_geometry")))
-    pdf_source = data.get("pdf_source")
-    if isinstance(pdf_source, dict):
-        yield pdf_source, "pdf_path"
+    for source in [*_dicts(data.get("pdf_sources")), *_dicts([data.get("pdf_source")])]:
+        yield source, "pdf_path"
+        yield source, "pages_dir"
     stage_params = data.get("stage_params")
     if isinstance(stage_params, dict):
         for entries in stage_params.values():

@@ -110,6 +110,37 @@ def source_pdf(tmp_path: Path) -> Path:
     return write_text_pdf(folder / "book.pdf")
 
 
+def accept_project_files_dialog(timeout_ms: int = 30000) -> list[bool]:
+    """Accept the New Project dialog once Open PDF shows it, after the extraction.
+
+    The extraction progress window is modal too, so a generic responder could
+    answer that instead; this one waits for the files dialog specifically.
+
+    Args:
+        timeout_ms (int): How long to wait for the dialog to appear.
+
+    Returns:
+        list[bool]: Holds one entry, True once the dialog was accepted.
+    """
+    from PySide6 import QtCore, QtWidgets
+
+    from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
+
+    answered: list[bool] = []
+    deadline = QtCore.QDeadlineTimer(timeout_ms)
+
+    def poll() -> None:
+        modal = QtWidgets.QApplication.activeModalWidget()
+        if isinstance(modal, ProjectFilesDialog):
+            modal.accept()
+            answered.append(True)
+        elif not deadline.hasExpired() and not answered:
+            QtCore.QTimer.singleShot(10, poll)
+
+    QtCore.QTimer.singleShot(10, poll)
+    return answered
+
+
 @pytest.fixture
 def pdf_window(
     qtbot: QtBot,
@@ -121,6 +152,8 @@ def pdf_window(
     """Main window with the two pages of ``source_pdf`` opened as a project."""
     file_dialogs.open_file = str(source_pdf)
     respond_to_modal(accept=True)
+    answered = accept_project_files_dialog()
     main_window.actionOpenPdf.trigger()
+    assert answered == [True]
     qtbot.waitUntil(lambda: main_window.project is not None, timeout=30000)
     return main_window

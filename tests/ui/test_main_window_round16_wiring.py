@@ -113,10 +113,10 @@ def test_a_legacy_sidecar_mapping_is_adopted_and_removed_after_saving(
     sidecar = directory / SOURCE_FILE_NAME
     source = PdfSource(pdf_path=Path("book.pdf"), dpi=300, pages={})
     sidecar.write_text(source.model_dump_json(), encoding="utf-8")
-    project.pdf_source = None
+    project.pdf_sources = []
 
     window._install_project(project, window.stages, project_file=None, modified=False)
-    assert window.pdf_source == source
+    assert window.pdf_sources == [source.model_copy(update={"pages_dir": directory})]
     assert window.modified
     assert sidecar.exists()
 
