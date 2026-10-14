@@ -10,7 +10,6 @@
         "ms-python.python",
         "ms-vscode-remote.remote-containers",
         "mutantdino.resourcemonitor",
-        "njpwerner.autodocstring",
         "tamasfe.even-better-toml",
         "trond-snekvik.simple-rst",
         "usernamehw.errorlens",

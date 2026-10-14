@@ -1,9 +1,9 @@
 """Detection mode enums for content and page detection."""
 
-from enum import Enum
+from enum import StrEnum
 
 
-class ContentDetectionMode(str, Enum):
+class ContentDetectionMode(StrEnum):
     """Mode for content detection.
 
     AUTO: Automatically detect content boundaries.
@@ -16,7 +16,7 @@ class ContentDetectionMode(str, Enum):
     DISABLED = "disabled"
 
 
-class PageDetectionMode(str, Enum):
+class PageDetectionMode(StrEnum):
     """Mode for page boundary detection.
 
     AUTO: Automatically detect page edges.

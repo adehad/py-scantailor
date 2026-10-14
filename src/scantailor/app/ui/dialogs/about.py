@@ -14,8 +14,13 @@ _UI_FOLDER = Path(__file__).parent
 class AboutDialog(QtWidgets.QDialog):
     """About Dialog."""
 
-    def __init__(self, parent: QtWidgets.QWidget | None = None):
-        """Initialize."""
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        """Build the dialog and fill in the version and licence text.
+
+        Args:
+            parent (QtWidgets.QWidget | None): Window that owns the dialog,
+                or None for a top-level dialog.
+        """
         super().__init__(parent)
         self.ui = load_ui_widget(_UI_FOLDER / "AboutDialog.ui", self)
         embed_ui(self, self.ui)
@@ -28,14 +33,14 @@ class AboutDialog(QtWidgets.QDialog):
         self.set_license()
         self.add_third_party_notices()
 
-    def set_version(self):
+    def set_version(self) -> None:
         """Set the version on the dialog."""
         self.version_label.setText(
             QtCore.QCoreApplication.translate("MainWindow", "version ")
             + __about__.__version__
         )
 
-    def set_license(self):
+    def set_license(self) -> None:
         """Set the license text from the resource file."""
         file = QtCore.QFile(":/GPLv3.html")
         if file.open(QtCore.QFile.ReadOnly | QtCore.QFile.Text):  # type: ignore[attr-defined]

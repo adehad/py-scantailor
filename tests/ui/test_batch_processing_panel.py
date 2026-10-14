@@ -1,8 +1,10 @@
 """The batch processing lower panel is defined by its .ui form."""
 
-from PySide6 import QtWidgets
+import pytest
+from PySide6 import QtCore, QtWidgets
 from pytestqt.qtbot import QtBot
 
+from scantailor.app.ui.panels import system_load
 from scantailor.app.ui.panels.batch_processing import BatchProcessingLowerPanel
 from scantailor.app.ui.panels.system_load import SystemLoadWidget
 
@@ -37,3 +39,47 @@ def test_load_changes_are_forwarded_from_the_system_load_widget(qtbot: QtBot):
         panel.set_load(target)
 
     assert blocker.args == [panel.get_load()]
+
+
+def test_system_load_shows_the_saved_count_without_saving_or_announcing_it(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(system_load.os, "cpu_count", lambda: 8)
+    QtCore.QSettings().setValue(system_load._SETTINGS_KEY, 3)
+    saves: list[int] = []
+    monkeypatch.setattr(SystemLoadWidget, "_save_state", lambda self: saves.append(1))
+    announced: list[int] = []
+    monkeypatch.setattr(
+        SystemLoadWidget,
+        "_on_value_changed",
+        lambda self, value: announced.append(value),
+    )
+
+    widget = SystemLoadWidget()
+    qtbot.addWidget(widget)
+
+    assert widget.get_load() == 3
+    assert saves == []
+    assert announced == []
+
+
+def test_system_load_with_nothing_saved_starts_at_every_thread_and_stores_nothing(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(system_load.os, "cpu_count", lambda: 8)
+
+    widget = SystemLoadWidget()
+    qtbot.addWidget(widget)
+
+    assert widget.get_load() == 8
+    assert not QtCore.QSettings().contains(system_load._SETTINGS_KEY)
+    assert not widget.findChild(QtWidgets.QToolButton, "plusBtn").isEnabled()
+
+
+def test_system_load_lays_out_its_form_so_the_panel_can_size_it(qtbot: QtBot):
+    widget = SystemLoadWidget()
+    qtbot.addWidget(widget)
+
+    assert widget.layout() is not None
+    assert widget.sizeHint().isValid()
+    assert widget.sizeHint().width() > 0

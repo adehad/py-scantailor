@@ -48,6 +48,53 @@ _DPI_FIELD_WIDTH = 56
 _SOURCE_DPI_PRESETS = (300, 400, 600, 1200)
 
 
+def _alignment_of_button(name: str) -> Alignment:
+    """Return the position an alignment button stands for.
+
+    Args:
+        name (str): Object name of a button in the 3x3 grid, such as
+            ``alignTopLeftBtn``.
+
+    Returns:
+        Alignment: The button's position; centre on an axis it does not name.
+    """
+    vertical = VerticalAlignment.VCENTER
+    if "Top" in name:
+        vertical = VerticalAlignment.TOP
+    elif "Bottom" in name:
+        vertical = VerticalAlignment.BOTTOM
+    horizontal = HorizontalAlignment.HCENTER
+    if "Left" in name:
+        horizontal = HorizontalAlignment.LEFT
+    elif "Right" in name:
+        horizontal = HorizontalAlignment.RIGHT
+    return Alignment(vertical=vertical, horizontal=horizontal)
+
+
+def _is_automatic_horizontal(mode: HorizontalAlignment) -> bool:
+    """Return True when the program, not the buttons, places the page sideways.
+
+    Args:
+        mode (HorizontalAlignment): The page's horizontal alignment.
+
+    Returns:
+        bool: True for Auto and Original.
+    """
+    return mode in (HorizontalAlignment.HAUTO, HorizontalAlignment.HORIGINAL)
+
+
+def _is_automatic_vertical(mode: VerticalAlignment) -> bool:
+    """Return True when the program, not the buttons, places the page vertically.
+
+    Args:
+        mode (VerticalAlignment): The page's vertical alignment.
+
+    Returns:
+        bool: True for Auto and Original.
+    """
+    return mode in (VerticalAlignment.VAUTO, VerticalAlignment.VORIGINAL)
+
+
 class OptionsWidget(QWidget):
     """Options widget for the Page Layout filter.
 
@@ -754,6 +801,7 @@ class OptionsWidget(QWidget):
 
             # Update alignment buttons
             self._update_alignment_buttons(alignment)
+            self._update_alignment_buttons_enabled(alignment)
         finally:
             self._updating = False
 
@@ -811,6 +859,35 @@ class OptionsWidget(QWidget):
 
         if btn_name in self._align_buttons:
             self._align_buttons[btn_name].setChecked(True)
+
+    def _update_alignment_buttons_enabled(self, alignment: Alignment) -> None:
+        """Enable only the buttons that move an axis the user places by hand.
+
+        Args:
+            alignment (Alignment): Alignment of the current page. An axis in
+                Auto or Original mode, or a page that does not match sizes,
+                disables the buttons along that axis.
+        """
+        matching = alignment.aligned_with_others()
+        horizontal = matching and not _is_automatic_horizontal(alignment.horizontal)
+        vertical = matching and not _is_automatic_vertical(alignment.vertical)
+        for name, button in self._align_buttons.items():
+            moves_horizontal = "Left" in name or "Right" in name
+            moves_vertical = "Top" in name or "Bottom" in name
+            if moves_horizontal or moves_vertical:
+                enabled = (horizontal or not moves_horizontal) and (
+                    vertical or not moves_vertical
+                )
+            else:
+                enabled = horizontal or vertical
+            button.setEnabled(enabled)
+
+    def _checked_button_alignment(self) -> Alignment:
+        """Return the position of the checked alignment button, centre if none."""
+        button = self._align_button_group.checkedButton()
+        if button is None:
+            return Alignment.centered()
+        return _alignment_of_button(button.objectName())
 
     def _on_auto_margins_changed(self, checked: bool) -> None:
         """Handle auto margins checkbox change."""
@@ -889,81 +966,75 @@ class OptionsWidget(QWidget):
         )
         new_params = params.with_alignment(new_alignment)
         self._filter.set_params(self._current_page_id, new_params)
+        self._update_alignment_buttons_enabled(new_alignment)
         self.alignment_changed.emit(self._current_page_id, new_alignment)
 
     def _on_h_mode_changed(self, index: int) -> None:
-        """Handle horizontal mode combo change."""
+        """Store the horizontal mode chosen in the combo.
+
+        Args:
+            index (int): Combo row: 0 Auto, 1 Manual, 2 Original. Manual takes
+                the horizontal position of the checked alignment button.
+        """
         if self._current_page_id is None or self._updating:
             return
 
         h_modes = [
             HorizontalAlignment.HAUTO,
-            HorizontalAlignment.HCENTER,
+            self._checked_button_alignment().horizontal,
             HorizontalAlignment.HORIGINAL,
         ]
         params = self._filter.get_params(self._current_page_id)
-        new_alignment = Alignment(
-            vertical=params.alignment.vertical,
-            horizontal=h_modes[index],
-            is_null=params.alignment.is_null,
+        self._store_alignment(
+            params.alignment.model_copy(update={"horizontal": h_modes[index]})
         )
-        new_params = params.with_alignment(new_alignment)
-        self._filter.set_params(self._current_page_id, new_params)
-        self.alignment_changed.emit(self._current_page_id, new_alignment)
 
     def _on_v_mode_changed(self, index: int) -> None:
-        """Handle vertical mode combo change."""
+        """Store the vertical mode chosen in the combo.
+
+        Args:
+            index (int): Combo row: 0 Auto, 1 Manual, 2 Original. Manual takes
+                the vertical position of the checked alignment button.
+        """
         if self._current_page_id is None or self._updating:
             return
 
         v_modes = [
             VerticalAlignment.VAUTO,
-            VerticalAlignment.VCENTER,
+            self._checked_button_alignment().vertical,
             VerticalAlignment.VORIGINAL,
         ]
         params = self._filter.get_params(self._current_page_id)
-        new_alignment = Alignment(
-            vertical=v_modes[index],
-            horizontal=params.alignment.horizontal,
-            is_null=params.alignment.is_null,
+        self._store_alignment(
+            params.alignment.model_copy(update={"vertical": v_modes[index]})
         )
-        new_params = params.with_alignment(new_alignment)
-        self._filter.set_params(self._current_page_id, new_params)
-        self.alignment_changed.emit(self._current_page_id, new_alignment)
 
     def _on_alignment_button_clicked(self, button: QToolButton) -> None:
-        """Handle alignment button click."""
+        """Move the axes in Manual mode to the clicked button's position.
+
+        Args:
+            button (QToolButton): The alignment button the user clicked.
+        """
         if self._current_page_id is None or self._updating:
             return
 
-        # Parse button name to get alignment
-        name = button.objectName()
-        v_align = VerticalAlignment.VCENTER
-        h_align = HorizontalAlignment.HCENTER
+        chosen = _alignment_of_button(button.objectName())
+        current = self._filter.get_params(self._current_page_id).alignment
+        update: dict[str, HorizontalAlignment | VerticalAlignment] = {}
+        if not _is_automatic_horizontal(current.horizontal):
+            update["horizontal"] = chosen.horizontal
+        if not _is_automatic_vertical(current.vertical):
+            update["vertical"] = chosen.vertical
+        self._store_alignment(current.model_copy(update=update))
 
-        if "Top" in name:
-            v_align = VerticalAlignment.TOP
-        elif "Bottom" in name:
-            v_align = VerticalAlignment.BOTTOM
+    def _store_alignment(self, alignment: Alignment) -> None:
+        """Save the current page's alignment and tell the view to redraw.
 
-        if "Left" in name:
-            h_align = HorizontalAlignment.LEFT
-        elif "Right" in name:
-            h_align = HorizontalAlignment.RIGHT
-
+        Args:
+            alignment (Alignment): The page's new alignment.
+        """
+        assert self._current_page_id is not None
         params = self._filter.get_params(self._current_page_id)
-        new_alignment = Alignment(
-            vertical=v_align,
-            horizontal=h_align,
-            is_null=params.alignment.is_null,
-        )
-        new_params = params.with_alignment(new_alignment)
-        self._filter.set_params(self._current_page_id, new_params)
-
-        # Update mode combos to Manual since we manually selected
-        self._updating = True
-        self._h_mode_combo.setCurrentIndex(1)  # Manual
-        self._v_mode_combo.setCurrentIndex(1)  # Manual
-        self._updating = False
-
-        self.alignment_changed.emit(self._current_page_id, new_alignment)
+        self._filter.set_params(self._current_page_id, params.with_alignment(alignment))
+        self._update_alignment_buttons_enabled(alignment)
+        self.alignment_changed.emit(self._current_page_id, alignment)

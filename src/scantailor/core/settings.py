@@ -6,15 +6,15 @@ directory.
 """
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum
 from pathlib import Path
 from typing import ClassVar, Self
 
 from loguru import logger
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 
-class Units(str, Enum):
+class Units(StrEnum):
     """Measurement units."""
 
     PIXELS = "px"
@@ -263,7 +263,7 @@ class ApplicationSettings(BaseModel):
         if config_path.exists():
             try:
                 return cls.model_validate_json(config_path.read_text(encoding="utf-8"))
-            except Exception as e:
+            except (OSError, UnicodeDecodeError, ValidationError) as e:
                 logger.warning(f"Failed to load settings from {config_path}: {e}")
                 logger.info("Using default settings")
         return cls()

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from PySide6 import QtWidgets
-from PySide6.QtWidgets import QCheckBox, QComboBox, QLineEdit, QPushButton
+from PySide6.QtWidgets import QCheckBox, QComboBox, QLineEdit, QPushButton, QToolButton
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.dialogs.apply_to import (
@@ -21,7 +21,11 @@ from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 from scantailor.core.propagation import ApplyScope
 from scantailor.core.settings import Units
 from scantailor.core.stage_sequence import StageSequence
-from scantailor.filters.page_layout.alignment import Alignment
+from scantailor.filters.page_layout.alignment import (
+    Alignment,
+    HorizontalAlignment,
+    VerticalAlignment,
+)
 from scantailor.filters.page_layout.params import ContentSize, Params
 
 
@@ -156,6 +160,81 @@ class TestMatchSizeToAllPages:
             before.vertical,
             before.horizontal,
         )
+
+
+class TestManualAlignment:
+    AUTO, MANUAL, ORIGINAL = 0, 1, 2
+
+    @pytest.fixture
+    def top_left(
+        self, widget: page_layout.OptionsWidget, stages: StageSequence
+    ) -> page_layout.OptionsWidget:
+        stages.page_layout_filter.set_alignment(
+            PAGE,
+            Alignment(
+                vertical=VerticalAlignment.TOP, horizontal=HorizontalAlignment.LEFT
+            ),
+        )
+        widget.set_current_page(PAGE)
+        return widget
+
+    def test_back_to_manual_horizontal_takes_the_checked_button_not_the_centre(
+        self, top_left: page_layout.OptionsWidget, stages: StageSequence
+    ) -> None:
+        combo = child(top_left, QComboBox, "hAlignmentModeCB")
+        combo.setCurrentIndex(self.AUTO)
+        assert stages.page_layout_filter.get_alignment(PAGE).horizontal == (
+            HorizontalAlignment.HAUTO
+        )
+
+        combo.setCurrentIndex(self.MANUAL)
+
+        alignment = stages.page_layout_filter.get_alignment(PAGE)
+        assert alignment.horizontal == HorizontalAlignment.LEFT
+        assert alignment.vertical == VerticalAlignment.TOP
+
+    def test_back_to_manual_vertical_takes_the_checked_button_not_the_centre(
+        self, top_left: page_layout.OptionsWidget, stages: StageSequence
+    ) -> None:
+        combo = child(top_left, QComboBox, "vAlignmentModeCB")
+        combo.setCurrentIndex(self.ORIGINAL)
+        combo.setCurrentIndex(self.MANUAL)
+
+        alignment = stages.page_layout_filter.get_alignment(PAGE)
+        assert alignment.vertical == VerticalAlignment.TOP
+        assert alignment.horizontal == HorizontalAlignment.LEFT
+
+    def test_buttons_along_an_automatic_axis_are_disabled(
+        self, top_left: page_layout.OptionsWidget
+    ) -> None:
+        child(top_left, QComboBox, "hAlignmentModeCB").setCurrentIndex(self.AUTO)
+
+        assert not child(top_left, QToolButton, "alignLeftBtn").isEnabled()
+        assert not child(top_left, QToolButton, "alignTopLeftBtn").isEnabled()
+        assert child(top_left, QToolButton, "alignTopBtn").isEnabled()
+        assert child(top_left, QToolButton, "alignCenterBtn").isEnabled()
+
+    def test_a_button_moves_only_the_manual_axis_and_keeps_the_automatic_one(
+        self, top_left: page_layout.OptionsWidget, stages: StageSequence
+    ) -> None:
+        h_combo = child(top_left, QComboBox, "hAlignmentModeCB")
+        h_combo.setCurrentIndex(self.AUTO)
+
+        child(top_left, QToolButton, "alignBottomBtn").click()
+
+        alignment = stages.page_layout_filter.get_alignment(PAGE)
+        assert alignment.horizontal == HorizontalAlignment.HAUTO
+        assert alignment.vertical == VerticalAlignment.BOTTOM
+        assert h_combo.currentIndex() == self.AUTO
+
+    def test_a_page_that_does_not_match_sizes_disables_every_button(
+        self, widget: page_layout.OptionsWidget, stages: StageSequence
+    ) -> None:
+        stages.page_layout_filter.set_alignment(PAGE, Alignment(is_null=True))
+        widget.set_current_page(PAGE)
+
+        assert not child(widget, QToolButton, "alignCenterBtn").isEnabled()
+        assert not child(widget, QToolButton, "alignTopLeftBtn").isEnabled()
 
 
 class TestSourceDpi:
