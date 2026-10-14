@@ -1,0 +1,38 @@
+---
+# Read the Docs build configuration.
+# https://docs.readthedocs.io/en/stable/config-file/v2.html
+version: 2
+
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "3.12"
+  # Shared libraries the PySide6 and opencv-python wheels load. The docs build
+  # imports both for autodoc, and the screenshot step starts the real window on
+  # Qt's offscreen platform.
+  apt_packages:
+    - libgl1
+    - libegl1
+    - libopengl0
+    - libglib2.0-0t64
+    - libfontconfig1
+    - libfreetype6
+    - libxkbcommon0
+    - libdbus-1-3
+    - fonts-dejavu-core
+  jobs:
+    # pdm-backend derives the version from git tags, which a shallow clone lacks.
+    post_checkout:
+      - git fetch --unshallow --tags || true
+    # Install from pdm.lock so the -W build sees the same versions as a local
+    # checkout. The test group carries pytest-qt, which takes the screenshots.
+    install:
+      - python -m pip install pdm
+      - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH PDM_IGNORE_SAVED_PYTHON=1 pdm sync -G docs -G test
+
+sphinx:
+  configuration: docs/conf.py
+  fail_on_warning: true
+
+formats:
+  - htmlzip
