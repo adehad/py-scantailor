@@ -65,16 +65,32 @@ _SCOPE_BUTTONS: tuple[tuple[ApplyScope, str, str], ...] = (
         ),
     ),
 )
+# The main window translates these titles in its own context.
 OUTPUT_GROUP_TITLES: dict[ApplyGroup, str] = {
-    ApplyGroup.DPI: "Apply Output Resolution",
-    ApplyGroup.COLOR_MODE: "Apply Color Settings",
-    ApplyGroup.SPLITTING: "Apply Splitting Settings",
-    ApplyGroup.BINARIZATION: "Apply Binarization Settings",
-    ApplyGroup.DESPECKLE: "Apply Despeckling Level",
-    ApplyGroup.DEWARPING: "Apply Dewarping Mode",
-    ApplyGroup.DEPTH_PERCEPTION: "Apply Depth Perception",
+    ApplyGroup.DPI: cast(
+        str, QtCore.QT_TRANSLATE_NOOP("MainWindowManager", "Apply Output Resolution")
+    ),
+    ApplyGroup.COLOR_MODE: cast(
+        str, QtCore.QT_TRANSLATE_NOOP("MainWindowManager", "Apply Color Settings")
+    ),
+    ApplyGroup.SPLITTING: cast(
+        str, QtCore.QT_TRANSLATE_NOOP("MainWindowManager", "Apply Splitting Settings")
+    ),
+    ApplyGroup.BINARIZATION: cast(
+        str,
+        QtCore.QT_TRANSLATE_NOOP("MainWindowManager", "Apply Binarization Settings"),
+    ),
+    ApplyGroup.DESPECKLE: cast(
+        str, QtCore.QT_TRANSLATE_NOOP("MainWindowManager", "Apply Despeckling Level")
+    ),
+    ApplyGroup.DEWARPING: cast(
+        str, QtCore.QT_TRANSLATE_NOOP("MainWindowManager", "Apply Dewarping Mode")
+    ),
+    ApplyGroup.DEPTH_PERCEPTION: cast(
+        str, QtCore.QT_TRANSLATE_NOOP("MainWindowManager", "Apply Depth Perception")
+    ),
 }
-DESKEW_TITLE = "Apply Deskew"
+DESKEW_TITLE = cast(str, QtCore.QT_TRANSLATE_NOOP("MainWindowManager", "Apply Deskew"))
 # Which parts of the Deskew settings are copied, as option key to label.
 DESKEW_OPTIONS: dict[str, str] = {
     "deskew": cast(

@@ -86,6 +86,21 @@ def no_window_outlives_its_test() -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
+def no_translation_outlives_its_test(
+    qapp: QtWidgets.QApplication,
+) -> Iterator[None]:
+    """Uninstall translators a test installed, such as by accepting a new language.
+
+    A translator left on the shared application would show later tests on the same
+    worker translated text where they look for English.
+    """
+    yield
+    for translator in qapp.findChildren(QtCore.QTranslator):
+        qapp.removeTranslator(translator)
+        translator.setParent(None)
+
+
+@pytest.fixture(autouse=True)
 def cursor_starts_in_the_screen_corner(qapp: QtWidgets.QApplication) -> None:
     """Park the platform cursor where no test points it before each test.
 

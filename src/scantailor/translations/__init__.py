@@ -12,6 +12,38 @@ TRANSLATIONS_DIR = pathlib.Path(__file__).parent
 _APP_PREFIX = "scantailor"
 _QT_BASE_PREFIX = "qtbase"
 _FILE_SEPARATOR = "_"
+_TRANSLATOR_NAME = "scantailor-translator"
+SYSTEM_LANGUAGE_VALUES = frozenset({"", "system", "auto"})
+
+
+def locale_for_language(language: str) -> QtCore.QLocale:
+    """Turn the saved language setting into the locale to translate to.
+
+    Args:
+        language (str): Locale code from the settings, such as "de" or "pt_BR".
+            Empty, "system" or "auto" mean the operating system's locale.
+
+    Returns:
+        QtCore.QLocale: Locale to pass to load_translation. A code Qt does not
+            recognise becomes the C locale, which has no translation, so the UI
+            stays in English.
+    """
+    code = language.strip()
+    if code.lower() in SYSTEM_LANGUAGE_VALUES:
+        return QtCore.QLocale()
+    return QtCore.QLocale(code)
+
+
+def _remove_installed_translators(app: QtWidgets.QApplication) -> None:
+    """Uninstall and release the translators an earlier load_translation installed.
+
+    Args:
+        app (QtWidgets.QApplication): Application the translators are parented to.
+    """
+    for translator in app.findChildren(QtCore.QTranslator, _TRANSLATOR_NAME):
+        app.removeTranslator(translator)
+        translator.setParent(None)
+        translator.deleteLater()
 
 
 def qt_translations_dir() -> pathlib.Path:
@@ -40,6 +72,10 @@ def load_translation(
     the application's lifetime. A Python reference alone would let the garbage
     collector drop them and silently revert the UI to English.
 
+    Translators a previous call installed are removed first, so switching language
+    while running does not leave the old catalogue answering ahead of the new one.
+    Qt sends every widget a LanguageChange event as translators come and go.
+
     Args:
         app (QtWidgets.QApplication): Application to install the translators on.
         locale (QtCore.QLocale | None): Locale to load; None uses the system locale.
@@ -50,6 +86,7 @@ def load_translation(
             first. Empty when neither the application nor Qt has the locale.
     """
     target_locale = locale if locale is not None else QtCore.QLocale()
+    _remove_installed_translators(app)
     installed: list[QtCore.QTranslator] = []
     sources = (
         (_QT_BASE_PREFIX, qt_translations_dir()),
@@ -57,9 +94,13 @@ def load_translation(
     )
     for prefix, folder in sources:
         translator = QtCore.QTranslator(app)
+        translator.setObjectName(_TRANSLATOR_NAME)
         if translator.load(target_locale, prefix, _FILE_SEPARATOR, str(folder)):
             app.installTranslator(translator)
             installed.append(translator)
+        else:
+            translator.setParent(None)
+            translator.deleteLater()
     if not installed:
         logger.info(
             f"No compiled translation for {target_locale.name()}; using English"
