@@ -41,7 +41,7 @@ Oblique correction
 ==================
 
 .. screenshot:: stage3_deskew_oblique
-   :alt: Deskew with an oblique correction set by hand
+   :alt: Deskew with the oblique angle found by Oblique mode Auto
 
 A page can also lean sideways instead of turning, with its vertical edges slanted
 while the text lines stay level. The oblique correction shears the page back after
@@ -52,8 +52,8 @@ is in :mod:`scantailor.filters.deskew.oblique`.
 
 **Oblique mode** has its own **Auto** and **Manual** buttons, apart from the ones
 for the rotation: switching one never changes the other. In **Manual** mode set the
-angle with **Oblique** or by dragging the two handles on the arcs at the right
-edge of the image; typing a value or dragging a handle switches to **Manual**.
+angle with **Oblique** or by dragging the two handles on the arcs at the top and
+bottom of the image; typing a value or dragging a handle switches to **Manual**.
 
 .. list-table::
    :header-rows: 1

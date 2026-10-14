@@ -55,6 +55,14 @@ SHOT_NAMES = (
     "default_parameters",
     "batch_progress",
     "export_pdf",
+    "fix_dpi",
+    "relinking",
+    "remove_pages",
+    "open_pdf",
+    "thumbnail_menu",
+    "stage_play_button",
+    "stage4_select_content_page_box_auto",
+    "stage6_output_despeckle_levels",
 )
 
 

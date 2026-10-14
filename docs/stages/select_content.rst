@@ -55,5 +55,8 @@ pictures, and the Page Box keeps the search inside the paper. The same box sets 
 page size that the Margins stage measures from, so margins are then measured from
 the paper edge rather than from the scan edge.
 
+.. screenshot:: stage4_select_content_page_box_auto
+   :alt: Select Content with the Page Box on Auto around the paper of a scan
+
 Use **Manual** when **Auto** finds the paper edge in the wrong place. Drag its
 sides in the image, as for the content box.
