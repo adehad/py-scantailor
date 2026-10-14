@@ -1,7 +1,7 @@
 """Fix DPI dialog for images whose resolution is undefined."""
 
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Qt
@@ -17,14 +17,27 @@ _ROW_INDEX_ROLE = Qt.ItemDataRole.UserRole
 
 
 _DPI_WARNINGS: dict[DpiStatus, str] = {
-    DpiStatus.TOO_LARGE: "DPI is too large and most likely wrong.",
-    DpiStatus.TOO_SMALL: (
-        "DPI is too small. Even if it's correct, you are not going to get "
-        "acceptable results with it."
+    DpiStatus.TOO_LARGE: cast(
+        str,
+        QtCore.QT_TRANSLATE_NOOP(
+            "FixDpiDialog", "DPI is too large and most likely wrong."
+        ),
     ),
-    DpiStatus.TOO_SMALL_FOR_PIXEL_SIZE: (
-        "DPI is too small for this pixel size. Such combination would probably "
-        "lead to out of memory errors."
+    DpiStatus.TOO_SMALL: cast(
+        str,
+        QtCore.QT_TRANSLATE_NOOP(
+            "FixDpiDialog",
+            "DPI is too small. Even if it's correct, you are not going to get "
+            "acceptable results with it.",
+        ),
+    ),
+    DpiStatus.TOO_SMALL_FOR_PIXEL_SIZE: cast(
+        str,
+        QtCore.QT_TRANSLATE_NOOP(
+            "FixDpiDialog",
+            "DPI is too small for this pixel size. Such combination would probably "
+            "lead to out of memory errors.",
+        ),
     ),
 }
 # Digits of the longest DPI the fields take.

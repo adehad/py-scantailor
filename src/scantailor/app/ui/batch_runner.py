@@ -194,4 +194,6 @@ class BatchRunner(QtCore.QObject):
         if isinstance(outcome, BatchResult):
             self.finished.emit(outcome)
         else:
-            self.failed.emit(outcome or "Batch processing stopped unexpectedly")
+            self.failed.emit(
+                outcome or self.tr("Batch processing stopped unexpectedly")
+            )

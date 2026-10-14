@@ -49,7 +49,7 @@ class RemovePagesDialog(QtWidgets.QDialog):
         )
         self._output_note = self._warning_label.text()
         self._button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).setText(
-            "Remove"
+            self.tr("Remove")
         )
 
         # Set the question icon
@@ -58,9 +58,13 @@ class RemovePagesDialog(QtWidgets.QDialog):
 
         # Set the text
         if self._page_count == 1:
-            self._text_label.setText("Remove 1 page from project?")
+            self._text_label.setText(self.tr("Remove 1 page from project?"))
         else:
-            self._text_label.setText(f"Remove {self._page_count} pages from project?")
+            self._text_label.setText(
+                self.tr("Remove {count} pages from project?").format(
+                    count=self._page_count
+                )
+            )
 
     def _connect_signals(self) -> None:
         """Connect widget signals."""
@@ -71,7 +75,9 @@ class RemovePagesDialog(QtWidgets.QDialog):
 
     def _show_output_note(self, erase: bool) -> None:
         self._warning_label.setText(
-            self._output_note if erase else "Input and output files will remain."
+            self._output_note
+            if erase
+            else self.tr("Input and output files will remain.")
         )
 
     @property

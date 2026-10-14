@@ -13,11 +13,21 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from itertools import pairwise
+from typing import cast
 
 import numpy as np
 from numpy.typing import NDArray
 from PySide6 import QtGui, QtWidgets
-from PySide6.QtCore import QLineF, QPointF, QRectF, QSettings, Qt, Signal
+from PySide6.QtCore import (
+    QT_TRANSLATE_NOOP,
+    QCoreApplication,
+    QLineF,
+    QPointF,
+    QRectF,
+    QSettings,
+    Qt,
+    Signal,
+)
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -78,11 +88,21 @@ class ImageViewTab(Enum):
 
 
 TAB_LABELS: dict[ImageViewTab, str] = {
-    ImageViewTab.OUTPUT: "Output",
-    ImageViewTab.PICTURE_ZONES: "Picture Zones",
-    ImageViewTab.FILL_ZONES: "Fill Zones",
-    ImageViewTab.DEWARPING: "Dewarping",
-    ImageViewTab.DESPECKLING: "Despeckling",
+    ImageViewTab.OUTPUT: cast(
+        str, QT_TRANSLATE_NOOP("output::Task::UiUpdater", "Output")
+    ),
+    ImageViewTab.PICTURE_ZONES: cast(
+        str, QT_TRANSLATE_NOOP("output::Task::UiUpdater", "Picture Zones")
+    ),
+    ImageViewTab.FILL_ZONES: cast(
+        str, QT_TRANSLATE_NOOP("output::Task::UiUpdater", "Fill Zones")
+    ),
+    ImageViewTab.DEWARPING: cast(
+        str, QT_TRANSLATE_NOOP("output::Task::UiUpdater", "Dewarping")
+    ),
+    ImageViewTab.DESPECKLING: cast(
+        str, QT_TRANSLATE_NOOP("output::Task::UiUpdater", "Despeckling")
+    ),
 }
 
 _TAB_ICONS: dict[ImageViewTab, str] = {
@@ -98,29 +118,96 @@ _ZONE_TAB_KINDS: dict[ImageViewTab, ZoneKind] = {
     ImageViewTab.FILL_ZONES: ZoneKind.FILL,
 }
 
-_ZONE_DEFAULT_TIP = (
-    "Click to start creating a new zone. Ctrl+Alt+Click to copy the latest "
-    "created zone. Use Z, X and C keys to switch zone creation mode."
+_ZONE_DEFAULT_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "ZoneDefaultInteraction",
+        "Click to start creating a new zone. Ctrl+Alt+Click to copy the latest "
+        "created zone. Use Z, X and C keys to switch zone creation mode.",
+    ),
 )
-_VERTEX_TIP = (
-    "Drag the vertex. Hold Ctrl to make the vertex angle right. Press D to "
-    "delete the vertex."
+_VERTEX_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "ZoneDefaultInteraction",
+        "Drag the vertex. Hold Ctrl to make the vertex angle right. Press D to "
+        "delete the vertex.",
+    ),
 )
-_SEGMENT_TIP = "Click to create a new vertex here."
-_ZONE_AREA_TIP = (
-    "Right click to edit zone properties. Hold Shift to drag the zone or "
-    "Shift+Ctrl to copy. Press Del to delete this zone."
+_SEGMENT_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP("ZoneDefaultInteraction", "Click to create a new vertex here."),
 )
-_ZONE_DRAG_TIP = "Hold left mouse button to drag the zone."
-_ZONE_COPY_TIP = "Hold left mouse button to copy and drag the zone."
-_FINISH_DRAG_TIP = "Release left mouse button to finish dragging."
-_MERGE_TIP = "Merge these two vertices."
-_MERGE_HINT_TIP = "Move the vertex to one of its neighbors to merge them."
-_PICKUP_TIP = "Click on an area to pick up its color, or ESC to cancel."
-_FINISH_RECTANGLE_TIP = "Click to finish this rectangular zone.  ESC to cancel."
-_FINISH_ZONE_TIP = "Click to finish this zone.  ESC to cancel."
-_CONNECT_TIP = "Connect first and last points to finish this zone.  ESC to cancel."
-_CREATION_MODE_TIP = "Use Z and X keys to switch zone creation mode.  ESC to cancel."
+_ZONE_AREA_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "ZoneDefaultInteraction",
+        "Right click to edit zone properties. Hold Shift to drag the zone or "
+        "Shift+Ctrl to copy. Press Del to delete this zone.",
+    ),
+)
+_ZONE_DRAG_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "ZoneDefaultInteraction", "Hold left mouse button to drag the zone."
+    ),
+)
+_ZONE_COPY_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "ZoneDefaultInteraction", "Hold left mouse button to copy and drag the zone."
+    ),
+)
+_FINISH_DRAG_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "ZoneDragInteraction", "Release left mouse button to finish dragging."
+    ),
+)
+_MERGE_TIP = cast(
+    str, QT_TRANSLATE_NOOP("ZoneVertexDragInteraction", "Merge these two vertices.")
+)
+_MERGE_HINT_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "ZoneVertexDragInteraction",
+        "Move the vertex to one of its neighbors to merge them.",
+    ),
+)
+_PICKUP_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "ColorPickupInteraction",
+        "Click on an area to pick up its color, or ESC to cancel.",
+    ),
+)
+_FINISH_RECTANGLE_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "ZoneCreationInteraction",
+        "Click to finish this rectangular zone.  ESC to cancel.",
+    ),
+)
+_FINISH_ZONE_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "ZoneCreationInteraction", "Click to finish this zone.  ESC to cancel."
+    ),
+)
+_CONNECT_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "ZoneCreationInteraction",
+        "Connect first and last points to finish this zone.  ESC to cancel.",
+    ),
+)
+_CREATION_MODE_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "ZoneCreationInteraction",
+        "Use Z and X keys to switch zone creation mode.  ESC to cancel.",
+    ),
+)
 
 _TAB_SHORTCUT_COUNT = 5
 # Colours that tell zones apart in the menu when several lie under the cursor.
@@ -432,10 +519,19 @@ class OutputImageView(ImageViewBase):
         while bar.count():
             bar.removeTab(0)
         for tab in self._tabs:
-            bar.addTab(icon(_TAB_ICONS[tab]), TAB_LABELS[tab])
+            bar.addTab(
+                icon(_TAB_ICONS[tab]),
+                QCoreApplication.translate("output::Task::UiUpdater", TAB_LABELS[tab]),
+            )
         bar.blockSignals(False)
         bar.setVisible(bool(self._tabs))
-        self.setStatusTip("Use Ctrl+1..5 to switch the tabs." if self._tabs else "")
+        self.setStatusTip(
+            QCoreApplication.translate(
+                "output::TabbedImageView", "Use Ctrl+1..5 to switch the tabs."
+            )
+            if self._tabs
+            else ""
+        )
         self._fit_tab_bar()
         if self._tabs:
             start = current if current in self._tabs else self._tabs[0]
@@ -443,6 +539,7 @@ class OutputImageView(ImageViewBase):
             self.set_current_tab(start)
         else:
             self.default_status_tip = DEFAULT_STATUS_TIP
+            self.default_status_tip_context = "ImageViewBase"
             self.set_status_tip("")
             self._show_tab_image(None)
             self._update_mask_pulse()
@@ -490,9 +587,12 @@ class OutputImageView(ImageViewBase):
             return
         self._leave_interactions()
         self._tab = tab
-        self.default_status_tip = (
-            _ZONE_DEFAULT_TIP if tab in _ZONE_TAB_KINDS else DEFAULT_STATUS_TIP
-        )
+        if tab in _ZONE_TAB_KINDS:
+            self.default_status_tip = _ZONE_DEFAULT_TIP
+            self.default_status_tip_context = "ZoneDefaultInteraction"
+        else:
+            self.default_status_tip = DEFAULT_STATUS_TIP
+            self.default_status_tip_context = "ImageViewBase"
         self.set_status_tip("")
         self._show_tab_image(tab)
         self._update_message()
@@ -844,7 +944,9 @@ class OutputImageView(ImageViewBase):
             return
         self._pickup_zone = index
         self._pickup.start(self._cursor.toPoint() if self._cursor.x() >= 0 else None)
-        self.set_status_tip(_PICKUP_TIP)
+        self.set_status_tip(
+            QCoreApplication.translate("ColorPickupInteraction", _PICKUP_TIP)
+        )
 
     def color_pickup_active(self) -> bool:
         """Return whether the view waits for a colour to be clicked.
@@ -939,7 +1041,7 @@ class OutputImageView(ImageViewBase):
         self, widget_pos: QPointF, modifiers: Qt.KeyboardModifier
     ) -> str:
         if self._pickup.is_active():
-            return _PICKUP_TIP
+            return QCoreApplication.translate("ColorPickupInteraction", _PICKUP_TIP)
         if self._tab is ImageViewTab.DEWARPING:
             return self._dewarp.status_tip_at(widget_pos)
         if not self._active_kinds():
@@ -948,23 +1050,32 @@ class OutputImageView(ImageViewBase):
             return self._creation_tip(widget_pos)
         pick = self._pick(widget_pos)
         if pick is not None:
-            return _SEGMENT_TIP if pick.on_edge else _VERTEX_TIP
+            tip = _SEGMENT_TIP if pick.on_edge else _VERTEX_TIP
+            return QCoreApplication.translate("ZoneDefaultInteraction", tip)
         if self._zone_at(widget_pos) < 0:
             return ""
         if modifiers & Qt.KeyboardModifier.ShiftModifier:
             if modifiers & Qt.KeyboardModifier.ControlModifier:
-                return _ZONE_COPY_TIP
-            return _ZONE_DRAG_TIP
-        return _ZONE_AREA_TIP
+                return QCoreApplication.translate(
+                    "ZoneDefaultInteraction", _ZONE_COPY_TIP
+                )
+            return QCoreApplication.translate("ZoneDefaultInteraction", _ZONE_DRAG_TIP)
+        return QCoreApplication.translate("ZoneDefaultInteraction", _ZONE_AREA_TIP)
 
     def _creation_tip(self, widget_pos: QPointF) -> str:
         if self._creation_mode is ZoneCreationMode.RECTANGULAR:
-            return _FINISH_RECTANGLE_TIP if self._outlining else ""
+            if not self._outlining:
+                return ""
+            return QCoreApplication.translate(
+                "ZoneCreationInteraction", _FINISH_RECTANGLE_TIP
+            )
         if len(self._new_points) >= 2:
             if self._closes_polygon(widget_pos):
-                return _FINISH_ZONE_TIP
-            return _CONNECT_TIP
-        return _CREATION_MODE_TIP
+                return QCoreApplication.translate(
+                    "ZoneCreationInteraction", _FINISH_ZONE_TIP
+                )
+            return QCoreApplication.translate("ZoneCreationInteraction", _CONNECT_TIP)
+        return QCoreApplication.translate("ZoneCreationInteraction", _CREATION_MODE_TIP)
 
     # Hit testing
 
@@ -1556,15 +1667,15 @@ class OutputImageView(ImageViewBase):
         """
         menu = QtWidgets.QMenu(self)
         if self._creating is not None:
-            menu.addAction("Finish Zone", self._finish_zone_creation)
-            menu.addAction("Cancel", self.cancel_zone_creation)
+            menu.addAction(self.tr("Finish Zone"), self._finish_zone_creation)
+            menu.addAction(self.tr("Cancel"), self.cancel_zone_creation)
         else:
             self._add_zone_items(menu, widget_pos)
             if self._tab is None:
                 self._add_creation_items(menu)
         if menu.actions():
             menu.addSeparator()
-        guides = menu.addAction(icon("crosshair"), "Show guides")
+        guides = menu.addAction(icon("crosshair"), self.tr("Show guides"))
         guides.setCheckable(True)
         guides.setChecked(self._show_guides)
         guides.toggled.connect(self.set_guides_shown)
@@ -1572,17 +1683,18 @@ class OutputImageView(ImageViewBase):
 
     def _add_creation_items(self, menu: QtWidgets.QMenu) -> None:
         menu.addAction(
-            "Create Picture Zone", lambda: self.start_zone_creation(ZoneKind.PICTURE)
+            self.tr("Create Picture Zone"),
+            lambda: self.start_zone_creation(ZoneKind.PICTURE),
         )
         menu.addAction(
-            "Create Fill Zone", lambda: self.start_zone_creation(ZoneKind.FILL)
+            self.tr("Create Fill Zone"), lambda: self.start_zone_creation(ZoneKind.FILL)
         )
         if self._selected >= 0:
             menu.addSeparator()
-            menu.addAction("Delete Zone", self.remove_selected_zone)
+            menu.addAction(self.tr("Delete Zone"), self.remove_selected_zone)
         if self._zones:
             menu.addSeparator()
-            menu.addAction("Clear All Zones", self.clear_zones)
+            menu.addAction(self.tr("Clear All Zones"), self.clear_zones)
 
     def _add_zone_items(self, menu: QtWidgets.QMenu, widget_pos: QPointF) -> None:
         under = self._zones_under(widget_pos)
@@ -1595,12 +1707,23 @@ class OutputImageView(ImageViewBase):
                 _MENU_ALPHA,
             )
             if self._zones[index].kind is ZoneKind.PICTURE:
-                first = ("Properties", lambda i=index: self.edit_zone_properties(i))
+                first = (
+                    QCoreApplication.translate(
+                        "ZoneContextMenuInteraction", "Properties"
+                    ),
+                    lambda i=index: self.edit_zone_properties(i),
+                )
             else:
-                first = ("Pick color", lambda i=index: self.start_color_pickup(i))
+                first = (
+                    QCoreApplication.translate("output::FillZoneEditor", "Pick color"),
+                    lambda i=index: self.start_color_pickup(i),
+                )
             for text, callback in (
                 first,
-                ("Delete", lambda i=index: self.remove_zone(i)),
+                (
+                    QCoreApplication.translate("ZoneContextMenuInteraction", "Delete"),
+                    lambda i=index: self.remove_zone(i),
+                ),
             ):
                 action = menu.addAction(text)
                 if several:

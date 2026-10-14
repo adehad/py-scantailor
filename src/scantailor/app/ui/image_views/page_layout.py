@@ -14,9 +14,18 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum, auto
+from typing import cast
 
 from PySide6 import QtGui, QtWidgets
-from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import (
+    QT_TRANSLATE_NOOP,
+    QCoreApplication,
+    QLineF,
+    QPointF,
+    QRectF,
+    Qt,
+    Signal,
+)
 from PySide6.QtGui import QAction, QPainter, QPen, QTransform
 
 from scantailor.app.ui.image_views.base import (
@@ -30,10 +39,25 @@ from scantailor.app.ui.theme.tokens import view_color
 from scantailor.core.content_mask import ContentMask
 from scantailor.core.models import Margins
 
-_MARGINS_TIP = "Resize margins by dragging any of the solid lines."
-_MOVE_TIP = "Hold left mouse button to drag the page content."
-_FINISH_DRAG_TIP = "Release left mouse button to finish dragging."
-_GUIDE_TIP = "Drag the guide."
+_MARGINS_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "page_layout::ImageView", "Resize margins by dragging any of the solid lines."
+    ),
+)
+_MOVE_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "page_layout::ImageView", "Hold left mouse button to drag the page content."
+    ),
+)
+_FINISH_DRAG_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "page_layout::ImageView", "Release left mouse button to finish dragging."
+    ),
+)
+_GUIDE_TIP = cast(str, QT_TRANSLATE_NOOP("page_layout::ImageView", "Drag the guide."))
 
 _VERTICAL_MOVE = Qt.KeyboardModifier.ControlModifier
 _HORIZONTAL_MOVE = Qt.KeyboardModifier.ShiftModifier
@@ -97,6 +121,7 @@ class PageLayoutImageView(ImageViewBase):
     margins_set_locally = Signal(Margins)
 
     default_status_tip = _MARGINS_TIP
+    default_status_tip_context = "page_layout::ImageView"
     EDGE_HIT_DISTANCE = 10
     GUIDE_HIT_DISTANCE = 6
 
@@ -172,19 +197,42 @@ class PageLayoutImageView(ImageViewBase):
 
     def _build_context_menu(self) -> None:
         self._context_menu = QtWidgets.QMenu(self)
-        self._add_horizontal_guide_action = QAction("Add a horizontal guide", self)
+        self._add_horizontal_guide_action = QAction(
+            QCoreApplication.translate(
+                "page_layout::ImageView", "Add a horizontal guide"
+            ),
+            self,
+        )
         self._add_horizontal_guide_action.triggered.connect(
             lambda: self._add_guide(True)
         )
-        self._add_vertical_guide_action = QAction("Add a vertical guide", self)
+        self._add_vertical_guide_action = QAction(
+            QCoreApplication.translate(
+                "page_layout::ImageView", "Add a vertical guide"
+            ),
+            self,
+        )
         self._add_vertical_guide_action.triggered.connect(
             lambda: self._add_guide(False)
         )
-        self._remove_all_guides_action = QAction("Remove all the guides", self)
+        self._remove_all_guides_action = QAction(
+            QCoreApplication.translate(
+                "page_layout::ImageView", "Remove all the guides"
+            ),
+            self,
+        )
         self._remove_all_guides_action.triggered.connect(self._clear_guides)
-        self._remove_guide_action = QAction("Remove this guide", self)
+        self._remove_guide_action = QAction(
+            QCoreApplication.translate("page_layout::ImageView", "Remove this guide"),
+            self,
+        )
         self._remove_guide_action.triggered.connect(self._remove_hovered_guide)
-        self._show_middle_rect_action = QAction("Show hard margins rectangle", self)
+        self._show_middle_rect_action = QAction(
+            QCoreApplication.translate(
+                "page_layout::ImageView", "Show hard margins rectangle"
+            ),
+            self,
+        )
         self._show_middle_rect_action.setCheckable(True)
         self._show_middle_rect_action.toggled.connect(self._toggle_middle_rect)
 
@@ -642,10 +690,10 @@ class PageLayoutImageView(ImageViewBase):
         self, widget_pos: QPointF, modifiers: Qt.KeyboardModifier
     ) -> str:
         if self._guide_at(widget_pos) is not None:
-            return _GUIDE_TIP
+            return QCoreApplication.translate("page_layout::ImageView", _GUIDE_TIP)
         hit = self._hit_test(widget_pos, modifiers)
         if hit is not None and hit == (_Target.INNER, Edge.NONE):
-            return _MOVE_TIP
+            return QCoreApplication.translate("page_layout::ImageView", _MOVE_TIP)
         return ""
 
     def _paint_overlay(self, painter: QPainter) -> None:
@@ -712,7 +760,11 @@ class PageLayoutImageView(ImageViewBase):
                 self._grab = self._begin_grab(target, edges, pos)
                 self.setCursor(self._cursor_for(edges))
                 if edges == Edge.NONE:
-                    self.set_status_tip(_FINISH_DRAG_TIP)
+                    self.set_status_tip(
+                        QCoreApplication.translate(
+                            "page_layout::ImageView", _FINISH_DRAG_TIP
+                        )
+                    )
                 event.accept()
                 return
         super().mousePressEvent(event)

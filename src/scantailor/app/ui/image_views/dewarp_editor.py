@@ -9,11 +9,12 @@ the events and calls ``paint`` from its overlay.
 import math
 from collections.abc import Callable
 from itertools import pairwise
+from typing import cast
 
 import numpy as np
 from numpy.typing import NDArray
 from PySide6 import QtGui
-from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtCore import QT_TRANSLATE_NOOP, QCoreApplication, QPointF, QRectF, Qt
 from PySide6.QtGui import QPainter, QPen, QPolygonF
 
 from scantailor.app.ui.image_views.base import ImageViewBase
@@ -23,9 +24,22 @@ from scantailor.dewarping.page_dewarper import dewarper_from_polylines
 from scantailor.filters.output.params import DistortionModelSpec
 from scantailor.math.spline import XSpline
 
-_END_POINT_TIP = "This point can be dragged. Hold Ctrl or Shift to drag along axes."
-_POINT_TIP = "Drag this point or delete it by pressing D key."
-_CURVE_TIP = "Click to create a new control point."
+_END_POINT_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "InteractiveXSpline",
+        "This point can be dragged. Hold Ctrl or Shift to drag along axes.",
+    ),
+)
+_POINT_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "InteractiveXSpline", "Drag this point or delete it by pressing D key."
+    ),
+)
+_CURVE_TIP = cast(
+    str, QT_TRANSLATE_NOOP("InteractiveXSpline", "Click to create a new control point.")
+)
 
 
 class DewarpEditor:
@@ -248,7 +262,8 @@ class DewarpEditor:
         if handle is not None:
             edge, index = handle
             is_end = index in (0, len(self._controls[edge]) - 1)
-            return _END_POINT_TIP if is_end else _POINT_TIP
+            tip = _END_POINT_TIP if is_end else _POINT_TIP
+            return QCoreApplication.translate("InteractiveXSpline", tip)
         to_widget = self._host.image_to_widget()
         for polyline in self._edges:
             for start, end in pairwise(polyline):
@@ -258,7 +273,7 @@ class DewarpEditor:
                     to_widget.map(QPointF(*end)),
                 )
                 if distance <= self.HIT_RADIUS:
-                    return _CURVE_TIP
+                    return QCoreApplication.translate("InteractiveXSpline", _CURVE_TIP)
         return ""
 
     def _insert_at(self, widget_pos: QPointF) -> tuple[int, int] | None:

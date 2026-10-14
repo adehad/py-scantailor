@@ -4,6 +4,7 @@ from collections.abc import Callable, Hashable, Sequence
 from pathlib import Path
 from typing import Any, cast
 
+from PySide6 import QtCore
 from PySide6.QtCore import (
     QEvent,
     QItemSelectionModel,
@@ -553,11 +554,18 @@ class ThumbnailListWidget(QWidget):
             QMenu: Insert before/after and remove, parented to the list.
         """
         menu = QMenu(self)
-        insert_before = menu.addAction(icon("insert-before"), "Insert before ...")
-        insert_after = menu.addAction(icon("insert-after"), "Insert after ...")
+        insert_before = menu.addAction(
+            icon("insert-before"),
+            QtCore.QCoreApplication.translate("MainWindow", "Insert before ..."),
+        )
+        insert_after = menu.addAction(
+            icon("insert-after"),
+            QtCore.QCoreApplication.translate("MainWindow", "Insert after ..."),
+        )
         menu.addSeparator()
         remove = menu.addAction(
-            icon("trash-2", tint="danger"), "Remove from project ..."
+            icon("trash-2", tint="danger"),
+            QtCore.QCoreApplication.translate("MainWindow", "Remove from project ..."),
         )
         insert_before.triggered.connect(lambda: self.insert_before_requested.emit(page))
         insert_after.triggered.connect(lambda: self.insert_after_requested.emit(page))
@@ -571,7 +579,10 @@ class ThumbnailListWidget(QWidget):
             QMenu: A single "Insert here ..." action, parented to the list.
         """
         menu = QMenu(self)
-        insert_here = menu.addAction(icon("insert-here"), "Insert here ...")
+        insert_here = menu.addAction(
+            icon("insert-here"),
+            QtCore.QCoreApplication.translate("MainWindow", "Insert here ..."),
+        )
         insert_here.triggered.connect(self.insert_here_requested)
         return menu
 

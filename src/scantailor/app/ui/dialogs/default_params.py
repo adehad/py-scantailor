@@ -1,6 +1,7 @@
 """Default parameters dialog: the values new projects start from, with profiles."""
 
 from pathlib import Path
+from typing import cast
 
 from loguru import logger
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -58,6 +59,18 @@ from scantailor.filters.select_content.detection import (
 _UI_FOLDER = Path(__file__).parent
 _MM_PER_UNIT = {Units.MILLIMETERS: 1.0, Units.CENTIMETERS: 10.0, Units.INCHES: 25.4}
 _UNIT_LABEL = {Units.MILLIMETERS: "mm", Units.CENTIMETERS: "cm", Units.INCHES: "in"}
+# Algorithm names are shown in the threshold combo box, but the combo loop only
+# sees variables, so lupdate needs each literal spelled out here.
+_METHOD_LABELS = {
+    "Otsu": cast(str, QtCore.QT_TRANSLATE_NOOP("DefaultParamsDialog", "Otsu")),
+    "Sauvola": cast(str, QtCore.QT_TRANSLATE_NOOP("DefaultParamsDialog", "Sauvola")),
+    "Wolf": cast(str, QtCore.QT_TRANSLATE_NOOP("DefaultParamsDialog", "Wolf")),
+    "Bradley": cast(str, QtCore.QT_TRANSLATE_NOOP("DefaultParamsDialog", "Bradley")),
+    "Grad": cast(str, QtCore.QT_TRANSLATE_NOOP("DefaultParamsDialog", "Grad")),
+    "EdgePlus": cast(str, QtCore.QT_TRANSLATE_NOOP("DefaultParamsDialog", "EdgePlus")),
+    "BlurDiv": cast(str, QtCore.QT_TRANSLATE_NOOP("DefaultParamsDialog", "BlurDiv")),
+    "EdgeDiv": cast(str, QtCore.QT_TRANSLATE_NOOP("DefaultParamsDialog", "EdgeDiv")),
+}
 _ROTATION_INDICATOR_SIZE = 32
 _CUSTOM_DPI = 200
 _DEPTH_STEPS_PER_UNIT = 10
@@ -157,37 +170,39 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         return get_cwidget(self.ui, kind, name)
 
     def _populate_combo_boxes(self) -> None:
-        self._w(QtWidgets.QComboBox, "layoutModeCB").addItem("Auto", "auto")
-        self._w(QtWidgets.QComboBox, "layoutModeCB").addItem("Manual", "manual")
+        self._w(QtWidgets.QComboBox, "layoutModeCB").addItem(self.tr("Auto"), "auto")
+        self._w(QtWidgets.QComboBox, "layoutModeCB").addItem(
+            self.tr("Manual"), "manual"
+        )
         color_modes = self._w(QtWidgets.QComboBox, "colorModeSelector")
-        color_modes.addItem("Black and White", ColorMode.BLACK_AND_WHITE)
-        color_modes.addItem("Color / Grayscale", ColorMode.COLOR_GRAYSCALE)
-        color_modes.addItem("Mixed", ColorMode.MIXED)
+        color_modes.addItem(self.tr("Black and White"), ColorMode.BLACK_AND_WHITE)
+        color_modes.addItem(self.tr("Color / Grayscale"), ColorMode.COLOR_GRAYSCALE)
+        color_modes.addItem(self.tr("Mixed"), ColorMode.MIXED)
         filling = self._w(QtWidgets.QComboBox, "fillingColorBox")
-        filling.addItem("Background", FillingColor.BACKGROUND)
-        filling.addItem("White", FillingColor.WHITE)
-        filling.addItem("Black", FillingColor.BLACK)
+        filling.addItem(self.tr("Background"), FillingColor.BACKGROUND)
+        filling.addItem(self.tr("White"), FillingColor.WHITE)
+        filling.addItem(self.tr("Black"), FillingColor.BLACK)
 
         methods = self._w(QtWidgets.QComboBox, "thresholdMethodBox")
         for name in _METHODS:
-            methods.addItem(name, name)
+            methods.addItem(self.tr(_METHOD_LABELS[name]), name)
 
         shapes = self._w(QtWidgets.QComboBox, "pictureShapeSelector")
-        shapes.addItem("Off", PictureShape.OFF)
-        shapes.addItem("Free", PictureShape.FREE)
-        shapes.addItem("Rectangular", PictureShape.RECTANGULAR)
+        shapes.addItem(self.tr("Off"), PictureShape.OFF)
+        shapes.addItem(self.tr("Free"), PictureShape.FREE)
+        shapes.addItem(self.tr("Rectangular"), PictureShape.RECTANGULAR)
 
         dpi = self._w(QtWidgets.QComboBox, "dpiSelector")
         for value in (300, 400, 600, 1200):
             dpi.addItem(str(value), value)
         self._custom_dpi_index = dpi.count()
-        dpi.addItem("Custom", self._custom_dpi)
+        dpi.addItem(self.tr("Custom"), self._custom_dpi)
 
         dewarping = self._w(QtWidgets.QComboBox, "dewarpingModeCB")
-        dewarping.addItem("Off", DewarpingMode.OFF)
-        dewarping.addItem("Auto", DewarpingMode.AUTO)
-        dewarping.addItem("Manual", DewarpingMode.MANUAL)
-        dewarping.addItem("Marginal", DewarpingMode.MARGINAL)
+        dewarping.addItem(self.tr("Off"), DewarpingMode.OFF)
+        dewarping.addItem(self.tr("Auto"), DewarpingMode.AUTO)
+        dewarping.addItem(self.tr("Manual"), DewarpingMode.MANUAL)
+        dewarping.addItem(self.tr("Marginal"), DewarpingMode.MARGINAL)
 
         self._w(QtWidgets.QSlider, "thresholdSlider").setRange(-100, 100)
         self._w(QtWidgets.QSlider, "despeckleSlider").setRange(
@@ -321,12 +336,12 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         box = self._profile_box()
         box.blockSignals(True)
         box.clear()
-        box.addItem("Default", DEFAULT_PROFILE)
-        box.addItem("Source", SOURCE_PROFILE)
+        box.addItem(self.tr("Default"), DEFAULT_PROFILE)
+        box.addItem(self.tr("Source"), SOURCE_PROFILE)
         for name in self._store.names():
             box.addItem(name, name)
         self._custom_profile_index = box.count()
-        box.addItem("Custom", CUSTOM_PROFILE)
+        box.addItem(self.tr("Custom"), CUSTOM_PROFILE)
         box.blockSignals(False)
 
     def _set_profile_controls(
@@ -363,7 +378,7 @@ class DefaultParamsDialog(QtWidgets.QDialog):
             except ProfileError:
                 logger.exception("Profile {} could not be loaded", name)
                 QtWidgets.QMessageBox.critical(
-                    self, "Error", "Error loading the profile."
+                    self, self.tr("Error"), self.tr("Error loading the profile.")
                 )
                 box.removeItem(index)
                 self._custom_profile_index -= 1
@@ -378,9 +393,11 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         if is_reserved_profile_name(name):
             QtWidgets.QMessageBox.information(
                 self,
-                "Error",
-                "The name conflicts with a default profile name. "
-                "Please enter a different name.",
+                self.tr("Error"),
+                self.tr(
+                    "The name conflicts with a default profile name. "
+                    "Please enter a different name."
+                ),
             )
             return
         try:
@@ -388,7 +405,9 @@ class DefaultParamsDialog(QtWidgets.QDialog):
             self._store.write(name, self._build_params())
         except ProfileError as error:
             logger.warning("{}", error)
-            QtWidgets.QMessageBox.critical(self, "Error", "Error saving the profile.")
+            QtWidgets.QMessageBox.critical(
+                self, self.tr("Error"), self.tr("Error saving the profile.")
+            )
             return
         if box.currentIndex() == self._custom_profile_index:
             box.blockSignals(True)
@@ -403,7 +422,7 @@ class DefaultParamsDialog(QtWidgets.QDialog):
                 box.setItemText(index, name)
                 box.setItemData(index, name)
                 self._custom_profile_index = box.count()
-                box.addItem("Custom", CUSTOM_PROFILE)
+                box.addItem(self.tr("Custom"), CUSTOM_PROFILE)
                 box.setCurrentIndex(index)
             else:
                 box.setCurrentIndex(existing)
@@ -417,7 +436,9 @@ class DefaultParamsDialog(QtWidgets.QDialog):
             self._store.delete(box.currentText())
         except ProfileError:
             logger.exception("Profile could not be deleted")
-            QtWidgets.QMessageBox.critical(self, "Error", "Error deleting the profile.")
+            QtWidgets.QMessageBox.critical(
+                self, self.tr("Error"), self.tr("Error deleting the profile.")
+            )
             return
         box.blockSignals(True)
         box.removeItem(index)
