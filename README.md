@@ -66,9 +66,19 @@ and assembling multi-page documents are out of scope of this project.
 
 ## Building
 
-**Windows download:** every `v*` tag publishes `ScanTailor-<tag>-windows-x64.zip` on the [GitHub Releases](https://github.com/adehad/py-scantailor/releases) page. Unzip it anywhere and run `ScanTailor\ScanTailor.exe`; `ScanTailor\scantailor-cli.exe` in the same folder is the headless command line. The folder carries its own Python, Qt and Visual C++ runtime, so nothing else needs installing. Nothing in the pipeline uses a GPU, so there is one build for every machine.
+**Downloads:** every `v*` tag publishes three archives on the [GitHub Releases](https://github.com/adehad/py-scantailor/releases) page. Each carries its own Python and Qt, and nothing in the pipeline uses a GPU, so there is one build per platform.
 
-The first launch of a new build compiles the image-processing kernels in the background and caches them under `%LOCALAPPDATA%\numba`; later launches load that cache.
+| Platform | Archive | Window | Command line |
+| --- | --- | --- | --- |
+| Windows x64 | `ScanTailor-<tag>-windows-x64.zip` | `ScanTailor\ScanTailor.exe` | `ScanTailor\scantailor-cli.exe` |
+| Linux x64 | `ScanTailor-<tag>-linux-x64.tar.gz` | `ScanTailor/ScanTailor` | `ScanTailor/scantailor-cli` |
+| macOS Apple Silicon | `ScanTailor-<tag>-macos-arm64.zip` | `ScanTailor.app` | `ScanTailor.app/Contents/MacOS/scantailor-cli` |
+
+- **Windows:** unzip anywhere and run `ScanTailor.exe`. The folder also carries the Visual C++ runtime, so nothing else needs installing.
+- **Linux:** unpack with `tar -xzf ScanTailor-<tag>-linux-x64.tar.gz` and run `ScanTailor/ScanTailor`. It is built on Ubuntu 22.04 and needs glibc 2.35 or newer. Qt's X11 plugin uses the system's xcb libraries; if the window does not open, install them (on Debian and Ubuntu: `sudo apt install libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libegl1`). The command line runs without a display when `QT_QPA_PLATFORM=offscreen` is set.
+- **macOS:** needs macOS 15 or later. Unzip and move `ScanTailor.app` to Applications. The app is not signed with an Apple Developer ID or notarised, so the first launch is blocked: right-click the app and choose **Open**; if macOS only offers to move it to the Bin, open it once, then allow it under **System Settings > Privacy & Security > Open Anyway**. The command line lives inside the bundle because it shares the bundle's libraries; link it onto your `PATH` with `ln -s /Applications/ScanTailor.app/Contents/MacOS/scantailor-cli /usr/local/bin/`. Intel Macs are not built; run from source there.
+
+The first launch of a new build compiles the image-processing kernels in the background and caches them in the user cache folder (`%LOCALAPPDATA%\numba`, `~/.cache/numba` or `~/Library/Caches/numba`); later launches load that cache.
 
 **From source** (Windows, Linux or macOS) needs Python 3.14 and [PDM](https://pdm-project.org):
 
@@ -78,8 +88,6 @@ pdm run translations        # compile the .ts catalogues into the gitignored .qm
 pdm run scantailor          # the application
 pdm run scantailor-cli --help
 ```
-
-**Linux packages:** there is no frozen Linux build of this port yet; run it from source.
 
 **Community examples / test data:** See also [scantailor-testing](https://github.com/ImageProcessing-ElectronicPublications/scantailor-testing).
 
@@ -445,7 +453,7 @@ pdm install
 pdm run exe
 ```
 
-`pdm run exe` compiles the translations, then runs PyInstaller on [`app.spec`](app.spec). The result is one folder, `dist/ScanTailor/`, holding the windowed `ScanTailor.exe` and the console `scantailor-cli.exe`, which share the bundled libraries. The entry scripts in [`tools/pyinstaller/`](tools/pyinstaller/) call `multiprocessing.freeze_support()` so the batch worker processes start correctly from a frozen executable. PyInstaller only builds for the platform it runs on.
+`pdm run exe` compiles the translations, then runs PyInstaller on [`app.spec`](app.spec). The result is one folder, `dist/ScanTailor/`, holding the windowed `ScanTailor` and the console `scantailor-cli` (`.exe` on Windows), which share the bundled libraries. On macOS the same folder is also wrapped as `dist/ScanTailor.app`, with both executables in `Contents/MacOS`. The entry scripts in [`tools/pyinstaller/`](tools/pyinstaller/) call `multiprocessing.freeze_support()` so the batch worker processes start correctly from a frozen executable. PyInstaller only builds for the platform it runs on.
 
 #### Releasing
 
@@ -458,4 +466,4 @@ git push origin v1.0.0-rc1
 
 [`.github/workflows/release.yml`](.github/workflows/release.yml) then compiles the translations, runs the default test suite, builds the executables, zips `dist/ScanTailor/` and creates a GitHub Release for the tag with the zip attached and generated release notes. Tags containing `-rc`, `-alpha` or `-beta` are published as pre-releases.
 
-Only Windows is built today. Adding macOS or Linux means copying the `build` job with that platform's runner, archive name and `scantailor-cli` path for the smoke test.
+Linux (Ubuntu 22.04) and macOS (Apple Silicon, macOS 15) are built alongside Windows. Only the Windows job runs the test suite; every build runs [`tools/smoke_frozen.py`](tools/smoke_frozen.py), which drives the frozen `scantailor-cli` through `create`, `run` and `export pdf` on a few sample pages. Running the workflow by hand from the Actions tab (or `gh workflow run release.yml --ref <branch>`) builds and smoke-tests all three without publishing; those archives are named with the short commit hash instead of a tag.

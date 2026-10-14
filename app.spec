@@ -1,13 +1,17 @@
 # -*- mode: python -*-
 """PyInstaller spec: the ScanTailor window and scantailor-cli in one folder.
 
+On macOS the folder is also wrapped in ScanTailor.app.
+
 Run ``pdm run exe``, which compiles the translations first.
 """
 
 import sys
 import typing
+from importlib import metadata
 from pathlib import Path
 
+from packaging.version import Version
 from PyInstaller.utils.hooks import copy_metadata
 
 if typing.TYPE_CHECKING:
@@ -21,7 +25,7 @@ ROOT = Path(SPECPATH)
 SRC = ROOT / "src"
 PACKAGE = SRC / "scantailor"
 ENTRY_POINTS = ROOT / "tools" / "pyinstaller"
-ICON = PACKAGE / "resources" / "win32" / "scantailor.ico"
+RESOURCES = PACKAGE / "resources"
 
 
 def _beside_package(files: list[Path]) -> list[tuple[str, str]]:
@@ -59,7 +63,9 @@ hiddenimports = ["PySide6.QtSvg", "scantailor.imageproc.numba_warmup"]
 # numba and scikit-image would otherwise sweep them in (about 30 MB).
 excludes = ["_pytest", "alabaster", "babel", "docutils", "pytest", "pytz", "sphinx"]
 
-icon = str(ICON) if sys.platform == "win32" else None
+exe_icon = None
+if sys.platform == "win32":
+    exe_icon = str(RESOURCES / "win32" / "scantailor.ico")
 
 
 def _analyse(script: str) -> "Analysis":
@@ -82,7 +88,7 @@ gui_exe = EXE(
     name="ScanTailor",
     upx=False,
     console=False,
-    icon=icon,
+    icon=exe_icon,
 )
 cli_exe = EXE(
     PYZ(cli.pure),
@@ -91,7 +97,7 @@ cli_exe = EXE(
     name="scantailor-cli",
     upx=False,
     console=True,
-    icon=icon,
+    icon=exe_icon,
 )
 
 # UPX stays off everywhere: it corrupts some Qt and Control Flow Guard DLLs.
@@ -106,5 +112,17 @@ coll = COLLECT(
     name="ScanTailor",
 )
 
+# The bundle copies the whole folder into Contents/MacOS, so the CLI ships at
+# ScanTailor.app/Contents/MacOS/scantailor-cli beside the libraries it shares.
+# There is no .icns in the resources; PyInstaller converts the PNG with Pillow.
+# BUNDLE takes its console flag from the COLLECT, which is the console CLI's, and
+# that would mark the window app LSBackgroundOnly: no Dock icon and no menu bar.
 if sys.platform == "darwin":
-    BUNDLE(coll, name="ScanTailor.app", bundle_identifier=None)
+    BUNDLE(
+        coll,
+        name="ScanTailor.app",
+        icon=str(RESOURCES / "ScanTailor.png"),
+        bundle_identifier="io.github.adehad.py-scantailor",
+        version=Version(metadata.version("py-scantailor")).base_version,
+        info_plist={"LSBackgroundOnly": False, "NSHighResolutionCapable": True},
+    )
