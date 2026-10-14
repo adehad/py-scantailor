@@ -49,7 +49,8 @@ class Dependencies(BaseModel):
         changes; one placed by hand is not.
 
         Args:
-            current (Dependencies): The dependencies as they stand now.
+            current (scantailor.filters.page_split.dependencies.Dependencies):
+                The dependencies as they stand now.
             manual_split_line (bool): Whether the stored split line was placed
                 by hand.
 

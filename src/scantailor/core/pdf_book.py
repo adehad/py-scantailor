@@ -67,19 +67,20 @@ def rebuild_pdf(
     """Import ``pdf_path``, run every page through the pipeline and export a PDF.
 
     Args:
-        pdf_path (Path): Source PDF.
-        out_path (Path): Destination PDF.
-        work_dir (Path): Scratch directory for the imported and processed pages;
+        pdf_path (pathlib.Path): Source PDF.
+        out_path (pathlib.Path): Destination PDF.
+        work_dir (pathlib.Path): Scratch directory for the imported and processed pages;
             kept so the intermediate files can be inspected.
         dpi (int): Resolution the source pages are rendered at.
         output_dpi (int | None): Output resolution; ``dpi`` when None. Ignored
             when ``stages`` is given.
-        bilevel_codec (BilevelCodec): Codec of black and white pages.
+        bilevel_codec (str): Codec of black and white pages.
         carry_text (bool): Carry the source text layer onto the output.
         max_workers (int | None): Worker processes of the batch.
         stages (StageSequence | None): Project settings; defaults otherwise.
-        on_progress (Callable[[BatchEvent], None] | None): Batch events.
-        cancel (Event | None): Stops the batch from starting further pages.
+        on_progress (Callable[[PageDetected | PageDone | PageFailed], None] | None):
+            Batch events.
+        cancel (threading.Event | None): Stops the batch from starting further pages.
 
     Returns:
         BookResult: Timings, failures and the output location. Pages that

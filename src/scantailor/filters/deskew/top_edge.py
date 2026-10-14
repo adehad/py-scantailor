@@ -38,7 +38,7 @@ def find_skew_from_top_edge(
     none.
 
     Args:
-        binary (NDArray[np.uint8]): 2-D image with 0 for ink and 255 for
+        binary (numpy.ndarray of numpy.uint8): 2-D image with 0 for ink and 255 for
             background.
         max_angle (float): The fitted angle is clamped to this many degrees.
         min_angle (float): Angles smaller than this are reported as 0.
@@ -85,7 +85,7 @@ def _edge_row(ink: NDArray[np.bool_]) -> int | None:
     """Return the last row of the first light window of a column that starts dark.
 
     Args:
-        ink (NDArray[np.bool_]): One column of the search band, True for ink.
+        ink (numpy.ndarray of numpy.bool): One column of the search band, True for ink.
 
     Returns:
         int | None: The row, or None when the column is light at the top or

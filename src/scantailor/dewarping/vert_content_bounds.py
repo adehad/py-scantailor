@@ -38,11 +38,11 @@ def detect_vert_content_bounds(binary: NDArray[np.bool_]) -> tuple[Line, Line]:
     """Find the left and right boundaries of the content.
 
     Args:
-        binary (NDArray[np.bool_]): 2-D page, True for ink. Clutter and specks
+        binary (numpy.ndarray of numpy.bool): 2-D page, True for ink. Clutter and specks
             outside the content should be gone already.
 
     Returns:
-        tuple[Line, Line]: The left and the right boundary as lines running from
+        tuple[tuple, tuple]: The left and the right boundary as lines running from
             the top to the bottom of the image; they may lie partly or wholly
             outside it. A page without ink gives two vertical lines at x = -1
             and x = 1.
@@ -164,7 +164,8 @@ class _SideProcessor:
         """Fit a line to the steep part of the envelope, with RANSAC.
 
         Returns:
-            Line: The fitted line, or a vertical line through the outermost ink
+            tuple[tuple[float, float], tuple[float, float]]:
+                The fitted line, or a vertical line through the outermost ink
                 column when the envelope has no steep segment.
         """
         segments = self._steep_segments()

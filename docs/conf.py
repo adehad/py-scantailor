@@ -27,6 +27,9 @@ extensions = [
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3.12", None),
+    "numpy": ("https://numpy.org/doc/stable", None),
+    "pydantic": ("https://docs.pydantic.dev/latest", None),
+    "pikepdf": ("https://pikepdf.readthedocs.io/en/latest", None),
 }
 
 autodoc_default_options = {
@@ -35,14 +38,28 @@ autodoc_default_options = {
     "show-inheritance": True,
     "special-members": "__init__",
     "undoc-members": True,
+    # Pydantic's config dict is not part of any reader-facing API.
+    "exclude-members": "model_config",
 }
 autodoc_inherit_docstrings = False
+# Signatures stay bare: each argument type is written in its Google-style docstring
+# entry, and annotations that name type aliases have no object to link to.
+autodoc_typehints = "none"
 
 
 nitpick_ignore_regex = [
     # PySide isn't compatible with intersphinx without some fiddling
     # https://bugreports.qt.io/browse/PYSIDE-2215?gerritIssueType=IssueOnly
     (r"py:.*", r"PySide6\..*"),
+]
+nitpick_ignore = [
+    # numpy's inventory lists its scalar types as attributes, which a :class:
+    # reference cannot resolve.
+    ("py:class", "numpy.uint8"),
+    ("py:class", "numpy.uint32"),
+    ("py:class", "numpy.int64"),
+    ("py:class", "numpy.float32"),
+    ("py:class", "numpy.float64"),
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -130,3 +147,6 @@ napoleon_google_docstring = True
 napoleon_numpy_docstring = False  # Explicitly prefer Google style docstring
 napoleon_use_param = True  # for type hint support
 napoleon_use_rtype = False  # False so the return type is inline with the description.
+# Attributes listed in a class docstring become fields, not a second object entry
+# that duplicates the one autodoc writes for each dataclass field.
+napoleon_use_ivar = True

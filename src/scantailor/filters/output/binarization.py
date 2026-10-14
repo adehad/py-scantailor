@@ -11,17 +11,17 @@ from pydantic import BaseModel, ConfigDict, Field
 class BinarizationMethod(Enum):
     """Binarization algorithm to use.
 
-    OTSU: Otsu's method - automatic global threshold.
-    SAUVOLA: Sauvola's method - local adaptive thresholding.
-    WOLF: Wolf's method - improved local adaptive thresholding.
-    FOX: Fox's method - Wolf with Singh's local contrast.
-    WINDOW: Dynamic window method of Bataineh et al.
-    BRADLEY: Bradley's method - simple local adaptive thresholding.
-    GRAD: Gradient snip - local mean blended with a page level taken where the
-        contrast is.
-    EDGEPLUS: Edge division with the edge enhancement term only.
-    BLURDIV: Edge division with the blur division term only.
-    EDGEDIV: Edge division method - edge enhancement with illumination normalization.
+    - ``OTSU``: Otsu's method, an automatic global threshold.
+    - ``SAUVOLA``: Sauvola's local adaptive threshold.
+    - ``WOLF``: Wolf's local adaptive threshold, an improved Sauvola.
+    - ``FOX``: Wolf with Singh's local contrast.
+    - ``WINDOW``: Dynamic window method of Bataineh et al.
+    - ``BRADLEY``: Bradley's simple local adaptive threshold.
+    - ``GRAD``: Gradient snip, a local mean blended with a page level taken where
+      the contrast is.
+    - ``EDGEPLUS``: Edge division with the edge enhancement term only.
+    - ``BLURDIV``: Edge division with the blur division term only.
+    - ``EDGEDIV``: Edge division with edge enhancement and illumination normalization.
     """
 
     OTSU = "otsu"
@@ -91,16 +91,16 @@ class BinarizationOptions(BaseModel):
             EdgeDiv. Higher = more edge enhancement.
         edge_div_kbd: Blur division weight (0.0-1.0), read by BlurDiv and
             EdgeDiv. Higher = more illumination normalization.
+        normalize_illumination: Normalize illumination before binarization.
+        savitzky_golay_smoothing: Smooth the gray image before binarization.
+        morphological_smoothing: Apply morphological smoothing after binarization.
+        color_segmenter: Options for colouring the foreground.
 
     C++ reads the one Sauvola coefficient for Bradley, EdgePlus, BlurDiv and
     EdgeDiv. The three fields above stay separate so that each method keeps
     its own control in the options widget, and the C++ project import copies
     the Sauvola coefficient into the fields a method reads, so an imported
     project binarises as it did in C++.
-        normalize_illumination: Normalize illumination before binarization.
-        savitzky_golay_smoothing: Smooth the gray image before binarization.
-        morphological_smoothing: Apply morphological smoothing after binarization.
-        color_segmenter: Options for colouring the foreground.
     """
 
     model_config = ConfigDict(frozen=True)

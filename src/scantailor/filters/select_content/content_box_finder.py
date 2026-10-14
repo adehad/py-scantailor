@@ -110,13 +110,15 @@ def find_content_rect(
     """Find the content of a page scanned at 150 dpi.
 
     Args:
-        gray (NDArray[np.uint8]): 2-D gray image, dark ink on a light page.
+        gray (numpy.ndarray of numpy.uint8): 2-D gray image, dark ink on a light page.
             Not modified.
-        page_rect (Rect | None): Area of the page; everything outside it is
+        page_rect (scantailor.filters.select_content.content_box_finder.Rect | None):
+            Area of the page; everything outside it is
             treated as shadow.
 
     Returns:
-        Rect | None: Box around the content in pixels of ``gray`` with one pixel
+        scantailor.filters.select_content.content_box_finder.Rect | None:
+            Box around the content in pixels of ``gray`` with one pixel
             of slack on every side, or None when no content was found.
     """
     ink = _binarize(gray)
@@ -178,13 +180,13 @@ def _open(
     """Morphological opening of the ink by a (width, height) brick.
 
     Args:
-        image (NDArray[np.bool_]): Ink mask.
+        image (numpy.ndarray of numpy.bool): Ink mask.
         size (tuple[int, int]): Brick width and height.
         surroundings_are_ink (bool): Whether pixels outside the image count as
             ink. When True, ink touching the border is not eaten away by it.
 
     Returns:
-        NDArray[np.bool_]: New mask.
+        numpy.ndarray of numpy.bool: New mask.
     """
     brick = cv2.getStructuringElement(cv2.MORPH_RECT, size)
     source = image.view(np.uint8)
@@ -245,11 +247,11 @@ def _content_blocks(
     """Group content into blocks by cutting out the largest whitespace rectangles.
 
     Args:
-        content (NDArray[np.bool_]): Ink without shadows.
-        despeckled (NDArray[np.bool_]): ``content`` without small specks.
+        content (numpy.ndarray of numpy.bool): Ink without shadows.
+        despeckled (numpy.ndarray of numpy.bool): ``content`` without small specks.
 
     Returns:
-        NDArray[np.bool_]: Mask of the blocks, each trimmed to its ink.
+        numpy.ndarray of numpy.bool: Mask of the blocks, each trimmed to its ink.
     """
     height, width = content.shape
     area_threshold = min(width, height)
@@ -288,8 +290,8 @@ def _cut_whitespace(
     """Clear the largest whitespace rectangles from ``blocks`` in place.
 
     Args:
-        blocks (NDArray[np.bool_]): Block mask; modified.
-        obstacles (NDArray[np.bool_]): Ink the rectangles must avoid. Not
+        blocks (numpy.ndarray of numpy.bool): Block mask; modified.
+        obstacles (numpy.ndarray of numpy.bool): Ink the rectangles must avoid. Not
             modified.
         powers (tuple[int, int]): Width and height exponents of the quality.
         max_count (int): Most rectangles to cut.
@@ -355,12 +357,12 @@ def _keep_inside_label_boxes(
     """Keep the pixels of each label that lie inside that label's box.
 
     Args:
-        labels (NDArray[np.int32]): Component labels, 0 for background.
-        rows (NDArray[np.int64]): First and last row of every label's box.
-        cols (NDArray[np.int64]): First and last column of every label's box.
+        labels (numpy.ndarray of numpy.int32): Component labels, 0 for background.
+        rows (numpy.ndarray of numpy.int64): First and last row of every label's box.
+        cols (numpy.ndarray of numpy.int64): First and last column of every label's box.
 
     Returns:
-        NDArray[np.bool_]: Mask of the pixels kept.
+        numpy.ndarray of numpy.bool: Mask of the pixels kept.
     """
     height, width = labels.shape
     kept = np.zeros((height, width), dtype=np.bool_)
@@ -410,7 +412,7 @@ def _distance_to_ink(
     The selected borders lie one pixel outside the image.
 
     Returns:
-        NDArray[np.float32]: Euclidean distances; a large constant when there
+        numpy.ndarray of numpy.float32: Euclidean distances; a large constant when there
             is nothing to measure to.
     """
     padded = np.zeros((ink.shape[0] + 2, ink.shape[1] + 2), dtype=bool)
@@ -462,7 +464,7 @@ def _split_text_lines(rows: NDArray[np.int64]) -> list[tuple[int, int]]:
     """Split a row histogram at its deep, balanced valleys.
 
     Args:
-        rows (NDArray[np.int64]): Ink pixels per row of a block.
+        rows (numpy.ndarray of numpy.int64): Ink pixels per row of a block.
 
     Returns:
         list[tuple[int, int]]: Inclusive row ranges, each at least as tall as the
@@ -513,11 +515,11 @@ def _estimate_text_mask(
     slightly skewed straight line.
 
     Args:
-        content (NDArray[np.bool_]): Ink.
-        blocks (NDArray[np.bool_]): Candidate blocks.
+        content (numpy.ndarray of numpy.bool): Ink.
+        blocks (numpy.ndarray of numpy.bool): Candidate blocks.
 
     Returns:
-        NDArray[np.bool_]: Mask of the block rows that are text.
+        numpy.ndarray of numpy.bool: Mask of the block rows that are text.
     """
     text = np.zeros_like(blocks)
     count, labels, stats, _ = cv2.connectedComponentsWithStats(
@@ -616,7 +618,8 @@ def _segment_garbage(
     belongs to both classes.
 
     Returns:
-        tuple[NDArray[np.bool_], NDArray[np.bool_]]: Vertical and horizontal
+        tuple[numpy.ndarray of numpy.bool, numpy.ndarray of numpy.bool]:
+            Vertical and horizontal
             garbage.
     """
     horizontal = _open(garbage, (_GARBAGE_SEGMENT_LENGTH, 1), False)
@@ -647,7 +650,7 @@ class _Garbage:
     """Garbage along one axis, with the distance of every pixel to it.
 
     Attributes:
-        image (NDArray[np.bool_]): The garbage pixels.
+        image (numpy.ndarray of numpy.bool): The garbage pixels.
     """
 
     def __init__(self, image: NDArray[np.bool_], horizontal_edges: bool) -> None:
@@ -685,15 +688,17 @@ def _trim_until_stable(
     """Trim each side in turn until no side changes any more.
 
     Args:
-        content (NDArray[np.bool_]): Ink without shadows.
-        blocks (NDArray[np.bool_]): Content blocks.
-        text (NDArray[np.bool_]): Ink that belongs to text lines.
-        rect (Rect): Starting rectangle.
+        content (numpy.ndarray of numpy.bool): Ink without shadows.
+        blocks (numpy.ndarray of numpy.bool): Content blocks.
+        text (numpy.ndarray of numpy.bool): Ink that belongs to text lines.
+        rect (scantailor.filters.select_content.content_box_finder.Rect):
+            Starting rectangle.
         garbage (tuple[_Garbage, _Garbage]): Horizontal and vertical garbage;
             grows while trimming.
 
     Returns:
-        Rect: Trimmed rectangle, empty when nothing credible remains.
+        scantailor.filters.select_content.content_box_finder.Rect:
+            Trimmed rectangle, empty when nothing credible remains.
     """
     horizontal_garbage, vertical_garbage = garbage
     sides = {"left", "right", "top", "bottom"}
@@ -740,7 +745,8 @@ def _trim_side(
     the candidate is kept, trimming may still be retried past it.
 
     Returns:
-        Rect: The reduced rectangle, or ``area`` when nothing could be removed.
+        scantailor.filters.select_content.content_box_finder.Rect:
+            The reduced rectangle, or ``area`` when nothing could be removed.
     """
     by_columns = side in ("left", "right")
     forward = side in ("left", "top")
@@ -786,7 +792,8 @@ def _split_area(
     """Split ``area`` at a whitespace gap into the part kept and the part removed.
 
     Args:
-        area (Rect): Rectangle to split.
+        area (scantailor.filters.select_content.content_box_finder.Rect):
+            Rectangle to split.
         side (str): Side being trimmed.
         kept_edge (int): First kept row or column for left and top, last kept
             for right and bottom.
@@ -823,7 +830,8 @@ def _trim(
     short direction, shift the weights towards keeping it.
 
     Returns:
-        tuple[Rect, bool]: The rectangle after the decision and whether trimming
+        tuple[scantailor.filters.select_content.content_box_finder.Rect, bool]:
+            The rectangle after the decision and whether trimming
             may be retried further in.
     """
     too_much = removed.area > _MAX_REMOVED_TO_KEPT_AREA * kept.area

@@ -76,13 +76,14 @@ def find_lines(gray: NDArray[np.uint8], dpi: float, max_lines: int = 8) -> list[
     """Find nearly vertical dark lines in a page.
 
     Args:
-        gray (NDArray[np.uint8]): (H, W) gray page.
+        gray (numpy.ndarray of numpy.uint8): (H, W) gray page.
         dpi (float): Resolution of ``gray``.
         max_lines (int): How many lines to return at most; the rest are
             dropped in order of the quality of their best candidate.
 
     Returns:
-        list[Line]: Lines as ``((x1, y1), (x2, y2))`` in ``gray`` pixels, each
+        list[tuple[tuple[float, float], tuple[float, float]]]:
+            Lines as ``((x1, y1), (x2, y2))`` in ``gray`` pixels, each
         running from top to bottom of the page, the point with the smaller x first.
     """
     gray100 = _reduce_to_working_dpi(gray, dpi)

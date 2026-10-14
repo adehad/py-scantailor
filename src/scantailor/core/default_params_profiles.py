@@ -90,7 +90,7 @@ class ProfileStore:
     """Reads and writes profiles in one folder.
 
     Args:
-        folder (Path | None): Folder that holds the profiles; defaults to
+        folder (pathlib.Path | None): Folder that holds the profiles; defaults to
             ``profiles`` beside the application settings file.
     """
 

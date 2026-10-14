@@ -170,7 +170,7 @@ def trivial_distortion_model(content_rect: ContentRect) -> DistortionModel:
     """The model that maps the content rectangle onto itself.
 
     Args:
-        content_rect (ContentRect): ``(x, y, width, height)``.
+        content_rect (tuple[float, float, float, float]): ``(x, y, width, height)``.
 
     Returns:
         DistortionModel: Straight top and bottom curves along the rectangle.
@@ -200,17 +200,19 @@ def build_auto_distortion_model(
     ``detect_distortion_model`` does the same and also tells what it found.
 
     Args:
-        gray (NDArray[np.uint8]): 2-D gray page as laid out for output, dark text
+        gray (numpy.ndarray of numpy.uint8):
+            2-D gray page as laid out for output, dark text
             on a light background.
         dpi (Dpi | tuple[float, float] | float): Resolution of ``gray``.
-        content_rect (ContentRect): ``(x, y, width, height)`` of the content in
+        content_rect (tuple[float, float, float, float]):
+            ``(x, y, width, height)`` of the content in
             ``gray`` pixels.
         spine_on_right (bool): True for a single or left page, False for a right
             page. Decides which outer border is straightened.
-        edge_gray (NDArray[np.uint8] | None): The image the page edges are
+        edge_gray (numpy.ndarray of numpy.uint8 | None): The image the page edges are
             traced on and the model is expressed in, when that is not ``gray``;
             the C++ code uses the unprocessed input image. None uses ``gray``.
-        to_edge_image (NDArray[np.float64] | None): Affine ``(2, 3)`` or
+        to_edge_image (numpy.ndarray of numpy.float64 | None): Affine ``(2, 3)`` or
             ``(3, 3)`` matrix from ``gray`` pixels to ``edge_gray`` pixels.
             Required with ``edge_gray``.
         min_span_percent (float): A model whose curves lie closer together

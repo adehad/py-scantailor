@@ -14,3 +14,9 @@ guide follows a page through the program from a new project to a finished PDF.
    batch
    export_pdf
    settings
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Reference
+
+   api/index
