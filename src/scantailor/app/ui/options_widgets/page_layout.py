@@ -3,6 +3,7 @@
 Provides UI controls for configuring margins and alignment.
 """
 
+from PySide6 import QtCore
 from PySide6.QtCore import QSize, Signal
 from PySide6.QtGui import QIcon, QIntValidator
 from PySide6.QtWidgets import (
@@ -120,7 +121,10 @@ class OptionsWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         # Margins group
-        self._margins_group = CollapsibleGroupBox("Margins", self)
+        self._margins_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate("page_layout::OptionsWidget", "Margins"),
+            self,
+        )
         self._margins_group.setObjectName("marginsGroup")
         margins_layout = QVBoxLayout(self._margins_group)
 
@@ -129,7 +133,11 @@ class OptionsWidget(QWidget):
         auto_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
-        self._auto_margins_check = QCheckBox("Auto Margins")
+        self._auto_margins_check = QCheckBox(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget", "Auto Margins"
+            )
+        )
         self._auto_margins_check.setObjectName("autoMargins")
         auto_layout.addWidget(self._auto_margins_check)
         auto_layout.addItem(
@@ -146,7 +154,13 @@ class OptionsWidget(QWidget):
         margins_grid = QGridLayout()
 
         # Top/Bottom spinboxes and link
-        margins_grid.addWidget(QLabel("Top"), 0, 0)
+        margins_grid.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate("page_layout::OptionsWidget", "Top")
+            ),
+            0,
+            0,
+        )
         self._top_spinbox = QDoubleSpinBox()
         self._top_spinbox.setObjectName("topMarginSpinBox")
         self._top_spinbox.setDecimals(1)
@@ -157,12 +171,24 @@ class OptionsWidget(QWidget):
         self._top_bottom_link.setObjectName("topBottomLink")
         self._top_bottom_link.setIcon(icon("link-2-off", "link-2"))
         self._top_bottom_link.setCheckable(True)
-        self._top_bottom_link.setToolTip("Link top and bottom margins")
+        self._top_bottom_link.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget", "Link top and bottom margins"
+            )
+        )
         self._top_bottom_link.setMinimumSize(20, 36)
         self._top_bottom_link.setMaximumSize(20, 36)
         margins_grid.addWidget(self._top_bottom_link, 0, 2, 2, 1)
 
-        margins_grid.addWidget(QLabel("Bottom"), 1, 0)
+        margins_grid.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate(
+                    "page_layout::OptionsWidget", "Bottom"
+                )
+            ),
+            1,
+            0,
+        )
         self._bottom_spinbox = QDoubleSpinBox()
         self._bottom_spinbox.setObjectName("bottomMarginSpinBox")
         self._bottom_spinbox.setDecimals(1)
@@ -170,7 +196,13 @@ class OptionsWidget(QWidget):
         margins_grid.addWidget(self._bottom_spinbox, 1, 1)
 
         # Left/Right spinboxes and link
-        margins_grid.addWidget(QLabel("Left"), 2, 0)
+        margins_grid.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate("page_layout::OptionsWidget", "Left")
+            ),
+            2,
+            0,
+        )
         self._left_spinbox = QDoubleSpinBox()
         self._left_spinbox.setObjectName("leftMarginSpinBox")
         self._left_spinbox.setDecimals(1)
@@ -181,12 +213,22 @@ class OptionsWidget(QWidget):
         self._left_right_link.setObjectName("leftRightLink")
         self._left_right_link.setIcon(icon("link-2-off", "link-2"))
         self._left_right_link.setCheckable(True)
-        self._left_right_link.setToolTip("Link left and right margins")
+        self._left_right_link.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget", "Link left and right margins"
+            )
+        )
         self._left_right_link.setMinimumSize(20, 36)
         self._left_right_link.setMaximumSize(20, 36)
         margins_grid.addWidget(self._left_right_link, 2, 2, 2, 1)
 
-        margins_grid.addWidget(QLabel("Right"), 3, 0)
+        margins_grid.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate("page_layout::OptionsWidget", "Right")
+            ),
+            3,
+            0,
+        )
         self._right_spinbox = QDoubleSpinBox()
         self._right_spinbox.setObjectName("rightMarginSpinBox")
         self._right_spinbox.setDecimals(1)
@@ -206,7 +248,11 @@ class OptionsWidget(QWidget):
         apply_margins_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
-        self._apply_margins_btn = QPushButton("Apply To ...")
+        self._apply_margins_btn = QPushButton(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget", "Apply To ..."
+            )
+        )
         self._apply_margins_btn.setObjectName("applyMarginsBtn")
         apply_margins_layout.addWidget(self._apply_margins_btn)
         self._fix_dpi_btn = QPushButton(self.tr("Fix all..."))
@@ -220,7 +266,12 @@ class OptionsWidget(QWidget):
         layout.addWidget(self._margins_group)
 
         # Alignment group
-        self._alignment_group = CollapsibleGroupBox("Alignment", self)
+        self._alignment_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget", "Alignment"
+            ),
+            self,
+        )
         self._alignment_group.setObjectName("alignmentGroup")
         alignment_layout = QVBoxLayout(self._alignment_group)
 
@@ -229,7 +280,11 @@ class OptionsWidget(QWidget):
         match_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
-        self._match_size_check = QCheckBox("Match size with other pages")
+        self._match_size_check = QCheckBox(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget", "Match size with other pages"
+            )
+        )
         self._match_size_check.setObjectName("alignWithOthersCB")
         self._match_size_check.setChecked(True)
         match_layout.addWidget(self._match_size_check)
@@ -245,17 +300,53 @@ class OptionsWidget(QWidget):
         )
 
         mode_grid = QGridLayout()
-        mode_grid.addWidget(QLabel("Horizontal mode:"), 0, 0)
+        mode_grid.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate(
+                    "page_layout::OptionsWidget", "Horizontal mode:"
+                )
+            ),
+            0,
+            0,
+        )
         self._h_mode_combo = QComboBox()
         self._h_mode_combo.setObjectName("hAlignmentModeCB")
-        self._h_mode_combo.addItems(["Auto", "Manual", "Original"])
+        self._h_mode_combo.addItems(
+            [
+                QtCore.QCoreApplication.translate("page_layout::OptionsWidget", "Auto"),
+                QtCore.QCoreApplication.translate(
+                    "page_layout::OptionsWidget", "Manual"
+                ),
+                QtCore.QCoreApplication.translate(
+                    "page_layout::OptionsWidget", "Original"
+                ),
+            ]
+        )
         self._h_mode_combo.setCurrentIndex(1)  # Manual by default
         mode_grid.addWidget(self._h_mode_combo, 0, 1)
 
-        mode_grid.addWidget(QLabel("Vertical mode:"), 1, 0)
+        mode_grid.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate(
+                    "page_layout::OptionsWidget", "Vertical mode:"
+                )
+            ),
+            1,
+            0,
+        )
         self._v_mode_combo = QComboBox()
         self._v_mode_combo.setObjectName("vAlignmentModeCB")
-        self._v_mode_combo.addItems(["Auto", "Manual", "Original"])
+        self._v_mode_combo.addItems(
+            [
+                QtCore.QCoreApplication.translate("page_layout::OptionsWidget", "Auto"),
+                QtCore.QCoreApplication.translate(
+                    "page_layout::OptionsWidget", "Manual"
+                ),
+                QtCore.QCoreApplication.translate(
+                    "page_layout::OptionsWidget", "Original"
+                ),
+            ]
+        )
         self._v_mode_combo.setCurrentIndex(1)  # Manual by default
         mode_grid.addWidget(self._v_mode_combo, 1, 1)
 
@@ -326,7 +417,11 @@ class OptionsWidget(QWidget):
         apply_align_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
-        self._apply_alignment_btn = QPushButton("Apply To ...")
+        self._apply_alignment_btn = QPushButton(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget", "Apply To ..."
+            )
+        )
         self._apply_alignment_btn.setObjectName("applyAlignmentBtn")
         apply_align_layout.addWidget(self._apply_alignment_btn)
         self._match_size_to_all_btn = QPushButton(self.tr("Match size to all pages"))

@@ -92,7 +92,13 @@ _VIEW_CLASSES: dict[FilterStage, type[ImageViewBase]] = {
 # Layer a newly drawn picture zone gets; it adds the zone to the picture mask.
 _NEW_PICTURE_LAYER = PictureLayer.PAINTER2
 
-_NO_DESPECKLING = "Despeckling can't be done in Color / Grayscale mode."
+_NO_DESPECKLING = cast(
+    str,
+    QtCore.QT_TRANSLATE_NOOP(
+        "output::Task::UiUpdater",
+        "Despeckling can't be done in Color / Grayscale mode.",
+    ),
+)
 
 
 @dataclass
@@ -905,7 +911,9 @@ class StagePanels(QtCore.QObject):
             )
             view.set_tab_message(
                 ImageViewTab.DESPECKLING,
-                _NO_DESPECKLING
+                QtCore.QCoreApplication.translate(
+                    "output::Task::UiUpdater", _NO_DESPECKLING
+                )
                 if extras.despeckle_source is None
                 and params.color_mode == ColorMode.COLOR_GRAYSCALE
                 else None,

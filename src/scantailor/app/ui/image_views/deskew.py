@@ -9,11 +9,21 @@ circle at the right edge set the oblique (shear) correction.
 
 import copy
 import math
+from typing import cast
 
 import numpy as np
 from numpy.typing import NDArray
 from PySide6 import QtGui, QtWidgets
-from PySide6.QtCore import QLineF, QLocale, QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import (
+    QT_TRANSLATE_NOOP,
+    QCoreApplication,
+    QLineF,
+    QLocale,
+    QPointF,
+    QRectF,
+    Qt,
+    Signal,
+)
 from PySide6.QtGui import QColor, QImage, QPainter, QPalette, QPen
 
 from scantailor.app.ui.image_views.base import ImageViewBase
@@ -57,9 +67,14 @@ class DeskewImageView(ImageViewBase):
     manual_oblique_angle_set = Signal(float)
 
     wheel_zoom_at_center = True
-    default_status_tip = (
-        "Use Ctrl+Wheel to rotate or Ctrl+Shift+Wheel for finer rotation."
+    default_status_tip = cast(
+        str,
+        QT_TRANSLATE_NOOP(
+            "deskew::ImageView",
+            "Use Ctrl+Wheel to rotate or Ctrl+Shift+Wheel for finer rotation.",
+        ),
     )
+    default_status_tip_context = "deskew::ImageView"
 
     MAX_ROTATION_DEG = 45.0
     MAX_ROTATION_SIN = math.sin(math.radians(MAX_ROTATION_DEG))
@@ -446,8 +461,12 @@ class DeskewImageView(ImageViewBase):
         if handle < 0:
             return ""
         if handle < self.ROTATION_HANDLES:
-            return "Drag this handle to rotate the image."
-        return "Drag this handle to adjust oblique (shear)."
+            return QCoreApplication.translate(
+                "deskew::ImageView", "Drag this handle to rotate the image."
+            )
+        return QCoreApplication.translate(
+            "deskew::ImageView", "Drag this handle to adjust oblique (shear)."
+        )
 
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
         """Pick up a handle.

@@ -3,6 +3,7 @@
 Provides UI controls for selecting page layout type and split mode.
 """
 
+from PySide6 import QtCore
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -75,7 +76,12 @@ class OptionsWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        self._layout_group = CollapsibleGroupBox("Page Layout", self)
+        self._layout_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate(
+                "page_split::OptionsWidget", "Page Layout"
+            ),
+            self,
+        )
         self._layout_group.setObjectName("pageLayoutGroup")
         layout_group_layout = QVBoxLayout(self._layout_group)
 
@@ -108,7 +114,9 @@ class OptionsWidget(QWidget):
         change_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
-        self._change_btn = QPushButton("Change ...")
+        self._change_btn = QPushButton(
+            QtCore.QCoreApplication.translate("page_split::OptionsWidget", "Change ...")
+        )
         self._change_btn.setObjectName("changeBtn")
         change_layout.addWidget(self._change_btn)
         change_layout.addItem(
@@ -118,20 +126,29 @@ class OptionsWidget(QWidget):
 
         layout.addWidget(self._layout_group)
 
-        self._split_group = CollapsibleGroupBox("Split Line", self)
+        self._split_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate(
+                "page_split::OptionsWidget", "Split Line"
+            ),
+            self,
+        )
         self._split_group.setObjectName("splitLineGroup")
         split_group_layout = QVBoxLayout(self._split_group)
 
         split_mode_layout = QHBoxLayout()
         self._mode_button_group = QButtonGroup(self)
 
-        self._auto_btn = QPushButton("Auto")
+        self._auto_btn = QPushButton(
+            QtCore.QCoreApplication.translate("page_split::OptionsWidget", "Auto")
+        )
         self._auto_btn.setObjectName("autoBtn")
         self._auto_btn.setCheckable(True)
         self._mode_button_group.addButton(self._auto_btn)
         split_mode_layout.addWidget(self._auto_btn)
 
-        self._manual_btn = QPushButton("Manual")
+        self._manual_btn = QPushButton(
+            QtCore.QCoreApplication.translate("page_split::OptionsWidget", "Manual")
+        )
         self._manual_btn.setObjectName("manualBtn")
         self._manual_btn.setCheckable(True)
         self._mode_button_group.addButton(self._manual_btn)
@@ -196,7 +213,11 @@ class OptionsWidget(QWidget):
         self._show_layout_type(layout_type)
         self._split_group.setVisible(layout_type != LayoutType.SINGLE_PAGE_UNCUT)
         if params.layout_type == LayoutType.AUTO_LAYOUT_TYPE:
-            self._scope_label.setText("Auto detected")
+            self._scope_label.setText(
+                QtCore.QCoreApplication.translate(
+                    "page_split::OptionsWidget", "Auto detected"
+                )
+            )
 
     def _show_requested_type(self) -> None:
         """Show the requested layout type while nothing is detected yet."""
@@ -212,7 +233,11 @@ class OptionsWidget(QWidget):
             self._scope_label.setText("?")
         else:
             self._change_btn.setEnabled(True)
-            self._scope_label.setText("Set manually")
+            self._scope_label.setText(
+                QtCore.QCoreApplication.translate(
+                    "page_split::OptionsWidget", "Set manually"
+                )
+            )
         self._uncheck(self._mode_button_group)
         self._auto_btn.setEnabled(False)
         self._manual_btn.setEnabled(False)
@@ -254,7 +279,11 @@ class OptionsWidget(QWidget):
         self._shown_type = layout_type
 
         self._split_group.setVisible(layout_type != LayoutType.SINGLE_PAGE_UNCUT)
-        self._scope_label.setText("Set manually")
+        self._scope_label.setText(
+            QtCore.QCoreApplication.translate(
+                "page_split::OptionsWidget", "Set manually"
+            )
+        )
 
         params = self._filter.get_params(page)
         detects_again = layout_type == LayoutType.PAGE_PLUS_OFFCUT or (

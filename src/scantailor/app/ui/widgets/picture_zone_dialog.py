@@ -1,6 +1,8 @@
 """Dialog that sets which layer a picture zone edits."""
 
-from PySide6.QtCore import Signal
+from typing import cast
+
+from PySide6.QtCore import QT_TRANSLATE_NOOP, QCoreApplication, Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
     QDialog,
@@ -13,12 +15,33 @@ from PySide6.QtWidgets import (
 from scantailor.core.zones import PictureLayer
 
 # In the order and with the names of the upstream dialog.
+_DIALOG_CONTEXT = "output::PictureZonePropDialog"
 LAYER_CHOICES: tuple[tuple[PictureLayer, str, str], ...] = (
-    (PictureLayer.ERASER3, "zoneeraser3", "Subtract from all layers"),
-    (PictureLayer.PAINTER2, "zonepainter2", "Add to auto layer"),
-    (PictureLayer.ERASER1, "zoneeraser1", "Subtract from auto layer"),
-    (PictureLayer.FOREGROUND, "zoneforeground", "Add to foreground"),
-    (PictureLayer.BACKGROUND, "zonebackground", "Add to background"),
+    (
+        PictureLayer.ERASER3,
+        "zoneeraser3",
+        cast(str, QT_TRANSLATE_NOOP(_DIALOG_CONTEXT, "Subtract from all layers")),
+    ),
+    (
+        PictureLayer.PAINTER2,
+        "zonepainter2",
+        cast(str, QT_TRANSLATE_NOOP(_DIALOG_CONTEXT, "Add to auto layer")),
+    ),
+    (
+        PictureLayer.ERASER1,
+        "zoneeraser1",
+        cast(str, QT_TRANSLATE_NOOP(_DIALOG_CONTEXT, "Subtract from auto layer")),
+    ),
+    (
+        PictureLayer.FOREGROUND,
+        "zoneforeground",
+        cast(str, QT_TRANSLATE_NOOP(_DIALOG_CONTEXT, "Add to foreground")),
+    ),
+    (
+        PictureLayer.BACKGROUND,
+        "zonebackground",
+        cast(str, QT_TRANSLATE_NOOP(_DIALOG_CONTEXT, "Add to background")),
+    ),
 )
 
 
@@ -32,7 +55,8 @@ def layer_label(layer: PictureLayer) -> str:
         str: What choosing the layer does; empty for ``PictureLayer.NOOP``, which
             the dialog does not offer.
     """
-    return next((text for kind, _name, text in LAYER_CHOICES if kind is layer), "")
+    text = next((text for kind, _name, text in LAYER_CHOICES if kind is layer), "")
+    return QCoreApplication.translate(_DIALOG_CONTEXT, text)
 
 
 class PictureZoneDialog(QDialog):
@@ -55,14 +79,16 @@ class PictureZoneDialog(QDialog):
             parent (QWidget | None): Parent widget.
         """
         super().__init__(parent)
-        self.setWindowTitle("Zone Properties")
+        self.setWindowTitle(
+            QCoreApplication.translate(_DIALOG_CONTEXT, "Zone Properties")
+        )
         self._layer = layer
         self._buttons: dict[PictureLayer, QRadioButton] = {}
         self._group = QButtonGroup(self)
 
         layout = QVBoxLayout(self)
         for kind, name, text in LAYER_CHOICES:
-            button = QRadioButton(text)
+            button = QRadioButton(QCoreApplication.translate(_DIALOG_CONTEXT, text))
             button.setObjectName(name)
             button.setChecked(kind is layer)
             button.toggled.connect(

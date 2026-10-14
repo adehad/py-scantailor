@@ -6,7 +6,9 @@ filling, despeckling and dewarping.
 """
 
 from collections.abc import Callable
+from typing import cast
 
+from PySide6 import QtCore
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
@@ -47,33 +49,60 @@ from scantailor.filters.output.picture_shape import PictureShape
 
 _DEPTH_PERCEPTION_SCALE = 10  # Slider steps per unit of depth perception.
 _DESPECKLE_LEVELS = (
-    (DespeckleLevel.OFF, "Off"),
-    (DespeckleLevel.CAUTIOUS, "Cautious"),
-    (DespeckleLevel.NORMAL, "Normal"),
-    (DespeckleLevel.AGGRESSIVE, "Aggressive"),
+    (DespeckleLevel.OFF, QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Off")),
+    (
+        DespeckleLevel.CAUTIOUS,
+        QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Cautious"),
+    ),
+    (
+        DespeckleLevel.NORMAL,
+        QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Normal"),
+    ),
+    (
+        DespeckleLevel.AGGRESSIVE,
+        QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Aggressive"),
+    ),
 )
 _DEWARPING_MODES = (
-    (DewarpingMode.OFF, "Off"),
-    (DewarpingMode.AUTO, "Auto"),
-    (DewarpingMode.MANUAL, "Manual"),
-    (DewarpingMode.MARGINAL, "Marginal"),
+    (DewarpingMode.OFF, QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Off")),
+    (DewarpingMode.AUTO, QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Auto")),
+    (DewarpingMode.MANUAL, QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Manual")),
+    (
+        DewarpingMode.MARGINAL,
+        QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Marginal"),
+    ),
 )
 _METHOD_LABELS = {
-    BinarizationMethod.OTSU: "Otsu",
-    BinarizationMethod.SAUVOLA: "Sauvola",
-    BinarizationMethod.WOLF: "Wolf",
-    BinarizationMethod.FOX: "Fox",
-    BinarizationMethod.WINDOW: "Window",
-    BinarizationMethod.BRADLEY: "Bradley",
-    BinarizationMethod.GRAD: "Grad",
-    BinarizationMethod.EDGEPLUS: "EdgePlus",
-    BinarizationMethod.BLURDIV: "BlurDiv",
-    BinarizationMethod.EDGEDIV: "EdgeDiv",
+    BinarizationMethod.OTSU: QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Otsu"),
+    BinarizationMethod.SAUVOLA: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget", "Sauvola"
+    ),
+    BinarizationMethod.WOLF: QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Wolf"),
+    BinarizationMethod.FOX: QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Fox"),
+    BinarizationMethod.WINDOW: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget", "Window"
+    ),
+    BinarizationMethod.BRADLEY: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget", "Bradley"
+    ),
+    BinarizationMethod.GRAD: QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Grad"),
+    BinarizationMethod.EDGEPLUS: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget", "EdgePlus"
+    ),
+    BinarizationMethod.BLURDIV: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget", "BlurDiv"
+    ),
+    BinarizationMethod.EDGEDIV: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget", "EdgeDiv"
+    ),
 }
 _PICTURE_SHAPES = (
-    (PictureShape.OFF, "Off"),
-    (PictureShape.FREE, "Free"),
-    (PictureShape.RECTANGULAR, "Rectangular"),
+    (PictureShape.OFF, QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Off")),
+    (PictureShape.FREE, QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Free")),
+    (
+        PictureShape.RECTANGULAR,
+        QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Rectangular"),
+    ),
 )
 # Methods that share the controls of another method's page.
 _SHARED_METHOD_PAGE = {
@@ -82,9 +111,11 @@ _SHARED_METHOD_PAGE = {
     BinarizationMethod.GRAD: BinarizationMethod.WOLF,
 }
 _FILLING_LABELS = {
-    FillingColor.BACKGROUND: "Background",
-    FillingColor.WHITE: "White",
-    FillingColor.BLACK: "Black",
+    FillingColor.BACKGROUND: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget", "Background"
+    ),
+    FillingColor.WHITE: QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "White"),
+    FillingColor.BLACK: QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Black"),
 }
 
 
@@ -120,9 +151,15 @@ def _check_box(name: str, text: str, tooltip: str = "") -> QCheckBox:
 
 def _apply_button(layout: QVBoxLayout | QHBoxLayout, group: ApplyGroup) -> QPushButton:
     """Add the button that copies one option group to other pages."""
-    button = QPushButton("Apply to ...")
+    button = QPushButton(
+        QtCore.QCoreApplication.translate("output::OptionsWidget", "Apply to ...")
+    )
     button.setObjectName(f"apply_{group.value}_btn")
-    button.setToolTip("Copy these settings to other pages")
+    button.setToolTip(
+        QtCore.QCoreApplication.translate(
+            "output::OptionsWidget", "Copy these settings to other pages"
+        )
+    )
     layout.addWidget(button)
     return button
 
@@ -282,11 +319,18 @@ class OptionsWidget(QWidget):
         )
 
     def _build_dpi_group(self, layout: QVBoxLayout) -> None:
-        self._dpi_group = CollapsibleGroupBox("Output Resolution", self)
+        self._dpi_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Output Resolution"
+            ),
+            self,
+        )
         self._dpi_group.setObjectName("dpiGroup")
         dpi_layout = QHBoxLayout(self._dpi_group)
         dpi_layout.addItem(_spacer())
-        dpi_layout.addWidget(QLabel("DPI:"))
+        dpi_layout.addWidget(
+            QLabel(QtCore.QCoreApplication.translate("output::OptionsWidget", "DPI:"))
+        )
         self._dpi_spinbox = _spin_box("dpiSpinBox", 50, 1200)
         self._dpi_spinbox.setValue(600)
         self._dpi_spinbox.setSingleStep(50)
@@ -296,22 +340,44 @@ class OptionsWidget(QWidget):
         layout.addWidget(self._dpi_group)
 
     def _build_mode_group(self, layout: QVBoxLayout) -> None:
-        self._mode_group = CollapsibleGroupBox("Mode", self)
+        self._mode_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Mode"), self
+        )
         self._mode_group.setObjectName("modeGroup")
         mode_layout = QVBoxLayout(self._mode_group)
 
         mode_btn_layout = QVBoxLayout()
         self._mode_button_group = QButtonGroup(self)
         self._bw_btn = _exclusive_button(
-            self._mode_button_group, mode_btn_layout, "bwBtn", "Black and White", 0
+            self._mode_button_group,
+            mode_btn_layout,
+            "bwBtn",
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Black and White"
+            ),
+            0,
         )
         self._gray_btn = _exclusive_button(
-            self._mode_button_group, mode_btn_layout, "grayBtn", "Color / Grayscale", 1
+            self._mode_button_group,
+            mode_btn_layout,
+            "grayBtn",
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Color / Grayscale"
+            ),
+            1,
         )
         self._mixed_btn = _exclusive_button(
-            self._mode_button_group, mode_btn_layout, "mixedBtn", "Mixed", 2
+            self._mode_button_group,
+            mode_btn_layout,
+            "mixedBtn",
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Mixed"),
+            2,
         )
-        self._mixed_btn.setToolTip("Black and white with colorful pictures")
+        self._mixed_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Black and white with colorful pictures"
+            )
+        )
         self._bw_btn.setIcon(icon("contrast"))
         self._gray_btn.setIcon(icon("palette"))
         self._mixed_btn.setIcon(icon("colour-mode-mixed"))
@@ -322,9 +388,12 @@ class OptionsWidget(QWidget):
         bow_layout.addItem(_spacer())
         self._black_on_white_check = _check_box(
             "blackOnWhiteCB",
-            "White margins",
-            "Checked: black text on white background\n"
-            "Unchecked: white text on black background",
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "White margins"),
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget",
+                "Checked: black text on white background\n"
+                "Unchecked: white text on black background",
+            ),
         )
         self._black_on_white_check.setChecked(True)
         bow_layout.addWidget(self._black_on_white_check)
@@ -337,30 +406,55 @@ class OptionsWidget(QWidget):
         layout.addWidget(self._mode_group)
 
     def _build_common_group(self, layout: QVBoxLayout) -> None:
-        self._common_group = CollapsibleGroupBox("Options", self)
+        self._common_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Options"), self
+        )
         self._common_group.setObjectName("commonGroup")
         common_layout = QVBoxLayout(self._common_group)
 
-        self._fill_margins_check = _check_box("fillMarginsCB", "Fill margins")
-        self._fill_offcut_check = _check_box("fillOffcutCB", "Fill offcut")
+        self._fill_margins_check = _check_box(
+            "fillMarginsCB",
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Fill margins"),
+        )
+        self._fill_offcut_check = _check_box(
+            "fillOffcutCB",
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Fill offcut"),
+        )
         self._fill_outside_page_box_check = _check_box(
             "fillOutsidePageBoxCB",
-            "Fill outside page box",
-            "Fill the full output page rectangle with the background color outside "
-            "the page content, instead of following offcut geometry.",
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Fill outside page box"
+            ),
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget",
+                "Fill the full output page rectangle with the background color outside "
+                "the page content, instead of following offcut geometry.",
+            ),
         )
         self._fill_outside_page_box_check.setIcon(icon("squares-exclude"))
         self._equalize_check = _check_box(
-            "equalizeIlluminationCB", "Equalize illumination"
+            "equalizeIlluminationCB",
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Equalize illumination"
+            ),
         )
         self._equalize_color_check = _check_box(
-            "equalizeIlluminationColorCB", "Equalize illumination (color)"
+            "equalizeIlluminationColorCB",
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Equalize illumination (color)"
+            ),
         )
         self._savitzky_golay_check = _check_box(
-            "savitzkyGolaySmoothingCB", "Savitzky-Golay smoothing"
+            "savitzkyGolaySmoothingCB",
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Savitzky-Golay smoothing"
+            ),
         )
         self._morphological_check = _check_box(
-            "morphologicalSmoothingCB", "Morphological smoothing"
+            "morphologicalSmoothingCB",
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Morphological smoothing"
+            ),
         )
         for widget in (
             self._fill_margins_check,
@@ -374,12 +468,28 @@ class OptionsWidget(QWidget):
             common_layout.addWidget(widget)
 
         wiener_layout = QGridLayout()
-        wiener_layout.addWidget(QLabel("Wiener coefficient:"), 0, 0)
+        wiener_layout.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget", "Wiener coefficient:"
+                )
+            ),
+            0,
+            0,
+        )
         self._wiener_coef_spinbox = _double_spin_box(
             "wienerCoefSpinBox", 0.0, 1.0, 0.05
         )
         wiener_layout.addWidget(self._wiener_coef_spinbox, 0, 1)
-        wiener_layout.addWidget(QLabel("Wiener window:"), 1, 0)
+        wiener_layout.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget", "Wiener window:"
+                )
+            ),
+            1,
+            0,
+        )
         self._wiener_window_spinbox = _spin_box("wienerWindowSpinBox", 3, 99)
         wiener_layout.addWidget(self._wiener_window_spinbox, 1, 1)
         common_layout.addLayout(wiener_layout)
@@ -387,34 +497,64 @@ class OptionsWidget(QWidget):
         layout.addWidget(self._common_group)
 
     def _build_filling_group(self, layout: QVBoxLayout) -> None:
-        self._filling_group = CollapsibleGroupBox("Filling", self)
+        self._filling_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Filling"), self
+        )
         self._filling_group.setObjectName("fillingGroup")
         filling_layout = QHBoxLayout(self._filling_group)
-        filling_layout.addWidget(QLabel("Filling color:"))
+        filling_layout.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget", "Filling color:"
+                )
+            )
+        )
         self._filling_color_combo = QComboBox()
         self._filling_color_combo.setObjectName("fillingColorBox")
         for color, label in _FILLING_LABELS.items():
-            self._filling_color_combo.addItem(label, color)
+            self._filling_color_combo.addItem(
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget", cast(str, label)
+                ),
+                color,
+            )
         filling_layout.addWidget(self._filling_color_combo)
         filling_layout.addItem(_spacer())
         layout.addWidget(self._filling_group)
 
     def _build_splitting_group(self, layout: QVBoxLayout) -> None:
-        self._splitting_group = CollapsibleGroupBox("Splitting", self)
+        self._splitting_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Splitting"),
+            self,
+        )
         self._splitting_group.setObjectName("splittingGroup")
         splitting_layout = QVBoxLayout(self._splitting_group)
 
-        self._split_output_check = _check_box("splittingCB", "Split output")
+        self._split_output_check = _check_box(
+            "splittingCB",
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Split output"),
+        )
         splitting_layout.addWidget(self._split_output_check)
-        self._bw_foreground_radio = QRadioButton("Black and white foreground")
+        self._bw_foreground_radio = QRadioButton(
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Black and white foreground"
+            )
+        )
         self._bw_foreground_radio.setObjectName("bwForegroundRB")
-        self._color_foreground_radio = QRadioButton("Color foreground")
+        self._color_foreground_radio = QRadioButton(
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Color foreground"
+            )
+        )
         self._color_foreground_radio.setObjectName("colorForegroundRB")
         self._bw_foreground_radio.setChecked(True)
         splitting_layout.addWidget(self._bw_foreground_radio)
         splitting_layout.addWidget(self._color_foreground_radio)
         self._original_background_check = _check_box(
-            "originalBackgroundCB", "Original background"
+            "originalBackgroundCB",
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Original background"
+            ),
         )
         splitting_layout.addWidget(self._original_background_check)
 
@@ -424,22 +564,38 @@ class OptionsWidget(QWidget):
         layout.addWidget(self._splitting_group)
 
     def _build_binarization_group(self, layout: QVBoxLayout) -> None:
-        self._binarization_group = CollapsibleGroupBox("Binarization", self)
+        self._binarization_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Binarization"),
+            self,
+        )
         self._binarization_group.setObjectName("binarizationGroup")
         bin_layout = QVBoxLayout(self._binarization_group)
 
         method_layout = QHBoxLayout()
-        method_layout.addWidget(QLabel("Method:"))
+        method_layout.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate("output::OptionsWidget", "Method:")
+            )
+        )
         self._method_combo = QComboBox()
         self._method_combo.setObjectName("methodCombo")
         for method, label in _METHOD_LABELS.items():
-            self._method_combo.addItem(label, method)
+            self._method_combo.addItem(
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget", cast(str, label)
+                ),
+                method,
+            )
         method_layout.addWidget(self._method_combo)
         method_layout.addItem(_spacer())
         bin_layout.addLayout(method_layout)
 
         thresh_layout = QHBoxLayout()
-        thresh_layout.addWidget(QLabel("Threshold:"))
+        thresh_layout.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate("output::OptionsWidget", "Threshold:")
+            )
+        )
         self._threshold_slider = QSlider()
         self._threshold_slider.setObjectName("thresholdSlider")
         self._threshold_slider.setOrientation(Qt.Orientation.Horizontal)
@@ -453,7 +609,13 @@ class OptionsWidget(QWidget):
         self._window_size_row = QWidget()
         window_layout = QHBoxLayout(self._window_size_row)
         window_layout.setContentsMargins(0, 0, 0, 0)
-        window_layout.addWidget(QLabel("Window size:"))
+        window_layout.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget", "Window size:"
+                )
+            )
+        )
         self._window_size_spinbox = _spin_box("windowSizeSpinBox", 10, 1000)
         self._window_size_spinbox.setValue(200)
         window_layout.addWidget(self._window_size_spinbox)
@@ -496,20 +658,71 @@ class OptionsWidget(QWidget):
 
         pages: dict[BinarizationMethod, list[tuple[str, QWidget]]] = {
             BinarizationMethod.OTSU: [],
-            BinarizationMethod.SAUVOLA: [("Coefficient:", self._sauvola_coef_spinbox)],
+            BinarizationMethod.SAUVOLA: [
+                (
+                    QtCore.QCoreApplication.translate(
+                        "output::OptionsWidget", "Coefficient:"
+                    ),
+                    self._sauvola_coef_spinbox,
+                )
+            ],
             BinarizationMethod.WOLF: [
-                ("Coefficient:", self._wolf_coef_spinbox),
-                ("Lower bound:", self._wolf_lower_spinbox),
-                ("Upper bound:", self._wolf_upper_spinbox),
+                (
+                    QtCore.QCoreApplication.translate(
+                        "output::OptionsWidget", "Coefficient:"
+                    ),
+                    self._wolf_coef_spinbox,
+                ),
+                (
+                    QtCore.QCoreApplication.translate(
+                        "output::OptionsWidget", "Lower bound:"
+                    ),
+                    self._wolf_lower_spinbox,
+                ),
+                (
+                    QtCore.QCoreApplication.translate(
+                        "output::OptionsWidget", "Upper bound:"
+                    ),
+                    self._wolf_upper_spinbox,
+                ),
             ],
-            BinarizationMethod.BRADLEY: [("Coefficient:", self._bradley_coef_spinbox)],
+            BinarizationMethod.BRADLEY: [
+                (
+                    QtCore.QCoreApplication.translate(
+                        "output::OptionsWidget", "Coefficient:"
+                    ),
+                    self._bradley_coef_spinbox,
+                )
+            ],
             BinarizationMethod.EDGEPLUS: [
-                ("Coefficient:", self._edge_plus_coef_spinbox)
+                (
+                    QtCore.QCoreApplication.translate(
+                        "output::OptionsWidget", "Coefficient:"
+                    ),
+                    self._edge_plus_coef_spinbox,
+                )
             ],
-            BinarizationMethod.BLURDIV: [("Coefficient:", self._blur_div_coef_spinbox)],
+            BinarizationMethod.BLURDIV: [
+                (
+                    QtCore.QCoreApplication.translate(
+                        "output::OptionsWidget", "Coefficient:"
+                    ),
+                    self._blur_div_coef_spinbox,
+                )
+            ],
             BinarizationMethod.EDGEDIV: [
-                ("Edge weight:", self._edge_div_kep_spinbox),
-                ("Blur weight:", self._edge_div_kbd_spinbox),
+                (
+                    QtCore.QCoreApplication.translate(
+                        "output::OptionsWidget", "Edge weight:"
+                    ),
+                    self._edge_div_kep_spinbox,
+                ),
+                (
+                    QtCore.QCoreApplication.translate(
+                        "output::OptionsWidget", "Blur weight:"
+                    ),
+                    self._edge_div_kbd_spinbox,
+                ),
             ],
         }
         self._method_page_index: dict[BinarizationMethod, int] = {}
@@ -546,12 +759,20 @@ class OptionsWidget(QWidget):
         self._method_options.updateGeometry()
 
     def _build_segmentation_group(self, layout: QVBoxLayout) -> None:
-        self._segmentation_group = CollapsibleGroupBox("Color segmentation", self)
+        self._segmentation_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Color segmentation"
+            ),
+            self,
+        )
         self._segmentation_group.setObjectName("segmentationGroup")
         seg_layout = QVBoxLayout(self._segmentation_group)
 
         self._color_segmentation_check = _check_box(
-            "colorSegmentationCB", "Segment colors"
+            "colorSegmentationCB",
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Segment colors"
+            ),
         )
         seg_layout.addWidget(self._color_segmentation_check)
 
@@ -564,10 +785,30 @@ class OptionsWidget(QWidget):
         self._blue_adjustment_spinbox = _spin_box("blueAdjustmentSB", -255, 255)
         for row, (label, spinbox) in enumerate(
             (
-                ("Noise reduction:", self._reduce_noise_spinbox),
-                ("Red adjustment:", self._red_adjustment_spinbox),
-                ("Green adjustment:", self._green_adjustment_spinbox),
-                ("Blue adjustment:", self._blue_adjustment_spinbox),
+                (
+                    QtCore.QCoreApplication.translate(
+                        "output::OptionsWidget", "Noise reduction:"
+                    ),
+                    self._reduce_noise_spinbox,
+                ),
+                (
+                    QtCore.QCoreApplication.translate(
+                        "output::OptionsWidget", "Red adjustment:"
+                    ),
+                    self._red_adjustment_spinbox,
+                ),
+                (
+                    QtCore.QCoreApplication.translate(
+                        "output::OptionsWidget", "Green adjustment:"
+                    ),
+                    self._green_adjustment_spinbox,
+                ),
+                (
+                    QtCore.QCoreApplication.translate(
+                        "output::OptionsWidget", "Blue adjustment:"
+                    ),
+                    self._blue_adjustment_spinbox,
+                ),
             )
         ):
             grid.addWidget(QLabel(label), row, 0)
@@ -577,25 +818,41 @@ class OptionsWidget(QWidget):
         layout.addWidget(self._segmentation_group)
 
     def _build_posterization_group(self, layout: QVBoxLayout) -> None:
-        self._posterization_group = CollapsibleGroupBox("Posterization", self)
+        self._posterization_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Posterization"),
+            self,
+        )
         self._posterization_group.setObjectName("posterizationGroup")
         poster_layout = QVBoxLayout(self._posterization_group)
 
-        self._posterize_check = _check_box("posterizeCB", "Posterize")
+        self._posterize_check = _check_box(
+            "posterizeCB",
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Posterize"),
+        )
         poster_layout.addWidget(self._posterize_check)
 
         self._posterize_options = QWidget()
         grid = QGridLayout(self._posterize_options)
         grid.setContentsMargins(0, 0, 0, 0)
-        grid.addWidget(QLabel("Level:"), 0, 0)
+        grid.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate("output::OptionsWidget", "Level:")
+            ),
+            0,
+            0,
+        )
         self._posterize_level_spinbox = _spin_box("posterizeLevelSB", 2, 255)
         grid.addWidget(self._posterize_level_spinbox, 0, 1)
         self._posterize_normalize_check = _check_box(
-            "posterizeNormalizationCB", "Normalize"
+            "posterizeNormalizationCB",
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Normalize"),
         )
         grid.addWidget(self._posterize_normalize_check, 1, 0, 1, 2)
         self._posterize_force_bw_check = _check_box(
-            "posterizeForceBwCB", "Force black and white"
+            "posterizeForceBwCB",
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Force black and white"
+            ),
         )
         grid.addWidget(self._posterize_force_bw_check, 2, 0, 1, 2)
         poster_layout.addWidget(self._posterize_options)
@@ -603,7 +860,10 @@ class OptionsWidget(QWidget):
         layout.addWidget(self._posterization_group)
 
     def _build_picture_shape_group(self, layout: QVBoxLayout) -> None:
-        self._picture_shape_group = CollapsibleGroupBox("Picture Shape", self)
+        self._picture_shape_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Picture Shape"),
+            self,
+        )
         self._picture_shape_group.setObjectName("pictureShapeOptions")
         shape_layout = QVBoxLayout(self._picture_shape_group)
 
@@ -612,7 +872,12 @@ class OptionsWidget(QWidget):
         self._picture_shape_combo = QComboBox()
         self._picture_shape_combo.setObjectName("pictureShapeSelector")
         for shape, label in _PICTURE_SHAPES:
-            self._picture_shape_combo.addItem(label, shape)
+            self._picture_shape_combo.addItem(
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget", cast(str, label)
+                ),
+                shape,
+            )
         selector_layout.addWidget(self._picture_shape_combo)
         selector_layout.addItem(_spacer())
         shape_layout.addLayout(selector_layout)
@@ -621,7 +886,13 @@ class OptionsWidget(QWidget):
         self._picture_sensitivity_row.setObjectName("pictureShapeSensitivityOptions")
         sensitivity_layout = QHBoxLayout(self._picture_sensitivity_row)
         sensitivity_layout.setContentsMargins(0, 0, 0, 0)
-        sensitivity_layout.addWidget(QLabel("Sensitivity (%):"))
+        sensitivity_layout.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget", "Sensitivity (%):"
+                )
+            )
+        )
         self._picture_sensitivity_spinbox = _spin_box(
             "pictureShapeSensitivitySB", 0, 100
         )
@@ -630,13 +901,19 @@ class OptionsWidget(QWidget):
         shape_layout.addWidget(self._picture_sensitivity_row)
 
         self._higher_search_check = _check_box(
-            "higherSearchSensitivityCB", "Higher search sensitivity"
+            "higherSearchSensitivityCB",
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Higher search sensitivity"
+            ),
         )
         shape_layout.addWidget(self._higher_search_check)
         layout.addWidget(self._picture_shape_group)
 
     def _build_despeckle_group(self, layout: QVBoxLayout) -> None:
-        self._despeckle_group = CollapsibleGroupBox("Despeckle", self)
+        self._despeckle_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Despeckle"),
+            self,
+        )
         self._despeckle_group.setObjectName("despeckleGroup")
         despeckle_layout = QVBoxLayout(self._despeckle_group)
 
@@ -653,7 +930,12 @@ class OptionsWidget(QWidget):
             _StopLabels(
                 self._despeckle_slider,
                 [
-                    (label, f"despeckle{label}Label")
+                    (
+                        QtCore.QCoreApplication.translate(
+                            "output::OptionsWidget", cast(str, label)
+                        ),
+                        f"despeckle{label}Label",
+                    )
                     for _lvl, label in _DESPECKLE_LEVELS
                 ],
             )
@@ -665,7 +947,10 @@ class OptionsWidget(QWidget):
         layout.addWidget(self._despeckle_group)
 
     def _build_dewarping_group(self, layout: QVBoxLayout) -> None:
-        self._dewarping_group = CollapsibleGroupBox("Dewarping", self)
+        self._dewarping_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Dewarping"),
+            self,
+        )
         self._dewarping_group.setObjectName("dewarpingGroup")
         dewarp_layout = QVBoxLayout(self._dewarping_group)
 
@@ -676,7 +961,9 @@ class OptionsWidget(QWidget):
                 self._dewarp_button_group,
                 btn_layout,
                 f"dewarp{label}Btn",
-                label,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget", cast(str, label)
+                ),
                 index,
             )
             for index, (mode, label) in enumerate(_DEWARPING_MODES)
@@ -685,7 +972,11 @@ class OptionsWidget(QWidget):
         self._dewarp_auto_btn = self._dewarp_buttons[DewarpingMode.AUTO]
         self._dewarp_manual_btn = self._dewarp_buttons[DewarpingMode.MANUAL]
         self._dewarp_marginal_btn = self._dewarp_buttons[DewarpingMode.MARGINAL]
-        self._dewarp_marginal_btn.setToolTip("Apply dewarping only to page margins")
+        self._dewarp_marginal_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Apply dewarping only to page margins"
+            )
+        )
         self._dewarp_off_btn.setChecked(True)
         dewarp_layout.addLayout(btn_layout)
 
@@ -693,11 +984,20 @@ class OptionsWidget(QWidget):
         self._min_span_row.setObjectName("dewarpMinSpanRow")
         span_layout = QHBoxLayout(self._min_span_row)
         span_layout.setContentsMargins(0, 0, 0, 0)
-        span_layout.addWidget(QLabel("Minimum span (%):"))
+        span_layout.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget", "Minimum span (%):"
+                )
+            )
+        )
         self._min_span_spinbox = _spin_box("dewarpMinSpanSB", 0, 100)
         self._min_span_spinbox.setToolTip(
-            "Leave the page as it is when the curves found lie closer together "
-            "than this share of the content height"
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget",
+                "Leave the page as it is when the curves found lie closer together "
+                "than this share of the content height",
+            )
         )
         span_layout.addWidget(self._min_span_spinbox)
         span_layout.addItem(_spacer())
@@ -710,7 +1010,11 @@ class OptionsWidget(QWidget):
         dewarp_layout.addWidget(self._dewarp_metrics_label)
 
         self._post_deskew_check = _check_box(
-            "postDeskewCB", "Post-deskew", "Apply additional deskewing after dewarping"
+            "postDeskewCB",
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Post-deskew"),
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Apply additional deskewing after dewarping"
+            ),
         )
         self._post_deskew_check.setChecked(True)
         dewarp_layout.addWidget(self._post_deskew_check)
@@ -721,7 +1025,12 @@ class OptionsWidget(QWidget):
         layout.addWidget(self._dewarping_group)
 
     def _build_depth_group(self, layout: QVBoxLayout) -> None:
-        self._depth_group = CollapsibleGroupBox("Depth perception", self)
+        self._depth_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Depth perception"
+            ),
+            self,
+        )
         self._depth_group.setObjectName("depthPerceptionGroup")
         depth_layout = QHBoxLayout(self._depth_group)
         self._depth_slider = QSlider()

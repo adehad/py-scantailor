@@ -30,6 +30,13 @@ from scantailor.app.ui.dialogs.apply_to import (
     MARGIN_SIDE_OPTIONS,
     MARGINS_OPTIONS_TITLE,
     OUTPUT_GROUP_TITLES,
+    ApplyChangeDewarpingDialog,
+    ApplyChangeDpiDialog,
+    ApplyColorsDialog,
+    ApplyDeskewDialog,
+    ApplyFixOrientationDialog,
+    ApplyPageLayoutDialog,
+    ApplySelectContentDialog,
     ApplyToDialog,
 )
 from scantailor.app.ui.dialogs.batch_progress import BatchProgressDialog
@@ -128,12 +135,26 @@ _VISIBLE_FRACTION = 0.5
 # Written by SystemLoadWidget: how many pages a batch processes at once.
 _BATCH_THREADS_KEY = "settings/batch_processing_threads"
 _SELECT_CONTENT_OPTIONS = {
-    "content_box": "Apply content box",
-    "page_box": "Apply page box",
+    "content_box": cast(
+        str, QtCore.QT_TRANSLATE_NOOP("ApplyToDialog", "Apply content box")
+    ),
+    "page_box": cast(str, QtCore.QT_TRANSLATE_NOOP("ApplyToDialog", "Apply page box")),
 }
 _APPLY_OPTIONS: dict[FilterStage, dict[str, str]] = {
     FilterStage.SELECT_CONTENT: _SELECT_CONTENT_OPTIONS,
     FilterStage.DESKEW: DESKEW_OPTIONS,
+}
+_APPLY_DIALOGS: dict[FilterStage, type[ApplyToDialog]] = {
+    FilterStage.FIX_ORIENTATION: ApplyFixOrientationDialog,
+    FilterStage.DESKEW: ApplyDeskewDialog,
+    FilterStage.SELECT_CONTENT: ApplySelectContentDialog,
+    FilterStage.PAGE_LAYOUT: ApplyPageLayoutDialog,
+    FilterStage.OUTPUT: ApplyColorsDialog,
+}
+# Output groups without an entry here use the colour dialog, as upstream does.
+_OUTPUT_GROUP_DIALOGS: dict[ApplyGroup, type[ApplyToDialog]] = {
+    ApplyGroup.DPI: ApplyChangeDpiDialog,
+    ApplyGroup.DEWARPING: ApplyChangeDewarpingDialog,
 }
 
 
@@ -1510,20 +1531,20 @@ class MainWindowManager:
             return self._show_split_mode_dialog(page)
         margins = stage == FilterStage.PAGE_LAYOUT and part == "margins"
         options = MARGIN_SIDE_OPTIONS if margins else _APPLY_OPTIONS.get(stage, {})
-        option_labels = {key: self.ui.tr(label) for key, label in options.items()}
-        dialog = ApplyToDialog(
+        dialog_class = self._apply_dialog_class(stage, part)
+        dialog = dialog_class(
             page,
             self.pages(),
             self.selectedPages(),
             self.ui,
             title=self._apply_dialog_title(stage, part),
-            options=option_labels,
+            options=options,
             option_icons=MARGIN_SIDE_ICONS if margins else None,
-            options_title=self.ui.tr(MARGINS_OPTIONS_TITLE) if margins else None,
+            options_title=MARGINS_OPTIONS_TITLE if margins else None,
         )
         accepted = dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted
         targets = dialog.pages() if accepted else []
-        flags = {key: dialog.option_checked(key) for key in option_labels}
+        flags = {key: dialog.option_checked(key) for key in options}
         dialog.deleteLater()
         others = [target for target in targets if target != page]
         sides = tuple(side for side in MARGIN_SIDE_OPTIONS if flags.get(side))
@@ -1540,6 +1561,22 @@ class MainWindowManager:
             sides=sides if margins else MARGIN_SIDES,
         )
         return True
+
+    @staticmethod
+    def _apply_dialog_class(stage: FilterStage, part: str) -> type[ApplyToDialog]:
+        """Return the apply dialog class for a stage and settings part.
+
+        Args:
+            stage (FilterStage): The stage whose settings are copied.
+            part (str): The output group value, or the Page Layout part; empty
+                when the whole stage is copied.
+
+        Returns:
+            type[ApplyToDialog]: The dialog class that owns the stage's labels.
+        """
+        if stage == FilterStage.OUTPUT and part:
+            return _OUTPUT_GROUP_DIALOGS.get(ApplyGroup(part), ApplyColorsDialog)
+        return _APPLY_DIALOGS.get(stage, ApplyToDialog)
 
     def _show_split_mode_dialog(self, page: PageId) -> bool:
         """Ask how pages are split and which pages get that, then apply it.

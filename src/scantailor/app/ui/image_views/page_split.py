@@ -9,10 +9,18 @@ from a button on the page.
 
 import math
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 
 from PySide6 import QtGui, QtWidgets
-from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import (
+    QT_TRANSLATE_NOOP,
+    QCoreApplication,
+    QLineF,
+    QPointF,
+    QRectF,
+    Qt,
+    Signal,
+)
 from PySide6.QtGui import QPainter, QPen, QPolygonF
 
 from scantailor.app.ui.icons import icon
@@ -21,8 +29,12 @@ from scantailor.app.ui.theme.tokens import view_color
 from scantailor.core.models import SubPage
 from scantailor.filters.page_split.page_layout import PageLayout, PageLayoutType
 
-_DRAG_TIP = "Drag the line or the handles."
-_UNREMOVE_TIP = "Restore removed page."
+_DRAG_TIP = cast(
+    str, QT_TRANSLATE_NOOP("page_split::ImageView", "Drag the line or the handles.")
+)
+_UNREMOVE_TIP = cast(
+    str, QT_TRANSLATE_NOOP("page_split::UnremoveButton", "Restore removed page.")
+)
 
 Part = Literal["top", "bottom", "line"]
 
@@ -378,8 +390,12 @@ class PageSplitImageView(ImageViewBase):
         self, widget_pos: QPointF, modifiers: Qt.KeyboardModifier
     ) -> str:
         if self._unremove_button_at(widget_pos) is not None:
-            return _UNREMOVE_TIP
-        return _DRAG_TIP if self._part_at(widget_pos) is not None else ""
+            return QCoreApplication.translate(
+                "page_split::UnremoveButton", _UNREMOVE_TIP
+            )
+        if self._part_at(widget_pos) is None:
+            return ""
+        return QCoreApplication.translate("page_split::ImageView", _DRAG_TIP)
 
     def _paint_overlay(self, painter: QPainter) -> None:
         if self._layout is None:

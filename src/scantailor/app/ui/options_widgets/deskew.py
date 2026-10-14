@@ -4,6 +4,7 @@ Provides UI controls for setting the deskew angle and the oblique (shear)
 correction, each automatic or manual.
 """
 
+from PySide6 import QtCore
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -84,14 +85,22 @@ class OptionsWidget(QWidget):
         self._auto_btn.setCheckable(True)
         self._auto_btn.setChecked(True)
         self._auto_btn.setAutoExclusive(True)
-        self._auto_btn.setToolTip("Automatically detect skew angle")
+        self._auto_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "deskew::OptionsWidget", "Automatically detect skew angle"
+            )
+        )
         mode_layout.addWidget(self._auto_btn)
 
         self._manual_btn = QPushButton(self.tr("Manual"))
         self._manual_btn.setObjectName("manualBtn")
         self._manual_btn.setCheckable(True)
         self._manual_btn.setAutoExclusive(True)
-        self._manual_btn.setToolTip("Manually specify skew angle")
+        self._manual_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "deskew::OptionsWidget", "Manually specify skew angle"
+            )
+        )
         mode_layout.addWidget(self._manual_btn)
 
         group_layout.addLayout(mode_layout)
@@ -108,7 +117,11 @@ class OptionsWidget(QWidget):
         self._angle_spinbox.setSingleStep(0.01)
         self._angle_spinbox.setDecimals(2)
         self._angle_spinbox.setSuffix("°")
-        self._angle_spinbox.setToolTip("Deskew angle in degrees")
+        self._angle_spinbox.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "deskew::OptionsWidget", "Deskew angle in degrees"
+            )
+        )
         angle_layout.addWidget(self._angle_spinbox)
 
         angle_layout.addItem(
@@ -182,9 +195,15 @@ class OptionsWidget(QWidget):
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
 
-        self._apply_btn = QPushButton("Apply To ...")
+        self._apply_btn = QPushButton(
+            QtCore.QCoreApplication.translate("deskew::OptionsWidget", "Apply To ...")
+        )
         self._apply_btn.setObjectName("applyDeskewBtn")
-        self._apply_btn.setToolTip("Apply this angle to other pages")
+        self._apply_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "deskew::OptionsWidget", "Apply this angle to other pages"
+            )
+        )
         apply_layout.addWidget(self._apply_btn)
 
         apply_layout.addItem(
