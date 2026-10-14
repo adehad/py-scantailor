@@ -122,6 +122,24 @@ def test_an_unreadable_pdf_is_not_listed(qtbot: QtBot, folder: Path):
     assert _names(dialog._off_project_model) == []
 
 
+def test_an_input_folder_that_cannot_be_listed_shows_no_files_instead_of_raising(
+    qtbot: QtBot, folder: Path, monkeypatch: pytest.MonkeyPatch
+):
+    _write_image(folder / "cover.png")
+    real_iterdir = Path.iterdir
+
+    def refuse_scans_folder(path: Path):
+        if path == folder:
+            raise PermissionError(13, "Access is denied", str(path))
+        return real_iterdir(path)
+
+    monkeypatch.setattr(Path, "iterdir", refuse_scans_folder)
+
+    dialog = _dialog(qtbot, folder)
+
+    assert _names(dialog._off_project_model) == []
+
+
 def test_adding_a_pdf_extracts_it_and_moves_its_pages_into_the_project(
     qtbot: QtBot, folder: Path
 ):
@@ -191,7 +209,7 @@ def test_pdfs_of_another_folder_are_added_with_add_pdf(
     qtbot: QtBot,
     folder: Path,
     tmp_path: Path,
-    file_dialogs: "FileDialogStub",
+    file_dialogs: FileDialogStub,
 ):
     other = write_text_pdf(tmp_path / "elsewhere.pdf")
     dialog = _dialog(qtbot, folder, _fake_extract())

@@ -1,5 +1,6 @@
 """System load widget for controlling parallel processing load."""
 
+import os
 import sys
 from pathlib import Path
 
@@ -37,10 +38,8 @@ class SystemLoadWidget(QtWidgets.QWidget):
         """Initialize the system load widget.
 
         Args:
-            parent: Parent widget.
+            parent (QtWidgets.QWidget | None): Widget that owns this one.
         """
-        import os
-
         super().__init__(parent)
 
         # Determine max threads
@@ -52,6 +51,9 @@ class SystemLoadWidget(QtWidgets.QWidget):
 
         # Load UI
         self.ui = load_ui_widget(_UI_FOLDER / "SystemLoadWidget.ui", self)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.ui)
         self._setup_widgets()
         self._connect_signals()
         self._load_state()
@@ -138,20 +140,29 @@ class SystemLoadWidget(QtWidgets.QWidget):
         self._plus_btn.setEnabled(current < self._max_threads)
 
     def _load_state(self) -> None:
-        """Load the saved thread count from QSettings."""
-        settings = QSettings()
-        saved_value = settings.value(_SETTINGS_KEY, self._max_threads)
+        """Show the saved thread count without saving it back or announcing it."""
+        self._slider.blockSignals(True)
+        try:
+            self._slider.setValue(self._saved_load())
+        finally:
+            self._slider.blockSignals(False)
+        self._update_button_states()
 
-        # Clamp to valid range
-        if isinstance(saved_value, int | str):
-            try:
-                value = int(saved_value)
-                value = min(self._max_threads, max(1, value))
-                self._slider.setValue(value)
-            except (ValueError, TypeError):
-                self._slider.setValue(self._max_threads)
-        else:
-            self._slider.setValue(self._max_threads)
+    def _saved_load(self) -> int:
+        """Return the thread count stored in QSettings, clamped to this machine.
+
+        Returns:
+            int: The stored count, or the thread limit when none is stored or
+            the stored value is not a number.
+        """
+        saved_value = QSettings().value(_SETTINGS_KEY, self._max_threads)
+        if not isinstance(saved_value, int | str):
+            return self._max_threads
+        try:
+            value = int(saved_value)
+        except ValueError:
+            return self._max_threads
+        return min(self._max_threads, max(1, value))
 
     def _save_state(self) -> None:
         """Save the thread count to QSettings."""
@@ -180,7 +191,3 @@ class SystemLoadWidget(QtWidgets.QWidget):
         """
         clamped = max(1, min(self._max_threads, value))
         self._slider.setValue(clamped)
-
-    def show(self) -> None:
-        """Show the widget."""
-        self.ui.show()

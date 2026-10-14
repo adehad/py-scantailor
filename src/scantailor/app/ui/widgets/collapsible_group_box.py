@@ -39,7 +39,6 @@ class CollapsibleGroupBox(QGroupBox):
         self._collapsed = False
         self._shown = False
         self._collapse_button: QToolButton | None = None
-        self._ignore_visibility_events = 0
         self._collapsed_widgets: set[QWidget] = set()
 
         self._collapse_icon = icon("chevron-down")
@@ -103,27 +102,22 @@ class CollapsibleGroupBox(QGroupBox):
         # Position the button in the title area
         self._position_collapse_button()
 
-        # Show/hide children
-        self._ignore_visibility_events += 1
-        try:
-            if self._collapsed:
-                # Hide all visible children and remember them
-                self._collapsed_widgets.clear()
-                for child in self.findChildren(QWidget):
-                    if child is self._collapse_button:
-                        continue
-                    if child.parent() is not self:
-                        continue
-                    if child.isVisible():
-                        self._collapsed_widgets.add(child)
-                        child.hide()
-            else:
-                # Restore previously hidden children
-                for child in self._collapsed_widgets:
-                    child.show()
-                self._collapsed_widgets.clear()
-        finally:
-            self._ignore_visibility_events -= 1
+        if self._collapsed:
+            # Hide all visible children and remember them
+            self._collapsed_widgets.clear()
+            for child in self.findChildren(QWidget):
+                if child is self._collapse_button:
+                    continue
+                if child.parent() is not self:
+                    continue
+                if child.isVisible():
+                    self._collapsed_widgets.add(child)
+                    child.hide()
+        else:
+            # Restore previously hidden children
+            for child in self._collapsed_widgets:
+                child.show()
+            self._collapsed_widgets.clear()
 
     def _position_collapse_button(self) -> None:
         """Position the collapse button in the title bar area."""

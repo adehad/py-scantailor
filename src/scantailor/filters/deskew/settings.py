@@ -5,7 +5,7 @@ This module provides storage for per-page deskew parameters.
 
 import threading
 from collections.abc import Iterable
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field, PrivateAttr
 
@@ -14,7 +14,7 @@ from scantailor.filters.deskew.dependencies import Dependencies
 from scantailor.filters.deskew.params import AutoManualMode, Params
 
 
-class Detection(str, Enum):
+class Detection(StrEnum):
     """A part of the page's parameters that detection fills in."""
 
     ROTATION = "rotation"

@@ -22,7 +22,7 @@ from numpy.typing import NDArray
 from scantailor.core.models import Dpi, OrthogonalRotation
 
 
-@dataclass
+@dataclass(frozen=True)
 class Rect:
     """A rectangle defined by position and size."""
 
@@ -68,7 +68,7 @@ class Rect:
         return _rect_to_polygon(self)
 
     @classmethod
-    def from_size(cls, width: float, height: float) -> "Rect":
+    def from_size(cls, width: float, height: float) -> Rect:
         """Create rect from size at origin."""
         return cls(x=0, y=0, width=width, height=height)
 

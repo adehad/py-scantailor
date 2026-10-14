@@ -4,13 +4,13 @@ This module defines how pages are aligned both vertically and horizontally
 when their sizes differ.
 """
 
-from enum import Enum
+from enum import StrEnum
 from typing import Self
 
 from pydantic import BaseModel
 
 
-class VerticalAlignment(str, Enum):
+class VerticalAlignment(StrEnum):
     """Vertical alignment mode for page content.
 
     TOP: Align content to top of page, soft margin at bottom.
@@ -27,7 +27,7 @@ class VerticalAlignment(str, Enum):
     VORIGINAL = "voriginal"
 
 
-class HorizontalAlignment(str, Enum):
+class HorizontalAlignment(StrEnum):
     """Horizontal alignment mode for page content.
 
     LEFT: Align content to left of page, soft margin at right.
