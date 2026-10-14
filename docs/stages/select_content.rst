@@ -4,8 +4,8 @@
 .. screenshot:: stage4_select_content
    :alt: Select Content with its Page Box and Content Box panels
 
-Finds the area of the page that holds text and pictures, and the area of the page
-itself. The detection is done by :mod:`scantailor.filters.select_content.content_box_finder`.
+Finds the area of the page that holds text and pictures, and the area of the paper.
+The detection code is in :mod:`scantailor.filters.select_content.content_box_finder`.
 
 .. list-table::
    :header-rows: 1
@@ -14,13 +14,13 @@ itself. The detection is done by :mod:`scantailor.filters.select_content.content
    * - Box
      - What it is
    * - Content Box
-     - The area around the text and pictures. The area outside it is treated as
-       empty, and the Margins stage measures from it.
+     - The area around the text and pictures. ScanTailor treats the area outside it
+       as empty, and the Margins stage measures from it.
    * - Page Box
-     - The paper itself. Content is only searched for inside it, and the Margins
-       stage measures the page size from it.
+     - The paper itself. ScanTailor searches for content only inside it, and the
+       Margins stage takes the page size from it.
 
-Each box has the modes in the table below. In manual mode drag the box edges in the
+Each box has three modes. In **Manual** mode, drag the edges of the box in the
 image. **Apply to ...** copies the setting to other pages.
 
 .. list-table::
@@ -36,27 +36,46 @@ image. **Apply to ...** copies the setting to other pages.
    * - **Manual**
      - Uses the box you drew by hand.
 
-A box cannot be made smaller than 10 pixels on screen. Double click inside or
-outside the content box to correct it from the page's content: outside the box it
-grows to take in the content under the pointer, inside it the nearest side moves to
-the content. Hold **Ctrl** to move only the top or the bottom side and **Shift** to
-move only the left or the right side. A double click on empty space does not create
-a box; use **Create Content Box** in the context menu or the **Ins** key for that.
+A box cannot be made smaller than 10 pixels on screen. A double click corrects the
+content box from the page's content.
 
-When a Page Box is worth enabling
-=================================
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
 
-Leave the **Page Box** on **Disable** when the scan already holds only the page, with
-no background, bed or shadow around it. The whole image is then the page.
+   * - Action
+     - Effect
+   * - Double click outside the content box
+     - The box grows to take in the content under the pointer.
+   * - Double click inside the content box
+     - The nearest side moves to the content.
+   * - Hold **Ctrl** and double click
+     - Moves only the top or the bottom side.
+   * - Hold **Shift** and double click
+     - Moves only the left or the right side.
+   * - **Create Content Box** in the context menu, or the **Ins** key
+     - Creates a content box. A double click on empty space does not create one.
 
-Set it to **Auto** when the scan shows the page on a dark background, a scanner bed or
-a shadow along its edges. Content detection can take those edges for text or
-pictures, and the Page Box keeps the search inside the paper. The same box sets the
-page size that the Margins stage measures from, so margins are then measured from
-the paper edge rather than from the scan edge.
+When to enable the Page Box
+===========================
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 80
+
+   * - Page Box
+     - When to use it
+   * - **Disable**
+     - The scan holds only the page, with no background, bed or shadow around it.
+       The whole image is then the page.
+   * - **Auto**
+     - The scan shows the page on a dark background, a scanner bed or a shadow along
+       its edges. Content detection can take those edges for text or pictures, and
+       the Page Box keeps the search inside the paper. The Margins stage then
+       measures the margins from the paper edge instead of the scan edge.
+   * - **Manual**
+     - **Auto** finds the paper edge in the wrong place. Drag the sides of the box in
+       the image, as for the content box.
 
 .. screenshot:: stage4_select_content_page_box_auto
    :alt: Select Content with the Page Box on Auto around the paper of a scan
-
-Use **Manual** when **Auto** finds the paper edge in the wrong place. Drag its
-sides in the image, as for the content box.

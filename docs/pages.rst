@@ -4,8 +4,8 @@ Working with pages
 .. screenshot:: thumbnails_sorting
    :alt: The thumbnail column with sorting paused
 
-The thumbnail column lists the pages of the project. The controls above it choose
-the order and show the state of each page.
+The thumbnail column lists the pages of the project. The buttons above it set the
+page order and how the thumbnails are shown.
 
 .. list-table::
    :header-rows: 1
@@ -34,7 +34,7 @@ the order and show the state of each page.
    * - Highlight deviation
      - Marks the thumbnails of pages whose values lie far from the others.
    * - Magnify and diminish thumbnails
-     - Change the thumbnail size, in steps. Ctrl++ and Ctrl+- do the same.
+     - Change the thumbnail size in steps. Ctrl++ and Ctrl+- do the same.
 
 Sort orders by stage
 --------------------
@@ -70,7 +70,7 @@ deviation orders.
 .. screenshot:: thumbnails_incomplete
    :alt: Thumbnails of pages the stage has not processed, marked with a question mark
 
-A page the shown stage has not processed is marked with a question mark. Its
+A question mark marks a page that the shown stage has not processed. Its
 thumbnail is a guess until the stage runs. On the Output stage, a page counts as
 done once a batch has written it.
 
@@ -92,7 +92,7 @@ Turn on the multi page selection button. Then:
    * - Shift+click
      - Selects a range of pages.
    * - Ctrl+drag over empty space
-     - Adds every page the rectangle touches. The selection is extended, never
+     - Adds every page the rectangle touches. The selection grows and is never
        replaced.
 
 Insert, remove and add pages
@@ -117,20 +117,20 @@ after the last page to add pages at the end.
    * - Insert here ...
      - On empty space past the last page, appends the chosen images.
    * - Remove from project ...
-     - Removes the selected pages after a confirmation. Input files are never
-       deleted.
+     - Removes the selected pages after a confirmation. The program never
+       deletes input files.
 
 .. screenshot:: remove_pages
    :alt: The removal confirmation with Remove output files too ticked
 
-The removal confirmation has a **Remove output files too** box, ticked when the
-confirmation opens. Ticked, it also deletes the output files written for the
-removed pages. Untick it to keep them.
+The removal confirmation has a **Remove output files too** box, which is ticked
+when the confirmation opens. If it is ticked, the program also deletes the output
+files written for the removed pages. Untick it to keep them.
 
-Images already in the project are skipped when you insert or add files.
+When you insert or add files, the program skips images already in the project.
 **File > Add Files ...** appends the chosen images to the end of the project.
 
-Pages can be inserted and removed only while no batch runs.
+You can insert and remove pages only while no batch runs.
 
 .. _reverse-spread-order:
 
@@ -142,11 +142,11 @@ Reversing the order of two-page spreads
 
 **Tools > Reverse two-page spread order** swaps the two halves of a split scan
 between left-to-right and right-to-left reading. The halves change place in the
-page list, and the output files already written for them are renamed to match.
-The setting is saved with the project.
+page list, and the program renames the output files already written for them to
+match. The project file stores the setting.
 
-Use it when the first half of a spread was numbered on the wrong side, for
-example when a book is read right to left but the project was made as left to
+Use it when the first half of a spread was numbered on the wrong side. For
+example, the book is read right to left but the project was made as left to
 right.
 
 .. _relinking:
@@ -157,9 +157,9 @@ Missing folders and relinking
 .. screenshot:: relinking
    :alt: The Relinking dialog with the folder of the sample pages selected
 
-A project keeps the paths of its input files and its output folder. When one of
-those folders has moved, the **Relinking** dialog opens on opening the project.
-Cancelling it cancels the opening. You can also open it at any time from
+A project stores the paths of its input files and its output folder. If one of
+those folders has moved, the **Relinking** dialog opens when you open the
+project. Cancelling it cancels the opening. You can also open it at any time from
 **Tools > Relinking ...**.
 
 .. list-table::
@@ -170,15 +170,16 @@ Cancelling it cancels the opening. You can also open it at any time from
      - What it does
    * - Folder list
      - Lists the folders to relink: the folders of the input files and the output
-       folder. On opening, only the missing ones are listed.
+       folder. When the dialog opens with the project, it lists only the missing
+       ones.
    * - Path display
      - Shows the path of the selected folder in parts. Click a part to choose the
        folder that replaces everything up to and including that part.
    * - Undo
      - Reverts the last change.
    * - Error line
-     - Explains why a change was refused. A change is refused when it would merge
-       the files of two folders into one.
+     - Explains why a change was refused. The dialog refuses a change that would
+       merge the files of two folders into one.
 
 Relinking one folder also relinks every listed folder below it. Press OK to apply
 the changes. The project is then marked as changed, so save it to keep the new

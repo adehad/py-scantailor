@@ -1,8 +1,10 @@
 ScanTailor
 ##########
 
-ScanTailor turns scanned book pages into clean, straight, evenly framed pages. This
-guide follows a page through the program from a new project to a finished PDF.
+ScanTailor processes scanned book pages. It splits two-page scans, straightens
+and crops each page and gives every page the same margins. This guide follows one
+page through the program, starting with a new project and ending with an exported
+PDF.
 
 .. toctree::
    :maxdepth: 2
@@ -19,4 +21,5 @@ guide follows a page through the program from a new project to a finished PDF.
    :maxdepth: 2
    :caption: Reference
 
+   performance
    api/index
