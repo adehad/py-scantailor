@@ -60,7 +60,9 @@ class PdfExtractDialog(QtWidgets.QDialog):
         """
         super().__init__(parent)
         self.setWindowTitle(self.tr("Extract pages"))
-        self._all_pages = QtWidgets.QRadioButton(f"All {page_count} pages", self)
+        self._all_pages = QtWidgets.QRadioButton(
+            self.tr("All {count} pages").format(count=page_count), self
+        )
         self._page_range = QtWidgets.QRadioButton(self.tr("Pages"), self)
         self._first = QtWidgets.QSpinBox(self)
         self._first.setRange(1, page_count)
@@ -97,8 +99,8 @@ class PdfExtractDialog(QtWidgets.QDialog):
         layout.addWidget(self._all_pages)
         layout.addLayout(range_row)
         form = QtWidgets.QFormLayout()
-        form.addRow("Render at", self._dpi)
-        form.addRow("Write to", QtWidgets.QLabel(str(destination), self))
+        form.addRow(self.tr("Render at"), self._dpi)
+        form.addRow(self.tr("Write to"), QtWidgets.QLabel(str(destination), self))
         layout.addLayout(form)
         layout.addWidget(self._buttons)
         self._update_enabled()
@@ -144,16 +146,30 @@ def ask_existing_pages(
     box.setWindowTitle(
         QtCore.QCoreApplication.translate("PdfExtractDialog", "Pages already extracted")
     )
-    box.setText(f"{folder} already holds {count} rendered pages.")
+    box.setText(
+        QtCore.QCoreApplication.translate(
+            "PdfExtractDialog", "{folder} already holds {count} rendered pages."
+        ).format(folder=folder, count=count)
+    )
     box.setInformativeText(
-        "Use them, or render the pages again? Rendering again replaces "
-        "the page images in that folder."
+        QtCore.QCoreApplication.translate(
+            "PdfExtractDialog",
+            "Use them, or render the pages again? Rendering again replaces "
+            "the page images in that folder.",
+        )
     )
-    use = box.addButton("Use them", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+    use = box.addButton(
+        QtCore.QCoreApplication.translate("PdfExtractDialog", "Use them"),
+        QtWidgets.QMessageBox.ButtonRole.AcceptRole,
+    )
     again = box.addButton(
-        "Render again", QtWidgets.QMessageBox.ButtonRole.DestructiveRole
+        QtCore.QCoreApplication.translate("PdfExtractDialog", "Render again"),
+        QtWidgets.QMessageBox.ButtonRole.DestructiveRole,
     )
-    box.addButton("Cancel", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+    box.addButton(
+        QtCore.QCoreApplication.translate("PdfExtractDialog", "Cancel"),
+        QtWidgets.QMessageBox.ButtonRole.RejectRole,
+    )
     box.exec()
     clicked = box.clickedButton()
     box.deleteLater()
