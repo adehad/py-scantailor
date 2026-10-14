@@ -50,9 +50,17 @@ class ImportedPdf:
 
 
 def import_pdf_pages(
-    pdf_path: Path, out_dir: Path, dpi: int, report: Report, cancel: threading.Event
+    pdf_path: Path,
+    out_dir: Path,
+    dpi: int,
+    report: Report,
+    cancel: threading.Event,
+    *,
+    first_page: int = 1,
+    last_page: int | None = None,
+    clear_existing: bool = False,
 ) -> ImportedPdf:
-    """Render a PDF into ``out_dir`` and record where the images came from.
+    """Render a PDF's pages into ``out_dir`` and record where the images came from.
 
     Pages are rendered beside ``out_dir`` and moved in only when all are done,
     so a cancel leaves the folder, and any earlier import in it, as it was.
@@ -63,22 +71,33 @@ def import_pdf_pages(
         dpi (int): Rendering resolution.
         report (Report): Receives ``(done, total, text)``.
         cancel (threading.Event): Set to stop and discard the result.
+        first_page (int): First page to render, one-based.
+        last_page (int | None): Last page to render, one-based and inclusive;
+            None renders to the end.
+        clear_existing (bool): Replace the rendered pages already in ``out_dir``
+            rather than keeping them; see ``core.pdf_import.import_pdf``.
 
     Returns:
         ImportedPdf: The images and their mapping, which the project stores.
 
     Raises:
         PdfCancelled: If ``cancel`` was set.
-        ValueError: If the PDF is unreadable or has no pages.
+        ValueError: If the PDF is unreadable, has no pages, or the page range
+            is outside it.
     """
-    total = _page_count(pdf_path)
-    report(0, total, "Rendering")
+    selected = range(
+        first_page - 1, _page_count(pdf_path) if last_page is None else last_page
+    )
+    report(0, len(selected), "Rendering")
     with ExitStack() as stack:
-        pool = _pool_if_worth_it(stack, total)
+        pool = _pool_if_worth_it(stack, len(selected))
         images = import_pdf(
             pdf_path,
             out_dir,
             dpi,
+            first_page=first_page,
+            last_page=last_page,
+            clear_existing=clear_existing,
             executor=pool,
             cancel=cancel,
             on_page=lambda done, count: report(done, count, "Rendering"),
@@ -86,7 +105,10 @@ def import_pdf_pages(
     source = PdfSource(
         pdf_path=pdf_path,
         dpi=dpi,
-        pages={image.name: index for index, image in enumerate(images)},
+        pages_dir=out_dir,
+        pages={
+            image.name: index for index, image in zip(selected, images, strict=True)
+        },
     )
     return ImportedPdf(source, images)
 
@@ -142,11 +164,13 @@ class PagePlan:
         image: The processed output image.
         dpi: Its resolution, horizontal and vertical.
         text: Source text to carry over, or None.
+        source: The PDF that rendered the page; required for ``text``.
     """
 
     image: Path
     dpi: tuple[float, float]
     text: TextRequest | StoredTextRequest | None = None
+    source: PdfSource | None = None
 
 
 @dataclass(frozen=True)
@@ -158,16 +182,17 @@ class PdfExportRequest:
         out_path: Destination PDF.
         bilevel_codec: Codec of black and white pages.
         jpeg_quality: JPEG quality of grey and colour pages.
-        source: The PDF the project's pages came from, if any. It is never
-            overwritten, and its bookmarks and page labels are carried over.
-        carry_text: Whether to carry the source PDF's text onto the pages.
+        sources: The PDFs the project's pages came from. None of them is ever
+            overwritten. Bookmarks and page labels are carried over only when
+            there is exactly one.
+        carry_text: Whether to carry the source text onto the pages.
     """
 
     pages: list[PagePlan]
     out_path: Path
     bilevel_codec: BilevelCodec = "jbig2"
     jpeg_quality: int = 85
-    source: PdfSource | None = None
+    sources: list[PdfSource] = field(default_factory=list)
     carry_text: bool = True
 
 
@@ -207,12 +232,10 @@ def export_pdf_pages(
 
     Raises:
         PdfCancelled: If ``cancel`` was set.
-        ValueError: If the destination is the source PDF.
+        ValueError: If the destination is one of the source PDFs.
     """
-    if request.source is not None and _same_file(
-        request.out_path, request.source.pdf_path
-    ):
-        msg = "The output would replace the source PDF; choose another file name"
+    if any(_same_file(request.out_path, source.pdf_path) for source in request.sources):
+        msg = "The output would replace a source PDF; choose another file name"
         raise ValueError(msg)
     total = len(request.pages)
     report(0, total, "Reading text")
@@ -263,20 +286,23 @@ def _write_pdf(
 
 
 def _outline_source(request: PdfExportRequest) -> Path | None:
-    source = request.source
-    return source.pdf_path if source is not None and source.is_available else None
+    if len(request.sources) != 1:
+        return None
+    source = request.sources[0]
+    return source.pdf_path if source.is_available else None
 
 
 def _text_layers_of(
     request: PdfExportRequest, pool: ProcessPoolExecutor | None
 ) -> list[TextLayer | None]:
-    source = request.source if request.carry_text else None
     jobs: list[TextLayerJob] = []
     positions: list[int] = []
     for position, page in enumerate(request.pages):
-        if source is None or page.text is None:
+        if not request.carry_text or page.text is None or page.source is None:
             continue
-        jobs.append(_text_job(source, page.text))
+        if not page.source.is_available:
+            continue
+        jobs.append(_text_job(page.source, page.text))
         positions.append(position)
     built = build_text_layers(jobs, executor=pool)
     layers: list[TextLayer | None] = [None] * len(request.pages)

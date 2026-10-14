@@ -8,6 +8,7 @@ CCITT, JPX) with per-page masks, and re-rendering gives one uniform path.
 """
 
 import os
+import re
 import shutil
 import uuid
 from collections.abc import Callable
@@ -33,6 +34,7 @@ _POINTS_PER_INCH: Final = 72.0
 # anti-aliasing and JPEG noise on a grayscale page stay below this.
 _COLOUR_SPREAD_THRESHOLD: Final = 12
 _MAX_PAGES_PER_JOB: Final = 16
+_RENDERED_NAME: Final = re.compile(r"page_\d{4,}\.png")
 
 PageProgress = Callable[[int, int], None]
 
@@ -82,7 +84,18 @@ def _render_pages(
     return written
 
 
-def _page_count(pdf_path: Path) -> int:
+def page_count(pdf_path: Path) -> int:
+    """Return the number of pages of a PDF.
+
+    Args:
+        pdf_path (pathlib.Path): The PDF to open.
+
+    Returns:
+        int: Number of pages.
+
+    Raises:
+        ValueError: If the file is not a readable PDF with pages.
+    """
     try:
         document = pdfium.PdfDocument(str(pdf_path))
     except pdfium.PdfiumError as error:
@@ -93,19 +106,29 @@ def _page_count(pdf_path: Path) -> int:
         document.close()
 
 
+def _page_indices(total: int, first_page: int, last_page: int | None) -> range:
+    """Turn a one-based inclusive page range into zero-based indices."""
+    last = total if last_page is None else last_page
+    if not 1 <= first_page <= last <= total:
+        msg = f"pages {first_page} to {last} are outside the {total} pages of the PDF"
+        raise ValueError(msg)
+    return range(first_page - 1, last)
+
+
 def _split_into_jobs(
-    pdf_path: Path, out_dir: Path, dpi: int, page_count: int, workers: int
+    pdf_path: Path, out_dir: Path, dpi: int, indices: range, workers: int
 ) -> list[_RenderJob]:
     """Cut the pages into runs small enough to balance across the workers."""
-    run = max(1, min(_MAX_PAGES_PER_JOB, -(-page_count // (workers * 4))))
+    count = len(indices)
+    run = max(1, min(_MAX_PAGES_PER_JOB, -(-count // (workers * 4))))
     return [
         _RenderJob(
             str(pdf_path),
-            tuple(range(start, min(start + run, page_count))),
+            tuple(indices[start : start + run]),
             str(out_dir),
             dpi,
         )
-        for start in range(0, page_count, run)
+        for start in range(0, count, run)
     ]
 
 
@@ -113,7 +136,7 @@ def _render_all(
     pdf_path: Path,
     staging: Path,
     dpi: int,
-    page_count: int,
+    indices: range,
     executor: ProcessPoolExecutor | None,
     max_workers: int | None,
     cancel: Event | None,
@@ -125,10 +148,10 @@ def _render_all(
         nonlocal done
         done += count
         if on_page is not None:
-            on_page(done, page_count)
+            on_page(done, len(indices))
 
     if executor is None:
-        job = _RenderJob(str(pdf_path), tuple(range(page_count)), str(staging), dpi)
+        job = _RenderJob(str(pdf_path), tuple(indices), str(staging), dpi)
 
         def after_page() -> None:
             if cancel is not None and cancel.is_set():
@@ -137,7 +160,7 @@ def _render_all(
 
         return _render_pages(job, after_page)
 
-    jobs = _split_into_jobs(pdf_path, staging, dpi, page_count, pool_size(max_workers))
+    jobs = _split_into_jobs(pdf_path, staging, dpi, indices, pool_size(max_workers))
     runs = map_pool_progress(
         _render_pages,
         jobs,
@@ -149,11 +172,43 @@ def _render_all(
     return [name for run in runs for name in run]
 
 
+def rendered_pages(out_dir: Path) -> list[Path]:
+    """List the ``page_NNNN.png`` images an earlier import left in a folder.
+
+    Args:
+        out_dir (pathlib.Path): Folder that may hold rendered pages.
+
+    Returns:
+        list[pathlib.Path]: The rendered pages in name order; empty when the
+            folder is missing.
+    """
+    if not out_dir.is_dir():
+        return []
+    return sorted(
+        path
+        for path in out_dir.iterdir()
+        if path.is_file() and _RENDERED_NAME.fullmatch(path.name)
+    )
+
+
+def clear_rendered_pages(out_dir: Path) -> None:
+    """Delete the rendered page images in a folder, leaving other files alone.
+
+    Args:
+        out_dir (pathlib.Path): Folder holding earlier rendered pages.
+    """
+    for path in rendered_pages(out_dir):
+        path.unlink()
+
+
 def import_pdf(
     pdf_path: Path,
     out_dir: Path,
     dpi: int = 300,
     *,
+    first_page: int = 1,
+    last_page: int | None = None,
+    clear_existing: bool = False,
     executor: ProcessPoolExecutor | None = None,
     max_workers: int | None = None,
     cancel: Event | None = None,
@@ -166,27 +221,35 @@ def import_pdf(
     ``out_dir`` and any images from an earlier import exactly as they were.
 
     Args:
-        pdf_path (Path): Source PDF.
-        out_dir (Path): Directory for the images; created when missing.
+        pdf_path (pathlib.Path): Source PDF.
+        out_dir (pathlib.Path): Directory for the images; created when missing.
         dpi (int): Rendering resolution, also stored as the PNG's DPI.
-        executor (ProcessPoolExecutor | None): A pool from ``spawn_pool`` that
+        first_page (int): First page to render, one-based.
+        last_page (int | None): Last page to render, one-based and inclusive;
+            None renders to the end. Each image keeps its PDF page number in its name.
+        clear_existing (bool): Delete the ``page_NNNN.png`` images already in
+            ``out_dir`` just before the new ones are moved in, so a shorter range
+            leaves no stale pages. Other files are kept.
+        executor (concurrent.futures.ProcessPoolExecutor | None):
+            A pool from ``spawn_pool`` that
             renders page runs in its workers, each opening the PDF itself
             because pypdfium2 documents cannot be shared across processes.
             Pages render in this process when None.
         max_workers (int | None): Size of ``executor``.
-        cancel (Event | None): Setting it stops the import. In this process it
+        cancel (threading.Event | None): Setting it stops the import. In this process it
             is checked after every page; on a pool, between page runs.
-        on_page (PageProgress | None): Called as ``(pages_done, page_count)``
+        on_page (Callable[[int, int], None] | None):
+            Called as ``(pages_done, page_count)``
             from the calling thread after each page, or after each run of pages
             on a pool.
 
     Returns:
-        list[Path]: ``page_0001.png``, ``page_0002.png``, ... in page order.
+        list[pathlib.Path]: ``page_0001.png``, ``page_0002.png``, ... in page order.
         Pages with colour content are written as BGR, all others as grayscale.
 
     Raises:
-        ValueError: If ``dpi`` is not positive, or the file is unreadable or
-            has no pages.
+        ValueError: If ``dpi`` is not positive, the file is unreadable or
+            has no pages, or the page range is outside the document.
         PdfCancelled: If ``cancel`` was set before every page was rendered.
     """
     if dpi <= 0:
@@ -195,16 +258,18 @@ def import_pdf(
     if cancel is not None and cancel.is_set():
         raise PdfCancelled
     out_dir = Path(out_dir)
-    page_count = _page_count(pdf_path)
+    indices = _page_indices(page_count(pdf_path), first_page, last_page)
     out_dir.parent.mkdir(parents=True, exist_ok=True)
     staging = out_dir.with_name(f".{out_dir.name}.importing-{uuid.uuid4().hex}")
     staging.mkdir()
     try:
         names = _render_all(
-            pdf_path, staging, dpi, page_count, executor, max_workers, cancel, on_page
+            pdf_path, staging, dpi, indices, executor, max_workers, cancel, on_page
         )
         if cancel is not None and cancel.is_set():
             raise PdfCancelled
+        if clear_existing:
+            clear_rendered_pages(out_dir)
         out_dir.mkdir(exist_ok=True)
         paths = []
         for name in names:

@@ -30,12 +30,12 @@ DPI = Dpi.uniform(144)
 SIZE = (400, 600)
 
 
-def _source(path: Path) -> Path:
+def _source(path: Path, words: list[str] | None = None) -> Path:
     pdf = pikepdf.Pdf.new()
     font = pdf.make_indirect(
         Dictionary(Type=Name.Font, Subtype=Name.Type1, BaseFont=Name.Helvetica)
     )
-    for word in WORDS:
+    for word in WORDS if words is None else words:
         page = pdf.add_blank_page(page_size=(200, 300))
         page.Resources = Dictionary(Font=Dictionary(F1=font))
         page.Contents = pdf.make_stream(
@@ -60,7 +60,9 @@ def _transformation() -> ImageTransformation:
     return ImageTransformation.from_size(*SIZE, DPI)
 
 
-def _plans(images: list[Path], text: object = None) -> list[PagePlan]:
+def _plans(
+    images: list[Path], source: PdfSource | None = None, text: object = None
+) -> list[PagePlan]:
     plans = []
     for index, image in enumerate(images):
         request = None
@@ -68,7 +70,7 @@ def _plans(images: list[Path], text: object = None) -> list[PagePlan]:
             request = TextRequest(index, _transformation(), DPI, False)
         elif text == "stored":
             request = StoredTextRequest(index, TextGeometry.of(_transformation(), DPI))
-        plans.append(PagePlan(image, (144.0, 144.0), request))
+        plans.append(PagePlan(image, (144.0, 144.0), request, source))
     return plans
 
 
@@ -92,10 +94,11 @@ def _export(
 ):
     pdf = _source(tmp_path / "book.pdf")
     images = _images(tmp_path)
+    book = source or PdfSource(pdf_path=pdf, dpi=144)
     request = PdfExportRequest(
-        _plans(images, text),
+        _plans(images, book, text),
         out or tmp_path / "out.pdf",
-        source=source or PdfSource(pdf_path=pdf, dpi=144),
+        sources=[book],
         carry_text=carry_text,
     )
     sink = [] if report is None else report
@@ -107,7 +110,7 @@ def _export(
 def test_the_source_pdf_is_never_overwritten_when_text_is_carried(
     tmp_path: Path,
 ) -> None:
-    with pytest.raises(ValueError, match="replace the source PDF"):
+    with pytest.raises(ValueError, match="replace a source PDF"):
         _export(tmp_path, out=tmp_path / "book.pdf")
 
     assert "alpha" in _page_text(tmp_path / "book.pdf", 0)
@@ -116,7 +119,7 @@ def test_the_source_pdf_is_never_overwritten_when_text_is_carried(
 def test_the_source_pdf_is_never_overwritten_when_text_is_not_carried(
     tmp_path: Path,
 ) -> None:
-    with pytest.raises(ValueError, match="replace the source PDF"):
+    with pytest.raises(ValueError, match="replace a source PDF"):
         _export(tmp_path, out=tmp_path / "book.pdf", carry_text=False)
 
     assert "alpha" in _page_text(tmp_path / "book.pdf", 0)
@@ -179,12 +182,103 @@ def test_a_missing_source_pdf_still_exports_without_text(tmp_path: Path) -> None
     source = PdfSource(pdf_path=pdf, dpi=144)
     images = _images(tmp_path)
     pdf.unlink()
-    request = PdfExportRequest(_plans(images), tmp_path / "out.pdf", source=source)
+    request = PdfExportRequest(
+        _plans(images, source, "live"), tmp_path / "out.pdf", sources=[source]
+    )
 
     result = export_pdf_pages(request, lambda *_: None, threading.Event())
 
     assert result.pages == len(WORDS)
     assert result.text_pages == 0
+
+
+def _two_sources(tmp_path: Path) -> tuple[PdfSource, PdfSource, list[Path]]:
+    first = PdfSource(pdf_path=_source(tmp_path / "first.pdf"), dpi=144)
+    second = PdfSource(
+        pdf_path=_source(tmp_path / "second.pdf", ["charlie", "delta"]), dpi=144
+    )
+    return first, second, _images(tmp_path)
+
+
+def _two_page_plans(
+    images: list[Path], first: PdfSource, second: PdfSource
+) -> list[PagePlan]:
+    return [
+        PagePlan(
+            images[0],
+            (144.0, 144.0),
+            TextRequest(0, _transformation(), DPI, False),
+            first,
+        ),
+        PagePlan(
+            images[1],
+            (144.0, 144.0),
+            TextRequest(1, _transformation(), DPI, False),
+            second,
+        ),
+    ]
+
+
+def test_each_page_carries_text_from_the_source_it_came_from(tmp_path: Path) -> None:
+    first, second, images = _two_sources(tmp_path)
+    request = PdfExportRequest(
+        _two_page_plans(images, first, second),
+        tmp_path / "out.pdf",
+        sources=[first, second],
+    )
+
+    result = export_pdf_pages(request, lambda *_: None, threading.Event())
+
+    assert result.text_pages == 2
+    assert "alpha" in _page_text(result.out_path, 0)
+    assert "delta" in _page_text(result.out_path, 1)
+
+
+def test_a_source_pdf_that_is_gone_costs_only_the_text_of_its_own_pages(
+    tmp_path: Path,
+) -> None:
+    first, second, images = _two_sources(tmp_path)
+    Path(second.pdf_path).unlink()
+    request = PdfExportRequest(
+        _two_page_plans(images, first, second),
+        tmp_path / "out.pdf",
+        sources=[first, second],
+    )
+
+    result = export_pdf_pages(request, lambda *_: None, threading.Event())
+
+    assert result.text_pages == 1
+    assert "alpha" in _page_text(result.out_path, 0)
+
+
+def test_bookmarks_are_carried_only_when_there_is_a_single_source(
+    tmp_path: Path,
+) -> None:
+    first, second, images = _two_sources(tmp_path)
+    request = PdfExportRequest(
+        _two_page_plans(images, first, second),
+        tmp_path / "out.pdf",
+        sources=[first, second],
+    )
+
+    result = export_pdf_pages(request, lambda *_: None, threading.Event())
+
+    with pikepdf.open(result.out_path) as pdf, pdf.open_outline() as outline:
+        assert list(outline.root) == []
+
+
+def test_writing_over_any_of_the_source_pdfs_is_refused(tmp_path: Path) -> None:
+    first, second, images = _two_sources(tmp_path)
+    request = PdfExportRequest(
+        _plans(images, first, "live"),
+        Path(second.pdf_path),
+        sources=[first, second],
+    )
+
+    with pytest.raises(ValueError, match="replace a source PDF"):
+        export_pdf_pages(request, lambda *_: None, threading.Event())
+
+    assert "charlie" in _page_text(Path(second.pdf_path), 0)
 
 
 def test_a_cancelled_import_leaves_an_earlier_import_in_the_folder(
