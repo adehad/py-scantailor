@@ -44,12 +44,12 @@ def detect_picture_mask(
     """Find picture regions automatically.
 
     Args:
-        gray (NDArray[np.uint8]): 2-D gray page. Not modified.
+        gray (numpy.ndarray of numpy.uint8): 2-D gray page. Not modified.
         dpi (tuple[int, int]): Horizontal and vertical resolution of ``gray``.
         options (PictureShapeOptions): Detection mode and sensitivity.
 
     Returns:
-        NDArray[np.bool_]: True where there is a picture; all False when
+        numpy.ndarray of numpy.bool: True where there is a picture; all False when
             detection is off.
     """
     if options.shape == PictureShape.OFF:
@@ -138,12 +138,13 @@ def apply_picture_layers(
     returned ink is the complement of the binarised ink and is not drawn.
 
     Args:
-        text_region (NDArray[np.bool_]): True where output is binarised.
-        ink (NDArray[np.bool_]): True where binarisation found ink.
+        text_region (numpy.ndarray of numpy.bool): True where output is binarised.
+        ink (numpy.ndarray of numpy.bool): True where binarisation found ink.
         layers (PictureLayers): The zones by layer.
 
     Returns:
-        tuple[NDArray[np.bool_], NDArray[np.bool_]]: New text region and the ink
+        tuple[numpy.ndarray of numpy.bool, numpy.ndarray of numpy.bool]:
+            New text region and the ink
             to draw inside it. Neither input is modified.
     """
     region = text_region | layers.eraser1
@@ -167,13 +168,14 @@ def compose_mixed(
     """Draw the binarised text over the picture layer.
 
     Args:
-        layer (NDArray[np.uint8]): 2-D gray or (H, W, 3|4) BGR(A) original
+        layer (numpy.ndarray of numpy.uint8): 2-D gray or (H, W, 3|4) BGR(A) original
             content. Not modified.
-        text_region (NDArray[np.bool_]): True where the output is binarised.
-        ink (NDArray[np.bool_]): True where binarised pixels are black.
+        text_region (numpy.ndarray of numpy.bool): True where the output is binarised.
+        ink (numpy.ndarray of numpy.bool): True where binarised pixels are black.
 
     Returns:
-        NDArray[np.uint8]: New image. Pixels in the text region are 0 or 255 in
+        numpy.ndarray of numpy.uint8:
+            New image. Pixels in the text region are 0 or 255 in
             every colour channel; the rest keep ``layer`` except that pure black
             and white become 1 and 254.
     """
@@ -230,14 +232,15 @@ def build_mixed_layer(
     is always Wiener filtered.
 
     Args:
-        original (NDArray[np.uint8]): Original page, gray or (H, W, 3|4) BGR(A).
-        normalized (NDArray[np.uint8] | None): The page with illumination
+        original (numpy.ndarray of numpy.uint8):
+            Original page, gray or (H, W, 3|4) BGR(A).
+        normalized (numpy.ndarray of numpy.uint8 | None): The page with illumination
             normalised, same shape; only read when the layer is the normalised page.
         render (RenderParams): Flags of the page.
         options (ColorCommonOptions): Wiener filter settings.
 
     Returns:
-        NDArray[np.uint8]: ``original`` itself when it is used unchanged,
+        numpy.ndarray of numpy.uint8: ``original`` itself when it is used unchanged,
             otherwise a new array. Callers must not modify it.
 
     Raises:
@@ -280,9 +283,9 @@ def colorize_ink(
     """Colour the ink with the colours of the original and optionally posterise it.
 
     Args:
-        image (NDArray[np.uint8]): Original page, gray or (H, W, 3|4) BGR(A).
+        image (numpy.ndarray of numpy.uint8): Original page, gray or (H, W, 3|4) BGR(A).
             Not modified.
-        ink (NDArray[np.bool_]): True where binarisation found ink.
+        ink (numpy.ndarray of numpy.bool): True where binarisation found ink.
         dpi (tuple[int, int]): Horizontal and vertical resolution of ``image``.
         segmenter (ColorSegmenterOptions): Noise reduction and thresholds.
         posterization (PosterizationOptions | None): Posterise the result with
@@ -292,7 +295,8 @@ def colorize_ink(
             posterising; white when None.
 
     Returns:
-        NDArray[np.uint8]: Ink in colour on white paper, same shape as ``image``.
+        numpy.ndarray of numpy.uint8:
+            Ink in colour on white paper, same shape as ``image``.
     """
     segmented = segment_colors(
         ink,
@@ -329,13 +333,15 @@ def compose_mixed_colored(
     """Put coloured text, from ``colorize_ink``, over the picture layer.
 
     Args:
-        layer (NDArray[np.uint8]): Picture layer, gray or (H, W, 3|4) BGR(A).
+        layer (numpy.ndarray of numpy.uint8): Picture layer, gray or (H, W, 3|4) BGR(A).
             Not modified.
-        text_region (NDArray[np.bool_]): True where the text replaces the layer.
-        colored_text (NDArray[np.uint8]): Text on white paper, same shape as ``layer``.
+        text_region (numpy.ndarray of numpy.bool):
+            True where the text replaces the layer.
+        colored_text (numpy.ndarray of numpy.uint8):
+            Text on white paper, same shape as ``layer``.
 
     Returns:
-        NDArray[np.uint8]: New image. Outside the text region pure black and
+        numpy.ndarray of numpy.uint8: New image. Outside the text region pure black and
             white of the layer become 1 and 254.
     """
     result = _reserve_black_and_white(layer, ~text_region)
@@ -351,14 +357,16 @@ def compose_over_original(
     """Draw ink over the original page, which stays as the background.
 
     Args:
-        layer (NDArray[np.uint8]): Original page, gray or (H, W, 3|4) BGR(A).
+        layer (numpy.ndarray of numpy.uint8): Original page, gray or (H, W, 3|4) BGR(A).
             Not modified.
-        ink (NDArray[np.bool_]): True where ink is drawn.
-        colored_text (NDArray[np.uint8] | None): Ink colours from ``colorize_ink``;
+        ink (numpy.ndarray of numpy.bool): True where ink is drawn.
+        colored_text (numpy.ndarray of numpy.uint8 | None):
+            Ink colours from ``colorize_ink``;
             pure white pixels of it are not drawn. Ink is black when None.
 
     Returns:
-        NDArray[np.uint8]: New image. Pure black and white of the page become 1
+        numpy.ndarray of numpy.uint8:
+            New image. Pure black and white of the page become 1
             and 254 away from the ink, so only ink is exactly black.
     """
     result = layer.copy()

@@ -1,32 +1,32 @@
-"""Cylindrical surface dewarping.
+"""Cylindrical surface dewarping: maps a curved page onto a flat rectangle.
 
-This module provides the CylindricalSurfaceDewarper class that corrects
-perspective distortion from curved page surfaces (like book spines).
+The page is modelled as a piece of a cylinder. Two curves, the directrices, run
+along the top and the bottom of the page. A generatrix joins a point on the top
+directrix to the point at the same position across the page on the bottom one.
+In the dewarped output every generatrix is a vertical line, so text that follows
+the curve comes out straight.
 
-RELATION TO THE C++ IMPLEMENTATION
-==================================
+Coordinates are in three systems:
 
-The original C++ CylindricalSurfaceDewarper
-(src/dewarping/CylindricalSurfaceDewarper.cpp) is transcribed step by step where
-it decides the result: the corner homography and its inverse (solved with the
-C++ solver's rules for near-zero entries), the walk over both directrices in
-order of plane x, the position of the straight line and the arc length mapping.
-The distortion model builder scores candidate curves with this mapping, and
-agrees with the C++ builder only because these steps agree.
+- ``img``: the warped image, which is the input.
+- ``pln``: a plane in which the four corners of the surface are the unit square.
+  The top-left corner is (0, 0), top-right (1, 0), bottom-left (0, 1) and
+  bottom-right (1, 1).
+- ``crv``: the dewarped output, normalized to the unit square.
 
-It is vectorised where the C++ code maps one point at a time: many points or
-generatrices go through numpy together, and the per-generatrix 1D homographies
+The corner homography maps ``pln`` to ``img``. Its inverse is taken with the C++
+solver's rules for entries that are almost zero.
+
+The C++ class, ``CylindricalSurfaceDewarper`` in
+``src/dewarping/CylindricalSurfaceDewarper.cpp``, is transcribed step by step
+where it decides the result: the corner homography and its inverse, the walk over
+both directrices in order of plane x, the height of the straight line and the arc
+length mapping. The distortion model builder scores candidate curves with this
+mapping, so its results match the C++ builder only as long as these steps match.
+
+The C++ code maps one point at a time. Here many points or generatrices go
+through NumPy together, and the one-dimensional homographies of the generatrices
 are solved with ``numpy.linalg.solve``.
-
-COORDINATE SYSTEMS:
-- img: Warped image coordinates (input)
-- pln: Plane coordinates where corner points map to unit
-  square: top-left -> (0,0), top-right -> (1,0),
-  bottom-left -> (0,1), bottom-right -> (1,1)
-- crv: Dewarped normalized coordinates (output)
-
-The dewarping model assumes the page surface is a cylindrical section,
-with the top and bottom curves (directrices) defining the cylinder shape.
 """
 
 from dataclasses import dataclass, field
@@ -102,7 +102,8 @@ class _DirectrixProjections:
         """Three matched (plane y, position along the generatrix) pairs per line.
 
         Returns:
-            tuple[NDArray[np.float64], NDArray[np.float64]]: Plane y values and
+            tuple[numpy.ndarray of numpy.float64, numpy.ndarray of numpy.float64]:
+                Plane y values and
                 positions along the generatrix, both of shape (N, 3).
         """
         count = len(self.directrix1)
@@ -141,7 +142,7 @@ def _solve_1d_homographies(
         target: Output values, shape (N, 3).
 
     Returns:
-        NDArray[np.float64]: Matrices [[a, b], [c, 1]], shape (N, 2, 2).
+        numpy.ndarray of numpy.float64: Matrices [[a, b], [c, 1]], shape (N, 2, 2).
 
     Raises:
         numpy.linalg.LinAlgError: If any of the systems is singular.
@@ -535,8 +536,8 @@ def _four_point_homography(
     """Homography taking four points to four points, solved like the C++ code.
 
     Args:
-        source (NDArray[np.float64]): Points, shape ``(4, 2)``.
-        target (NDArray[np.float64]): Their images, shape ``(4, 2)``.
+        source (numpy.ndarray of numpy.float64): Points, shape ``(4, 2)``.
+        target (numpy.ndarray of numpy.float64): Their images, shape ``(4, 2)``.
 
     Returns:
         Homography: The transformation with its bottom right element 1.

@@ -25,10 +25,11 @@ def build_sausage_mask(mask: NDArray[np.uint8]) -> NDArray[np.uint8]:
     """Replace the ink of each row by a centred run of the same length.
 
     Args:
-        mask (NDArray[np.uint8]): Binary image, 0 for ink and 255 for background.
+        mask (numpy.ndarray of numpy.uint8):
+            Binary image, 0 for ink and 255 for background.
 
     Returns:
-        NDArray[np.uint8]: Binary image of the same size, with the same
+        numpy.ndarray of numpy.uint8: Binary image of the same size, with the same
         convention. Rows without ink stay white.
     """
     height, width = mask.shape[:2]
@@ -49,11 +50,12 @@ def rotate_mask(mask: NDArray[np.uint8], degrees: float) -> NDArray[np.uint8]:
     """Rotate a binary mask about its centre, growing the canvas to fit.
 
     Args:
-        mask (NDArray[np.uint8]): Binary image, 0 for ink and 255 for background.
+        mask (numpy.ndarray of numpy.uint8):
+            Binary image, 0 for ink and 255 for background.
         degrees (float): Clockwise rotation in degrees.
 
     Returns:
-        NDArray[np.uint8]: Rotated binary image; the corners are background.
+        numpy.ndarray of numpy.uint8: Rotated binary image; the corners are background.
     """
     if abs(degrees) < 1e-6:
         return mask
@@ -94,7 +96,8 @@ def find_oblique_degrees(
     measurement contributes less.
 
     Args:
-        mask (NDArray[np.uint8]): Binary image, 0 for ink and 255 for background,
+        mask (numpy.ndarray of numpy.uint8):
+            Binary image, 0 for ink and 255 for background,
             rotated so the text lines are horizontal.
         max_oblique_deg (float): The result is clamped to plus or minus this.
 

@@ -39,7 +39,7 @@ class ImageId(BaseModel, frozen=True):
     """Identifies a specific image, potentially within a multi-page file.
 
     Args:
-        file_path (Path): Path to the image file.
+        file_path (pathlib.Path): Path to the image file.
         page (int): Page number (1-indexed) for multi-page files, 0 for single-page.
     """
 
@@ -140,7 +140,7 @@ class OrthogonalRotation(BaseModel):
     """Represents a rotation by a multiple of 90 degrees.
 
     Args:
-        degrees (OrthogonalDegrees): Rotation in degrees (must be 0, 90, 180, or 270).
+        degrees (int): Rotation in degrees (must be 0, 90, 180, or 270).
     """
 
     degrees: OrthogonalDegrees = 0

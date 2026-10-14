@@ -1,4 +1,10 @@
-"""Entry point of automatic page split detection."""
+"""Entry point of automatic page split detection.
+
+The Split Pages stage calls :func:`detect_split` for each scan. It converts the
+image to gray and passes it to the layout estimator, which looks for a folding
+line first and for whitespace second. See
+:mod:`scantailor.filters.page_split.page_layout_estimator` for the steps.
+"""
 
 from dataclasses import dataclass
 
@@ -33,7 +39,8 @@ def detect_split(
     """Detect how to split an upright page image into pages.
 
     Args:
-        image (NDArray[np.uint8]): (H, W) gray or (H, W, 3 or 4) BGR(A) image.
+        image (numpy.ndarray of numpy.uint8):
+            (H, W) gray or (H, W, 3 or 4) BGR(A) image.
         layout_type (LayoutType): Requested layout; ``AUTO_LAYOUT_TYPE`` lets the
             detector choose.
         dpi (float): Resolution of the image, the same horizontally and vertically.

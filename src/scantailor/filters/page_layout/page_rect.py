@@ -36,10 +36,12 @@ def adapt_content_rect(xform: ImageTransformation, content_rect: Rect) -> Rect:
     Args:
         xform (ImageTransformation): Transformation whose resulting rect
             provides the fallback centre.
-        content_rect (Rect): Content rectangle in resulting coordinates.
+        content_rect (scantailor.core.transformation.Rect):
+            Content rectangle in resulting coordinates.
 
     Returns:
-        Rect: content_rect when it has area, otherwise a near-point rectangle.
+        scantailor.core.transformation.Rect:
+            content_rect when it has area, otherwise a near-point rectangle.
     """
     if not content_rect.is_empty():
         return content_rect
@@ -58,7 +60,7 @@ def rect_size_mm(xform: ImageTransformation, rect: Rect) -> tuple[float, float]:
 
     Args:
         xform (ImageTransformation): Transformation the rectangle is expressed in.
-        rect (Rect): Rectangle in resulting coordinates.
+        rect (scantailor.core.transformation.Rect): Rectangle in resulting coordinates.
 
     Returns:
         tuple[float, float]: (width_mm, height_mm) measured along the rectangle's
@@ -80,8 +82,10 @@ def calc_margins_mm(
 
     Args:
         xform (ImageTransformation): Transformation both rectangles are in.
-        page_rect (Rect): Page rectangle in resulting coordinates.
-        content_rect (Rect): Content rectangle in resulting coordinates.
+        page_rect (scantailor.core.transformation.Rect):
+            Page rectangle in resulting coordinates.
+        content_rect (scantailor.core.transformation.Rect):
+            Content rectangle in resulting coordinates.
 
     Returns:
         Margins: Millimetre margins that, added to the content size, reproduce
@@ -123,9 +127,9 @@ def calc_soft_margins_mm(
         aggregate_size_mm (tuple[float, float]): Largest hard size among aligned
             pages.
         alignment (Alignment): Where the shortfall goes.
-        content_rect (Rect): Content rectangle in pixels.
+        content_rect (scantailor.core.transformation.Rect): Content rectangle in pixels.
         content_size_mm (tuple[float, float]): Content size in millimetres.
-        page_rect (Rect): Page rectangle in pixels.
+        page_rect (scantailor.core.transformation.Rect): Page rectangle in pixels.
 
     Returns:
         Margins: Soft margins in millimetres; all zero for a page that is not
@@ -204,15 +208,17 @@ def calc_page_polygon(
 
     Args:
         xform (ImageTransformation): Transformation the content rectangle is in.
-        content_rect (Rect): Non-empty content rectangle in resulting
+        content_rect (scantailor.core.transformation.Rect):
+            Non-empty content rectangle in resulting
             coordinates.
-        params (Params): Page layout parameters with margins, alignment and the
+        params (scantailor.filters.page_layout.params.Params):
+            Page layout parameters with margins, alignment and the
             stored content and page rectangles.
         aggregate_hard_size_mm (tuple[float, float]): Largest hard size among
             aligned pages.
 
     Returns:
-        NDArray[np.float64]: (4, 2) polygon, top-left first, whose bounding
+        numpy.ndarray of numpy.float64: (4, 2) polygon, top-left first, whose bounding
         rectangle origin is shifted to whole pixels so the later crop lands on
         the pixel grid.
     """
@@ -242,10 +248,10 @@ def rect_from_params(rect: ContentRect) -> Rect:
     """Copy a stored rectangle into a Rect.
 
     Args:
-        rect (ContentRect): Rectangle as stored in Params.
+        rect (tuple[float, float, float, float]): Rectangle as stored in Params.
 
     Returns:
-        Rect: Equivalent geometry rectangle.
+        scantailor.core.transformation.Rect: Equivalent geometry rectangle.
     """
     return Rect(x=rect.x, y=rect.y, width=rect.width, height=rect.height)
 
@@ -276,11 +282,12 @@ def _extend_with_margins(
     """Grow a (possibly rotated) rectangle outwards along its own edges.
 
     Args:
-        polygon (NDArray[np.float64]): (4, 2) rectangle, top-left first, clockwise.
+        polygon (numpy.ndarray of numpy.float64):
+            (4, 2) rectangle, top-left first, clockwise.
         margins (Margins): Amount to add on each side, in the polygon's units.
 
     Returns:
-        NDArray[np.float64]: Extended copy of the polygon.
+        numpy.ndarray of numpy.float64: Extended copy of the polygon.
     """
     down = _unit(polygon[3] - polygon[0])
     right = _unit(polygon[1] - polygon[0])

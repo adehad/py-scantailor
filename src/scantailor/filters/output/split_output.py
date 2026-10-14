@@ -94,12 +94,14 @@ def split_mixed_output(
     """Split a composed mixed page according to the render flags.
 
     Args:
-        image (NDArray[np.uint8]): The composed page, gray or (H, W, 3|4) BGR(A).
+        image (numpy.ndarray of numpy.uint8):
+            The composed page, gray or (H, W, 3|4) BGR(A).
             With the original background kept, it is the original page with
             the ink drawn over it. Not modified.
         render (RenderParams): Decides the mode and the foreground type.
-        text_region (NDArray[np.bool_]): True where the page is text, not picture.
-        ink (NDArray[np.bool_]): True where text ink is drawn.
+        text_region (numpy.ndarray of numpy.bool):
+            True where the page is text, not picture.
+        ink (numpy.ndarray of numpy.bool): True where text ink is drawn.
 
     Returns:
         SplitImages: The layers.
@@ -120,8 +122,9 @@ def split_by_foreground_mask(
     """Split a page into the part inside a mask and the part outside it.
 
     Args:
-        image (NDArray[np.uint8]): Gray or (H, W, 3|4) BGR(A) page. Not modified.
-        foreground_mask (NDArray[np.bool_]): True where the foreground is.
+        image (numpy.ndarray of numpy.uint8):
+            Gray or (H, W, 3|4) BGR(A) page. Not modified.
+        foreground_mask (numpy.ndarray of numpy.bool): True where the foreground is.
         foreground_type (ForegroundType): Storage type of the foreground.
 
     Returns:
@@ -149,10 +152,12 @@ def split_with_original_background(
     """Split a page that keeps its original background.
 
     Args:
-        image (NDArray[np.uint8]): Original page with the ink drawn over it,
+        image (numpy.ndarray of numpy.uint8): Original page with the ink drawn over it,
             gray or (H, W, 3|4) BGR(A). Not modified.
-        ink_mask (NDArray[np.bool_]): True on ink pixels; they form the foreground.
-        text_region (NDArray[np.bool_]): True outside the pictures; the pictures
+        ink_mask (numpy.ndarray of numpy.bool):
+            True on ink pixels; they form the foreground.
+        text_region (numpy.ndarray of numpy.bool):
+            True outside the pictures; the pictures
             form the background.
         foreground_type (ForegroundType): Storage type of the foreground.
 
@@ -179,14 +184,14 @@ def merge_split_images(
     """Rebuild the combined page from stored layers.
 
     Args:
-        foreground (NDArray[np.uint8]): Foreground layer, white where empty.
-        background (NDArray[np.uint8]): Background layer, white where empty.
-        original_background (NDArray[np.uint8] | None): Original background
+        foreground (numpy.ndarray of numpy.uint8): Foreground layer, white where empty.
+        background (numpy.ndarray of numpy.uint8): Background layer, white where empty.
+        original_background (numpy.ndarray of numpy.uint8 | None): Original background
             layer; when given, the other two are laid over it on the ink
             (white pixels of it) and the pictures (black pixels of it).
 
     Returns:
-        NDArray[np.uint8]: New page with the layout of ``background`` (or of
+        numpy.ndarray of numpy.uint8: New page with the layout of ``background`` (or of
             ``original_background`` when given).
 
     Raises:
@@ -218,13 +223,13 @@ def write_split_images(
     """Write the layers into the foreground, background and original background folders.
 
     Args:
-        out_dir (Path): Output folder; the sub-folders are created inside it.
+        out_dir (pathlib.Path): Output folder; the sub-folders are created inside it.
         file_name (str): File name of the page, with a TIFF or PNG suffix.
         split (SplitImages): Layers to write.
         dpi (Dpi | None): Resolution tags to store.
 
     Returns:
-        list[Path]: Paths written: foreground, background and, when present,
+        list[pathlib.Path]: Paths written: foreground, background and, when present,
             original background.
     """
     layers = [

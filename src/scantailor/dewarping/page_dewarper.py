@@ -80,11 +80,12 @@ def auto_dewarper(
     """Detect the page curvature from its text lines and page edges.
 
     Args:
-        gray (NDArray[np.uint8]): 2-D gray page with dark text on a light
+        gray (numpy.ndarray of numpy.uint8): 2-D gray page with dark text on a light
             background, illumination already normalised.
         dpi (Dpi | tuple[float, float] | float): Horizontal and vertical
             resolution of ``gray``.
-        content_rect (ContentRect): (x, y, width, height) of the content.
+        content_rect (tuple[float, float, float, float]):
+            (x, y, width, height) of the content.
         depth_perception (float): See ``dewarper_from_polylines``.
         spine_on_right (bool): True for a single or left page, False for a
             right page.
@@ -106,8 +107,9 @@ def marginal_dewarper(
     """Dewarp only the strip of page next to the binding.
 
     Args:
-        gray (NDArray[np.uint8]): 2-D gray page.
-        content_rect (ContentRect): (x, y, width, height) of the content.
+        gray (numpy.ndarray of numpy.uint8): 2-D gray page.
+        content_rect (tuple[float, float, float, float]):
+            (x, y, width, height) of the content.
         spine_on_right (bool): True for a single or left page.
         depth_perception (float): See ``dewarper_from_polylines``.
 

@@ -66,9 +66,9 @@ def dewarp_image(
         >>> from scantailor.dewarping.raster_dewarper import dewarp_image
         >>>
         >>> # Create a test image and dewarper
-        >>> image = np.zeros((300, 200), dtype=np.uint8)
-        >>> top = np.array([[0, 10], [100, 5], [199, 12]])
-        >>> bottom = np.array([[0, 290], [100, 295], [199, 288]])
+        >>> image = numpy.zeros((300, 200), dtype=numpy.uint8)
+        >>> top = numpy.array([[0, 10], [100, 5], [199, 12]])
+        >>> bottom = numpy.array([[0, 290], [100, 295], [199, 288]])
         >>> dewarper = CylindricalSurfaceDewarper.from_directrices(top, bottom)
         >>>
         >>> # Dewarp the image
@@ -95,15 +95,17 @@ def remap_with_maps(
     builds the maps once with ``compute_dewarp_maps`` and reuses them.
 
     Args:
-        src (NDArray[np.uint8]): Source image, gray or 3 or 4 channels.
-        maps (tuple[NDArray[np.float32], NDArray[np.float32]]): ``(map_x, map_y)``
+        src (numpy.ndarray of numpy.uint8): Source image, gray or 3 or 4 channels.
+        maps (tuple[numpy.ndarray of numpy.float32, numpy.ndarray of numpy.float32]):
+            ``(map_x, map_y)``
             of shape (height, width) in source pixel coordinates.
         background_color (int | tuple[int, ...]): Colour for output pixels whose
             source position falls outside ``src``.
         interpolation (InterpolationMethod): Sampling filter.
 
     Returns:
-        NDArray[np.uint8]: New image of the maps' size with ``src``'s channel layout.
+        numpy.ndarray of numpy.uint8:
+            New image of the maps' size with ``src``'s channel layout.
 
     Raises:
         ValueError: If ``src`` has an unsupported shape.
@@ -167,7 +169,8 @@ def compute_dewarp_maps(
             [0, 1] extrapolate the model.
 
     Returns:
-        tuple[NDArray[np.float32], NDArray[np.float32]]: ``(map_x, map_y)``
+        tuple[numpy.ndarray of numpy.float32, numpy.ndarray of numpy.float32]:
+            ``(map_x, map_y)``
             for ``remap_with_maps`` or ``cv2.remap``.
 
     Raises:

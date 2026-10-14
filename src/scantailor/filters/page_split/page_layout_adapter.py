@@ -19,7 +19,8 @@ def adapt_page_layout(layout: PageLayout, outline: Rect) -> PageLayout:
 
     Args:
         layout (PageLayout): The layout to carry over.
-        outline (Rect): New outline as ``(x, y, width, height)``.
+        outline (scantailor.core.transformation.Rect):
+            New outline as ``(x, y, width, height)``.
 
     Returns:
         PageLayout: ``layout`` itself when the outline is the same. Otherwise a

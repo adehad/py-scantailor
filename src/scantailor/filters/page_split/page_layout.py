@@ -1,7 +1,10 @@
-"""Page layout representation for page split filter.
+"""Page layout of a split scan: the outline of the image and the cut lines in it.
 
-This module provides the PageLayout class which represents how an image
-is divided into pages, including the outline and any split lines.
+A :class:`PageLayout` stores the outline of the whole image and up to two cutter
+lines. Each cutter runs the full height of the image, and a layout reads its
+position at mid height. :class:`PageLayoutType` tells how the cutters divide the
+image: not at all, into a single page with two cutters that bound the content, or
+into two pages with one cutter between them.
 """
 
 from enum import Enum
@@ -17,7 +20,12 @@ from .layout_type import LayoutType
 
 
 class PageLayoutType(Enum):
-    """Internal type of the page layout."""
+    """Which cutters a page layout has.
+
+    SINGLE_PAGE_UNCUT: no cutters; the whole image is one page.
+    SINGLE_PAGE_CUT: two cutters that bound the content of one page.
+    TWO_PAGES: one cutter that divides the image into a left and a right page.
+    """
 
     SINGLE_PAGE_UNCUT = "single-uncut"
     SINGLE_PAGE_CUT = "single-cut"
@@ -376,12 +384,13 @@ def _keep_side(
     horizontal; a horizontal line leaves the polygon unchanged.
 
     Args:
-        polygon (NDArray[np.floating]): Vertices as an (N, 2) array.
-        line (Line): Two points on the cutter.
+        polygon (numpy.ndarray of numpy.floating): Vertices as an (N, 2) array.
+        line (tuple[tuple[float, float], tuple[float, float]]):
+            Two points on the cutter.
         keep_left (bool): Keep the part with smaller x at each y.
 
     Returns:
-        NDArray[np.floating]: The clipped polygon; empty if nothing is left.
+        numpy.ndarray of numpy.floating: The clipped polygon; empty if nothing is left.
     """
     (x1, y1), (x2, y2) = line
     if y1 == y2:

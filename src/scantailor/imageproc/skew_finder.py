@@ -48,7 +48,7 @@ def find_skew_binary(
     """Find the skew of a page whose text lines are roughly horizontal.
 
     Args:
-        image (NDArray[np.bool_]): (H, W) page, True for black.
+        image (numpy.ndarray of numpy.bool): (H, W) page, True for black.
         max_angle (float): Largest skew searched for, both ways, in degrees.
         min_angle (float): Smaller angles are reported as no skew.
         accuracy (float): Allowed error of the angle in degrees.

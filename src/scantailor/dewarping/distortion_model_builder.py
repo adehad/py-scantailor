@@ -46,9 +46,10 @@ class TracedCurve:
     """A traced curve and what was fitted to it.
 
     Attributes:
-        trimmed (NDArray[np.float64]): The traced points between the bounds,
+        trimmed (numpy.ndarray of numpy.float64): The traced points between the bounds,
             shape ``(n, 2)``, left to right.
-        extended (NDArray[np.float64]): The fitted spline sampled from the left
+        extended (numpy.ndarray of numpy.float64):
+            The fitted spline sampled from the left
             bound to the right one, shape ``(m, 2)``.
         order (float): Position along the down direction; smaller values lie
             higher on the page.
@@ -114,7 +115,8 @@ class DistortionModelBuilder:
         Long curves are better; curves with fewer than two points are ignored.
 
         Args:
-            polyline (NDArray[np.float64]): Points, shape ``(n, 2)``, in either
+            polyline (numpy.ndarray of numpy.float64):
+                Points, shape ``(n, 2)``, in either
                 direction.
         """
         points = np.asarray(polyline, dtype=np.float64)
@@ -130,7 +132,8 @@ class DistortionModelBuilder:
         """Apply an affine transformation to everything collected so far.
 
         Args:
-            matrix (NDArray[np.float64]): ``(2, 3)`` or ``(3, 3)`` matrix acting
+            matrix (numpy.ndarray of numpy.float64):
+                ``(2, 3)`` or ``(3, 3)`` matrix acting
                 on column vectors ``(x, y, 1)``.
         """
         affine = np.asarray(matrix, dtype=np.float64)[:2]
@@ -354,7 +357,7 @@ def build_distortion_model(
     """Build a model from traced curves and bounds in one step.
 
     Args:
-        traced (TextLineResult | Sequence[NDArray[np.float64]]): A tracing
+        traced (TextLineResult | Sequence[numpy.ndarray of numpy.float64]): A tracing
             result, or traced curves of shape ``(n, 2)``.
         bounds (VerticalBounds | None): The content bounds. Not needed with a
             tracing result.

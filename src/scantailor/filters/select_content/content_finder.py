@@ -50,14 +50,14 @@ def find_content_box(
     to content.
 
     Args:
-        image (NDArray[np.uint8]): Gray or BGR image, dark content on a light
+        image (numpy.ndarray of numpy.uint8): Gray or BGR image, dark content on a light
             page. Not modified.
         dpi (float): Image resolution in DPI.
         margin (int): Inset from the image edges of the box returned when no
             content is found, in pixels of ``image``.
         page_box (ContentBox | None): Area of the page in pixels of ``image``;
             anything outside it counts as shadow.
-        outside (NDArray[np.bool_] | None): Pixels of ``image`` with no source
+        outside (numpy.ndarray of numpy.bool | None): Pixels of ``image`` with no source
             pixel behind them, such as the corners exposed by a rotation. They
             are painted with the darkest gray level of the rest of the image,
             so that a shadow along the edge of the page still reaches the edge

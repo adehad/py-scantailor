@@ -48,26 +48,30 @@ def export_pdf(
     """Write pages to one PDF.
 
     Args:
-        pages (Sequence[PageInput]): ``(image, dpi)`` per page. ``image`` is a path or
-            an array: 2-D ``bool`` (``True`` is black), 2-D ``uint8`` or 3-channel
-            BGR ``uint8``. A single-channel ``uint8`` image containing only 0 and 255
-            is stored as bilevel. ``dpi`` is one number or ``(x, y)``.
-        out_path (str | Path): Destination PDF.
-        bilevel_codec (BilevelCodec): ``"jbig2"`` or ``"g4"`` for bilevel pages.
+        pages (Sequence[tuple[Any, Any]]): ``(image, dpi)`` per page. ``image`` is a
+            path, or an array: 2-D ``bool`` (``True`` is black), 2-D ``uint8`` or
+            3-channel BGR ``uint8``. A single-channel ``uint8`` image containing only
+            0 and 255 is stored as bilevel. ``dpi`` is one number or ``(x, y)``.
+        out_path (str | pathlib.Path): Destination PDF.
+        bilevel_codec (str): ``"jbig2"`` or ``"g4"`` for bilevel pages.
         colour_quality (int): JPEG quality, 1 to 100, for grey and colour pages.
-        text_layers (Sequence[TextLayer | None] | None): One entry per page, or
+        text_layers (Sequence[scantailor.core.text_layer.TextLayer | None] | None):
+            One entry per page, or
             ``None`` for no text.
-        executor (ProcessPoolExecutor | None): A pool from ``spawn_pool`` whose
+        executor (concurrent.futures.ProcessPoolExecutor | None):
+            A pool from ``spawn_pool`` whose
             workers load and encode the page images; this process assembles the
             PDF in page order. Pages are encoded in this process when None.
         max_workers (int | None): Size of ``executor``.
-        cancel (Event | None): Setting it stops the export before the next page
+        cancel (threading.Event | None):
+            Setting it stops the export before the next page
             is encoded or added, and before the file is written.
-        on_progress (ExportProgress | None): Called as ``(done, total, phase)``
+        on_progress (Callable[[int, int, str], None] | None):
+            Called as ``(done, total, phase)``
             from the calling thread: per encoded page on a pool ("Encoding
             pages"), per page added ("Writing PDF"), then once more, with
             ``done == total``, before the file is saved ("Saving PDF").
-        outline_source (str | Path | None): A PDF whose bookmarks and page
+        outline_source (str | pathlib.Path | None): A PDF whose bookmarks and page
             labels are copied when it has as many pages as this export.
 
     Raises:

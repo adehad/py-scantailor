@@ -19,8 +19,9 @@ class Relinker:
         """Send everything below ``old`` to ``new``.
 
         Args:
-            old (Path): Directory (or file) as stored in the project.
-            new (Path): Where it is now. Mapping a path to itself removes the entry.
+            old (pathlib.Path): Directory (or file) as stored in the project.
+            new (pathlib.Path):
+                Where it is now. Mapping a path to itself removes the entry.
         """
         if old == new:
             self._mapping.pop(old, None)
@@ -31,7 +32,7 @@ class Relinker:
         """Forget the mapping of ``old``, if any.
 
         Args:
-            old (Path): A path previously passed to ``relink``.
+            old (pathlib.Path): A path previously passed to ``relink``.
         """
         self._mapping.pop(old, None)
 
@@ -39,10 +40,10 @@ class Relinker:
         """Return what ``old`` itself was relinked to, ignoring its ancestors.
 
         Args:
-            old (Path): A path previously passed to ``relink``.
+            old (pathlib.Path): A path previously passed to ``relink``.
 
         Returns:
-            Path | None: The new location, or None when ``old`` is not mapped.
+            pathlib.Path | None: The new location, or None when ``old`` is not mapped.
         """
         return self._mapping.get(old)
 
@@ -54,10 +55,11 @@ class Relinker:
         """Return ``path`` rewritten by its nearest mapped ancestor.
 
         Args:
-            path (Path): A stored file or directory path.
+            path (pathlib.Path): A stored file or directory path.
 
         Returns:
-            Path: The relinked path, or ``path`` itself when no ancestor is mapped.
+            pathlib.Path:
+                The relinked path, or ``path`` itself when no ancestor is mapped.
         """
         for ancestor in (path, *path.parents):
             new = self._mapping.get(ancestor)
@@ -70,11 +72,11 @@ def image_directories(files: Iterable[Path], *, only_missing: bool) -> list[Path
     """List the distinct folders that hold the given image files.
 
     Args:
-        files (Iterable[Path]): Image file paths.
+        files (Iterable[pathlib.Path]): Image file paths.
         only_missing (bool): Keep only folders of files that do not exist.
 
     Returns:
-        list[Path]: Folders in sorted order.
+        list[pathlib.Path]: Folders in sorted order.
     """
     return sorted(
         {file.parent for file in files if not only_missing or not file.exists()}

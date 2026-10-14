@@ -67,8 +67,8 @@ class VerticalBounds:
     """The left and right content bounds as lines running from top to bottom.
 
     Attributes:
-        first (Line): The left bound.
-        second (Line): The right bound.
+        first (tuple[tuple[float, float], tuple[float, float]]): The left bound.
+        second (tuple[tuple[float, float], tuple[float, float]]): The right bound.
     """
 
     first: Line
@@ -80,7 +80,8 @@ class TextLineResult:
     """What the tracer found.
 
     Attributes:
-        lines (list[NDArray[np.float64]]): Traced lines, each of shape ``(n, 2)``,
+        lines (list[numpy.ndarray of numpy.float64]):
+            Traced lines, each of shape ``(n, 2)``,
             running from the left bound to the right one, in the input image's
             pixels.
         vertical_bounds (VerticalBounds | None): The content bounds in the input
@@ -103,7 +104,8 @@ def trace_text_lines(
     """Trace the text lines of a page.
 
     Args:
-        image (NDArray[np.uint8]): 2-D gray, or BGR(A), page with dark text on a
+        image (numpy.ndarray of numpy.uint8):
+            2-D gray, or BGR(A), page with dark text on a
             light background.
         dpi (Dpi | tuple[float, float] | float): Resolution of ``image``, as one
             value or (horizontal, vertical).
@@ -247,11 +249,11 @@ def _sanitize_binary_image(
     content rectangle.
 
     Args:
-        ink (NDArray[np.bool_]): True for ink.
+        ink (numpy.ndarray of numpy.bool): True for ink.
         content_rect (tuple[int, int, int, int]): ``(x, y, width, height)`` to keep.
 
     Returns:
-        NDArray[np.bool_]: The cleaned page.
+        numpy.ndarray of numpy.bool: The cleaned page.
     """
     height, width = ink.shape
     frame = np.zeros_like(ink)
@@ -310,10 +312,10 @@ def _squared_distance_map(ink: NDArray[np.bool_]) -> NDArray[np.int64]:
     """Squared distance of each ink pixel to the nearest background or border.
 
     Args:
-        ink (NDArray[np.bool_]): True for ink.
+        ink (numpy.ndarray of numpy.bool): True for ink.
 
     Returns:
-        NDArray[np.int64]: Squared distances, zero on the background.
+        numpy.ndarray of numpy.int64: Squared distances, zero on the background.
     """
     padded = np.pad(ink, 1, constant_values=False)
     distances = ndimage.distance_transform_edt(padded)
@@ -361,9 +363,10 @@ def _trace_towards_line(
     the current cell, in which case the one with the largest distance wins.
 
     Args:
-        sedm (NDArray[np.int64]): Squared distance map of the ridge mask.
-        ridge (NDArray[np.float32]): Ridge response.
-        line (NDArray[np.float64]): ``[[x1, y1], [x2, y2]]`` of the line to reach.
+        sedm (numpy.ndarray of numpy.int64): Squared distance map of the ridge mask.
+        ridge (numpy.ndarray of numpy.float32): Ridge response.
+        line (numpy.ndarray of numpy.float64):
+            ``[[x1, y1], [x2, y2]]`` of the line to reach.
         seed_x (int): Start column.
         seed_y (int): Start row.
         max_dist (float): A point is reported each time the path is further than this
@@ -592,7 +595,7 @@ def _is_curvature_consistent(polyline: NDArray[np.float64]) -> bool:
     """False for a line that bends significantly both ways.
 
     Args:
-        polyline (NDArray[np.float64]): Line of shape ``(n, 2)``.
+        polyline (numpy.ndarray of numpy.float64): Line of shape ``(n, 2)``.
 
     Returns:
         bool: True when the line has no significant convexity together with a

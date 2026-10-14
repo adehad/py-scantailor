@@ -210,7 +210,8 @@ class WhitespaceSearch:
     one scan. Results are identical to a fresh scan of the updated image.
 
     Args:
-        obstacles (NDArray[np.bool_]): 2-D mask, True where a rectangle may not
+        obstacles (numpy.ndarray of numpy.bool):
+            2-D mask, True where a rectangle may not
             reach. Not modified.
         width_power (int): Exponent of the width in the quality, at least 1.
         height_power (int): Exponent of the height in the quality, at least 1.
@@ -308,7 +309,8 @@ def largest_whitespace(
     so ``(1, 1)`` prefers area, ``(2, 1)`` wide rectangles and ``(1, 2)`` tall ones.
 
     Args:
-        obstacles (NDArray[np.bool_]): 2-D mask, True where a rectangle may not
+        obstacles (numpy.ndarray of numpy.bool):
+            2-D mask, True where a rectangle may not
             reach. Not modified.
         width_power (int): Exponent of the width in the quality, at least 1.
         height_power (int): Exponent of the height in the quality, at least 1.

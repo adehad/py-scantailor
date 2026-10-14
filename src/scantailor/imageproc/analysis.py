@@ -52,9 +52,10 @@ def find_skew(
     """Detect the skew angle of a document image.
 
     Uses a two-phase algorithm:
-    1. Coarse search: Linear scan from -max_angle to +max_angle
-       in coarse_step increments
-    2. Fine search: Binary search around the best coarse angle for accuracy
+
+    1. Coarse search: linear scan from -max_angle to +max_angle in coarse_step
+       increments.
+    2. Fine search: binary search around the best coarse angle for accuracy.
 
     The algorithm works by applying vertical shear transforms at various
     angles and scoring each based on horizontal alignment of text lines.
@@ -81,7 +82,7 @@ def find_skew(
         >>> import numpy as np
         >>> from scantailor.imageproc import find_skew
         >>> # Create a simple test image with horizontal lines
-        >>> image = np.zeros((100, 200), dtype=np.uint8)
+        >>> image = numpy.zeros((100, 200), dtype=numpy.uint8)
         >>> image[20, :] = 255
         >>> image[50, :] = 255
         >>> image[80, :] = 255
