@@ -19,7 +19,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final
 
-import cv2
 import numpy as np
 import pikepdf
 import pypdfium2 as pdfium
@@ -31,8 +30,7 @@ from scantailor.core.dewarp_spec import DewarpSpec
 from scantailor.core.models import Dpi
 from scantailor.core.pdf_pool import map_pool_progress
 from scantailor.core.transformation import ImageTransformation
-from scantailor.dewarping.page_dewarper import dewarper_from_polylines
-from scantailor.dewarping.raster_dewarper import output_model_domain
+from scantailor.dewarping.point_mapper import DewarpingPointMapper
 
 _POINTS_PER_INCH: Final = 72.0
 _INVISIBLE_RENDER_MODE: Final = 3
@@ -538,7 +536,12 @@ def _extract_layer(source: pikepdf.Pdf, job: TextLayerJob) -> TextLayerData | No
 def _dewarp_mapper(
     job: TextLayerJob, matrix: NDArray[np.float64], spec: DewarpSpec
 ) -> Callable[[NDArray[np.float64]], NDArray[np.float64]] | None:
-    """Return a function taking source pixels to dewarped output pixels, or None."""
+    """Return a function taking source pixels to dewarped output pixels, or None.
+
+    The output generator dewarps the page in its view, the source image after
+    the page's transformation, so source pixels are carried into the view first
+    and then through the same model the generator built.
+    """
     to_view = (
         np.array(
             [[1, 0, -job.rect_x], [0, 1, -job.rect_y], [0, 0, 1]], dtype=np.float64
@@ -549,42 +552,29 @@ def _dewarp_mapper(
     if width <= 0 or height <= 0:
         return None
 
-    def in_view(polyline: tuple[tuple[float, float], ...]) -> NDArray[np.float64]:
-        points = np.asarray(polyline, dtype=np.float64)
+    def in_view(points: NDArray[np.float64]) -> NDArray[np.float64]:
         homogeneous = np.column_stack([points, np.ones(len(points))])
         return (homogeneous @ to_view.T)[:, :2]
 
+    def edge_in_view(
+        polyline: tuple[tuple[float, float], ...],
+    ) -> list[tuple[float, float]]:
+        mapped = in_view(np.asarray(polyline, dtype=np.float64))
+        return [(float(x), float(y)) for x, y in mapped]
+
     try:
-        dewarper = dewarper_from_polylines(
-            in_view(spec.top), in_view(spec.bottom), spec.depth_perception
+        mapper = DewarpingPointMapper(
+            edge_in_view(spec.top),
+            edge_in_view(spec.bottom),
+            spec.depth_perception,
+            (width, height),
+            spec.post_deskew_angle,
         )
-        if dewarper is None:
-            return None
-        left, top, right, bottom = output_model_domain(dewarper, (width, height))
     except (ValueError, ArithmeticError, np.linalg.LinAlgError, IndexError):
         return None
-    rotation = np.vstack(
-        [
-            cv2.getRotationMatrix2D(
-                (width / 2.0, height / 2.0), -spec.post_deskew_angle, 1.0
-            ),
-            [0, 0, 1],
-        ]
-    )
 
     def map_points(source_px: NDArray[np.float64]) -> NDArray[np.float64]:
-        view = (np.column_stack([source_px, np.ones(len(source_px))]) @ to_view.T)[
-            :, :2
-        ]
-        model = dewarper.map_points_to_dewarped_space(view)
-        dewarped = np.column_stack(
-            [
-                (model[:, 0] - left) / (right - left) * width,
-                (model[:, 1] - top) / (bottom - top) * height,
-            ]
-        )
-        turned = np.column_stack([dewarped, np.ones(len(dewarped))]) @ rotation.T
-        return turned[:, :2]
+        return mapper.to_dewarped(in_view(source_px))
 
     return map_points
 
