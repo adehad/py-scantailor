@@ -54,6 +54,7 @@ from scantailor.app.ui.dialogs.split_mode import SplitModeDialog
 from scantailor.app.ui.icons import icon
 from scantailor.app.ui.page_renderer import (
     PageRenderer,
+    release_thumbnail_memory,
     render_thumbnail,
     shrink_to_thumbnail,
 )
@@ -2883,6 +2884,7 @@ class MainWindowManager:
         """Drop the project and reset the window to its empty state."""
         self._discard_panels()
         self.renderer.sources.clear()
+        release_thumbnail_memory()
         self._thumbnail_epoch += 1
         self.project = None
         self._refresh_dpi_overrides()
