@@ -363,6 +363,9 @@ def project_window(
     respond_to_modal(accept=True)
     main_window.actionNewProject.trigger()
     assert main_window.project is not None
+    # Windows will not move or delete a scan a render thread still holds open.
+    main_window.renderer.wait_for_done(10_000)
+    main_window.thumbnails.model.wait_for_idle(10_000)
     return main_window
 
 
