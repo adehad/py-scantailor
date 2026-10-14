@@ -85,6 +85,22 @@ def no_window_outlives_its_test() -> Iterator[None]:
     QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
 
 
+@pytest.fixture(autouse=True)
+def cursor_starts_in_the_screen_corner(qapp: QtWidgets.QApplication) -> None:
+    """Park the platform cursor where no test points it before each test.
+
+    QTest.mouseMove sets the platform cursor, and Qt drops a set to the point the
+    cursor is already at, so no move event reaches the widget. The cursor keeps its
+    place across the tests of a worker: a test that moves to the point an earlier
+    test left it at would never see its hover.
+
+    Args:
+        qapp (QtWidgets.QApplication): Needed so a screen exists.
+    """
+    screen = qapp.primaryScreen()
+    QtGui.QCursor.setPos(screen, screen.geometry().bottomRight())
+
+
 @pytest.fixture
 def main_window(
     qtbot: QtBot, isolated_settings: pathlib.Path
