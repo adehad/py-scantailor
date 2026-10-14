@@ -175,7 +175,9 @@ def test_caption_is_drawn_in_the_text_colour_below_the_frame(
     inked = [c for c in pixels if _distance(c, window) > TOLERANCE]
 
     assert inked, "the caption drew nothing on the plain background"
-    assert min(_distance(c, text) for c in inked) <= TOLERANCE
+    # Small anti-aliased text may never cover a whole pixel, so ask for one pixel
+    # nine tenths of the way from the background to the text colour.
+    assert min(_distance(c, text) for c in inked) <= _distance(window, text) / 10
     assert all(
         _distance(c, window) <= TOLERANCE
         or _distance(c, text) < _distance(window, text)
