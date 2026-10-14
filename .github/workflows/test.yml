@@ -19,30 +19,21 @@ env:
 
 jobs:
   run:
-    name: >
-      Python ${{ matrix.python-version }} on
-      ${{
-        startsWith(matrix.os, 'macos-') && 'macOS'
-        || startsWith(matrix.os, 'windows-') && 'Windows'
-        || 'Linux'
-      }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        # os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.12"]
+    # To add a platform or Python version, copy this job.
+    name: Python 3.14 on Linux
+    runs-on: ubuntu-latest
+    env:
+      NUMBA_CACHE_DIR: ${{ github.workspace }}/.numba-cache
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v5
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.14"
 
-      - name: Set up ${{ matrix.os }}
+      - name: Install Qt system packages
         run: |
           sudo apt-get update -y
           sudo apt-get install -y \
@@ -55,10 +46,19 @@ jobs:
           qtchooser -install qt6 $(which qmake6)
 
       - name: Setup PDM
-        uses: pdm-project/setup-pdm@v3
+        uses: pdm-project/setup-pdm@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.14"
           cache: true
+
+      - name: Cache numba compiled functions
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUMBA_CACHE_DIR }}
+          key: numba-${{ runner.os }}-${{ hashFiles('pdm.lock', 'src/**/*.py') }}
+          # numba checks each entry against its source file's hash, so a
+          # cache from an older commit is still safe to restore.
+          restore-keys: numba-${{ runner.os }}-
 
       - name: Install dependencies
         run: pdm install
@@ -70,9 +70,9 @@ jobs:
         run: pdm run cov
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
-          file: ./dist/cov/coverage.xml
-          name: ${{ runner.os }}-${{ matrix.python-version }}
+          files: ./dist/cov/coverage.xml
+          name: ${{ runner.os }}-3.14

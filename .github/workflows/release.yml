@@ -1,5 +1,5 @@
 # Release: on a pushed v* tag, test, freeze with PyInstaller and attach the
-# archives to a GitHub Release. Add a platform by adding a matrix entry.
+# archives to a GitHub Release. To add a platform, copy the build job.
 name: Release
 
 on:
@@ -17,16 +17,11 @@ env:
 
 jobs:
   build:
-    name: Build (${{ matrix.label }})
-    runs-on: ${{ matrix.os }}
+    name: Build (windows-x64)
+    runs-on: windows-latest
     timeout-minutes: 90
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - os: windows-latest
-            label: windows-x64
-            cli: dist/ScanTailor/scantailor-cli.exe
+    env:
+      NUMBA_CACHE_DIR: ${{ github.workspace }}/.numba-cache
     defaults:
       run:
         shell: bash
@@ -39,8 +34,17 @@ jobs:
       - name: Set up PDM
         uses: pdm-project/setup-pdm@v4
         with:
-          python-version: "3.12"
+          python-version: "3.14"
           cache: true
+
+      - name: Cache numba compiled functions
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUMBA_CACHE_DIR }}
+          key: numba-${{ runner.os }}-${{ hashFiles('pdm.lock', 'src/**/*.py') }}
+          # numba checks each entry against its source file's hash, so a
+          # cache from an older commit is still safe to restore.
+          restore-keys: numba-${{ runner.os }}-
 
       - name: Install dependencies
         run: pdm install --frozen-lockfile -G test -G installer
@@ -55,18 +59,18 @@ jobs:
         run: pdm run exe
 
       - name: Smoke test the CLI
-        run: ${{ matrix.cli }} --help
+        run: dist/ScanTailor/scantailor-cli.exe --help
 
       - name: Archive
         id: archive
         run: |
-          name="ScanTailor-${GITHUB_REF_NAME}-${{ matrix.label }}.zip"
+          name="ScanTailor-${GITHUB_REF_NAME}-windows-x64.zip"
           (cd dist && pdm run python -m zipfile -c "../${name}" ScanTailor)
           echo "name=${name}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v5
         with:
-          name: release-${{ matrix.label }}
+          name: release-windows-x64
           path: ${{ steps.archive.outputs.name }}
           if-no-files-found: error
 
