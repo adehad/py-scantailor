@@ -1,33 +1,68 @@
 """Dialog that picks the pages a stage's settings are copied to."""
 
 from collections.abc import Mapping, Sequence
+from typing import cast
 
-from PySide6 import QtWidgets
+from PySide6 import QtCore, QtWidgets
 
 from scantailor.app.ui.icons import icon
 from scantailor.core.models import PageId
 from scantailor.core.propagation import ApplyScope, select_pages
 from scantailor.filters.output.params import ApplyGroup
 
+# Labels are translated with self.tr() in ApplyToDialog, so their context is that class.
 _SCOPE_BUTTONS: tuple[tuple[ApplyScope, str, str], ...] = (
-    (ApplyScope.THIS_PAGE, "thisPageRB", "This page only (already applied)"),
-    (ApplyScope.ALL_PAGES, "allPagesRB", "All pages"),
+    (
+        ApplyScope.THIS_PAGE,
+        "thisPageRB",
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyToDialog", "This page only (already applied)"
+            ),
+        ),
+    ),
+    (
+        ApplyScope.ALL_PAGES,
+        "allPagesRB",
+        cast(str, QtCore.QT_TRANSLATE_NOOP("ApplyToDialog", "All pages")),
+    ),
     (
         ApplyScope.THIS_PAGE_AND_FOLLOWERS,
         "thisPageAndFollowersRB",
-        "This page and the following ones",
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyToDialog", "This page and the following ones"
+            ),
+        ),
     ),
     (
         ApplyScope.THIS_PAGE_EVERY_OTHER,
         "thisEveryOtherRB",
-        "This page and the following every other page",
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyToDialog", "This page and the following every other page"
+            ),
+        ),
     ),
-    (ApplyScope.EVERY_OTHER, "everyOtherRB", "Every other page"),
-    (ApplyScope.SELECTED_PAGES, "selectedPagesRB", "Selected pages"),
+    (
+        ApplyScope.EVERY_OTHER,
+        "everyOtherRB",
+        cast(str, QtCore.QT_TRANSLATE_NOOP("ApplyToDialog", "Every other page")),
+    ),
+    (
+        ApplyScope.SELECTED_PAGES,
+        "selectedPagesRB",
+        cast(str, QtCore.QT_TRANSLATE_NOOP("ApplyToDialog", "Selected pages")),
+    ),
     (
         ApplyScope.EVERY_OTHER_SELECTED,
         "everyOtherSelectedRB",
-        "Every other selected page",
+        cast(
+            str, QtCore.QT_TRANSLATE_NOOP("ApplyToDialog", "Every other selected page")
+        ),
     ),
 )
 OUTPUT_GROUP_TITLES: dict[ApplyGroup, str] = {
@@ -42,17 +77,21 @@ OUTPUT_GROUP_TITLES: dict[ApplyGroup, str] = {
 DESKEW_TITLE = "Apply Deskew"
 # Which parts of the Deskew settings are copied, as option key to label.
 DESKEW_OPTIONS: dict[str, str] = {
-    "deskew": "Deskew angle and mode",
-    "oblique": "Oblique angle and mode",
+    "deskew": cast(
+        str, QtCore.QT_TRANSLATE_NOOP("ApplyToDialog", "Deskew angle and mode")
+    ),
+    "oblique": cast(
+        str, QtCore.QT_TRANSLATE_NOOP("ApplyToDialog", "Oblique angle and mode")
+    ),
 }
 MARGINS_TITLE = "Apply Margins"
 MARGINS_OPTIONS_TITLE = "Apply margins"
 # Which sides of the margins are copied, as option key to label, in the order shown.
 MARGIN_SIDE_OPTIONS: dict[str, str] = {
-    "left": "Left",
-    "right": "Right",
-    "top": "Top",
-    "bottom": "Bottom",
+    "left": cast(str, QtCore.QT_TRANSLATE_NOOP("ApplyToDialog", "Left")),
+    "right": cast(str, QtCore.QT_TRANSLATE_NOOP("ApplyToDialog", "Right")),
+    "top": cast(str, QtCore.QT_TRANSLATE_NOOP("ApplyToDialog", "Top")),
+    "bottom": cast(str, QtCore.QT_TRANSLATE_NOOP("ApplyToDialog", "Bottom")),
 }
 # Each side is marked with the edge the margin lies along.
 MARGIN_SIDE_ICONS: dict[str, str] = {
@@ -140,7 +179,7 @@ class ApplyToDialog(QtWidgets.QDialog):
             layout.addWidget(options_group)
             option_parent = options_group
         for key, label in (options or {}).items():
-            box = QtWidgets.QCheckBox(label, option_parent)
+            box = QtWidgets.QCheckBox(self.tr(label), option_parent)
             box.setObjectName(f"{key}Option")
             box.setChecked(True)
             glyph = (option_icons or {}).get(key)
@@ -199,3 +238,472 @@ class ApplyToDialog(QtWidgets.QDialog):
             bool: The check box state.
         """
         return self._options[key].isChecked()
+
+
+class ApplyDeskewDialog(ApplyToDialog):
+    """Apply dialog of the Deskew stage."""
+
+    # lupdate only reads literal QT_TRANSLATE_NOOP calls, so the labels this
+    # dialog shows are listed here under its own context.
+    translatable_labels: tuple[str, ...] = (
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyDeskewDialog", "This page only (already applied)"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyDeskewDialog", "All pages"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyDeskewDialog", "This page and the following ones"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyDeskewDialog", "This page and the following every other page"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyDeskewDialog", "Every other page"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyDeskewDialog", "Selected pages"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyDeskewDialog", "Every other selected page"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyDeskewDialog", "Apply to"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyDeskewDialog",
+                "Use Ctrl+Click / Shift+Click to select multiple pages.",
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyDeskewDialog", "The current page will be included."
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyDeskewDialog", "Deskew angle and mode"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyDeskewDialog", "Oblique angle and mode"),
+        ),
+    )
+
+
+class ApplyFixOrientationDialog(ApplyToDialog):
+    """Apply dialog of the Fix Orientation stage."""
+
+    # lupdate only reads literal QT_TRANSLATE_NOOP calls, so the labels this
+    # dialog shows are listed here under its own context.
+    translatable_labels: tuple[str, ...] = (
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyFixOrientationDialog", "This page only (already applied)"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyFixOrientationDialog", "All pages"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyFixOrientationDialog", "This page and the following ones"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyFixOrientationDialog",
+                "This page and the following every other page",
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyFixOrientationDialog", "Every other page"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyFixOrientationDialog", "Selected pages"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyFixOrientationDialog", "Every other selected page"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyFixOrientationDialog", "Apply to"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyFixOrientationDialog",
+                "Use Ctrl+Click / Shift+Click to select multiple pages.",
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyFixOrientationDialog", "The current page will be included."
+            ),
+        ),
+    )
+
+
+class ApplyPageLayoutDialog(ApplyToDialog):
+    """Apply dialog of the Page Layout stage, for margins and alignment."""
+
+    # lupdate only reads literal QT_TRANSLATE_NOOP calls, so the labels this
+    # dialog shows are listed here under its own context.
+    translatable_labels: tuple[str, ...] = (
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyPageLayoutDialog", "This page only (already applied)"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyPageLayoutDialog", "All pages"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyPageLayoutDialog", "This page and the following ones"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyPageLayoutDialog", "This page and the following every other page"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyPageLayoutDialog", "Every other page"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyPageLayoutDialog", "Selected pages"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyPageLayoutDialog", "Every other selected page"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyPageLayoutDialog", "Apply to"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyPageLayoutDialog",
+                "Use Ctrl+Click / Shift+Click to select multiple pages.",
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyPageLayoutDialog", "The current page will be included."
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyPageLayoutDialog", "Left"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyPageLayoutDialog", "Right"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyPageLayoutDialog", "Top"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyPageLayoutDialog", "Bottom"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyPageLayoutDialog", "Apply margins"),
+        ),
+    )
+
+
+class ApplySelectContentDialog(ApplyToDialog):
+    """Apply dialog of the Select Content stage."""
+
+    # lupdate only reads literal QT_TRANSLATE_NOOP calls, so the labels this
+    # dialog shows are listed here under its own context.
+    translatable_labels: tuple[str, ...] = (
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplySelectContentDialog", "This page only (already applied)"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplySelectContentDialog", "All pages"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplySelectContentDialog", "This page and the following ones"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplySelectContentDialog",
+                "This page and the following every other page",
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplySelectContentDialog", "Every other page"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplySelectContentDialog", "Selected pages"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplySelectContentDialog", "Every other selected page"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplySelectContentDialog", "Apply to"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplySelectContentDialog",
+                "Use Ctrl+Click / Shift+Click to select multiple pages.",
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplySelectContentDialog", "The current page will be included."
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplySelectContentDialog", "Apply content box"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplySelectContentDialog", "Apply page box"),
+        ),
+    )
+
+
+class ApplyColorsDialog(ApplyToDialog):
+    """Apply dialog of the Output stage for the colour and other option groups."""
+
+    # lupdate only reads literal QT_TRANSLATE_NOOP calls, so the labels this
+    # dialog shows are listed here under its own context.
+    translatable_labels: tuple[str, ...] = (
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyColorsDialog", "This page only (already applied)"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyColorsDialog", "All pages"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyColorsDialog", "This page and the following ones"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyColorsDialog", "This page and the following every other page"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyColorsDialog", "Every other page"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyColorsDialog", "Selected pages"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyColorsDialog", "Every other selected page"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyColorsDialog", "Apply to"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyColorsDialog",
+                "Use Ctrl+Click / Shift+Click to select multiple pages.",
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyColorsDialog", "The current page will be included."
+            ),
+        ),
+    )
+
+
+class ApplyChangeDpiDialog(ApplyToDialog):
+    """Apply dialog of the Output resolution group."""
+
+    # lupdate only reads literal QT_TRANSLATE_NOOP calls, so the labels this
+    # dialog shows are listed here under its own context.
+    translatable_labels: tuple[str, ...] = (
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyChangeDpiDialog", "This page only (already applied)"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyChangeDpiDialog", "All pages"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyChangeDpiDialog", "This page and the following ones"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyChangeDpiDialog", "This page and the following every other page"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyChangeDpiDialog", "Every other page"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyChangeDpiDialog", "Selected pages"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyChangeDpiDialog", "Every other selected page"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyChangeDpiDialog", "Apply to"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyChangeDpiDialog",
+                "Use Ctrl+Click / Shift+Click to select multiple pages.",
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyChangeDpiDialog", "The current page will be included."
+            ),
+        ),
+    )
+
+
+class ApplyChangeDewarpingDialog(ApplyToDialog):
+    """Apply dialog of the Output dewarping group."""
+
+    # lupdate only reads literal QT_TRANSLATE_NOOP calls, so the labels this
+    # dialog shows are listed here under its own context.
+    translatable_labels: tuple[str, ...] = (
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyChangeDewarpingDialog", "This page only (already applied)"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyChangeDewarpingDialog", "All pages"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyChangeDewarpingDialog", "This page and the following ones"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyChangeDewarpingDialog",
+                "This page and the following every other page",
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyChangeDewarpingDialog", "Every other page"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyChangeDewarpingDialog", "Selected pages"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyChangeDewarpingDialog", "Every other selected page"
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP("ApplyChangeDewarpingDialog", "Apply to"),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyChangeDewarpingDialog",
+                "Use Ctrl+Click / Shift+Click to select multiple pages.",
+            ),
+        ),
+        cast(
+            str,
+            QtCore.QT_TRANSLATE_NOOP(
+                "ApplyChangeDewarpingDialog", "The current page will be included."
+            ),
+        ),
+    )

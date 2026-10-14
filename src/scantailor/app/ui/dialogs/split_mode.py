@@ -76,7 +76,11 @@ class SplitModeDialog(QtWidgets.QDialog):
         self._ui = load_ui_widget(_UI_FOLDER / "SplitModeDialog.ui", self)
 
         embed_ui(self, self._ui)
-        self.setWindowTitle("Split Pages")
+        self.setWindowTitle(
+            QtCore.QCoreApplication.translate(
+                "page_split::SplitModeDialog", "Split Pages"
+            )
+        )
         self.setModal(True)
 
         # Get references to widgets

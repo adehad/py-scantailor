@@ -14,11 +14,20 @@ subclasses draw overlays and handle their own handles.
 
 import math
 from enum import IntFlag, auto
+from typing import cast
 
 import numpy as np
 from numpy.typing import NDArray
 from PySide6 import QtGui, QtWidgets
-from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
+from PySide6.QtCore import (
+    QT_TRANSLATE_NOOP,
+    QCoreApplication,
+    QPointF,
+    QRectF,
+    Qt,
+    QTimer,
+    Signal,
+)
 from PySide6.QtGui import (
     QImage,
     QPainter,
@@ -31,10 +40,22 @@ from PySide6.QtGui import (
 
 from scantailor.core.transformation import ImageTransformation
 
-DEFAULT_STATUS_TIP = (
-    "Use the mouse wheel or +/- to zoom.  When zoomed, dragging is possible."
+# Marked, not translated: these are read at import, before the translator is
+# installed, so they are translated where they are shown.
+DEFAULT_STATUS_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "ImageViewBase",
+        "Use the mouse wheel or +/- to zoom.  When zoomed, dragging is possible.",
+    ),
 )
-PAN_STATUS_TIP = "Unrestricted dragging is possible by holding down the Shift key."
+PAN_STATUS_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        "DragHandler",
+        "Unrestricted dragging is possible by holding down the Shift key.",
+    ),
+)
 _MODIFIER_OF_KEY: dict[int, Qt.KeyboardModifier] = {
     Qt.Key.Key_Shift.value: Qt.KeyboardModifier.ShiftModifier,
     Qt.Key.Key_Control.value: Qt.KeyboardModifier.ControlModifier,
@@ -146,6 +167,7 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
     default_status_tip = (
         DEFAULT_STATUS_TIP  # Shown while nothing under the pointer has a hint
     )
+    default_status_tip_context = "ImageViewBase"
     HQ_TRANSFORM_DELAY_MS = 150  # Idle time before drawing the full-size image
     DOWNSCALED_MAX_SIZE = 1024
 
@@ -179,8 +201,9 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
         viewport.setBackgroundRole(QtGui.QPalette.ColorRole.Dark)
         viewport.setAutoFillBackground(True)
         viewport.setMouseTracking(True)
-        viewport.setStatusTip(self.default_status_tip)
-        self._status_tip = self.default_status_tip
+        default_tip = self._translated_default_status_tip()
+        viewport.setStatusTip(default_tip)
+        self._status_tip = default_tip
 
         self._image: QImage | None = None
         self._pixmap: QPixmap | None = None
@@ -563,13 +586,23 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
             painter.drawPixmap(0, 0, self._pixmap)
         painter.restore()
 
+    def _translated_default_status_tip(self) -> str:
+        """Return the idle hint in the active language.
+
+        Returns:
+            str: The default status tip, translated in its own context.
+        """
+        return QCoreApplication.translate(
+            self.default_status_tip_context, self.default_status_tip
+        )
+
     def set_status_tip(self, tip: str) -> None:
         """Show a hint in the window's status bar.
 
         Args:
             tip (str): The hint; the default one when empty.
         """
-        tip = tip or self.default_status_tip
+        tip = tip or self._translated_default_status_tip()
         if tip == self._status_tip:
             return
         self._status_tip = tip
@@ -634,7 +667,9 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
             self._panning = True
             self._last_mouse_pos = event.position()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
-            self.set_status_tip(PAN_STATUS_TIP)
+            self.set_status_tip(
+                QCoreApplication.translate("DragHandler", PAN_STATUS_TIP)
+            )
             event.accept()
         else:
             super().mousePressEvent(event)

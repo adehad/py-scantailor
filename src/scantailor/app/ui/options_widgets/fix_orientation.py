@@ -4,6 +4,7 @@ Provides UI controls for rotating images by 90-degree increments and for
 trimming the edges of an image by hand.
 """
 
+from PySide6 import QtCore
 from PySide6.QtCore import QSignalBlocker, Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -81,7 +82,12 @@ class OptionsWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         # Rotate group box
-        self._rotate_group = CollapsibleGroupBox("Rotate", self)
+        self._rotate_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate(
+                "fix_orientation::OptionsWidget", "Rotate"
+            ),
+            self,
+        )
         self._rotate_group.setObjectName("rotateGroupBox")
         rotate_layout = QVBoxLayout(self._rotate_group)
 
@@ -93,14 +99,22 @@ class OptionsWidget(QWidget):
 
         self._rotate_left_btn = QToolButton()
         self._rotate_left_btn.setObjectName("rotateLeftBtn")
-        self._rotate_left_btn.setToolTip("Rotate 90° counter-clockwise")
+        self._rotate_left_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "fix_orientation::OptionsWidget", "Rotate 90° counter-clockwise"
+            )
+        )
         self._rotate_left_btn.setIconSize(self._rotate_left_btn.iconSize() * 1.5)
         self._rotate_left_btn.setIcon(icon("rotate-ccw-square"))
         buttons_layout.addWidget(self._rotate_left_btn)
 
         self._rotate_right_btn = QToolButton()
         self._rotate_right_btn.setObjectName("rotateRightBtn")
-        self._rotate_right_btn.setToolTip("Rotate 90° clockwise")
+        self._rotate_right_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "fix_orientation::OptionsWidget", "Rotate 90° clockwise"
+            )
+        )
         self._rotate_right_btn.setIconSize(self._rotate_right_btn.iconSize() * 1.5)
         self._rotate_right_btn.setIcon(icon("rotate-cw-square"))
         buttons_layout.addWidget(self._rotate_right_btn)
@@ -131,9 +145,15 @@ class OptionsWidget(QWidget):
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
 
-        self._reset_btn = QPushButton("Reset")
+        self._reset_btn = QPushButton(
+            QtCore.QCoreApplication.translate("fix_orientation::OptionsWidget", "Reset")
+        )
         self._reset_btn.setObjectName("resetBtn")
-        self._reset_btn.setToolTip("Reset rotation to 0°")
+        self._reset_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "fix_orientation::OptionsWidget", "Reset rotation to 0°"
+            )
+        )
         reset_layout.addWidget(self._reset_btn)
 
         reset_layout.addItem(
@@ -150,9 +170,17 @@ class OptionsWidget(QWidget):
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
 
-        self._apply_to_btn = QPushButton("Apply to ...")
+        self._apply_to_btn = QPushButton(
+            QtCore.QCoreApplication.translate(
+                "fix_orientation::OptionsWidget", "Apply to ..."
+            )
+        )
         self._apply_to_btn.setObjectName("applyToBtn")
-        self._apply_to_btn.setToolTip("Apply this rotation to other pages")
+        self._apply_to_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "fix_orientation::OptionsWidget", "Apply this rotation to other pages"
+            )
+        )
         apply_layout.addWidget(self._apply_to_btn)
 
         apply_layout.addItem(
@@ -167,12 +195,21 @@ class OptionsWidget(QWidget):
 
     def _build_trim_group(self) -> CollapsibleGroupBox:
         """Build the group box with the manual trim controls."""
-        group = CollapsibleGroupBox("Crop scan (trim)", self)
+        group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate(
+                "fix_orientation::OptionsWidget", "Crop scan (trim)"
+            ),
+            self,
+        )
         group.setObjectName("trimGroupBox")
         group_layout = QVBoxLayout(group)
 
         enable_layout = QHBoxLayout()
-        self._trim_enabled_check = QCheckBox("Enable manual trim")
+        self._trim_enabled_check = QCheckBox(
+            QtCore.QCoreApplication.translate(
+                "fix_orientation::OptionsWidget", "Enable manual trim"
+            )
+        )
         self._trim_enabled_check.setObjectName("trimEnabledCheck")
         enable_layout.addWidget(self._trim_enabled_check)
         enable_layout.addWidget(IconLabel("crop", _TRIM_ICON_SIZE))
@@ -216,7 +253,11 @@ class OptionsWidget(QWidget):
         grid.addWidget(bottom_right, 2, 2)
         group_layout.addLayout(grid)
 
-        self._reset_trim_btn = QPushButton("Reset trim")
+        self._reset_trim_btn = QPushButton(
+            QtCore.QCoreApplication.translate(
+                "fix_orientation::OptionsWidget", "Reset trim"
+            )
+        )
         self._reset_trim_btn.setObjectName("resetTrimBtn")
         self._reset_trim_btn.setIcon(icon("undo-2"))
         group_layout.addWidget(self._reset_trim_btn)

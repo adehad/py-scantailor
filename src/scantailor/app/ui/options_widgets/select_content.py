@@ -3,6 +3,7 @@
 Provides UI controls for configuring content and page box detection.
 """
 
+from PySide6 import QtCore
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -81,43 +82,82 @@ class OptionsWidget(QWidget):
         outer_layout = QVBoxLayout(outer_group)
 
         # Page Box group
-        self._page_box_group = CollapsibleGroupBox("Page Box", outer_group)
+        self._page_box_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget", "Page Box"
+            ),
+            outer_group,
+        )
         self._page_box_group.setObjectName("pageBoxGroup")
         page_layout = QGridLayout(self._page_box_group)
 
         # Disable button (row 0, spans both columns)
-        self._page_disable_btn = QPushButton("Disable")
+        self._page_disable_btn = QPushButton(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget", "Disable"
+            )
+        )
         self._page_disable_btn.setObjectName("pageDetectDisableBtn")
         self._page_disable_btn.setCheckable(True)
         self._page_disable_btn.setChecked(True)
         self._page_disable_btn.setAutoExclusive(True)
-        self._page_disable_btn.setToolTip("Use full image as page")
+        self._page_disable_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget", "Use full image as page"
+            )
+        )
         page_layout.addWidget(self._page_disable_btn, 0, 0, 1, 2)
 
         # Auto/Manual buttons (row 1)
-        self._page_auto_btn = QPushButton("Auto")
+        self._page_auto_btn = QPushButton(
+            QtCore.QCoreApplication.translate("select_content::OptionsWidget", "Auto")
+        )
         self._page_auto_btn.setObjectName("pageDetectAutoBtn")
         self._page_auto_btn.setCheckable(True)
         self._page_auto_btn.setAutoExclusive(True)
-        self._page_auto_btn.setToolTip("Automatically detect page boundaries")
+        self._page_auto_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget", "Automatically detect page boundaries"
+            )
+        )
         page_layout.addWidget(self._page_auto_btn, 1, 0)
 
-        self._page_manual_btn = QPushButton("Manual")
+        self._page_manual_btn = QPushButton(
+            QtCore.QCoreApplication.translate("select_content::OptionsWidget", "Manual")
+        )
         self._page_manual_btn.setObjectName("pageDetectManualBtn")
         self._page_manual_btn.setCheckable(True)
         self._page_manual_btn.setAutoExclusive(True)
-        self._page_manual_btn.setToolTip("Manually specify page boundaries")
+        self._page_manual_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget", "Manually specify page boundaries"
+            )
+        )
         page_layout.addWidget(self._page_manual_btn, 1, 1)
 
         # Options subgroup (row 2)
-        self._page_options_group = QGroupBox("Options", self._page_box_group)
+        self._page_options_group = QGroupBox(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget", "Options"
+            ),
+            self._page_box_group,
+        )
         self._page_options_group.setObjectName("pageDetectOptions")
         options_layout = QVBoxLayout(self._page_options_group)
 
         # Fine tune checkbox
-        self._fine_tune_check = QCheckBox("Fine Tune Page Corners")
+        self._fine_tune_check = QCheckBox(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget", "Fine Tune Page Corners"
+            )
+        )
         self._fine_tune_check.setObjectName("fineTuneBtn")
-        self._fine_tune_check.setToolTip("Shift with corners while they are in black.")
+        self._fine_tune_check.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget",
+                "Shift with corners while they are in black.",
+            )
+        )
         options_layout.addWidget(self._fine_tune_check)
 
         # Dimensions widget
@@ -127,8 +167,24 @@ class OptionsWidget(QWidget):
         )
 
         dims_grid = QGridLayout()
-        dims_grid.addWidget(QLabel("Width"), 0, 0)
-        dims_grid.addWidget(QLabel("Height"), 1, 0)
+        dims_grid.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate(
+                    "select_content::OptionsWidget", "Width"
+                )
+            ),
+            0,
+            0,
+        )
+        dims_grid.addWidget(
+            QLabel(
+                QtCore.QCoreApplication.translate(
+                    "select_content::OptionsWidget", "Height"
+                )
+            ),
+            1,
+            0,
+        )
 
         self._width_spinbox = QDoubleSpinBox()
         self._width_spinbox.setObjectName("widthSpinBox")
@@ -152,32 +208,58 @@ class OptionsWidget(QWidget):
         outer_layout.addWidget(self._page_box_group)
 
         # Content Box group
-        self._content_box_group = CollapsibleGroupBox("Content Box", outer_group)
+        self._content_box_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget", "Content Box"
+            ),
+            outer_group,
+        )
         self._content_box_group.setObjectName("contentBoxGroup")
         content_layout = QGridLayout(self._content_box_group)
 
         # Disable button (row 0, spans both columns)
-        self._content_disable_btn = QPushButton("Disable")
+        self._content_disable_btn = QPushButton(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget", "Disable"
+            )
+        )
         self._content_disable_btn.setObjectName("contentDetectDisableBtn")
         self._content_disable_btn.setCheckable(True)
         self._content_disable_btn.setAutoExclusive(True)
-        self._content_disable_btn.setToolTip("Treat entire page as content")
+        self._content_disable_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget", "Treat entire page as content"
+            )
+        )
         content_layout.addWidget(self._content_disable_btn, 0, 0, 1, 2)
 
         # Auto/Manual buttons (row 1)
-        self._content_auto_btn = QPushButton("Auto")
+        self._content_auto_btn = QPushButton(
+            QtCore.QCoreApplication.translate("select_content::OptionsWidget", "Auto")
+        )
         self._content_auto_btn.setObjectName("contentDetectAutoBtn")
         self._content_auto_btn.setCheckable(True)
         self._content_auto_btn.setChecked(True)
         self._content_auto_btn.setAutoExclusive(True)
-        self._content_auto_btn.setToolTip("Automatically detect content boundaries")
+        self._content_auto_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget",
+                "Automatically detect content boundaries",
+            )
+        )
         content_layout.addWidget(self._content_auto_btn, 1, 0)
 
-        self._content_manual_btn = QPushButton("Manual")
+        self._content_manual_btn = QPushButton(
+            QtCore.QCoreApplication.translate("select_content::OptionsWidget", "Manual")
+        )
         self._content_manual_btn.setObjectName("contentDetectManualBtn")
         self._content_manual_btn.setCheckable(True)
         self._content_manual_btn.setAutoExclusive(True)
-        self._content_manual_btn.setToolTip("Manually specify content boundaries")
+        self._content_manual_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget", "Manually specify content boundaries"
+            )
+        )
         content_layout.addWidget(self._content_manual_btn, 1, 1)
 
         outer_layout.addWidget(self._content_box_group)
@@ -188,9 +270,17 @@ class OptionsWidget(QWidget):
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
 
-        self._apply_btn = QPushButton("Apply to ...")
+        self._apply_btn = QPushButton(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget", "Apply to ..."
+            )
+        )
         self._apply_btn.setObjectName("applyToBtn")
-        self._apply_btn.setToolTip("Apply settings to other pages")
+        self._apply_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget", "Apply settings to other pages"
+            )
+        )
         apply_layout.addWidget(self._apply_btn)
 
         apply_layout.addItem(

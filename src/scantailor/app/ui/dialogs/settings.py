@@ -1,6 +1,7 @@
 """Settings dialog for application preferences."""
 
 from pathlib import Path
+from typing import cast
 
 from loguru import logger
 from PySide6 import QtCore, QtWidgets
@@ -21,7 +22,13 @@ from scantailor.core.settings import (
 _UI_FOLDER = Path(__file__).parent
 _TRANSLATIONS_FOLDER = _UI_FOLDER.parents[2] / "translations"
 _SOURCE_LANGUAGE = "en"
-_OPENGL_UNAVAILABLE = "Your hardware / driver don't provide the necessary features"
+_OPENGL_UNAVAILABLE = cast(
+    str,
+    QtCore.QT_TRANSLATE_NOOP(
+        "SettingsDialog",
+        "Your hardware / driver don't provide the necessary features",
+    ),
+)
 # C++ derives the thumbnail height from the width with this aspect ratio.
 _THUMBNAIL_ASPECT = 16.0 / 25.0
 # Options that nothing in the application reads yet; they stay visible but cannot
@@ -150,7 +157,11 @@ class SettingsDialog(QtWidgets.QDialog):
 
     def _populate_combo_boxes(self) -> None:
         """Fill the combo boxes; the item data carries the stored value."""
-        for text, mode in (("Auto", AUTO), ("Light", "light"), ("Dark", "dark")):
+        for text, mode in (
+            (self.tr("Auto"), AUTO),
+            (self.tr("Light"), "light"),
+            (self.tr("Dark"), "dark"),
+        ):
             self._color_scheme_box.addItem(text, mode)
 
         for text, units in (
@@ -164,7 +175,7 @@ class SettingsDialog(QtWidgets.QDialog):
         for text, zone_mode, glyph in (
             ("Polygonal", ZoneCreationMode.POLYGONAL, "zone-polygon"),
             ("Lasso", ZoneCreationMode.LASSO, "lasso"),
-            ("Rectangular", ZoneCreationMode.RECTANGULAR, "square-dashed"),
+            (self.tr("Rectangular"), ZoneCreationMode.RECTANGULAR, "square-dashed"),
         ):
             self._zone_mode_box.addItem(icon(glyph), text, zone_mode)
 
@@ -174,13 +185,13 @@ class SettingsDialog(QtWidgets.QDialog):
         self._language_box.setEnabled(self._language_box.count() > 1)
 
         for box, last in (
-            (self._tiff_bw_box, ("CCITT G4", TiffCompression.CCITT_FAX4)),
-            (self._tiff_color_box, ("JPEG", TiffCompression.JPEG)),
+            (self._tiff_bw_box, (self.tr("CCITT G4"), TiffCompression.CCITT_FAX4)),
+            (self._tiff_color_box, (self.tr("JPEG"), TiffCompression.JPEG)),
         ):
             for text, method in (
-                ("None", TiffCompression.NONE),
-                ("LZW", TiffCompression.LZW),
-                ("Deflate", TiffCompression.DEFLATE),
+                (self.tr("None"), TiffCompression.NONE),
+                (self.tr("LZW"), TiffCompression.LZW),
+                (self.tr("Deflate"), TiffCompression.DEFLATE),
                 last,
             ):
                 box.addItem(text, method)
@@ -193,7 +204,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self._enable_opengl_cb.setChecked(False)
         self._enable_opengl_cb.setEnabled(False)
         self._opengl_device_label.setEnabled(False)
-        self._opengl_device_label.setText(_OPENGL_UNAVAILABLE)
+        self._opengl_device_label.setText(self.tr(_OPENGL_UNAVAILABLE))
 
         self._auto_save_cb.setChecked(settings.auto_save_project)
         self._select_data(self._color_scheme_box, AUTO)
