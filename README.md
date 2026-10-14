@@ -1,5 +1,9 @@
 # ScanTailor Advanced
 
+[![Documentation Status](https://readthedocs.org/projects/py-scantailor-advanced/badge/?version=latest)](https://py-scantailor-advanced.readthedocs.io/en/latest/)
+
+Documentation: <https://py-scantailor-advanced.readthedocs.io/>
+
 The ScanTailor version that merges the features of the `ScanTailor Featured` and `ScanTailor Enhanced` versions,
 brings new ones and fixes.
 

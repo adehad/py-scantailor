@@ -26,6 +26,9 @@ _SCRIPT = _REPO_ROOT / "tools" / "docs_screenshots.py"
 _SCREENSHOTS = "_generated/screenshots"
 _PLACEHOLDER = "/_static/images/screenshot-missing.svg"
 _GENERATION_TIMEOUT_S = 900
+# Read the Docs stops the whole build at 15 minutes. Giving up on the
+# screenshots sooner leaves time to finish the manual with placeholders.
+_READTHEDOCS_TIMEOUT_S = 600
 
 
 def _expected_shots(out_dir: Path) -> list[Path]:
@@ -58,7 +61,9 @@ def generate_missing_screenshots(app: Sphinx) -> None:
         subprocess.run(
             [sys.executable, str(_SCRIPT), "--out", str(out_dir)],
             check=True,
-            timeout=_GENERATION_TIMEOUT_S,
+            timeout=_READTHEDOCS_TIMEOUT_S
+            if os.environ.get("READTHEDOCS")
+            else _GENERATION_TIMEOUT_S,
         )
     except (subprocess.SubprocessError, OSError) as error:
         logger.info("Screenshot generation failed, using placeholders: %s", error)
