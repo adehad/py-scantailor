@@ -85,9 +85,10 @@ typecheck = "pyrefly check"
 #   pytest -m ''     runs everything (use this as the full gate before merging)
 # Tests run on one xdist worker per CPU; loadgroup keeps xdist_group-marked tests on a
 # single worker. Pass -n0 to run serially, for example when debugging one test.
-addopts = "-m 'not slow' -n auto --dist loadgroup"
+addopts = "-m 'not slow and not docs_screenshot' -n auto --dist loadgroup"
 markers = [
     "slow: takes more than about 2 s; excluded from the default run",
+    "docs_screenshot: drives the window to save the manual's PNGs; run with pytest -m docs_screenshot",
 ]
 
 [tool.pyrefly]

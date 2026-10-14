@@ -34,7 +34,8 @@ def find_post_deskew_angle(dewarped_gray: NDArray[np.uint8]) -> float:
     """Measure the rotation that levels the text lines of a dewarped page.
 
     Args:
-        dewarped_gray (NDArray[np.uint8]): 2-D gray dewarped page, dark text on
+        dewarped_gray (numpy.ndarray of numpy.uint8):
+            2-D gray dewarped page, dark text on
             a light background.
 
     Returns:
@@ -59,17 +60,19 @@ def measure_post_deskew(
     built from it is the one the generator would build.
 
     Args:
-        image (NDArray[np.uint8]): The page the generator is given, 2-D gray or
+        image (numpy.ndarray of numpy.uint8):
+            The page the generator is given, 2-D gray or
             BGR(A).
-        params (Params): Output parameters; the angle is only measured when the
+        params (scantailor.filters.output.params.Params):
+            Output parameters; the angle is only measured when the
             dewarping mode and the post-deskew option ask for it.
-        source (DewarperSource | None): The page's dewarper or the function
+        source (Any): The page's dewarper or the function
             making it from the normalised gray page.
         page_outline (Sequence[tuple[float, float]] | None): Page outline in the
             pixels of ``image``, limiting where illumination is estimated.
 
     Returns:
-        tuple[float, DewarperSource | None]: The angle in degrees, positive
+        tuple[float, Any]: The angle in degrees, positive
         turning the page clockwise (0 when it is not to be applied or cannot be
         measured), and the source to give the generator in place of ``source``:
         a made dewarper, so that building it is not repeated.

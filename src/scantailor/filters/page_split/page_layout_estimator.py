@@ -1,9 +1,30 @@
 """Automatic page layout detection.
 
-A folding line (a thin dark vertical line) decides the layout when one can be
-found. Otherwise the page is binarised at 300 dpi, cleaned of shadows and
-garbage, deskewed and reduced to 150 dpi, and the layout follows from the
-vertical bands of content and whitespace.
+Auto detection decides the layout in two steps. A folding line, a thin dark
+vertical line, decides the layout when one is found. Otherwise the page is
+analysed for the whitespace between its blocks of content.
+
+The whitespace analysis works like this:
+
+1. The page is binarized at 300 dpi and reduced to 150 dpi. Specks are dropped:
+   a mark survives only when it holds a bar at least 4 pixels long, across or
+   down. Shadows along the page borders are removed, found as dark bands at least
+   200 pixels long and 14 pixels thick, or 300 pixels tall and 14 pixels wide.
+2. The page is deskewed when the skew is measured with good confidence.
+3. A column counts as content when a component at least 5 pixels wide and tall
+   covers it. Components more than 6 times taller than wide are dropped as rules
+   and edges.
+4. Content runs are cut at gaps of at least 8 pixels (about 1.4 mm at 150 dpi).
+   A run narrower than 2 pixels is dropped unless a gap shorter than 8 pixels
+   joins it to a neighbour.
+5. Two pages: the cut goes through a gap where the content on each side is
+   balanced. The balance of a gap is the smaller side over the larger one, and a
+   gap is only used when that ratio is at least 0.25. From the best gap, the
+   neighbouring gaps whose balance is at least 90 % of the best are checked, and
+   the widest of them is taken.
+6. One page: an edge strip is cut off as an offcut when it is no wider than a
+   quarter of the image, the gutter beside it is at least 20 pixels, and the
+   gutter is at least twice the widest gap inside the content.
 
 Coordinates are those of the input image, which is already upright. A region of
 it can be analysed alone; the layout is still in the coordinates of the whole
@@ -77,7 +98,7 @@ def estimate_page_layout(
     any type.
 
     Args:
-        gray (NDArray[np.uint8]): (H, W) gray image.
+        gray (numpy.ndarray of numpy.uint8): (H, W) gray image.
         layout_type (LayoutType): Requested layout.
         dpi (float): Resolution of the image, the same on both axes.
         bw_threshold (int | None): Gray level below which a pixel is black. By

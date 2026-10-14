@@ -43,16 +43,17 @@ def map_pool_progress[Job, Result](
     Results are keyed by job position, so the same job object may appear twice.
 
     Args:
-        function (Callable[[Job], Result]): Picklable module-level callable.
-        jobs (Sequence[Job]): Picklable job arguments.
-        executor (ProcessPoolExecutor): A pool from ``spawn_pool``; left running.
+        function (Callable[[Any], Any]): Picklable module-level callable.
+        jobs (Sequence[Any]): Picklable job arguments.
+        executor (concurrent.futures.ProcessPoolExecutor):
+            A pool from ``spawn_pool``; left running.
         max_workers (int | None): The pool's size.
-        cancel (Event | None): Stops further jobs from being scheduled.
-        on_done (Callable[[int, Job, Result], None] | None): Called from this
+        cancel (threading.Event | None): Stops further jobs from being scheduled.
+        on_done (Callable[[int, Any, Any], None] | None): Called from this
             thread with each finished job's position, the job and its result.
 
     Returns:
-        list[Result]: One result per job, in job order.
+        list[Any]: One result per job, in job order.
 
     Raises:
         PdfCancelled: If ``cancel`` was set before every job ran.

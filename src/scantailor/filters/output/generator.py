@@ -140,11 +140,13 @@ class _PageLayout:
         Args:
             shape (tuple[int, int]): (height, width) of the image.
             render (RenderParams): Decides which fills are on.
-            content_polygon (Polygon | None): Content area.
-            page_outline (Polygon | None): Page outline; ignored when
+            content_polygon (Sequence[tuple[float, float]] | None): Content area.
+            page_outline (Sequence[tuple[float, float]] | None):
+                Page outline; ignored when
                 ``render.fill_outside_page_box`` is set, so that nothing is
                 taken from the page area alone.
-            source_outline (Polygon | None): Where the input has source pixels.
+            source_outline (Sequence[tuple[float, float]] | None):
+                Where the input has source pixels.
                 Everything outside it is filled with the margin colour, and the
                 background colour is sampled inside it. None means the whole
                 image.
@@ -185,19 +187,22 @@ def generate_output(
     dewarped, the masks they produce are dewarped with it.
 
     Args:
-        image (NDArray[np.uint8]): Input image, 2-D gray or BGR(A) colour. Not modified.
-        params (Params): Output parameters.
-        dewarper (DewarperSource | None): The page's dewarper, or a function
+        image (numpy.ndarray of numpy.uint8):
+            Input image, 2-D gray or BGR(A) colour. Not modified.
+        params (scantailor.filters.output.params.Params): Output parameters.
+        dewarper (Any): The page's dewarper, or a function
             that builds it from the illumination-normalised gray page. Used
             when ``params`` enable dewarping; None skips dewarping. A function
             that returns None skips it too.
         color_options (ColorCommonOptions | None): Options for the grayscale and
             colour paths; margin filling also applies to bilevel output.
             Defaults to ``params.color_common``.
-        content_polygon (Polygon | None): Content area as (x, y) vertices.
+        content_polygon (Sequence[tuple[float, float]] | None):
+            Content area as (x, y) vertices.
             Margins outside it are filled when ``fill_margins`` is set. None
             means the whole image is content.
-        page_outline (Polygon | None): Outline of the page as (x, y) vertices.
+        page_outline (Sequence[tuple[float, float]] | None):
+            Outline of the page as (x, y) vertices.
             What lies outside it is filled when ``fill_offcut`` is set. None
             means the whole image is page.
         picture_zones (Sequence[Zone]): Manual picture zones, used by mixed mode.
@@ -205,7 +210,8 @@ def generate_output(
             after everything else.
         keep_despeckle_source (bool): Also return the page as it was before
             despeckling, for the despeckling preview.
-        source_outline (Polygon | None): Outline of the source image in the
+        source_outline (Sequence[tuple[float, float]] | None):
+            Outline of the source image in the
             coordinates of ``image``. Pixels outside it have nothing behind
             them and are always filled with the margin colour. None means
             ``image`` is all source.
@@ -352,9 +358,9 @@ def _dewarp_page(
 
     Args:
         page (_PageGeometry): The page on the input image's grid.
-        params (Params): Output parameters.
+        params (scantailor.filters.output.params.Params): Output parameters.
         render (RenderParams): Flags derived from ``params``.
-        source (DewarperSource): A dewarper, or a function that builds one from
+        source (Any): A dewarper, or a function that builds one from
             the normalised gray page.
 
     Returns:
@@ -426,7 +432,7 @@ def applied_post_deskew_angle(params: Params) -> float:
     """Return the rotation a dewarped page gets after dewarping, in degrees.
 
     Args:
-        params (Params): Output parameters.
+        params (scantailor.filters.output.params.Params): Output parameters.
 
     Returns:
         float: The angle; positive turns the page clockwise. Zero unless the
@@ -446,12 +452,12 @@ def _apply_post_deskew(
     """Rotate a dewarped image about its centre, keeping its size.
 
     Args:
-        image (NDArray[np.uint8]): Dewarped image.
+        image (numpy.ndarray of numpy.uint8): Dewarped image.
         angle (float): Rotation in degrees; positive turns the page clockwise.
         border (int): Gray level of the newly exposed pixels, in every channel.
 
     Returns:
-        NDArray[np.uint8]: Rotated image of the same shape.
+        numpy.ndarray of numpy.uint8: Rotated image of the same shape.
     """
     h, w = image.shape[:2]
     # cv2 counts positive angles counter-clockwise.
@@ -476,8 +482,8 @@ def _generate_binary_output(
     """Generate black and white output.
 
     Args:
-        image (NDArray[np.uint8]): Input image, 2-D gray or BGR(A).
-        params (Params): Output parameters.
+        image (numpy.ndarray of numpy.uint8): Input image, 2-D gray or BGR(A).
+        params (scantailor.filters.output.params.Params): Output parameters.
         render (RenderParams): Flags derived from ``params``.
         layout (_PageLayout): Page and fill areas.
         keep_despeckle_source (bool): Keep the page before despeckling in the
@@ -527,14 +533,16 @@ def _segmentation_source(
     """Colour page whose colours the segmented text takes; None without segmentation.
 
     Args:
-        image (NDArray[np.uint8]): Page in black-on-white polarity. Not modified.
-        gray (NDArray[np.uint8]): Its illumination-normalised gray, when
+        image (numpy.ndarray of numpy.uint8):
+            Page in black-on-white polarity. Not modified.
+        gray (numpy.ndarray of numpy.uint8): Its illumination-normalised gray, when
             ``render`` normalises illumination.
-        params (Params): Output parameters.
+        params (scantailor.filters.output.params.Params): Output parameters.
         render (RenderParams): Flags derived from ``params``.
 
     Returns:
-        NDArray[np.uint8] | None: The page, normalised and Wiener filtered like
+        numpy.ndarray of numpy.uint8 | None:
+            The page, normalised and Wiener filtered like
             the binarisation input; None unless colour segmentation is on.
     """
     if not render.color_segmentation:
@@ -554,10 +562,11 @@ def _colored_binary_output(
     """Colour the ink of a binarised page with the colours of the original.
 
     Args:
-        color_page (NDArray[np.uint8]): Colour source from ``_segmentation_source``.
-        binary (NDArray[np.uint8]): Despeckled binary page in black-on-white
+        color_page (numpy.ndarray of numpy.uint8):
+            Colour source from ``_segmentation_source``.
+        binary (numpy.ndarray of numpy.uint8): Despeckled binary page in black-on-white
             polarity, 0 is ink.
-        params (Params): Output parameters.
+        params (scantailor.filters.output.params.Params): Output parameters.
         render (RenderParams): Flags derived from ``params``.
         layout (_PageLayout): Page and fill areas.
 
@@ -599,8 +608,8 @@ def _generate_grayscale_output(
     fill zones are posterized too.
 
     Args:
-        image (NDArray[np.uint8]): Input image, 2-D gray or BGR(A).
-        params (Params): Output parameters.
+        image (numpy.ndarray of numpy.uint8): Input image, 2-D gray or BGR(A).
+        params (scantailor.filters.output.params.Params): Output parameters.
         render (RenderParams): Flags derived from ``params``.
         layout (_PageLayout): Page and fill areas.
 
@@ -644,8 +653,8 @@ def _generate_mixed_output(
     white, or with black when the filling colour says so.
 
     Args:
-        image (NDArray[np.uint8]): Input image, 2-D gray or BGR(A).
-        params (Params): Output parameters.
+        image (numpy.ndarray of numpy.uint8): Input image, 2-D gray or BGR(A).
+        params (scantailor.filters.output.params.Params): Output parameters.
         render (RenderParams): Flags derived from ``params``.
         layout (_PageLayout): Page and fill areas.
         picture_layers (PictureLayers): Rasterised manual picture zones.
@@ -729,18 +738,18 @@ def _compose_text(
     """Put the page's ink, black or coloured, over the picture layer.
 
     Args:
-        layer (NDArray[np.uint8]): Picture layer from ``build_mixed_layer``.
-        ink (NDArray[np.bool_]): Despeckled ink of the whole page, pictures
+        layer (numpy.ndarray of numpy.uint8): Picture layer from ``build_mixed_layer``.
+        ink (numpy.ndarray of numpy.bool): Despeckled ink of the whole page, pictures
             included; colour segmentation sees all of it and the text region
             then limits where it is drawn.
-        text_region (NDArray[np.bool_]): True where the output is binarised.
-        params (Params): Output parameters.
+        text_region (numpy.ndarray of numpy.bool): True where the output is binarised.
+        params (scantailor.filters.output.params.Params): Output parameters.
         render (RenderParams): Flags derived from ``params``.
         layout (_PageLayout): Page area, for the background colour.
         dpi (tuple[int, int]): Horizontal and vertical output resolution.
 
     Returns:
-        NDArray[np.uint8]: The composed page.
+        numpy.ndarray of numpy.uint8: The composed page.
     """
     colored = None
     if render.color_segmentation:
@@ -901,11 +910,11 @@ def _with_brightness(
     """Give an image a new brightness while keeping its colour differences.
 
     Args:
-        image (NDArray[np.uint8]): 2-D gray or BGR(A) image. Not modified.
-        brightness (NDArray[np.uint8]): Target luma, same height and width.
+        image (numpy.ndarray of numpy.uint8): 2-D gray or BGR(A) image. Not modified.
+        brightness (numpy.ndarray of numpy.uint8): Target luma, same height and width.
 
     Returns:
-        NDArray[np.uint8]: A new array; for gray input the brightness itself.
+        numpy.ndarray of numpy.uint8: A new array; for gray input the brightness itself.
     """
     if image.ndim == 2:
         return brightness.copy()
@@ -919,11 +928,12 @@ def _replace_brightness(
     """Give a colour image a new luma while keeping its colour differences.
 
     Args:
-        image (NDArray[np.uint8]): BGR(A) image. Not modified.
-        brightness (NDArray[np.uint8]): Target luma, same height and width.
+        image (numpy.ndarray of numpy.uint8): BGR(A) image. Not modified.
+        brightness (numpy.ndarray of numpy.uint8): Target luma, same height and width.
 
     Returns:
-        NDArray[np.uint8]: New image; an alpha channel is carried over unchanged.
+        numpy.ndarray of numpy.uint8:
+            New image; an alpha channel is carried over unchanged.
     """
     result = image.copy()
     color = image[..., :3].astype(np.float32)
@@ -945,8 +955,10 @@ def _margin_color(
     """Pick the margin colour before any white-on-black inversion.
 
     Args:
-        image (NDArray[np.uint8]): Image whose page decides the background colour.
-        params (Params): Output parameters; ``black_on_white`` flips white and black.
+        image (numpy.ndarray of numpy.uint8):
+            Image whose page decides the background colour.
+        params (scantailor.filters.output.params.Params):
+            Output parameters; ``black_on_white`` flips white and black.
         layout (_PageLayout): Page area the background colour is sampled from.
 
     Returns:
@@ -983,11 +995,12 @@ def _binarize(
     as described in ``scantailor.imageproc.binarize``.
 
     Args:
-        gray (NDArray[np.uint8]): 2-D gray image. Not modified.
+        gray (numpy.ndarray of numpy.uint8): 2-D gray image. Not modified.
         options (BinarizationOptions): Binarization options.
 
     Returns:
-        NDArray[np.uint8]: New binary image, 0 for ink and 255 for background.
+        numpy.ndarray of numpy.uint8:
+            New binary image, 0 for ink and 255 for background.
     """
     adjustment = options.threshold_adjustment
     if options.method == BinarizationMethod.OTSU:
@@ -1031,13 +1044,13 @@ def _despeckle(
     """Remove small noise components that are not near text.
 
     Args:
-        binary (NDArray[np.uint8]): Binary image, 0 is ink. Not modified.
+        binary (numpy.ndarray of numpy.uint8): Binary image, 0 is ink. Not modified.
         strength (float): Despeckle strength, 0 for off; 1, 2 and 3 are the
             cautious, normal and aggressive presets.
         dpi (Dpi): Resolution of ``binary``; the smaller axis sets the thresholds.
 
     Returns:
-        NDArray[np.uint8]: Despeckled binary image.
+        numpy.ndarray of numpy.uint8: Despeckled binary image.
     """
     if strength <= 0.0:
         return binary

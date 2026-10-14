@@ -301,7 +301,8 @@ class Params(BaseModel):
         """Create a copy that takes one group of options from another page.
 
         Args:
-            source (Params): Parameters of the page being copied from.
+            source (scantailor.filters.output.params.Params):
+                Parameters of the page being copied from.
             group (ApplyGroup): The options to copy; everything else, zones and
                 the distortion model included, stays as it is.
 

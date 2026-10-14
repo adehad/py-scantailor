@@ -1,7 +1,7 @@
-"""Layout type enumeration for page split filter.
+"""Layout types for splitting a scan into pages.
 
-This module defines the different layout types that can be detected or
-specified for splitting scanned images into pages.
+The type is what the user picks in the Split Pages panel, or what the detector
+chooses when the type is automatic.
 """
 
 from enum import Enum
