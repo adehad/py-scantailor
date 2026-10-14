@@ -1,8 +1,8 @@
 # ScanTailor Advanced
 
-[![Documentation Status](https://readthedocs.org/projects/py-scantailor-advanced/badge/?version=latest)](https://py-scantailor-advanced.readthedocs.io/en/latest/)
+[![Documentation Status](https://readthedocs.org/projects/py-scantailor/badge/?version=latest)](https://py-scantailor.readthedocs.io/en/latest/)
 
-Documentation: <https://py-scantailor-advanced.readthedocs.io/>
+Documentation: <https://py-scantailor.readthedocs.io/>
 
 The ScanTailor version that merges the features of the `ScanTailor Featured` and `ScanTailor Enhanced` versions,
 brings new ones and fixes.
@@ -66,7 +66,7 @@ and assembling multi-page documents are out of scope of this project.
 
 ## Building
 
-**Windows download:** every `v*` tag publishes `ScanTailor-<tag>-windows-x64.zip` on the [GitHub Releases](https://github.com/adehad/py-scantailor-advanced/releases) page. Unzip it anywhere and run `ScanTailor\ScanTailor.exe`; `ScanTailor\scantailor-cli.exe` in the same folder is the headless command line. The folder carries its own Python, Qt and Visual C++ runtime, so nothing else needs installing. Nothing in the pipeline uses a GPU, so there is one build for every machine.
+**Windows download:** every `v*` tag publishes `ScanTailor-<tag>-windows-x64.zip` on the [GitHub Releases](https://github.com/adehad/py-scantailor/releases) page. Unzip it anywhere and run `ScanTailor\ScanTailor.exe`; `ScanTailor\scantailor-cli.exe` in the same folder is the headless command line. The folder carries its own Python, Qt and Visual C++ runtime, so nothing else needs installing. Nothing in the pipeline uses a GPU, so there is one build for every machine.
 
 The first launch of a new build compiles the image-processing kernels in the background and caches them under `%LOCALAPPDATA%\numba`; later launches load that cache.
 

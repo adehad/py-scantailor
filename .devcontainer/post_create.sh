@@ -1,6 +1,6 @@
 #!/bin/bash
 
-git config --global --add safe.directory /workspaces/py-scantailor-advanced
+git config --global --add safe.directory "$(pwd)"
 
 # Install pipx
 python -m pip install pipx
