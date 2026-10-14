@@ -3,13 +3,13 @@
 language: en-US
 
 # CRITICAL: Set architectural context for all reviews
-tone_instructions: "Senior engineer reviewing a C++ to Python migration. Be thorough, question C++ patterns, verify thread safety. Production-quality standards."
+tone_instructions: "Senior engineer reviewing a Python and PySide6 image-processing application. Be thorough, question patterns carried over from C++, verify thread safety. Production-quality standards."
 
 early_access: false
 enable_free_tier: true
 
 reviews:
-  # Assertive profile for stricter enforcement during migration
+  # Assertive profile for stricter enforcement
   profile: assertive
 
   request_changes_workflow: false
