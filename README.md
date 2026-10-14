@@ -79,7 +79,7 @@ pdm run scantailor          # the application
 pdm run scantailor-cli --help
 ```
 
-**Linux packages:** there is no frozen Linux build of this port yet; run it from source. The manifest in [`flatpak/`](flatpak/org.scantailor.Advanced.json) and [`.github/workflows/flatpak.yml`](.github/workflows/flatpak.yml) still build the upstream C++ v1.1.1 release, not this port.
+**Linux packages:** there is no frozen Linux build of this port yet; run it from source.
 
 **Community examples / test data:** See also [scantailor-testing](https://github.com/ImageProcessing-ElectronicPublications/scantailor-testing).
 
@@ -458,4 +458,4 @@ git push origin v1.0.0-rc1
 
 [`.github/workflows/release.yml`](.github/workflows/release.yml) then compiles the translations, runs the default test suite, builds the executables, zips `dist/ScanTailor/` and creates a GitHub Release for the tag with the zip attached and generated release notes. Tags containing `-rc`, `-alpha` or `-beta` are published as pre-releases.
 
-Only Windows is built today. The build job is a matrix keyed by runner, so adding macOS or Linux means adding an entry to its `include` list with that runner's `os`, a `label` for the archive name, and the path of its `cli` executable for the smoke test.
+Only Windows is built today. Adding macOS or Linux means copying the `build` job with that platform's runner, archive name and `scantailor-cli` path for the smoke test.

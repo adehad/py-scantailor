@@ -2,19 +2,7 @@
 # Hooks parse the source, which uses Python 3.14 syntax.
 default_language_version:
   python: python3.14
-exclude: |
-            (?x)^(
-                .github/workflows/clang-format.yml|
-                .github/workflows/cmake.yml|
-                cmake/|
-                src/app/|
-                src/core/|
-                src/dewarping/|
-                src/imageproc/|
-                src/foundation/|
-                src/math/|
-                src/scantailor/app/_ui
-            )
+exclude: ^src/scantailor/app/_ui
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
