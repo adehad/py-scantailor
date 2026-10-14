@@ -75,7 +75,7 @@ class TestTextOnly:
 
     def test_result_scales_with_dpi(self) -> None:
         page = _text_page()
-        left, top, right, bottom = _text_extent(page)
+        left, _top, right, bottom = _text_extent(page)
 
         # Twice the dpi, so the processing image is half the size.
         box = find_content_box(page, dpi=300.0).content_box
@@ -117,7 +117,7 @@ class TestGutterShadow:
 
     def test_wedge_at_the_right_edge_is_excluded(self) -> None:
         page = _with_gutter_wedge(_text_page())[:, ::-1].copy()
-        left, top, right, bottom = _text_extent(_text_page()[:, ::-1])
+        left, _top, right, _bottom = _text_extent(_text_page()[:, ::-1])
 
         box = find_content_box(page, dpi=150.0).content_box
 
@@ -126,7 +126,7 @@ class TestGutterShadow:
 
     def test_wedge_at_the_top_edge_is_excluded(self) -> None:
         page = _with_gutter_wedge(_text_page()).T.copy()
-        left, top, right, bottom = _text_extent(_text_page().T)
+        left, top, _right, bottom = _text_extent(_text_page().T)
 
         box = find_content_box(page, dpi=150.0).content_box
 
@@ -210,7 +210,7 @@ class TestPageBox:
 
     def test_content_beyond_the_page_box_is_ignored(self) -> None:
         page = _text_page()
-        left, top, _, bottom = _text_extent(page)
+        left, _top, _, _bottom = _text_extent(page)
         page_box = ContentBox(x=0, y=0, width=500, height=PAGE_HEIGHT)
 
         box = find_content_box(page, dpi=150.0, page_box=page_box).content_box

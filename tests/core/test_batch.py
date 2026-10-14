@@ -336,9 +336,9 @@ class TestRunBatch:
             sources,
             tmp_path / "out",
             max_workers=1,
-            on_progress=lambda event: cancel.set()
-            if isinstance(event, PageDone)
-            else None,
+            on_progress=lambda event: (
+                cancel.set() if isinstance(event, PageDone) else None
+            ),
             cancel=cancel,
         )
 

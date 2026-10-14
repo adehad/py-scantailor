@@ -154,7 +154,8 @@ def find_picture_rectangles(
     _, clusters = cv2.connectedComponents(joined, connectivity=8)
 
     rectangles: list[tuple[int, int, int, int]] = []
-    for rows, cols in ndimage.find_objects(np.where(picture, clusters, 0)):
+    found = ndimage.find_objects(np.where(picture, clusters, 0))
+    for rows, cols in (slices for slices in found if slices is not None):
         rect = (cols.start, rows.start, cols.stop - 1, rows.stop - 1)
         rectangles.append(
             _trim_rectangle(picture, rect, sensitivity / 100.0)

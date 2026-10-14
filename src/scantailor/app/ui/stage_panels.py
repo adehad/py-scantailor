@@ -118,7 +118,7 @@ class _ViewState:
     scroll: tuple[float | None, float | None]
 
     @classmethod
-    def of(cls, view: ImageViewBase) -> "_ViewState":
+    def of(cls, view: ImageViewBase) -> _ViewState:
         """Capture the zoom and scroll position of ``view``."""
         return cls(
             view.zoom_level,
@@ -670,7 +670,7 @@ class StagePanels(QtCore.QObject):
 
     def _view_state_of_same_page(
         self, view: ImageViewBase, key: tuple[object, ...]
-    ) -> "_ViewState | None":
+    ) -> _ViewState | None:
         """Capture a zoomed view that is about to show the same page at another size."""
         shown = self._view_key
         if shown is None or shown[:2] != key[:2] or view._fit_mode:

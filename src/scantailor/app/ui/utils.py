@@ -9,17 +9,17 @@ QWidgetT = typing.TypeVar("QWidgetT", bound=QtCore.QObject)
 
 # -------------------- Overloads for get_cwidget()
 @typing.overload
-def get_cwidget(
+def get_cwidget[QWidgetT: QtCore.QObject](
     ui: QtWidgets.QWidget,
     qtype: type[QWidgetT],
     qname: str,
     *,
     required: typing.Literal[False],
-) -> None | QWidgetT: ...
+) -> QWidgetT | None: ...
 
 
 @typing.overload
-def get_cwidget(
+def get_cwidget[QWidgetT: QtCore.QObject](
     ui: QtWidgets.QWidget,
     qtype: type[QWidgetT],
     qname: str,
@@ -29,7 +29,7 @@ def get_cwidget(
 
 
 @typing.overload
-def get_cwidget(
+def get_cwidget[QWidgetT: QtCore.QObject](
     ui: QtWidgets.QWidget,
     qtype: type[QWidgetT],
     qname: str,
@@ -39,13 +39,13 @@ def get_cwidget(
 # --------------------
 
 
-def get_cwidget(
+def get_cwidget[QWidgetT: QtCore.QObject](
     ui: QtWidgets.QWidget,
     qtype: type[QWidgetT],
     qname: str,
     *,
     required: bool = True,
-) -> None | QWidgetT:
+) -> QWidgetT | None:
     """Get the (child) widget from the loaded ``.ui`` file.
 
     Args:

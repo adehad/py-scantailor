@@ -16,6 +16,7 @@ from .assets import write_assets
 from .docks import DockSizer
 from .fonts import TabularFigures, apply_fonts
 from .palette import build_palette
+from .spin_boxes import SpinBoxTextInset
 from .stylesheet import build_stylesheet
 from .tokens import DARK, LIGHT, set_active_tokens
 
@@ -96,6 +97,7 @@ class _ThemeController(QtCore.QObject):
         apply_fonts(app)
         app.installEventFilter(IconBinder(self))
         app.installEventFilter(TabularFigures(self))
+        app.installEventFilter(SpinBoxTextInset(self))
         app.installEventFilter(DockSizer(self))
         app.styleHints().colorSchemeChanged.connect(self._on_scheme_changed)
 

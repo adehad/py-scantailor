@@ -49,7 +49,7 @@ class PolynomialSurface:
         hor_degree: int,
         vert_degree: int,
         mask: NDArray[np.bool_] | None = None,
-    ) -> "PolynomialSurface":
+    ) -> PolynomialSurface:
         """Least-squares fit of a surface to an image.
 
         Degrees are reduced until the number of coefficients does not exceed

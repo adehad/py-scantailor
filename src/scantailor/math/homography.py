@@ -35,7 +35,7 @@ class Homography(BaseModel):
         return v
 
     @classmethod
-    def identity(cls) -> "Homography":
+    def identity(cls) -> Homography:
         """Create an identity homography.
 
         Returns:
@@ -48,7 +48,7 @@ class Homography(BaseModel):
         cls,
         src_points: NDArray[np.floating],
         dst_points: NDArray[np.floating],
-    ) -> "Homography":
+    ) -> Homography:
         """Create a homography from four point correspondences.
 
         Args:
@@ -78,7 +78,7 @@ class Homography(BaseModel):
         dst_points: NDArray[np.floating],
         method: int = cv2.RANSAC,
         ransac_reproj_threshold: float = 5.0,
-    ) -> "Homography":
+    ) -> Homography:
         """Create a homography from multiple point correspondences.
 
         Uses cv2.findHomography which can handle more than 4 points
@@ -120,7 +120,7 @@ class Homography(BaseModel):
         cls,
         rect: tuple[float, float, float, float],
         quad: NDArray[np.floating],
-    ) -> "Homography":
+    ) -> Homography:
         """Create a homography mapping a rectangle to a quadrilateral.
 
         Args:
@@ -185,7 +185,7 @@ class Homography(BaseModel):
         )
         return result.reshape((-1, 2)).astype(np.float64)
 
-    def compose(self, other: "Homography") -> "Homography":
+    def compose(self, other: Homography) -> Homography:
         """Compose this homography with another.
 
         The resulting transformation applies 'other' first, then 'self'.
@@ -200,7 +200,7 @@ class Homography(BaseModel):
         composed = self.matrix @ other.matrix
         return Homography(matrix=composed)
 
-    def inverse(self) -> "Homography":
+    def inverse(self) -> Homography:
         """Compute the inverse homography.
 
         Returns:

@@ -24,8 +24,8 @@ which matches JBIG2 where 1 is black. Inputs are never modified.
 from jbig2_numba import encode_file, encode_generic, encode_pdf_stream
 
 stream = encode_pdf_stream(image, dpi=(300, 300))  # body of a PDF image XObject
-jb2 = encode_file(image, dpi=(300, 300))           # standalone .jb2 file
-raw = encode_generic(image)                        # generic region data only
+jb2 = encode_file(image, dpi=(300, 300))  # standalone .jb2 file
+raw = encode_generic(image)  # generic region data only
 ```
 
 `encode_pdf_stream` follows ISO 32000-1 7.4.7: page information plus the

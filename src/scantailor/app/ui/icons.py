@@ -163,7 +163,7 @@ class SvgIconEngine(QtGui.QIconEngine):
             svg_source(name_on)
         self._name = name
         self._name_on = name_on
-        self._tint = tint
+        self._tint: Tint | None = tint
 
     def _glyph(self, state: QtGui.QIcon.State) -> str:
         if state == QtGui.QIcon.State.On and self._name_on is not None:
@@ -239,7 +239,7 @@ class SvgIconEngine(QtGui.QIconEngine):
         painter.end()
         return pixmap
 
-    def clone(self) -> "SvgIconEngine":
+    def clone(self) -> SvgIconEngine:
         """Return a copy, as Qt requires for implicitly shared icons."""
         return SvgIconEngine(self._name, self._name_on, self._tint)
 

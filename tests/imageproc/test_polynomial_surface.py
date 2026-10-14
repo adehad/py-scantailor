@@ -36,7 +36,7 @@ class TestPolynomialSurface:
         assert abs(int(rendered[20, 30]) - 200) <= 2
 
     def test_render_at_other_size_keeps_the_same_function(self):
-        ys, xs = np.mgrid[0:30, 0:30]
+        _ys, xs = np.mgrid[0:30, 0:30]
         image = (50 + 4 * xs).astype(np.uint8)
         surface = PolynomialSurface.fit(image, 1, 0)
 

@@ -22,7 +22,7 @@ LEFT = QtCore.Qt.MouseButton.LeftButton
 
 
 @pytest.fixture
-def files_dialog(qtbot: QtBot, page_images: "PageImages") -> ProjectFilesDialog:
+def files_dialog(qtbot: QtBot, page_images: PageImages) -> ProjectFilesDialog:
     dialog = ProjectFilesDialog(input_dir=page_images.directory)
     qtbot.addWidget(dialog)
     dialog.show()
@@ -54,7 +54,7 @@ def test_dialog_lists_scanned_images_as_available_when_input_dir_given(
 
 
 def test_dialog_ignores_non_image_files_in_input_dir(
-    qtbot: QtBot, page_images: "PageImages"
+    qtbot: QtBot, page_images: PageImages
 ):
     (page_images.directory / "notes.txt").write_text("not a scan")
     dialog = ProjectFilesDialog(input_dir=page_images.directory)
@@ -67,7 +67,7 @@ def test_dialog_ignores_non_image_files_in_input_dir(
 
 
 def test_browse_button_sets_input_dir_and_lists_its_images(
-    qtbot: QtBot, page_images: "PageImages", file_dialogs
+    qtbot: QtBot, page_images: PageImages, file_dialogs
 ):
     dialog = ProjectFilesDialog()
     qtbot.addWidget(dialog)
@@ -148,7 +148,7 @@ def test_add_button_with_empty_selection_leaves_project_unchanged(
 
 
 def test_files_already_in_project_are_not_offered_again(
-    qtbot: QtBot, page_images: "PageImages"
+    qtbot: QtBot, page_images: PageImages
 ):
     dialog = ProjectFilesDialog(
         input_dir=page_images.directory, project_files=["page_002.png"]
@@ -185,7 +185,7 @@ def test_dialog_cancel_rejects(files_dialog: ProjectFilesDialog):
 
 
 def test_chosen_files_become_project_pages_in_order(
-    qtbot: QtBot, files_dialog: ProjectFilesDialog, page_images: "PageImages"
+    qtbot: QtBot, files_dialog: ProjectFilesDialog, page_images: PageImages
 ):
     _select_rows(files_dialog._off_project_list, [0, 1, 2])
     qtbot.mouseClick(files_dialog._add_to_project_btn, LEFT)
@@ -199,7 +199,7 @@ def test_chosen_files_become_project_pages_in_order(
     assert [page.image_id.file_path.name for page in project.get_pages()] == expected
 
 
-def test_project_add_image_returns_the_stored_info(page_images: "PageImages"):
+def test_project_add_image_returns_the_stored_info(page_images: PageImages):
     project = Project()
     image_id = ImageId(file_path=page_images.paths[0])
 
@@ -210,7 +210,7 @@ def test_project_add_image_returns_the_stored_info(page_images: "PageImages"):
 
 
 def test_status_dialog_all_loaded_shows_counts_and_paths(
-    qtbot: QtBot, page_images: "PageImages"
+    qtbot: QtBot, page_images: PageImages
 ):
     dialog = LoadFilesStatusDialog(loaded_files=page_images.paths)
     qtbot.addWidget(dialog)
@@ -224,7 +224,7 @@ def test_status_dialog_all_loaded_shows_counts_and_paths(
 
 
 def test_status_dialog_with_failures_focuses_failed_tab_and_shows_errors(
-    qtbot: QtBot, page_images: "PageImages", tmp_path: pathlib.Path
+    qtbot: QtBot, page_images: PageImages, tmp_path: pathlib.Path
 ):
     broken = tmp_path / "broken.png"
     dialog = LoadFilesStatusDialog(
@@ -240,7 +240,7 @@ def test_status_dialog_with_failures_focuses_failed_tab_and_shows_errors(
 
 
 def test_status_dialog_reports_corrupt_file_on_disk_as_failure(
-    qtbot: QtBot, page_images: "PageImages", tmp_path: pathlib.Path
+    qtbot: QtBot, page_images: PageImages, tmp_path: pathlib.Path
 ):
     corrupt = tmp_path / "corrupt.png"
     corrupt.write_bytes(b"not a png")
@@ -263,7 +263,7 @@ def test_status_dialog_reports_corrupt_file_on_disk_as_failure(
 
 
 def test_show_status_returns_true_when_user_accepts(
-    page_images: "PageImages", respond_to_modal
+    page_images: PageImages, respond_to_modal
 ):
     respond_to_modal(accept=True)
 
@@ -271,7 +271,7 @@ def test_show_status_returns_true_when_user_accepts(
 
 
 def test_show_status_returns_false_when_user_cancels(
-    page_images: "PageImages", respond_to_modal
+    page_images: PageImages, respond_to_modal
 ):
     respond_to_modal(accept=False)
 
@@ -280,7 +280,7 @@ def test_show_status_returns_false_when_user_cancels(
 
 def test_main_window_add_files_action_opens_project_files_dialog(
     project_window: MainWindowManager,
-    dialog_factory: "DialogFactory",
+    dialog_factory: DialogFactory,
     respond_to_modal,
 ):
     dialog_factory.names = []
@@ -299,7 +299,7 @@ def test_add_files_action_is_listed_in_the_file_menu(main_window: MainWindowMana
 
 
 def test_accepting_project_files_dialog_adds_pages_to_main_window_project(
-    project_window: MainWindowManager, page_images: "PageImages"
+    project_window: MainWindowManager, page_images: PageImages
 ):
     assert project_window.project is not None
     assert [info.id.file_path for info in project_window.project.images] == (
@@ -309,8 +309,8 @@ def test_accepting_project_files_dialog_adds_pages_to_main_window_project(
 
 def test_adding_a_further_file_appends_a_page_and_marks_project_modified(
     project_window: MainWindowManager,
-    dialog_factory: "DialogFactory",
-    page_images: "PageImages",
+    dialog_factory: DialogFactory,
+    page_images: PageImages,
     respond_to_modal,
 ):
     extra = page_images.directory / "page_004.png"

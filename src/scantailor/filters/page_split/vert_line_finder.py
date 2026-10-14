@@ -42,7 +42,7 @@ class _QualityLine:
     @classmethod
     def of(
         cls, top: tuple[float, float], bottom: tuple[float, float], quality: int
-    ) -> "_QualityLine":
+    ) -> _QualityLine:
         if top[0] < bottom[0]:
             return cls(top, bottom, quality)
         return cls(bottom, top, quality)
@@ -65,7 +65,7 @@ class _LineGroup:
         if line.quality > self.leader.quality:
             self.leader = line
 
-    def merge(self, other: "_LineGroup") -> None:
+    def merge(self, other: _LineGroup) -> None:
         self.left = min(self.left, other.left)
         self.right = max(self.right, other.right)
         if other.leader.quality > self.leader.quality:

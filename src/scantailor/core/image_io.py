@@ -88,7 +88,7 @@ def _dpi_value(raw: Any, scale: float = 1.0) -> int:
     """
     try:
         value = float(raw) * scale
-    except (TypeError, ValueError, ZeroDivisionError):
+    except TypeError, ValueError, ZeroDivisionError:
         return 0
     if not math.isfinite(value) or value <= 0:
         return 0
@@ -247,7 +247,7 @@ def _scan_tiff_orientations(file: BinaryIO) -> tuple[list[int], dict[int, bytes]
                     )
                     patches[entry_start + value_offset] = struct.pack(endian + "H", 1)
             orientations.append(orientation)
-    except (struct.error, OSError, ValueError):
+    except struct.error, OSError, ValueError:
         return [], {}
     return orientations, patches
 
@@ -260,7 +260,7 @@ def _exif_orientation(image: Image.Image) -> int:
         return tiff_orientations[frame] if frame < len(tiff_orientations) else 1
     try:
         value = image.getexif().get(_TAG_ORIENTATION, 1)
-    except (OSError, SyntaxError, ValueError, TypeError):
+    except OSError, SyntaxError, ValueError, TypeError:
         return 1
     return value if isinstance(value, int) and 1 <= value <= 8 else 1
 

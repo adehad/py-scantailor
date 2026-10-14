@@ -63,7 +63,7 @@ class PageLayout(BaseModel):
         cls, v: tuple[float, float, float, float]
     ) -> tuple[float, float, float, float]:
         """Validate outline dimensions are positive."""
-        x, y, w, h = v
+        _x, _y, w, h = v
         if w <= 0 or h <= 0:
             msg = "Outline width and height must be positive"
             raise ValueError(msg)
@@ -263,7 +263,7 @@ class PageLayout(BaseModel):
             left_line, right_line = right_line, left_line
 
         if _is_vertical(left_line) and _is_vertical(right_line):
-            x, y, w, h = self.outline
+            _x, y, _w, h = self.outline
             left_x, right_x = _mid_x(left_line), _mid_x(right_line)
             return np.array(
                 [[left_x, y], [right_x, y], [right_x, y + h], [left_x, y + h]],
@@ -272,7 +272,7 @@ class PageLayout(BaseModel):
         between = _keep_side(self.get_outline_polygon(), left_line, keep_left=False)
         return _keep_side(between, right_line, keep_left=True)
 
-    def get_page_outline(self, sub_page: "SubPage") -> NDArray[np.floating] | None:
+    def get_page_outline(self, sub_page: SubPage) -> NDArray[np.floating] | None:
         """Get the outline for a specific sub-page.
 
         Args:
@@ -297,7 +297,7 @@ class PageLayout(BaseModel):
             PageLayoutType.TWO_PAGES: LayoutType.TWO_PAGES,
         }[self.layout_type]
 
-    def with_type(self, layout_type: PageLayoutType) -> Self:
+    def with_type(self, layout_type: PageLayoutType) -> PageLayout:
         """Change the layout type and keep the cutter lines.
 
         Keeping them lets a hand-placed line come back after the type was
@@ -325,7 +325,7 @@ class PageLayout(BaseModel):
             cutter2=cutter2,
         )
 
-    def with_split_line(self, split_x: float) -> Self:
+    def with_split_line(self, split_x: float) -> PageLayout:
         """Create a new layout with a different split line position.
 
         Args:
@@ -334,7 +334,7 @@ class PageLayout(BaseModel):
         Returns:
             New PageLayout with updated split line.
         """
-        x, y, w, h = self.outline
+        _x, y, _w, h = self.outline
         split_line = ((split_x, y), (split_x, y + h))
         return PageLayout(
             outline=self.outline,
@@ -343,7 +343,7 @@ class PageLayout(BaseModel):
             cutter2=split_line,
         )
 
-    def with_cutters(self, left_x: float, right_x: float) -> Self:
+    def with_cutters(self, left_x: float, right_x: float) -> PageLayout:
         """Create a new layout with different cutter positions.
 
         Args:
@@ -353,7 +353,7 @@ class PageLayout(BaseModel):
         Returns:
             New PageLayout with updated cutters.
         """
-        x, y, _w, h = self.outline
+        _x, y, _w, h = self.outline
         left_line = ((left_x, y), (left_x, y + h))
         right_line = ((right_x, y), (right_x, y + h))
         return PageLayout(

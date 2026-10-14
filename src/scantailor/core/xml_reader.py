@@ -84,7 +84,7 @@ def decode_project_bytes(raw: bytes) -> str:
     )
     try:
         return raw.decode(fallback)
-    except (UnicodeDecodeError, LookupError):
+    except UnicodeDecodeError, LookupError:
         return raw.decode("cp1252", errors="replace")
 
 
