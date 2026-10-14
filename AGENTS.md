@@ -10,48 +10,44 @@ pdm run cov                               # Run tests with coverage
 pdm run typecheck                         # Run type checking
 pre-commit run --all-files                # Run all linters/formatters
 pdm run docs                              # Build documentation
+pdm run exe                               # Build the executables with PyInstaller
 ```
 
 **Formatting**: Do NOT manually fix formatting/linting errors. Write code first, then run `pre-commit run --all-files` at the end to auto-fix.
 
 ## Project Context
 
-**Application**: ScanTailor Advanced - document scanning post-processor
-**Migration**: C++ → Python
-**Status**: In progress (UI, pipeline, batch processing and output stages working; remaining gaps tracked in `plan/PARITY_TRACKER.md`)
+**Application**: ScanTailor - document scanning post-processor, written in Python with PySide6
+**Origin**: a port of [ScanTailor Advanced](https://github.com/ScanTailor-Advanced/scantailor-advanced) (C++/Qt). The C++ code is not in this repository; read it upstream when you need to compare behaviour.
+**Tracking**: work and known defects are GitHub issues on `adehad/py-scantailor-advanced`
 
 ## Source Code Locations
 
-### C++ Source (Reference Only)
-
 ```text
-src/app/           - UI dialogs (37 files)
-src/core/          - Core engine (205 files)
-src/core/filters/  - 6 filter stages (240 files)
-src/imageproc/     - Image algorithms (102 files)
-src/math/          - Math utilities (24 files)
-src/dewarping/     - Page dewarping (22 files)
-src/foundation/    - Utilities (43 files)
+src/scantailor/              - Main package
+src/scantailor/app/ui/       - Qt windows, dialogs, panels and their .ui forms
+src/scantailor/core/         - Project model, settings, pipeline
+src/scantailor/filters/      - The six processing stages
+src/scantailor/imageproc/    - Image algorithms
+src/scantailor/dewarping/    - Page dewarping
+src/scantailor/math/         - Splines and numeric helpers
+src/scantailor/cli/          - Headless command line
+src/scantailor/resources/    - Qt resources (icons, fonts)
+src/scantailor/translations/ - .ts catalogues
+packages/jbig2-numba/        - JBIG2 encoder used by PDF export
+tools/                       - Translation, screenshot and PyInstaller helpers
+tests/                       - pytest suite, mirroring the package layout
+docs/                        - Sphinx user guide and API reference
 ```
 
-### Python Source (Active Development)
+## Design Philosophy
 
-```text
-src/scantailor/           - Main package
-src/scantailor/app/ui/    - UI implementations
-src/scantailor/resources/ - Qt resources
-src/scantailor/translations/
-tests/
-```
-
-## Migration Philosophy
-
-**Do NOT blindly replicate C++ patterns.** The C++ code is reference material, not a template.
-- Critically evaluate each C++ design - many are workarounds for C++ limitations
+**Do NOT blindly replicate upstream C++ patterns.** Upstream is a behavioural reference, not a template.
+- Critically evaluate each upstream design - many are workarounds for C++ limitations
 - Use Pythonic idioms (iterators, context managers, dataclasses, etc.)
 - Simplify where possible - Python has richer built-ins
 - Question the need for each class/abstraction
-- Bundle related changes in single commits: new Python code + tests + removal of corresponding C++ code
+- Bundle related changes in single commits: code + tests + docs
 
 ## Code Rules
 
@@ -63,7 +59,7 @@ tests/
 - loguru for logging
 - Tests for every module
 - Self-describing code that reads like English
-- Preserve C++ filenames where sensible, use PEP8 variable naming
+- Keep upstream class names as module names where sensible, use PEP8 variable naming
 - Comments explain WHY, not what
 - If a comment breaks up a function, extract to a named function instead
 
@@ -76,9 +72,9 @@ tests/
 - `from x import *`
 - Keep deprecated/dead code (rely on git for rollback)
 
-## Package Mappings
+## Library Choices
 
-| C++           | Python                                       |
+| Upstream C++  | Python                                       |
 | ------------- | -------------------------------------------- |
 | BinaryImage   | `np.ndarray` (uint8/bool)                    |
 | GrayImage     | `np.ndarray` (uint8)                         |
@@ -89,13 +85,13 @@ tests/
 | Transform     | `cv2.warpAffine()` / `cv2.warpPerspective()` |
 | XmlMarshaller | Pydantic + JSON                              |
 
-## Custom Code Required
+## Custom Code
 
-These have no library equivalent:
-- X-splines (`src/math/XSpline.cpp`)
-- Cylindrical dewarping (`src/dewarping/`)
-- Text line tracing
-- Mokji binarization
+These have no library equivalent and live in this repository:
+- X-splines (`src/scantailor/math/spline.py`)
+- Cylindrical dewarping (`src/scantailor/dewarping/`)
+- Text line tracing (`src/scantailor/dewarping/text_line_tracer.py`)
+- Mokji binarization (`src/scantailor/imageproc/binarize.py`)
 
 ## Testing Requirements
 
@@ -104,20 +100,13 @@ These have no library equivalent:
 - Test data in `tests/fixtures/`
 - pytest + pytest-qt
 
-## File References
-
-For task tracking: `plan/MIGRATION_CHECKLIST.md`
-For detailed strategy: `plan/MIGRATION_PLAN.md`
-
 ## Commit Style
 
-Brief messages grouping related changes. For migration work, one commit should include:
-- New Python code + tests
-- Removal of corresponding C++ code (if applicable)
+Brief messages grouping related changes: code, tests and docs for one change in one commit.
 
 Examples:
-- `Migrate binarization algorithms`
-- `Port page split filter`
+- `Add Mokji binarization`
+- `Remember the split line across pages`
 - `Add project JSON schema`
 
 ## Code Review Focus
@@ -130,7 +119,7 @@ CI/pre-commit already enforces: formatting, imports, type hint presence, docstri
 - Is this the right abstraction? Question over-engineering
 - Is this a C++ pattern that should be more Pythonic?
 - Filter classes must be stateless; Settings classes must be thread-safe
-- Are we using Python stdlib where C++ had manual implementations?
+- Are we using Python stdlib where upstream had manual implementations?
 
 ### Thread Safety (Critical for filters/)
 - Settings with mutable state must use `threading.Lock`
