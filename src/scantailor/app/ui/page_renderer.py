@@ -1,7 +1,9 @@
 """Background rendering of a page up to a filter stage."""
 
+import hashlib
 import threading
 from collections.abc import Callable, Hashable
+from dataclasses import dataclass
 
 import cv2
 import numpy as np
@@ -10,10 +12,16 @@ from numpy.typing import NDArray
 from PySide6 import QtCore, QtGui
 
 from scantailor.app.ui.source_cache import SourceCache
+from scantailor.app.ui.thumbnails.render_memo import ThumbnailMemo, reduced_copy
 from scantailor.core import pipeline
 from scantailor.core.image_io import ImageLoadError
-from scantailor.core.models import PageId
-from scantailor.core.page_source import FALLBACK_DPI, DpiOverrides, load_page
+from scantailor.core.models import ImageId, PageId
+from scantailor.core.page_source import (
+    FALLBACK_DPI,
+    DpiOverrides,
+    LoadedPage,
+    load_page,
+)
 from scantailor.core.pipeline import OutputExtras
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.output.params import DistortionModelSpec
@@ -33,6 +41,33 @@ _MAX_THREADS = 3
 
 # Longest a thumbnail worker waits for the render the user is waiting for.
 THUMBNAIL_YIELD_SECONDS = 30.0
+
+# A shrunk source is only used while it holds this multiple of the detail the
+# thumbnail shows; the area averaging down to the box then hides the extra
+# resampling step.
+_OVERSAMPLE = 2
+# A shrunk source keeps this multiple of the box along its longer side, so views
+# of two thirds of the image or more can still be oversampled from it.
+_REDUCED_SOURCE_FACTOR = 3
+
+# The stages that may detect parameters when a render reaches them.
+_DETECTING_STAGES = (
+    FilterStage.PAGE_SPLIT,
+    FilterStage.DESKEW,
+    FilterStage.SELECT_CONTENT,
+)
+
+# Keys name their content, so every window and project can share one memo.
+_SHARED_MEMO = ThumbnailMemo()
+
+
+def release_thumbnail_memory() -> None:
+    """Drop the kept thumbnails and shrunk sources, such as when a project closes.
+
+    Only frees memory early: kept entries are keyed by the file's content and
+    parameters, so none could be handed out wrongly later.
+    """
+    _SHARED_MEMO.clear()
 
 
 def warm_up_qt_image_types() -> None:
@@ -90,6 +125,7 @@ def render_page_with_model(
     pixels: bool = True,
     on_extras: Callable[[OutputExtras], None] | None = None,
     should_cancel: Callable[[], bool] | None = None,
+    on_source: Callable[[LoadedPage], None] | None = None,
 ) -> tuple[NDArray[np.uint8], DistortionModelSpec | None]:
     """Render a page like ``render_page`` and return the dewarping model it built.
 
@@ -111,6 +147,8 @@ def render_page_with_model(
             Output stage; they are not produced without it.
         should_cancel (Callable[[], bool] | None): Asked between stages; True
             stops the render with ``pipeline.PipelineCancelled``.
+        on_source (Callable[[LoadedPage], None] | None): Called with the
+            decoded source before the pipeline runs; it must not modify it.
 
     Returns:
         tuple[NDArray[np.uint8], DistortionModelSpec | None]: The display image
@@ -124,6 +162,8 @@ def render_page_with_model(
         page = load_page(page_id.image_id, dpi_overrides)
     else:
         page = sources.load(page_id.image_id, dpi_overrides, keep=keep_source)
+    if on_source is not None:
+        on_source(page)
     options = pipeline.PipelineOptions(
         end_stage=end_stage,
         dpi=page.horizontal_dpi(),
@@ -134,12 +174,16 @@ def render_page_with_model(
     result = pipeline.process_page(page.pixels, page_id, sequence, options)
     if on_extras is not None and result.output_extras is not None:
         on_extras(result.output_extras)
-    image = result.image
     if not pixels:
         return np.empty((0, 0), dtype=np.uint8), result.distortion_model
+    return _bgr_to_rgb(result.image), result.distortion_model
+
+
+def _bgr_to_rgb(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
+    """Return a colour image in display channel order; gray is returned as is."""
     if image.ndim == 3 and image.shape[2] == 3:
-        image = np.ascontiguousarray(image[:, :, ::-1])
-    return image, result.distortion_model
+        return np.ascontiguousarray(image[:, :, ::-1])
+    return image
 
 
 def render_thumbnail(
@@ -149,10 +193,17 @@ def render_thumbnail(
     max_size: QtCore.QSize,
     dpi_overrides: DpiOverrides | None = None,
     sources: SourceCache | None = None,
+    memo: ThumbnailMemo | None = None,
 ) -> QtGui.QImage:
     """Render a page up to ``end_stage`` and shrink it to fit ``max_size``.
 
-    Safe to call from worker threads; ``sequence`` is only read.
+    Safe to call from worker threads. Stages may store what they detect in
+    ``sequence``, as any render does.
+
+    Before Output, a thumbnail whose parameters are unchanged since it was last
+    made is handed out again, and one whose detecting stages a full render has
+    already settled is rendered from a shrunk copy of the source. Only the rest
+    decode the source at full size.
 
     Args:
         page_id (PageId): Page to render.
@@ -163,13 +214,113 @@ def render_thumbnail(
             the image file's.
         sources (SourceCache | None): Decoded sources to reuse when the page is
             in it; a page decoded here is not added to it.
+        memo (ThumbnailMemo | None): Where thumbnails, shrunk sources and
+            settled parameters are kept; one shared by every caller when None.
 
     Returns:
-        QtGui.QImage: Detached image, 8-bit gray or RGB888.
+        QtGui.QImage: 8-bit gray or RGB888, possibly handed out before; do not
+            modify it.
 
     Raises:
         ImageLoadError: If the source image cannot be decoded.
     """
+    if end_stage >= FilterStage.OUTPUT:
+        image = render_page_with_model(
+            page_id,
+            sequence,
+            end_stage,
+            dpi_overrides,
+            sources=sources,
+            keep_source=False,
+        )[0]
+        return shrink_to_thumbnail(image, max_size)
+    memo = _SHARED_MEMO if memo is None else memo
+    source_key = _source_key(page_id.image_id, dpi_overrides)
+    before = _ParamDigests.of(page_id, sequence, end_stage, source_key)
+    image_key = (before.everything, max_size.width(), max_size.height())
+    thumbnail = memo.image(image_key)
+    if thumbnail is not None:
+        return thumbnail
+    thumbnail = _render_from_reduced_source(
+        page_id, sequence, end_stage, max_size, memo, source_key, before
+    )
+    from_full_size = thumbnail is None
+    if thumbnail is None:
+        thumbnail = _render_from_full_source(
+            page_id,
+            sequence,
+            end_stage,
+            max_size,
+            (dpi_overrides, sources),
+            memo,
+            source_key,
+        )
+    # Unchanged digests mean no stage detected and nobody edited meanwhile.
+    if _ParamDigests.of(page_id, sequence, end_stage, source_key) == before:
+        memo.keep_image(image_key, thumbnail)
+        if from_full_size:
+            for digest in before.detecting:
+                memo.settle(digest)
+    return thumbnail
+
+
+def _render_from_reduced_source(
+    page_id: PageId,
+    sequence: StageSequence,
+    end_stage: FilterStage,
+    max_size: QtCore.QSize,
+    memo: ThumbnailMemo,
+    source_key: Hashable,
+    digests: "_ParamDigests",
+) -> QtGui.QImage | None:
+    """Render from the kept shrunk source when no stage would detect.
+
+    Returns:
+        QtGui.QImage | None: The thumbnail, or None when it needs the full-size
+            source.
+    """
+    reduced = memo.reduced_source(source_key)
+    if reduced is None:
+        return None
+    if digests.detecting and not memo.is_settled(digests.detecting[-1]):
+        return None
+    rendered = pipeline.render_from_reduced_source(
+        reduced.pixels,
+        reduced.full_size,
+        page_id,
+        sequence,
+        pipeline.PipelineOptions(end_stage=end_stage, dpi=reduced.dpi),
+        (max_size.width() * _OVERSAMPLE, max_size.height() * _OVERSAMPLE),
+    )
+    if rendered is None:
+        return None
+    view, full_size = rendered
+    return shrink_to_thumbnail(_bgr_to_rgb(view), max_size, full_size)
+
+
+def _render_from_full_source(
+    page_id: PageId,
+    sequence: StageSequence,
+    end_stage: FilterStage,
+    max_size: QtCore.QSize,
+    origin: tuple[DpiOverrides | None, SourceCache | None],
+    memo: ThumbnailMemo,
+    source_key: Hashable,
+) -> QtGui.QImage:
+    """Render from the full-size source, keeping a shrunk copy of it."""
+    dpi_overrides, sources = origin
+    longest_side = _REDUCED_SOURCE_FACTOR * max(max_size.width(), max_size.height())
+
+    def keep_reduced(page: LoadedPage) -> None:
+        kept = memo.reduced_source(source_key)
+        height, width = page.pixels.shape[:2]
+        # A copy made for this size falls short of it by the rounding of its sides.
+        if kept is not None and kept.scale * max(width, height) >= longest_side - 1:
+            return
+        reduced = reduced_copy(page.pixels, page.horizontal_dpi(), longest_side)
+        if reduced is not None:
+            memo.keep_reduced_source(source_key, reduced)
+
     image = render_page_with_model(
         page_id,
         sequence,
@@ -177,12 +328,76 @@ def render_thumbnail(
         dpi_overrides,
         sources=sources,
         keep_source=False,
+        on_source=keep_reduced,
     )[0]
     return shrink_to_thumbnail(image, max_size)
 
 
+def _source_key(image_id: ImageId, dpi_overrides: DpiOverrides | None) -> Hashable:
+    """Name a source by the image, its project resolution and the file's state."""
+    override = dpi_overrides.get(image_id) if dpi_overrides else None
+    try:
+        stat = image_id.file_path.stat()
+        version: tuple[int, int] | None = (stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        version = None
+    return (image_id, override, version)
+
+
+@dataclass(frozen=True)
+class _ParamDigests:
+    """Digests of everything a render up to a stage before Output reads.
+
+    Attributes:
+        detecting (tuple[str, ...]): One digest per stage that can detect, up to
+            the end stage, each covering the source and every stage up to it.
+        everything (str): Covers the source, every stage up to the end stage and
+            the size the pages are matched to.
+    """
+
+    detecting: tuple[str, ...]
+    everything: str
+
+    @classmethod
+    def of(
+        cls,
+        page_id: PageId,
+        sequence: StageSequence,
+        end_stage: FilterStage,
+        source_key: Hashable,
+    ) -> "_ParamDigests":
+        """Read the parameters a render of a page up to ``end_stage`` uses."""
+        digest = hashlib.blake2b(repr((source_key, page_id)).encode(), digest_size=16)
+        orientation = sequence.fix_orientation_filter
+        for model in (
+            orientation.get_rotation(page_id.image_id),
+            orientation.get_trim(page_id.image_id),
+        ):
+            digest.update(model.model_dump_json().encode())
+        params_of = {
+            FilterStage.PAGE_SPLIT: sequence.page_split_filter.get_params,
+            FilterStage.DESKEW: sequence.deskew_filter.get_params,
+            FilterStage.SELECT_CONTENT: sequence.select_content_filter.get_params,
+            FilterStage.PAGE_LAYOUT: sequence.page_layout_filter.get_params,
+        }
+        detecting: list[str] = []
+        for stage, params in params_of.items():
+            if stage > end_stage:
+                break
+            digest.update(params(page_id).model_dump_json().encode())
+            if stage in _DETECTING_STAGES:
+                detecting.append(digest.hexdigest())
+        if end_stage >= FilterStage.PAGE_LAYOUT:
+            aggregate = sequence.page_layout_filter.get_aggregate_hard_size()
+            digest.update(aggregate.model_dump_json().encode())
+        digest.update(str(int(end_stage)).encode())
+        return cls(tuple(detecting), digest.hexdigest())
+
+
 def shrink_to_thumbnail(
-    image: NDArray[np.uint8], max_size: QtCore.QSize
+    image: NDArray[np.uint8],
+    max_size: QtCore.QSize,
+    full_size: tuple[int, int] | None = None,
 ) -> QtGui.QImage:
     """Shrink a rendered page to fit ``max_size``; smaller pages keep their size.
 
@@ -190,14 +405,19 @@ def shrink_to_thumbnail(
         image (NDArray[np.uint8]): Display image, ``(H, W)`` gray or ``(H, W, 3)``
             RGB, as ``render_page_with_model`` returns it; only read.
         max_size (QtCore.QSize): Bounding size of the result.
+        full_size (tuple[int, int] | None): Width and height of the page at
+            full size when ``image`` is a reduced copy of it, so that the result
+            is as large as one shrunk from the full-size page.
 
     Returns:
         QtGui.QImage: Detached image, 8-bit gray or RGB888.
     """
     height, width = image.shape[:2]
+    if full_size is not None:
+        width, height = full_size
     scale = min(max_size.width() / width, max_size.height() / height, 1.0)
-    if scale < 1.0:
-        size = (max(1, round(width * scale)), max(1, round(height * scale)))
+    size = (max(1, round(width * scale)), max(1, round(height * scale)))
+    if size != (image.shape[1], image.shape[0]):
         image = np.asarray(
             cv2.resize(image, size, interpolation=cv2.INTER_AREA), dtype=np.uint8
         )

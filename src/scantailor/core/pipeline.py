@@ -19,6 +19,7 @@ give a later stage something to detect on or to produce the result.
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
 
+import cv2
 import numpy as np
 from loguru import logger
 from numpy.typing import NDArray
@@ -32,6 +33,7 @@ from scantailor.core.page_geometry import (
 from scantailor.core.transformation import (
     ImageTransformation,
     Rect,
+    _whiten_outside,
     render_transformed,
 )
 from scantailor.core.zones import Zone, ZoneSpline
@@ -287,6 +289,116 @@ def process_page(
     )
 
 
+def render_from_reduced_source(
+    source: NDArray[np.uint8],
+    full_size: tuple[int, int],
+    page_id: PageId,
+    sequence: StageSequence,
+    options: PipelineOptions,
+    fit: tuple[int, int],
+) -> tuple[NDArray[np.uint8], tuple[int, int]] | None:
+    """Render a stage before Output from a downscaled copy of the source.
+
+    The geometry is built as ``process_page`` builds it for the full-size
+    source, from stored parameters only: no stage detects, so the caller must
+    know that every stage up to ``options.end_stage`` already holds what a full
+    run would settle on. Only the final resampling reads pixels, from ``source``.
+
+    Args:
+        source (NDArray[np.uint8]): The decoded image shrunk evenly, before Fix
+            Orientation; ``(H, W)`` gray or ``(H, W, 3)`` BGR. Only read.
+        full_size (tuple[int, int]): Width and height of the full-size decode
+            that ``source`` was shrunk from.
+        page_id (PageId): The page.
+        sequence (StageSequence): Stages holding the page's parameters. Page
+            Layout records the page's content size, as a full run does.
+        options (PipelineOptions): ``end_stage`` must come before Output;
+            ``dpi`` is the full-size source's resolution.
+        fit (tuple[int, int]): Width and height of a box; the view, scaled
+            to fit it, needs at least this much detail.
+
+    Returns:
+        tuple[NDArray[np.uint8], tuple[int, int]] | None: The stage's view
+            shrunk as ``source`` is, in the channel layout of ``source``, and
+            the width and height the view has at full size; None when ``source``
+            is coarser than ``fit`` needs.
+
+    Raises:
+        ValueError: If ``options.end_stage`` is Output.
+    """
+    if options.end_stage >= FilterStage.OUTPUT:
+        msg = "a reduced source cannot render the Output stage"
+        raise ValueError(msg)
+    orientation = sequence.fix_orientation_filter
+    oriented = orientation.process_image(source, page_id.image_id)
+    full_width, full_height = full_size
+    if orientation.get_rotation(page_id.image_id).degrees % 180:
+        full_width, full_height = full_height, full_width
+    # Zero strides: the geometry only reads the full-size source's shape.
+    stand_in = np.broadcast_to(np.uint8(0), (full_height, full_width))
+    state = _PageState(stand_in, options.dpi)
+    _apply_trim(state, page_id, sequence)
+    for stage in FilterStage:
+        if FilterStage.FIX_ORIENTATION < stage <= options.end_stage:
+            _process_stage(state, page_id, sequence, stage, options, detect=False)
+    source_scale = (oriented.shape[1] / full_width, oriented.shape[0] / full_height)
+    return _resample_reduced(oriented, source_scale, state.xform, fit)
+
+
+def _resample_reduced(
+    source: NDArray[np.uint8],
+    source_scale: tuple[float, float],
+    xform: ImageTransformation,
+    fit: tuple[int, int],
+) -> tuple[NDArray[np.uint8], tuple[int, int]] | None:
+    """Resample a shrunk source through a full-size transformation, shrunk too.
+
+    Like ``render_transformed``, areas with no source pixel or outside the
+    pre-crop area are white. The view is shrunk as the source is, so that the
+    resampling neither blurs nor drops detail the source still has.
+
+    Returns:
+        The view and its full-size width and height, or None when the view
+        scaled to fit ``fit`` needs more detail than the source has.
+    """
+    rect = xform.resulting_rect
+    full_size = (max(1, round(rect.width)), max(1, round(rect.height)))
+    view_width, view_height = max(1.0, rect.width), max(1.0, rect.height)
+    scale = min(source_scale)
+    if min(fit[0] / view_width, fit[1] / view_height, 1.0) > scale * (1 + 1e-9):
+        return None
+    out_width = max(1, round(view_width * scale))
+    out_height = max(1, round(view_height * scale))
+    # OpenCV addresses pixel centres at integer coordinates while the
+    # transformation addresses pixel corners, hence the half pixel shifts.
+    result_to_view = np.array(
+        [
+            [1 / scale, 0.0, rect.x + 0.5 / scale],
+            [0.0, 1 / scale, rect.y + 0.5 / scale],
+            [0.0, 0.0, 1.0],
+        ]
+    )
+    full_to_reduced = np.array(
+        [[source_scale[0], 0.0, -0.5], [0.0, source_scale[1], -0.5], [0.0, 0.0, 1.0]]
+    )
+    dst_to_src = full_to_reduced @ xform.transform_back @ result_to_view
+    result = np.asarray(
+        cv2.warpAffine(
+            np.ascontiguousarray(source),
+            dst_to_src[:2],
+            (out_width, out_height),
+            flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=(255, 255, 255, 255),
+        ),
+        dtype=np.uint8,
+    )
+    if result.ndim < source.ndim:
+        result = result.reshape(out_height, out_width, 1)
+    _whiten_outside(result, (xform.resulting_pre_crop_area - [rect.x, rect.y]) * scale)
+    return result, full_size
+
+
 def _run_stages(
     image: NDArray[np.uint8],
     page_id: PageId,
@@ -416,13 +528,28 @@ def _process_fix_orientation(
 
     if not options.detect_only:
         state.replace_source(filter_.process_image(state.source, page_id.image_id))
-        height, width = state.source.shape[:2]
-        trim_area = filter_.trim_crop_area(page_id.image_id, (width, height))
+        trim_area = _apply_trim(state, page_id, sequence)
         if trim_area is not None:
-            state.trim_area = trim_area
-            state.crop_to(trim_area)
             metadata["trim_area"] = trim_area.tolist()
     return metadata
+
+
+def _apply_trim(
+    state: _PageState, page_id: PageId, sequence: StageSequence
+) -> NDArray[np.float64] | None:
+    """Crop the oriented source to Fix Orientation's manual trim, if there is one.
+
+    Returns:
+        The trimmed region in oriented source pixels, or None without a trim.
+    """
+    height, width = state.source.shape[:2]
+    trim_area = sequence.fix_orientation_filter.trim_crop_area(
+        page_id.image_id, (width, height)
+    )
+    if trim_area is not None:
+        state.trim_area = trim_area
+        state.crop_to(trim_area)
+    return trim_area
 
 
 def _process_page_split(
