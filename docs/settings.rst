@@ -1,9 +1,9 @@
 Settings and default parameters
 ###############################
 
-**Tools > Settings ...** and **Tools > Default parameters ...** hold the options
-for the application and for new projects. Units are also under **Tools > Units**,
-which sets the same value as the Settings dialog.
+**Tools > Settings ...** holds the options of the application.
+**Tools > Default parameters ...** holds the values new projects start from.
+**Tools > Units** sets the same Units value as the Settings dialog.
 
 Settings
 --------
@@ -26,9 +26,10 @@ act on them, so they keep their stored values.
      - Greyed out. This build has no OpenGL drawing path.
      - Not available.
    * - Auto-save the existing project
-     - Saves the open project to its file about a minute after the first change since
-       the last save. A project that has never been saved has no file, so nothing is written. A save due during
-       a batch waits until the batch ends.
+     - Saves the open project to its file about a minute after the first change
+       since the last save. A project that was never saved has no file, so
+       nothing is written. A save that falls due during a batch waits until the
+       batch ends.
      - Turn on to keep the project file up to date while you work.
    * - Color scheme
      - Auto follows the operating system. Light and Dark fix the scheme. The
@@ -39,15 +40,17 @@ act on them, so they keep their stored values.
        inches. Same as **Tools > Units**.
      - The unit you read margins and sizes in.
    * - Language
-     - Greyed out in this version.
-     - Not available.
+     - The language of the menus and dialogs. Pressing OK switches the running
+       program to it, and it is used again at the next start. Until you choose one,
+       ScanTailor follows the system language.
+     - When the system language is not the one you want to work in.
    * - Default zone creation mode
      - The shape of a new zone in the Output view: Polygonal, Lasso (freehand) or
        Rectangular. Keys Z, X and C switch it while editing.
      - Lasso for freehand outlines, Rectangular for boxes.
    * - Thumbnails: Quality
-     - Pixel width at which each thumbnail picture is made. Higher is sharper and
-       takes longer to draw.
+     - Pixel width at which each thumbnail picture is made. Higher values are
+       sharper and take longer to draw.
      - Raise it only if the thumbnails look soft.
    * - Thumbnails: Size
      - Largest width of a thumbnail on screen, in pixels. The height follows a
@@ -88,8 +91,8 @@ Default parameters
    :alt: The Default parameters dialog
 
 The Default parameters dialog sets the values that a new project starts from. It
-has the same sections as the stage options, so each stage's defaults can be set
-in one place. The units of the margins and sizes follow the Units setting.
+has the same sections as the stage options, so you can set the defaults of every
+stage in one place. The units of the margins and sizes follow the Units setting.
 
 How the defaults apply
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -101,18 +104,21 @@ How the defaults apply
    * - Case
      - What happens
    * - New project
-     - The selected profile is applied to every page when the project is created.
+     - The program applies the selected profile to every page when it creates
+       the project.
    * - Pages inserted later
-     - The same profile is applied to them as they are inserted.
-   * - Pages opened from a PDF
-     - The same profile is applied, and the resolution chosen in the Open PDF
-       dialog becomes the output resolution. See :doc:`export_pdf`.
+     - The program applies the same profile to them as they are inserted.
+   * - Pages rendered from a PDF
+     - The program applies the same profile, and the resolution chosen in the
+       **Extract pages** prompt becomes the output resolution. See
+       :doc:`export_pdf`.
    * - Open project
      - Not changed. A saved project keeps the values it was saved with.
 
-A default that equals the factory value is not written to the new project. That
-stage then keeps detecting by itself. Deskew is set only when its mode is Manual,
-because an automatic entry would be trusted instead of measured.
+The program does not write a default that equals the factory value to the new
+project. That stage then keeps detecting by itself. Deskew is set only when its
+mode is Manual, because the stage would trust an automatic entry instead of
+measuring the page.
 
 Profiles
 ~~~~~~~~
@@ -130,8 +136,9 @@ The profile box at the top of the dialog chooses which set of defaults is used.
      - The factory values.
      - Read only.
    * - Source
-     - Leaves the scan as it is: pages are not split, deskewed, cropped or given
-       margins, and the output stays grayscale.
+     - Leaves the scan as it is: the pages are not split, deskewed, cropped or
+       given margins, and the output uses the **Color / Grayscale** mode, so
+       it is not turned into black and white.
      - Read only.
    * - A saved profile
      - Your own set of values, stored under the name you gave it. Save writes
@@ -143,6 +150,6 @@ The profile box at the top of the dialog chooses which set of defaults is used.
      - Yes.
 
 When you press OK, the selected profile becomes the one new projects use. Edits to
-a saved profile apply to new projects straight away, but the saved profile itself
-changes only when you press Save. See :mod:`scantailor.core.default_params` and
+a saved profile apply to new projects at once, but the stored profile changes
+only when you press Save. See :mod:`scantailor.core.default_params` and
 :mod:`scantailor.core.default_params_profiles`.

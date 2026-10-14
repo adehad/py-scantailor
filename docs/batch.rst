@@ -6,14 +6,14 @@ Batch processing
 
 The play button runs every page of the project through all six stages, from Fix
 Orientation to Output. It appears on the row of the selected stage in the stage
-list whenever a project is open and no batch is running. The selected row only
-sets where the button sits. Which stage you select does not change what runs.
+list whenever a project is open and no batch is running. The selected row decides
+only where the button is. A batch always runs every stage.
 
 .. screenshot:: stage_play_button
    :alt: The stage list with the play button on the selected Select Content row
 
-Pages are processed in the order the thumbnail list shows them, whichever sort
-order is chosen. Every page is included, not only the selected ones.
+The batch processes the pages in the order the thumbnail list shows them, with
+any sort order. It includes every page, not only the selected ones.
 
 Progress window
 ---------------
@@ -27,11 +27,12 @@ A batch has two phases, and the Batch processing window shows both:
    * - Phase
      - What happens
    * - Detecting ``n/N``
-     - Each page is measured for its split, deskew, content box and margins. The
-       results go into the project's settings, so every page's parameters are
-       known before any page is written.
+     - The batch measures the split, deskew, content box and margins of each page.
+       The results go into the project's settings, so the parameters of every
+       page are known before any page is written.
    * - Rendering ``n/N``
-     - Each page is rendered and written as a TIFF file in the output folder.
+     - The batch renders each page and writes it as a TIFF file in the output
+       folder.
 
 The window also has these parts:
 
@@ -57,10 +58,10 @@ The window also has these parts:
 How many pages run at once
 --------------------------
 
-Pages are processed in parallel by worker processes, one per CPU core. On
+Worker processes handle the pages in parallel, one process per CPU core. On
 Windows the count is capped at 61, the most worker processes one pool can hold.
-The worker count can be stored in the application settings, but this build does
-not show the control that sets it, so the default applies.
+The application settings can store a worker count, but this build has no control
+to set it, so the default applies.
 
 What is locked while a batch runs
 ---------------------------------
@@ -77,13 +78,28 @@ would change them:
 Output files
 ------------
 
-Each page is written as a TIFF file named after its source file, with a label in brackets when two
-source files share a name. A page of a multi-page file gets ``_pageNNNN`` after the name. The two halves of a split scan
-get a number and a side letter, such as ``_1L`` and ``_2R``. The numbering follows
-the reading direction of the project. See :mod:`scantailor.core.batch`.
+Each page is written as a TIFF file named after its source file. The batch adds
+these parts to the name, in this order:
 
-The compression of the TIFF files comes from **Tools > Settings ... > Saving**:
-one setting for black and white pages and one for grey and colour pages. See
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
+
+   * - Case
+     - Added to the name
+   * - Two source files in different folders share a name
+     - A label in brackets, such as ``(1)`` or ``(2)``.
+   * - Page of a multi-page file
+     - ``_page`` and the page number in four digits, such as ``_page0003``.
+   * - Half of a split scan, left to right project
+     - ``_1L`` for the left half and ``_2R`` for the right half.
+   * - Half of a split scan, right to left project
+     - ``_1R`` for the right half and ``_2L`` for the left half.
+
+See :mod:`scantailor.core.batch`.
+
+The TIFF compression comes from **Tools > Settings ... > Saving**, which has one
+setting for black and white pages and one for grey and colour pages. See
 :doc:`settings`.
 
 Batch and PDF export

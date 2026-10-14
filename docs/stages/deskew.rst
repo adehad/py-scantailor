@@ -4,9 +4,9 @@
 .. screenshot:: stage3_deskew
    :alt: Deskew with its angle dial and Deskew panel
 
-Straightens pages that were scanned at a slight angle. The rotation is found from the
-text lines when it is **Auto** (see :mod:`scantailor.imageproc.skew_finder`), or set by
-hand when it is **Manual**.
+Straightens pages that were scanned at a slight angle. **Auto** finds the rotation
+from the text lines, with the code in :mod:`scantailor.imageproc.skew_finder`.
+**Manual** uses the angle you set.
 
 .. list-table::
    :header-rows: 1
@@ -25,17 +25,26 @@ hand when it is **Manual**.
 Top page edge
 =============
 
-By default **Auto** finds the angle from the lines of text. Tick **Top page edge
-(book scans)** to find it from the top edge of the page instead, which suits book
-scans with a dark background around the page. Changing it detects the angle again
-for the current page while its angle is **Auto**; other pages with **Auto** keep
-their angle until they are processed. A page needs a dark surround that reaches
-the top of the scan; a page without one has no visible edge, and its angle is then
-found from the lines of text.
+By default **Auto** finds the angle from the lines of text. **Top page edge (book
+scans)** makes it find the angle from the top edge of the page instead. The page
+needs a dark surround that reaches the top of the scan. A page without one has no
+visible edge, and its angle then comes from the lines of text.
 
-Use the top page edge when the text on the page is too sparse to measure, such as a
-page of a few short lines or a plate with a caption. Leave it off for ordinary text
-pages, where the lines of text give the angle.
+Changing the box detects the angle again for the current page while its angle is
+**Auto**. Other pages on **Auto** keep their angle until they are processed.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Top page edge
+     - When to use it
+   * - Ticked
+     - Book scans with a dark background around the page, where the text is too
+       sparse to measure, such as a page of a few short lines or a plate with a
+       caption.
+   * - Unticked
+     - Ordinary text pages, where the lines of text give the angle.
 
 Oblique correction
 ==================
@@ -45,15 +54,15 @@ Oblique correction
 
 A page can also lean sideways instead of turning, with its vertical edges slanted
 while the text lines stay level. The oblique correction shears the page back after
-it has been rotated, up to 5 degrees either way. The angle is measured as the
-difference between how the text lines and how the left and right edges of the
-text are skewed, so it works best on pages with justified text. The measuring code
+the rotation, by up to 5 degrees either way. ScanTailor measures the oblique angle as
+the difference between the skew of the text lines and the skew of the left and right
+edges of the text, so it works best on pages with justified text. The measuring code
 is in :mod:`scantailor.filters.deskew.oblique`.
 
-**Oblique mode** has its own **Auto** and **Manual** buttons, apart from the ones
-for the rotation: switching one never changes the other. In **Manual** mode set the
-angle with **Oblique** or by dragging the two handles on the arcs at the top and
-bottom of the image; typing a value or dragging a handle switches to **Manual**.
+**Oblique mode** has its own **Auto** and **Manual** buttons, separate from the ones
+for the rotation. Switching one never changes the other. In **Manual** mode, set the
+angle with **Oblique** or drag the two handles on the arcs at the top and bottom of
+the image. Typing a value or dragging a handle switches to **Manual**.
 
 .. list-table::
    :header-rows: 1
@@ -75,20 +84,31 @@ bottom of the image; typing a value or dragging a handle switches to **Manual**.
 When to enable oblique correction
 ---------------------------------
 
-Turn it on for a book or a batch whose pages are visibly sheared: the vertical edges
-of the text block, the page edge or a ruled table lean the same way on every page,
-while the lines of text sit level after the rotation. Leave it off for pages whose
-only fault is the rotation, because the rotation already corrects them, and for
-pages with little or ragged text, where the difference between the line skew and the
-edge skew cannot be measured. On those pages set the angle by hand, or leave it at
-zero.
+.. list-table::
+   :header-rows: 1
+   :widths: 40 15 45
 
-Check a sample page after you enable it, and look at the text lines and the page
-edges together.
+   * - Pages
+     - Oblique correction
+     - Why
+   * - The vertical edges of the text block, the page edge or a ruled table lean the
+       same way on every page, while the lines of text sit level after the rotation.
+     - On
+     - The pages are sheared, and the rotation cannot correct a shear.
+   * - The only fault is the rotation.
+     - Off
+     - The rotation already corrects them.
+   * - Little or ragged text.
+     - Off, or set the angle by hand
+     - ScanTailor cannot measure the difference between the line skew and the edge
+       skew. Set the angle by hand, or leave it at zero.
+
+After you enable it, check a sample page and compare the text lines with the page
+edges.
 
 **Apply To ...** asks which parts to copy: **Deskew angle and mode** and **Oblique
-angle and mode**. A part that is **Auto** is not copied as a number; each page
-detects its own.
+angle and mode**. A part on **Auto** is copied as **Auto**, not as a number, so each
+page detects its own angle.
 
 Projects
 ========

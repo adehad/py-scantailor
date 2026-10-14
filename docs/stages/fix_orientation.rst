@@ -25,7 +25,7 @@ Rotate
      - The top of the text points to the left.
    * - **Reset**
      - Returns the page to the rotation it was scanned with.
-     - Undoing a turn that was wrong.
+     - A turn was wrong.
    * - **Apply to ...**
      - Copies the rotation and the trim to other pages you choose.
      - The whole book, or a run of pages, was scanned the same way.
@@ -34,8 +34,8 @@ The **L** and **R** keys, the left and right arrow keys, and a double click in t
 view also turn the page a quarter turn.
 
 The arrow in the corner of the view points to where the top of the page is now,
-so you can check the direction of a turn without reading the text. It turns with
-the rotation, so a page turned a half turn shows it pointing down.
+so you can check the direction of a turn without reading the text. The arrow turns
+with the page, so after a half turn it points down.
 
 Crop scan (trim)
 ================
@@ -66,11 +66,11 @@ image, for example a scanner bed's border or a dark edge.
      - Pixels from the bottom edge of the image as it was scanned.
      - A strip runs along the bottom.
 
-The four edges are fixed to the scan, not to the page, so a margin keeps naming
-the same edge when the page is rotated. **Reset trim** sets all four to zero.
+The four boxes refer to the edges of the scan, not of the page, so each box names
+the same edge after the page is rotated. **Reset trim** sets all four to zero.
 
-Every later step works on what is left: Page Split, Deskew, Select Content, Margins
-and Output, and the thumbnails, all see the trimmed image. On a two-page scan each
-page is the part of its side of the split that lies inside the trim. The trim never
-leaves less than 32 pixels in either direction. Unticking the box removes the trim
-but keeps the numbers shown, so ticking it again brings them back.
+Split Pages, Deskew, Select Content, Margins, Output and the thumbnails all work on
+the trimmed image. On a two-page scan, each page is the part of its side of the
+split that lies inside the trim. The trim never leaves less than 32 pixels in either
+direction. Unticking the box removes the trim but keeps the numbers, so ticking it
+again brings them back.

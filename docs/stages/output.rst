@@ -11,8 +11,7 @@ Output resolution
 =================
 
 **DPI** sets the resolution of the output images. The output size in pixels is the
-page size at that DPI, so a higher value makes larger files. Set it to the resolution
-the final use needs.
+page size at that DPI, so a higher value makes larger files.
 
 Mode
 ====
@@ -111,15 +110,25 @@ it matches the paper instead of showing white.
 Despeckling
 ===========
 
-**Despeckle** removes black specks that are small and far from text. It runs a
-second pass that gives a speck a second chance to reach a large neighbour, with
-the ink already kept counting as its own source. This keeps small marks that
-belong to the text and that a single pass loses, for example the dots of Arabic
-letters, the dots of i and j, and full stops. The result keeps more small marks
-than the original ScanTailor does at the same level. The stricter result of the
-original is suspected to come from a bug in how it measures the distance to the ink.
-This port keeps the lenient pass on purpose. The bug is not confirmed against the
-original program.
+**Despeckle** removes black specks that are small and far from text. A second pass
+looks again at specks whose only close neighbours are too small to keep them. In
+that pass the ink of marks already kept counts as a neighbour, so a speck next to
+kept ink can attach to it. This keeps small marks that belong to the text and that
+a single pass loses, for example the dots of Arabic letters, the dots of i and j,
+and full stops.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 30 45
+
+   * - Upstream ScanTailor Advanced
+     - This port
+     - Why
+   * - Removes more small marks at the same level.
+     - Keeps more small marks at the same level, with the second pass.
+     - The stricter upstream result probably comes from a bug in how upstream
+       measures the distance to the ink. Nobody has confirmed the bug against the
+       upstream program, and the port keeps the second pass on purpose.
 
 The strength has four steps:
 
@@ -147,7 +156,7 @@ The strength has four steps:
        fine punctuation and thin strokes, so check the Despeckling tab.
 
 The slider moves through these steps. The strength is stored as a number from 0 to
-3.5, as the original stores it, and the named steps are the presets 0, 1, 2 and 3.
+3.5, as upstream stores it, and the named steps are the presets 0, 1, 2 and 3.
 A project that stores a value between two steps keeps that value, and the tooltip on
 the slider shows it. Choosing a named step sets the strength to that preset.
 
@@ -166,8 +175,8 @@ chosen level removes in red and a halo of red around each, fading with the
 distance. The halo shows how far from the text a speck has to be to go. The pictures
 of a mixed page show through unchanged. The tab previews every level as you pick it,
 and the page renders again only once the slider has rested. Despeckling applies to
-black and white pages and to the text of mixed pages; in **Color / Grayscale** mode
-the tab says so.
+black and white pages and to the text of mixed pages. In **Color / Grayscale** mode
+the tab says that it does not apply.
 
 Picture shape
 -------------
@@ -233,8 +242,9 @@ The output view has five tabs. **Ctrl+1** to **Ctrl+5** switch between them.
 
 A zone tab shows and edits one kind of zone. Click anywhere that is not a corner
 or an edge to start a zone. The **Z**, **X** and **C** keys switch between the three
-ways of drawing a zone. The way a view starts in is **Default zone creation mode** in
-:doc:`../settings`; pressing one of the keys also makes that the default.
+ways of drawing a zone. A view starts in the way set by **Default zone creation
+mode** in :doc:`../settings`. Pressing one of the keys also makes that way the
+default.
 
 .. list-table::
    :header-rows: 1
@@ -276,14 +286,15 @@ To change a zone:
    * - **Delete** over the zone
      - Removes the zone.
 
-The right button lists every zone under the cursor.
+A right click lists every zone under the pointer.
 
 .. screenshot:: stage6_zone_menu
    :alt: The context menu of a picture zone
 
 **Properties** of a picture zone chooses its layer. **Pick color** of a fill zone lets
-you click a colour in the page; it samples the median of a small circle, and Escape
-cancels. The layer and the colour are remembered for the next zone.
+you click a colour in the page. It takes the median colour of a small circle around
+the click, and **Escape** cancels. ScanTailor remembers the layer and the colour for
+the next zone.
 
 .. list-table::
    :header-rows: 1
@@ -337,34 +348,54 @@ Automatic dewarping
 
 **Auto** traces the text lines of the page and the top and bottom edges of the
 paper, and takes as the model the pair of curves that leaves all the lines
-straightest. The model is fitted by :mod:`scantailor.dewarping.auto_model`.
-Once the page has rendered, the **Dewarping** panel says what it found, in a line
-such as "2 of 33 lines kept, no page edge. Curves span 7% of the text. Below the 40%
-minimum, so the page is left as is; a minimum of 7% or less would use them.": how
-many text lines were traced and how many survived the filters that drop short,
-stray and doubly bent ones, how many page edges were found, how far apart the two
-chosen curves lie as a share of the content height, whether each came from a text
-line or a page edge, and, when the page gets no model, why. The Dewarping tab shows
-the same line along its bottom edge.
+straightest. The fitting code is in :mod:`scantailor.dewarping.auto_model`.
+
+Once the page has rendered, the **Dewarping** panel reports what **Auto** found in
+one line, for example "2 of 33 lines kept, no page edge. Curves span 7% of the text.
+Below the 40% minimum, so the page is left as is; a minimum of 7% or less would use
+them." The line gives:
+
+* how many text lines were traced, and how many survived the filters that drop
+  short, stray and doubly bent lines;
+* how many page edges were found;
+* how far apart the two chosen curves lie, as a share of the content height;
+* whether each curve came from a text line or a page edge;
+* why the page gets no model, when it gets none.
+
+The Dewarping tab shows the same line along its bottom edge.
 
 .. screenshot:: stage6_dewarping_metrics
    :alt: The Dewarping panel with the minimum span and what auto dewarping found
 
-Two behaviours deviate from ScanTailor Advanced 1.2.1 on purpose:
+Two behaviours differ from ScanTailor Advanced 1.2.1 on purpose.
 
-* **Minimum span (%)** refuses a model whose two curves lie closer together
-  than this share of the content height, and leaves the page as it is. The
-  model is stretched over the whole page from those two curves, so when only
-  two neighbouring lines survive, as on a page of short centred lines, a
-  wobble of a pixel in one of them becomes an error of dozens of pixels at the
-  far end of the page. The original accepts any pair. The default of 40% is a
-  tuned value. Set the minimum to 0 to accept every model, as the original does. **Apply to ...** copies it with the other dewarping options.
-* A page edge that hugs the first or the last row of the scan (within 1.5% of
-  the image height) and is straight (bending by at most 2 pixels at the size
-  the edges are traced at, about 6 pixels on a 300 dpi scan) is taken for the
-  scanner's own border and ignored. The original accepts it as the page edge
-  and then often prefers it to the last text line, so the model treats the
-  bottom of the page as flat and corrects the lower half too little. A paper edge further in, or one that bends, still counts.
+.. list-table::
+   :header-rows: 1
+   :widths: 16 22 32 30
 
-Output depends on every page's content size, so run the batch first
-(:doc:`../batch`) when this stage reports that pages are not ready.
+   * - Behaviour
+     - Upstream 1.2.1
+     - This port
+     - Why
+   * - **Minimum span (%)**
+     - Accepts any pair of curves.
+     - Refuses a model whose two curves lie closer together than this share of the
+       content height, and leaves the page as it is. The default is 40%, a tuned
+       value. Set it to 0 to accept every model, as upstream does. **Apply to ...**
+       copies it with the other dewarping options.
+     - ScanTailor stretches the model over the whole page from the two curves. When
+       only two neighbouring lines survive, as on a page of short centred lines, a
+       wobble of one pixel in one of them becomes an error of dozens of pixels at the
+       far end of the page.
+   * - Scanner border
+     - Accepts a straight edge on the first or the last row of the scan as the page
+       edge, and often prefers it to the last text line.
+     - Ignores a page edge that lies within 1.5% of the image height of the first or
+       the last row and bends by at most 2 pixels at the size the edges are traced
+       at, which is about 6 pixels on a 300 dpi scan. A paper edge further in, or one
+       that bends, still counts.
+     - Such an edge is the scanner's own border. Upstream's model treats the bottom
+       of the page as flat and corrects the lower half too little.
+
+Output depends on every page's content size. When this stage reports that pages are
+not ready, run the batch first, as :doc:`../batch` describes.

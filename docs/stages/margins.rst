@@ -4,11 +4,12 @@
 .. screenshot:: stage5_margins
    :alt: Margins with its Margins and Alignment panels
 
-Sets the white space around the content. The margins are stored in millimetres, and
-the spin boxes show them in the unit chosen under **Units** in :doc:`../settings`:
-millimetres (the default), centimetres, inches or pixels. A pixel margin depends on
-the source DPI, so a value in millimetres or inches means the same on a page of any
-resolution. The calculation is in :mod:`scantailor.filters.page_layout.params`.
+Sets the white space around the content. ScanTailor stores the margins in
+millimetres, and the spin boxes show them in the unit chosen under **Units** in
+:doc:`../settings`. The units are millimetres, which is the default, centimetres,
+inches and pixels. A pixel margin depends on the source DPI, so a value in
+millimetres or inches means the same on a page of any resolution. The conversion is
+in :mod:`scantailor.filters.page_layout.params`.
 
 .. list-table::
    :header-rows: 1
@@ -20,8 +21,8 @@ resolution. The calculation is in :mod:`scantailor.filters.page_layout.params`.
      - The hard margin on each side of the content, in the chosen unit.
    * - Link buttons
      - Keep the two opposite sides equal. Switching one on makes an unequal pair
-       equal at once. Both pairs start linked, and a link you switch off or on is
-       remembered for the next session.
+       equal at once. Both pairs start linked, and ScanTailor remembers a link you
+       switch off or on for the next session.
    * - **Auto Margins**
      - Sets the margins from where the content sits on the page, and disables the
        four spin boxes. See below.
@@ -34,21 +35,52 @@ resolution. The calculation is in :mod:`scantailor.filters.page_layout.params`.
 Auto Margins
 ============
 
-**Auto Margins** replaces the four spin boxes with margins worked out from the page.
-The gap between the content and the page edge, from
-:mod:`scantailor.filters.page_layout.page_rect`, is split between the two sides in
-proportion to the distances in pixels. The margins are recalculated for each page
-from its own content, so each page keeps its content where it sits on the paper.
+.. list-table::
+   :header-rows: 1
+   :widths: 15 50 35
 
-Turn it on when the content should keep its position on each page, for example
-when the text sits off centre on purpose and the page size is set by the Page Box.
-Turn it off to give every page the same fixed margins with **Apply To ...**.
+   * - Auto Margins
+     - What it does
+     - When to use it
+   * - On
+     - Replaces the four spin boxes with margins worked out from each page's own
+       content. ScanTailor splits the gap between the content and the page edge,
+       from :mod:`scantailor.filters.page_layout.page_rect`, between the two sides
+       in proportion to the distances in pixels. The content keeps its position on
+       the paper.
+     - The text sits off centre on purpose, and the Page Box sets the page size.
+   * - Off
+     - The four spin boxes set the margins.
+     - Every page gets the same fixed margins, copied with **Apply To ...**.
 
-The view shows three rectangles: the content box, the content with the hard
-margins, and that with the soft margins that bring every aligned page to one size.
-Drag a solid side of the middle rectangle to set a margin. Dragging a side or a
-corner of the content box sets the margin from the other end: the page moves so
-that the side stays under the pointer.
+The view shows three rectangles: the content box, the content box with the hard
+margins, and the content box with the soft margins that bring every aligned page to
+one size. Drag a solid side of the middle rectangle to set a margin. Dragging a side
+or a corner of the content box sets the margin from the other end. The page then
+moves so that the side stays under the pointer.
+
+Pages with little content
+=========================
+
+New pages are centred inside the matched page size, as in upstream ScanTailor
+Advanced. On a page that holds only a folio or a printer's mark, centring moves that
+mark to the middle of the page. Pick another alignment for such pages.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 40 40
+
+   * - Alignment
+     - Where the content goes
+     - When to use it
+   * - **Original**
+     - Stays where it sat on the scan.
+     - A page that holds only a folio or a printer's mark.
+   * - **Bottom**
+     - Goes to the foot of the page.
+     - A folio at the foot of the page.
+
+Set the alignment on one page and copy it to the others with **Apply To ...**.
 
 Moving the content
 ==================
@@ -87,9 +119,9 @@ Guides
    * - **Show hard margins rectangle**
      - Shows or hides the middle rectangle.
 
-Hold **Ctrl+Alt** and drag a guide to move it. Guides are measured from the centre of
-the page, so one means the same on pages of every size. Double click the content to
-snap it to the nearest guide. The guides are saved with the project.
+Hold **Ctrl+Alt** and drag a guide to move it. ScanTailor measures guides from the
+centre of the page, so a guide keeps its place on pages of every size. Double click
+the content to snap it to the nearest guide. The project stores the guides.
 
 Apply To and matching
 =====================
@@ -97,14 +129,23 @@ Apply To and matching
 .. screenshot:: stage5_margins_apply
    :alt: The Apply Margins dialog with the four sides to copy
 
-**Apply To ...** under Margins asks which sides to copy: **Left**, **Right**,
-**Top** and **Bottom**. The sides you leave unchecked keep each page's own value.
-Margins that follow the content ignore the choice of sides.
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
 
-**Match size to all pages** turns on size matching for every page at once.
-**Lock aggregate size for matching** holds the size the pages are matched to, so
-it does not change while you edit pages; uncheck it to follow the pages again.
-
-**Source DPI** shows the resolution of the current page's image. Pick a preset
-or type both values to correct it; a value that looks wrong is shown in red with
-a hint. **Fix all...** opens the Fix DPI dialog for every image in the project.
+   * - Control
+     - What it does
+   * - **Apply To ...**
+     - Asks which sides to copy: **Left**, **Right**, **Top** and **Bottom**. The
+       sides you leave unchecked keep each page's own value. With **Auto Margins**
+       on, ScanTailor ignores the choice of sides.
+   * - **Match size to all pages**
+     - Turns on size matching for every page at once.
+   * - **Lock aggregate size for matching**
+     - Holds the size the pages are matched to, so it does not change while you edit
+       pages. Uncheck it to follow the pages again.
+   * - **Source DPI**
+     - Shows the resolution of the current page's image. Pick a preset or type both
+       values to correct it. A value that looks wrong turns red and shows a hint.
+   * - **Fix all...**
+     - Opens the Fix DPI dialog for every image in the project.
