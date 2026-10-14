@@ -2,7 +2,6 @@
 
 # Project Specific
 docs/_generated/
-CMakeLists.txt.user
 build/
 **/scantailor_*.qm
 
