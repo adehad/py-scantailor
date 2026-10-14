@@ -4,10 +4,15 @@ import importlib.util
 from pathlib import Path
 from types import ModuleType
 
+import cv2
 import numpy as np
 import pypdfium2 as pdfium
 import pytest
 from PIL import Image
+
+from scantailor.filters.deskew.oblique import find_oblique_degrees
+from scantailor.filters.deskew.params import MAX_OBLIQUE_DEG
+from scantailor.imageproc.binarize import binarize_otsu
 
 _TOOLS = Path(__file__).resolve().parents[2] / "tools"
 
@@ -79,3 +84,23 @@ def test_sample_pdf_has_three_pages_with_extractable_text(
         assert "ledger bound in" in first_text
     finally:
         document.close()
+
+
+def test_oblique_sample_page_is_detected_as_leaning_within_the_correction_limit() -> (
+    None
+):
+    """The detector finds most of the shear, short of the clamp at the limit.
+
+    The manual's oblique shot relies on automatic oblique correction picking up
+    the shear of ``06_oblique``.
+    """
+    sample = _load_sample_book()
+
+    page = sample.render_sample_page("06_oblique")
+    found = find_oblique_degrees(
+        binarize_otsu(cv2.cvtColor(page.image, cv2.COLOR_RGB2GRAY))
+    )
+
+    assert found is not None
+    assert found == pytest.approx(-sample._OBLIQUE_DEGREES, abs=1.5)
+    assert abs(found) < MAX_OBLIQUE_DEG

@@ -9,6 +9,9 @@ Orientation to Output. It appears on the row of the selected stage in the stage
 list whenever a project is open and no batch is running. The selected row only
 sets where the button sits. Which stage you select does not change what runs.
 
+.. screenshot:: stage_play_button
+   :alt: The stage list with the play button on the selected Select Content row
+
 Pages are processed in the order the thumbnail list shows them, whichever sort
 order is chosen. Every page is included, not only the selected ones.
 

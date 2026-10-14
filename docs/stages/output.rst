@@ -155,6 +155,9 @@ Choose the lowest level that removes the specks you can see on the Despeckling t
 Higher levels remove small marks first, so check the Arabic dots and the i-dots after
 each step.
 
+.. screenshot:: stage6_output_despeckle_levels
+   :alt: The Despeckle slider at Aggressive, with the specks it removes on the Despeckling tab
+
 .. screenshot:: stage6_tab_despeckling
    :alt: The Despeckling tab showing the text before despeckling
 

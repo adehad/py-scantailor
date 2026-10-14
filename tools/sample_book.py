@@ -42,7 +42,10 @@ _TEXT_WIDTH: Final = 610
 _FOOT_CLEARANCE: Final = 100
 _SEED: Final = 20260613
 _SKEW_DEGREES: Final = 3.0
-_OBLIQUE_DEGREES: Final = 6.0
+# Inside the 5 degree limit of the oblique correction, so it can be undone in full.
+_OBLIQUE_DEGREES: Final = 4.0
+_RULE_INSET: Final = 24
+_RULE_REACH: Final = 110
 _CURL_DIP: Final = 26.0
 _CURL_DECAY: Final = 0.42
 _SPECK_COUNT: Final = 420
@@ -611,6 +614,19 @@ def _skew(
     return rotated, tuple(_affine_line(line, matrix) for line in lines)
 
 
+def _rule_text_block(paper: NDArray[np.uint8]) -> None:
+    """Draw a vertical rule down each side of the text block.
+
+    Text alone gives the oblique detector too weak a vertical edge to find the
+    shear: ragged line ends and the blank rows between lines drown it.
+
+    Args:
+        paper (NDArray[np.uint8]): The sheet to draw on, changed in place.
+    """
+    for x in (_TEXT_LEFT - _RULE_INSET, _TEXT_LEFT + _TEXT_WIDTH + _RULE_INSET):
+        cv2.line(paper, (x, _RULE_REACH), (x, PAPER_HEIGHT - _RULE_REACH), _INK_RGB, 2)
+
+
 def _oblique(
     canvas: NDArray[np.uint8], lines: tuple[TextLine, ...], degrees: float
 ) -> tuple[NDArray[np.uint8], tuple[TextLine, ...]]:
@@ -681,7 +697,10 @@ def _render_scan(name: str) -> tuple[NDArray[np.uint8], tuple[TextLine, ...]]:
         "10_sideways": (_HEADINGS[1], 10),
     }
     heading, folio = headings[name]
-    canvas, lines = _single_canvas(_text_sheet(_rng_for(name), heading, 4, folio))
+    sheet = _text_sheet(_rng_for(name), heading, 4, folio)
+    if name == "06_oblique":
+        _rule_text_block(sheet.pixels)
+    canvas, lines = _single_canvas(sheet)
     if name == "05_skewed":
         return _skew(canvas, lines, _SKEW_DEGREES)
     if name == "06_oblique":
