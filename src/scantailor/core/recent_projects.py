@@ -21,7 +21,7 @@ class RecentProjects:
         self._paths: list[str] = list(paths or [])
 
     @classmethod
-    def read(cls, settings: QSettings | None = None) -> "RecentProjects":
+    def read(cls, settings: QSettings | None = None) -> RecentProjects:
         """Load the list from settings.
 
         Args:

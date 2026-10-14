@@ -119,7 +119,7 @@ class HoughLineDetector:
             keep the raster order of their peaks.
         """
         peaks = _find_histogram_peaks(self._histogram, quality_lower_bound)
-        labels, count = ndimage.label(peaks, structure=_EIGHT_CONNECTED)
+        labels, _count = ndimage.label(peaks, structure=_EIGHT_CONNECTED)
         lines: list[HoughLine] = []
         for index, box in enumerate(ndimage.find_objects(labels), start=1):
             if box is None:

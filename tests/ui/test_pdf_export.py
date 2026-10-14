@@ -350,7 +350,7 @@ def test_pages_batched_in_an_earlier_session_still_export_with_their_text(
     qtbot: QtBot,
     pdf_window: MainWindowManager,  # noqa: F811
     respond: Callable[..., None],
-    file_dialogs: "FileDialogStub",
+    file_dialogs: FileDialogStub,
     source_pdf: Path,  # noqa: F811
     tmp_path: Path,
 ):

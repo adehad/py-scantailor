@@ -116,7 +116,7 @@ class TestColorOutput:
 
     def test_colour_normalisation_preserves_alpha_channel(self):
         rgb = self._color_page()
-        alpha = np.full(rgb.shape[:2] + (1,), 77, dtype=np.uint8)
+        alpha = np.full((*rgb.shape[:2], 1), 77, dtype=np.uint8)
         page = np.concatenate([rgb, alpha], axis=2)
         options = ColorCommonOptions(normalize_illumination=True)
 
@@ -127,7 +127,7 @@ class TestColorOutput:
 
     def test_white_on_black_colour_page_keeps_channels_and_alpha(self):
         rgb = self._color_page()
-        alpha = np.full(rgb.shape[:2] + (1,), 77, dtype=np.uint8)
+        alpha = np.full((*rgb.shape[:2], 1), 77, dtype=np.uint8)
         page = np.concatenate([rgb, alpha], axis=2)
 
         result = generate_output(page, _gray_params(black_on_white=False))

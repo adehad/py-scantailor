@@ -29,17 +29,17 @@ class PdfSource(BaseModel):
     pages: dict[str, int] = Field(default_factory=dict)
 
     @classmethod
-    def _read_sidecar(cls, directory: Path) -> "PdfSource | None":
+    def _read_sidecar(cls, directory: Path) -> PdfSource | None:
         try:
             source = cls.model_validate_json(
                 (directory / SOURCE_FILE_NAME).read_text(encoding="utf-8")
             )
-        except (OSError, ValueError):
+        except OSError, ValueError:
             return None
         return source.model_copy(update={"pages_dir": directory})
 
     @classmethod
-    def find(cls, image_files: Iterable[Path]) -> list["PdfSource"]:
+    def find(cls, image_files: Iterable[Path]) -> list[PdfSource]:
         """Return the mappings stored beside the image files, one per folder.
 
         Args:

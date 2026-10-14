@@ -6,6 +6,7 @@ Hovering over a component highlights it and all components before it.
 """
 
 from dataclasses import dataclass
+from enum import IntEnum
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QObject, Qt, Signal
@@ -14,7 +15,7 @@ from PySide6.QtWidgets import QHBoxLayout, QPushButton, QWidget
 
 
 # Path types matching C++ RelinkablePath::Type
-class PathType:
+class PathType(IntEnum):
     """Type of path component."""
 
     FILE = 0
@@ -28,7 +29,7 @@ class PathComponent:
     label: str  # Display text
     prefix_path: str  # Path up to and including this component
     suffix_path: str  # Rest of the path after this component
-    path_type: int  # PathType.FILE or PathType.DIR
+    path_type: PathType
     exists: bool = False  # Whether this component exists on filesystem
 
 
@@ -96,18 +97,21 @@ class RelinkablePathVisualization(QWidget):
         """Clear all path components."""
         while self._layout.count():
             item = self._layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            if item is not None and (widget := item.widget()) is not None:
+                widget.deleteLater()
 
         self._components.clear()
 
-    def set_path(self, path_str: str, path_type: int, clickable: bool = True) -> None:
+    def set_path(
+        self, path_str: str, path_type: PathType, clickable: bool = True
+    ) -> None:
         """Set the path to display.
 
         Args:
-            path_str: The path string to display.
-            path_type: PathType.FILE or PathType.DIR for the last component.
-            clickable: Whether the components should be clickable.
+            path_str (str): The path string to display.
+            path_type (PathType): Whether the last component is a file or a
+                folder; every earlier component is a folder.
+            clickable (bool): Whether the components should be clickable.
         """
         self.clear()
 
@@ -255,27 +259,33 @@ class RelinkablePathVisualization(QWidget):
             True if event was handled.
         """
         if event.type() == QEvent.Type.Enter:
-            # Find which button was entered
-            for i in range(self._layout.count()):
-                widget = self._layout.itemAt(i).widget()
-                if widget is watched:
-                    # Highlight this button and all before it
-                    for j in range(i + 1):
-                        btn = self._layout.itemAt(j).widget()
-                        if btn:
-                            btn.setProperty("forceHighlight", True)
-                            btn.update()
-                    break
-
-        elif event.type() == QEvent.Type.Leave:
-            # Clear highlight from all buttons
-            for i in range(self._layout.count()):
-                widget = self._layout.itemAt(i).widget()
-                if widget:
-                    widget.setProperty("forceHighlight", False)
+            widgets = self._widgets()
+            if watched in widgets:
+                # A hovered component highlights the whole path up to it.
+                for widget in widgets[: widgets.index(watched) + 1]:
+                    widget.setProperty("forceHighlight", True)
                     widget.update()
 
+        elif event.type() == QEvent.Type.Leave:
+            for widget in self._widgets():
+                widget.setProperty("forceHighlight", False)
+                widget.update()
+
         return super().eventFilter(watched, event)
+
+    def _widgets(self) -> list[QWidget]:
+        """Return the path's component widgets.
+
+        Returns:
+            list[QWidget]: The layout's widgets in display order, skipping
+            spacer items.
+        """
+        items = (self._layout.itemAt(i) for i in range(self._layout.count()))
+        return [
+            widget
+            for item in items
+            if item is not None and (widget := item.widget()) is not None
+        ]
 
     def _on_button_clicked(self, component_idx: int) -> None:
         """Handle button click.

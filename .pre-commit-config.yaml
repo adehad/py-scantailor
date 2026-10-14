@@ -1,4 +1,7 @@
 ---
+# Hooks parse the source, which uses Python 3.14 syntax.
+default_language_version:
+  python: python3.14
 exclude: |
             (?x)^(
                 .github/workflows/clang-format.yml|
@@ -41,7 +44,7 @@ repos:
         additional_dependencies: []
         exclude: src/scantailor/translations/
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.11.13"
+    rev: "v0.17.0"
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]

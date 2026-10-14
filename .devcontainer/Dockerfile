@@ -2,7 +2,7 @@
 
 # https://hub.docker.com/_/python
 ARG VARIANT="bookworm"
-ARG PYTHON="3.12"
+ARG PYTHON="3.14"
 FROM python:${PYTHON}-${VARIANT}
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \

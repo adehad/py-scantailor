@@ -155,8 +155,8 @@ class StageListDelegate(QStyledItemDelegate):
         """
         # Remove focus state to prevent focus rectangle
         opt = QStyleOptionViewItem(option)
-        # QStyleOption.state missing from PySide6 stubs (PYSIDE-3034)
-        # pyrefly: ignore[missing-attribute]
+        # QStyleOption.state is typed as `...` in the PySide6 stubs (PYSIDE-3034)
+        # pyrefly: ignore[bad-assignment, unsupported-operation]
         opt.state &= ~QStyle.StateFlag.State_HasFocus
         super().paint(painter, opt, index)
 

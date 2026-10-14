@@ -22,7 +22,7 @@ class LayoutType(Enum):
     TWO_PAGES = "two-pages"
 
     @classmethod
-    def from_string(cls, value: str) -> "LayoutType":
+    def from_string(cls, value: str) -> LayoutType:
         """Parse a LayoutType from its string value."""
         for layout_type in cls:
             if layout_type.value == value:

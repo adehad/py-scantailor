@@ -297,7 +297,7 @@ class Params(BaseModel):
         """Create a copy with different layer splitting options."""
         return self.model_copy(update={"splitting": options})
 
-    def with_group_from(self, source: "Params", group: ApplyGroup) -> Self:
+    def with_group_from(self, source: Params, group: ApplyGroup) -> Self:
         """Create a copy that takes one group of options from another page.
 
         Args:

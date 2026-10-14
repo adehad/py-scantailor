@@ -266,7 +266,7 @@ class TestLineIntersectionScalar:
         line2 = LineSegment(p1=np.array([5, -1]), p2=np.array([5, 1]))
         result = line_intersection_scalar(line1, line2)
         assert result is not None
-        s1, s2 = result
+        s1, _s2 = result
         # s1 should be > 1 (intersection extends past line1)
         assert s1 > 1
 

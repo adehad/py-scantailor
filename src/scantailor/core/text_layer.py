@@ -364,7 +364,7 @@ class TextGeometry(BaseModel):
         *,
         dewarped: bool = False,
         dewarp: DewarpSpec | None = None,
-    ) -> "TextGeometry":
+    ) -> TextGeometry:
         """Capture the geometry of a page from its final transformation."""
         rect = transformation.resulting_rect
         return cls(
@@ -378,7 +378,7 @@ class TextGeometry(BaseModel):
             dewarp=dewarp,
         )
 
-    def job(self, pdf_path: Path, page_index: int, source_dpi: Dpi) -> "TextLayerJob":
+    def job(self, pdf_path: Path, page_index: int, source_dpi: Dpi) -> TextLayerJob:
         """Describe the text layer of source page ``page_index`` of ``pdf_path``."""
         return TextLayerJob(
             pdf_path=str(pdf_path),
@@ -439,7 +439,7 @@ class TextLayerJob:
         *,
         dewarped: bool = False,
         dewarp: DewarpSpec | None = None,
-    ) -> "TextLayerJob":
+    ) -> TextLayerJob:
         """Describe the text layer of a page from its transformation."""
         geometry = TextGeometry.of(
             transformation, output_dpi, dewarped=dewarped, dewarp=dewarp
@@ -475,7 +475,7 @@ def _font_at(source: pikepdf.Pdf, page_index: int, reference: FontRef) -> Any:
     try:
         for key in path:
             node = node[key]
-    except (KeyError, TypeError, AttributeError):
+    except KeyError, TypeError, AttributeError:
         return None
     return node
 
@@ -570,7 +570,7 @@ def _dewarp_mapper(
             (width, height),
             spec.post_deskew_angle,
         )
-    except (ValueError, ArithmeticError, np.linalg.LinAlgError, IndexError):
+    except ValueError, ArithmeticError, np.linalg.LinAlgError, IndexError:
         return None
 
     def map_points(source_px: NDArray[np.float64]) -> NDArray[np.float64]:

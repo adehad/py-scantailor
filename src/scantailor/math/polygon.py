@@ -47,7 +47,7 @@ class Polygon(BaseModel):
         y: float,
         width: float,
         height: float,
-    ) -> "Polygon":
+    ) -> Polygon:
         """Create a rectangular polygon.
 
         Args:
@@ -167,7 +167,7 @@ class Polygon(BaseModel):
             float(max_y - min_y),
         )
 
-    def intersects(self, other: "Polygon") -> bool:
+    def intersects(self, other: Polygon) -> bool:
         """Test if this polygon intersects with another polygon.
 
         Two polygons intersect if they share any common area or if one
@@ -202,7 +202,7 @@ class Polygon(BaseModel):
 
         return False
 
-    def translate(self, dx: float, dy: float) -> "Polygon":
+    def translate(self, dx: float, dy: float) -> Polygon:
         """Translate the polygon by a given offset.
 
         Args:
@@ -221,7 +221,7 @@ class Polygon(BaseModel):
         scale_x: float,
         scale_y: float | None = None,
         center: NDArray[np.floating] | None = None,
-    ) -> "Polygon":
+    ) -> Polygon:
         """Scale the polygon by given factors.
 
         Args:

@@ -30,7 +30,7 @@ class Dependencies(BaseModel):
         return self.image_size == (0, 0)
 
     def is_compatible_with(
-        self, current: "Dependencies", *, manual_split_line: bool
+        self, current: Dependencies, *, manual_split_line: bool
     ) -> bool:
         """Tell whether a result computed under ``self`` is still valid.
 

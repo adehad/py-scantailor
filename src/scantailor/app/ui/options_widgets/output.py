@@ -746,13 +746,16 @@ class OptionsWidget(QWidget):
         """
         for page_index in range(self._method_options.count()):
             page = self._method_options.widget(page_index)
+            if page is None:
+                continue
             vertical = (
                 QSizePolicy.Policy.Preferred
                 if page_index == index
                 else QSizePolicy.Policy.Ignored
             )
             page.setSizePolicy(QSizePolicy.Policy.Preferred, vertical)
-        page_layout = self._method_options.widget(index).layout()
+        current = self._method_options.widget(index)
+        page_layout = current.layout() if current is not None else None
         self._method_options.setVisible(
             page_layout is not None and page_layout.count() > 0
         )

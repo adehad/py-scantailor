@@ -40,9 +40,7 @@ class Line2D(BaseModel):
         return v
 
     @classmethod
-    def from_points(
-        cls, p1: NDArray[np.floating], p2: NDArray[np.floating]
-    ) -> "Line2D":
+    def from_points(cls, p1: NDArray[np.floating], p2: NDArray[np.floating]) -> Line2D:
         """Create a line from two points.
 
         Args:
@@ -80,7 +78,7 @@ class Line2D(BaseModel):
     @classmethod
     def from_point_and_normal(
         cls, point: NDArray[np.floating], normal: NDArray[np.floating]
-    ) -> "Line2D":
+    ) -> Line2D:
         """Create a line from a point and normal vector.
 
         Args:
@@ -175,7 +173,7 @@ class Line2D(BaseModel):
 
         return point - (signed_dist * normal / np.sqrt(norm_sq))
 
-    def normalize(self) -> "Line2D":
+    def normalize(self) -> Line2D:
         """Return a normalized version of the line.
 
         Returns a line with the same geometry but normalized such that
@@ -236,7 +234,7 @@ class LineSegment(BaseModel):
         vec = self.p2 - self.p1
         return vec / np.linalg.norm(vec)
 
-    def to_line(self) -> "Line2D":
+    def to_line(self) -> Line2D:
         """Convert the line segment to an infinite line.
 
         Returns:
