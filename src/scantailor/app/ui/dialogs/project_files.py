@@ -73,7 +73,7 @@ def _adopt_rendered_pages(
     dpi = DEFAULT_IMPORT_DPI
     try:
         horizontal = list_image_pages(existing[0])[0][1].dpi.horizontal
-    except (ImageLoadError, OSError, IndexError):
+    except ImageLoadError, OSError, IndexError:
         logger.warning("Could not read the resolution of {}", existing[0])
     else:
         dpi = round(horizontal) if horizontal > 0 else DEFAULT_IMPORT_DPI
@@ -356,11 +356,19 @@ class ProjectFilesDialog(QtWidgets.QDialog):
         if not input_dir.is_dir():
             return
 
-        for file_path in input_dir.iterdir():
-            if not file_path.is_file():
-                continue
-            if _is_pdf(file_path) or file_path.suffix.lower() in _IMAGE_EXTENSIONS:
-                self._available_files.add(file_path)
+        try:
+            found = {
+                file_path
+                for file_path in input_dir.iterdir()
+                if file_path.is_file()
+                and (
+                    _is_pdf(file_path) or file_path.suffix.lower() in _IMAGE_EXTENSIONS
+                )
+            }
+        except OSError as error:
+            logger.warning("Cannot list the input directory {}: {}", input_dir, error)
+            return
+        self._available_files.update(found)
 
     def _page_count_of(self, pdf_path: Path) -> int:
         """Return the pages of a PDF, 0 when it cannot be read. Cached per file."""

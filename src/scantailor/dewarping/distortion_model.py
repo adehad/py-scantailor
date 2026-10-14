@@ -21,6 +21,12 @@ from numpy.typing import NDArray
 
 from scantailor.math.spline import XSpline
 
+# Smallest cross product, in square pixels, of the two edges meeting at a corner
+# of the curve-end quadrilateral. Below it two corners nearly coincide or an edge
+# almost doubles back, and the homography built from the corners is
+# ill-conditioned. Same threshold as C++ DistortionModel::isValid.
+_MIN_CORNER_TURN = 0.01
+
 
 @dataclass
 class Curve:
@@ -80,7 +86,7 @@ class Curve:
         # Check that endpoints are distinct
         return not np.allclose(self.polyline[0], self.polyline[-1], atol=1e-6)
 
-    def matches(self, other: "Curve", tolerance: float = 0.01) -> bool:
+    def matches(self, other: Curve, tolerance: float = 0.01) -> bool:
         """Check if this curve approximately matches another.
 
         Args:
@@ -181,12 +187,12 @@ class DistortionModel:
             return False
 
         # Check for degenerate cases (points too close together)
-        if abs(min_dot) < 0.01 or abs(max_dot) < 0.01:
+        if abs(min_dot) < _MIN_CORNER_TURN or abs(max_dot) < _MIN_CORNER_TURN:
             return False
 
         return True
 
-    def matches(self, other: "DistortionModel") -> bool:
+    def matches(self, other: DistortionModel) -> bool:
         """Check if this model approximately matches another.
 
         Args:
@@ -214,40 +220,6 @@ class DistortionModel:
             return False
 
         return True
-
-    def bounding_box(
-        self,
-        transform: NDArray[np.float64] | None = None,
-    ) -> tuple[float, float, float, float] | None:
-        """Compute the bounding box of the distorted region.
-
-        Args:
-            transform: Optional 3x3 transformation matrix to apply to points.
-
-        Returns:
-            Tuple of (left, top, right, bottom), or None if model is invalid.
-        """
-        if self.top_curve is None or self.bottom_curve is None:
-            return None
-
-        # Collect all points
-        points = np.vstack([self.top_curve.polyline, self.bottom_curve.polyline])
-
-        # Apply transform if provided
-        if transform is not None:
-            # Convert to homogeneous coordinates
-            ones = np.ones((len(points), 1))
-            points_h = np.hstack([points, ones])
-            transformed = points_h @ transform.T
-            # Normalize
-            points = transformed[:, :2] / transformed[:, 2:3]
-
-        left = float(np.min(points[:, 0]))
-        right = float(np.max(points[:, 0]))
-        top = float(np.min(points[:, 1]))
-        bottom = float(np.max(points[:, 1]))
-
-        return left, top, right, bottom
 
 
 def create_distortion_model(

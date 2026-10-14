@@ -4,7 +4,7 @@ This module defines the parameter structures for storing deskew settings
 on a per-page basis.
 """
 
-from enum import Enum
+from enum import StrEnum
 from typing import Self
 
 from pydantic import BaseModel, Field
@@ -14,7 +14,7 @@ from .dependencies import Dependencies
 MAX_OBLIQUE_DEG = 5.0
 
 
-class AutoManualMode(str, Enum):
+class AutoManualMode(StrEnum):
     """Mode for deskew angle determination.
 
     AUTO: Automatically detect skew angle using the find_skew algorithm.

@@ -6,7 +6,13 @@ import numpy as np
 import pytest
 
 from scantailor.core.models import Dpi
-from scantailor.core.zones import PictureLayer, ZoneSet, ZoneSpline
+from scantailor.core.zones import (
+    FillZoneProperties,
+    PictureLayer,
+    PictureZoneProperties,
+    Zone,
+    ZoneSpline,
+)
 from scantailor.filters.output.binarization import BinarizationOptions
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.color_options import (
@@ -24,6 +30,16 @@ PAGE_HEIGHT = 600
 PAGE_WIDTH = 480
 PAPER = 235
 PHOTO = (slice(300, 480), slice(120, 360))  # rows, columns
+
+
+def _picture_zones(spline: ZoneSpline, layer: PictureLayer) -> list[Zone]:
+    """Return a single manual picture zone on ``layer``."""
+    return [Zone(spline=spline, properties=PictureZoneProperties(layer=layer))]
+
+
+def _fill_zones(spline: ZoneSpline, color: tuple[int, int, int]) -> list[Zone]:
+    """Return a single manual fill zone painted ``color``."""
+    return [Zone(spline=spline, properties=FillZoneProperties(color=color))]
 
 
 def _text_lines(page: np.ndarray) -> None:
@@ -217,13 +233,14 @@ class TestManualPictureZones:
 
     def test_painter_zone_keeps_original_grays_where_nothing_was_detected(self):
         page, _ = _synthetic_page()
-        zones = ZoneSet()
-        zones.add_picture_zone(_rectangle(30, 30, 450, 70), layer=PictureLayer.PAINTER2)
+        picture_zones = _picture_zones(
+            _rectangle(30, 30, 450, 70), layer=PictureLayer.PAINTER2
+        )
         params = _mixed_params(
             picture_shape=PictureShapeOptions(shape=PictureShape.OFF)
         )
 
-        result = generate_output(page, params, picture_zones=zones.picture_zones)
+        result = generate_output(page, params, picture_zones=picture_zones)
 
         inside = (slice(40, 60), slice(40, 440))
         assert result.picture_mask is not None
@@ -233,14 +250,11 @@ class TestManualPictureZones:
 
     def test_eraser_zone_binarises_a_detected_photo(self):
         page, _ = _synthetic_page()
-        zones = ZoneSet()
-        zones.add_picture_zone(
+        picture_zones = _picture_zones(
             _rectangle(100, 280, 380, 500), layer=PictureLayer.ERASER3
         )
 
-        result = generate_output(
-            page, _mixed_params(), picture_zones=zones.picture_zones
-        )
+        result = generate_output(page, _mixed_params(), picture_zones=picture_zones)
 
         assert set(np.unique(result.image[_interior(PHOTO)])) <= {0, 255}
         assert result.picture_mask is not None
@@ -248,15 +262,14 @@ class TestManualPictureZones:
 
     def test_foreground_zone_keeps_colours_of_ink_and_whitens_the_background(self):
         page, _ = _synthetic_page()
-        zones = ZoneSet()
-        zones.add_picture_zone(
+        picture_zones = _picture_zones(
             _rectangle(30, 30, 450, 230), layer=PictureLayer.FOREGROUND
         )
         params = _mixed_params(
             picture_shape=PictureShapeOptions(shape=PictureShape.OFF)
         )
 
-        result = generate_output(page, params, picture_zones=zones.picture_zones)
+        result = generate_output(page, params, picture_zones=picture_zones)
 
         zone = (slice(30, 230), slice(30, 450))
         ink = page[zone] < 100
@@ -265,15 +278,14 @@ class TestManualPictureZones:
 
     def test_background_zone_blackens_ink_and_keeps_the_paper_grey(self):
         page, _ = _synthetic_page()
-        zones = ZoneSet()
-        zones.add_picture_zone(
+        picture_zones = _picture_zones(
             _rectangle(30, 30, 450, 230), layer=PictureLayer.BACKGROUND
         )
         params = _mixed_params(
             picture_shape=PictureShapeOptions(shape=PictureShape.OFF)
         )
 
-        result = generate_output(page, params, picture_zones=zones.picture_zones)
+        result = generate_output(page, params, picture_zones=picture_zones)
 
         zone = (slice(30, 230), slice(30, 450))
         ink = page[zone] < 100
@@ -282,13 +294,12 @@ class TestManualPictureZones:
 
     def test_zone_on_the_no_op_layer_changes_nothing(self):
         page, _ = _synthetic_page()
-        zones = ZoneSet()
-        zones.add_picture_zone(_rectangle(30, 30, 450, 230), layer=PictureLayer.NOOP)
+        picture_zones = _picture_zones(
+            _rectangle(30, 30, 450, 230), layer=PictureLayer.NOOP
+        )
 
         without = generate_output(page, _mixed_params())
-        with_zone = generate_output(
-            page, _mixed_params(), picture_zones=zones.picture_zones
-        )
+        with_zone = generate_output(page, _mixed_params(), picture_zones=picture_zones)
 
         assert np.array_equal(without.image, with_zone.image)
 
@@ -456,29 +467,27 @@ class TestFillZones:
 
     def test_binary_output_snaps_the_zone_colour_to_black_or_white(self):
         page, _ = _synthetic_page()
-        zones = ZoneSet()
-        zones.add_fill_zone(_rectangle(200, 400, 300, 450), color=(20, 20, 20))
+        fill_zones = _fill_zones(_rectangle(200, 400, 300, 450), color=(20, 20, 20))
         params = Params(
             output_dpi=Dpi.uniform(300),
             despeckle_level=DespeckleLevel.OFF,
             binarization=BinarizationOptions(normalize_illumination=False),
         )
 
-        result = generate_output(page, params, fill_zones=zones.fill_zones)
+        result = generate_output(page, params, fill_zones=fill_zones)
 
         assert (result.image[410:440, 210:290] == 0).all()
         assert result.is_binary
 
     def test_colour_output_paints_the_exact_colour(self):
         page = np.full((100, 100, 3), 200, dtype=np.uint8)
-        zones = ZoneSet()
-        zones.add_fill_zone(_rectangle(20, 20, 60, 60), color=(255, 0, 0))
+        fill_zones = _fill_zones(_rectangle(20, 20, 60, 60), color=(255, 0, 0))
 
         result = generate_output(
             page,
             Params(color_mode=ColorMode.COLOR_GRAYSCALE),
             color_options=ColorCommonOptions(fill_margins=False),
-            fill_zones=zones.fill_zones,
+            fill_zones=fill_zones,
         )
 
         assert tuple(result.image[40, 40]) == (0, 0, 255)
@@ -488,8 +497,7 @@ class TestFillZones:
         page = np.full((100, 100, 3), 200, dtype=np.uint8)
         page[:, :5] = 20
         page[:, 5:10] = 240
-        zones = ZoneSet()
-        zones.add_fill_zone(_rectangle(20, 20, 60, 60), color=(195, 195, 195))
+        fill_zones = _fill_zones(_rectangle(20, 20, 60, 60), color=(195, 195, 195))
         options = ColorCommonOptions(
             fill_margins=False,
             posterization=PosterizationOptions(
@@ -501,7 +509,7 @@ class TestFillZones:
             page,
             Params(color_mode=ColorMode.COLOR_GRAYSCALE),
             color_options=options,
-            fill_zones=zones.fill_zones,
+            fill_zones=fill_zones,
         )
 
         assert tuple(result.image[40, 40]) == (200, 200, 200)

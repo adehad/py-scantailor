@@ -3,10 +3,10 @@
 This module defines the different color modes available for output images.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class ColorMode(Enum):
+class ColorMode(StrEnum):
     """Output color mode.
 
     BLACK_AND_WHITE: Binary (1-bit) black and white output.
@@ -19,16 +19,20 @@ class ColorMode(Enum):
     MIXED = "mixed"
 
     @classmethod
-    def from_string(cls, value: str) -> "ColorMode":
-        """Parse a ColorMode from its string value."""
+    def from_string(cls, value: str) -> ColorMode:
+        """Parse a ColorMode from its stored string value.
+
+        Args:
+            value (str): The stored value, such as ``"bw"`` or ``"mixed"``.
+
+        Returns:
+            ColorMode: The matching mode, or BLACK_AND_WHITE when ``value``
+            names none.
+        """
         for mode in cls:
             if mode.value == value:
                 return mode
         return cls.BLACK_AND_WHITE
-
-    def __str__(self) -> str:
-        """Return the string value."""
-        return self.value
 
     def is_binary(self) -> bool:
         """Return True if this mode produces binary output."""

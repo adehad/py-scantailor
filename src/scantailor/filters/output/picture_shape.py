@@ -1,11 +1,11 @@
 """Options for automatic picture detection in mixed output."""
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class PictureShape(str, Enum):
+class PictureShape(StrEnum):
     """How detected pictures are shaped.
 
     OFF: No automatic detection; only manual zones make pictures.

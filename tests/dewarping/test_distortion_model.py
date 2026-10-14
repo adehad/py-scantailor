@@ -141,48 +141,6 @@ class TestDistortionModel:
         )
         assert not model.is_valid()
 
-    def test_bounding_box(self):
-        """Bounding box calculation."""
-        model = create_distortion_model(
-            top_polyline=np.array([[10, 20], [90, 30]]),
-            bottom_polyline=np.array([[15, 80], [85, 90]]),
-        )
-
-        bbox = model.bounding_box()
-        assert bbox is not None
-
-        left, top, right, bottom = bbox
-        assert left == pytest.approx(10.0)
-        assert top == pytest.approx(20.0)
-        assert right == pytest.approx(90.0)
-        assert bottom == pytest.approx(90.0)
-
-    def test_bounding_box_with_transform(self):
-        """Bounding box with transformation."""
-        model = create_distortion_model(
-            top_polyline=np.array([[0, 0], [100, 0]]),
-            bottom_polyline=np.array([[0, 100], [100, 100]]),
-        )
-
-        # Scale by 2
-        transform = np.array(
-            [
-                [2, 0, 0],
-                [0, 2, 0],
-                [0, 0, 1],
-            ],
-            dtype=np.float64,
-        )
-
-        bbox = model.bounding_box(transform)
-        assert bbox is not None
-
-        left, top, right, bottom = bbox
-        assert left == pytest.approx(0.0)
-        assert top == pytest.approx(0.0)
-        assert right == pytest.approx(200.0)
-        assert bottom == pytest.approx(200.0)
-
     def test_model_matches_identical(self):
         """Identical models match."""
         model1 = create_distortion_model(

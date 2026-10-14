@@ -4,13 +4,13 @@ This module provides configuration for dewarping (page curvature correction)
 during output generation.
 """
 
-from enum import Enum
+from enum import StrEnum
 from typing import Self
 
 from pydantic import BaseModel, Field
 
 
-class DewarpingMode(str, Enum):
+class DewarpingMode(StrEnum):
     """Dewarping mode selection.
 
     OFF: No dewarping applied.

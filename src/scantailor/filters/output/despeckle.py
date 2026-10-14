@@ -5,7 +5,7 @@ the continuous strength a C++ project stores between them.
 """
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 # C++ stores a number between 0.5 and 3.5 (0 is off); the named levels are the
 # presets 1, 2 and 3 of it.
@@ -14,7 +14,7 @@ MAX_DESPECKLE_FACTOR = 3.5
 _NEAREST_LEVEL_UPPER_BOUNDS = (0.5, 1.5, 2.5)
 
 
-class DespeckleLevel(Enum):
+class DespeckleLevel(StrEnum):
     """Named steps of the despeckle strength.
 
     OFF: No despeckling.
@@ -29,8 +29,14 @@ class DespeckleLevel(Enum):
     AGGRESSIVE = "aggressive"
 
     @classmethod
-    def from_string(cls, value: str) -> "DespeckleLevel":
-        """Parse a DespeckleLevel from its string value.
+    def from_string(cls, value: str) -> DespeckleLevel:
+        """Parse a DespeckleLevel from its stored string value.
+
+        Args:
+            value (str): The stored value, such as ``"normal"``.
+
+        Returns:
+            DespeckleLevel: The level with that value.
 
         Raises:
             ValueError: If ``value`` names no level.
@@ -43,7 +49,7 @@ class DespeckleLevel(Enum):
         raise ValueError(msg)
 
     @classmethod
-    def nearest(cls, factor: float) -> "DespeckleLevel":
+    def nearest(cls, factor: float) -> DespeckleLevel:
         """Return the named level closest to a continuous strength.
 
         Args:
@@ -58,10 +64,6 @@ class DespeckleLevel(Enum):
             if factor < upper_bound:
                 return level
         return levels[-1]
-
-    def __str__(self) -> str:
-        """Return the string value."""
-        return self.value
 
     def to_factor(self) -> float:
         """Return the despeckle strength passed to the despeckling algorithm.
