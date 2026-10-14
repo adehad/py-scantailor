@@ -119,7 +119,6 @@ def window_lightness(app: QtWidgets.QApplication) -> int:
 
 
 UNWIRED = (
-    ("languageBox", QtWidgets.QComboBox),
     ("blackOnWhiteDetectionCB", QtWidgets.QCheckBox),
     ("blackOnWhiteDetectionAtOutputCB", QtWidgets.QCheckBox),
     ("highlightDeviationCB", QtWidgets.QCheckBox),
@@ -131,6 +130,7 @@ UNWIRED = (
     ("marginsDeviationThresholdSB", QtWidgets.QDoubleSpinBox),
 )
 WIRED = (
+    ("languageBox", QtWidgets.QComboBox),
     ("colorSchemeBox", QtWidgets.QComboBox),
     ("unitsBox", QtWidgets.QComboBox),
     ("autoSaveProjectCB", QtWidgets.QCheckBox),

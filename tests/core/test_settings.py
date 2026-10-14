@@ -209,7 +209,7 @@ class TestApplicationSettings:
         settings = ApplicationSettings.load()
 
         assert settings.units == Units.MILLIMETERS
-        assert settings.language == "en"
+        assert settings.language == ""
 
     def test_singleton_pattern(
         self, temp_config_path: Path, reset_singleton: None
