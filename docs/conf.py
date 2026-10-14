@@ -47,6 +47,10 @@ autodoc_inherit_docstrings = False
 autodoc_typehints = "none"
 
 
+# Read the Docs runs sphinx-build without -n, so the strict reference check is
+# switched on here rather than on the command line.
+nitpicky = True
+
 nitpick_ignore_regex = [
     # PySide isn't compatible with intersphinx without some fiddling
     # https://bugreports.qt.io/browse/PYSIDE-2215?gerritIssueType=IssueOnly
