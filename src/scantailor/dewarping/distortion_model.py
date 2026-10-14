@@ -1,21 +1,16 @@
-"""Distortion model for dewarping.
+"""Distortion model: the pair of curves that describe how a page is curved.
 
-This module provides the DistortionModel class that stores the top and bottom
-curves defining page distortion, used for cylindrical surface dewarping.
+A model stores the top and the bottom curve. Each curve keeps its polyline and, when
+it was made from an X-spline, the spline too. The dewarper reads the curves to work
+out how every row of the page is bent.
 
-SIMPLIFICATIONS FROM C++ IMPLEMENTATION
-========================================
+Differences from the C++ ``DistortionModel`` (``src/dewarping/DistortionModel.cpp``):
 
-The original C++ DistortionModel (src/dewarping/DistortionModel.cpp):
-- Uses XML serialization via QDomDocument
-- Has a Curve class wrapping XSpline with polyline caching
-- Validates convexity of the corner quadrilateral
-
-PYTHON SIMPLIFICATION:
-- Uses numpy arrays for polylines
-- Supports our XSpline class directly
-- Simple convexity validation
-- No XML serialization (can add later if needed)
+- The C++ class serializes itself to XML with ``QDomDocument``. This model has no
+  file format of its own.
+- The C++ ``Curve`` wraps an X-spline with a cached polyline. Here the polyline is
+  stored with the spline when there is one.
+- Convexity of the corner quadrilateral is checked with a simple test.
 """
 
 from dataclasses import dataclass, field

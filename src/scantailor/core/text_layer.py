@@ -307,7 +307,8 @@ def source_to_output_points(
     Args:
         page (pikepdf.Page): Source page; its CropBox (MediaBox when absent) and
             /Rotate fix the pixel grid the page was rendered to.
-        source_to_output_px (NDArray[np.float64]): 3x3 matrix from source pixels
+        source_to_output_px (numpy.ndarray of numpy.float64):
+            3x3 matrix from source pixels
             (y down, at ``source_dpi``) to output pixels (y down, origin at the
             output's top-left corner).
         source_dpi (Dpi): Resolution the source page was rendered at.
@@ -315,7 +316,8 @@ def source_to_output_points(
         output_height_px (float): Height of the output image in pixels.
 
     Returns:
-        NDArray[np.float64]: 3x3 matrix in column-vector form, source points to
+        numpy.ndarray of numpy.float64:
+            3x3 matrix in column-vector form, source points to
         output points (y up in both).
     """
     return (
@@ -453,7 +455,8 @@ class TextLayerData:
 
     Attributes:
         content (bytes): Content stream of the layer.
-        fonts (dict[str, FontRef]): Object number and generation, in the source
+        fonts (dict[str, tuple[tuple[int, int], tuple[str, ...]]]):
+            Object number and generation, in the source
             PDF, of each font the content selects, and the path to it from the
             page's resources for a font written directly in a dictionary.
         generated_fonts (dict[str, tuple[int, ...]]): Fonts the layer defines
@@ -810,7 +813,7 @@ def build_text_layer(
     replaced by invisible stand-ins with the same metrics.
 
     Args:
-        pdf_path (Path): The source PDF.
+        pdf_path (pathlib.Path): The source PDF.
         page_index (int): Zero-based page in that PDF the output was made from.
         transformation (ImageTransformation): Final transformation of the page;
             maps source pixels to output pixels relative to its resulting rect.
@@ -822,7 +825,8 @@ def build_text_layer(
             has a text layer only when this is given.
 
     Returns:
-        TextLayer | None: The layer, or None when the page has no text or the
+        scantailor.core.text_layer.TextLayer | None:
+            The layer, or None when the page has no text or the
         mapping cannot be inverted.
     """
     job = TextLayerJob.of(
@@ -864,12 +868,14 @@ def build_text_layers(
 
     Args:
         jobs (Sequence[TextLayerJob]): One per output page.
-        executor (ProcessPoolExecutor | None): A pool from ``spawn_pool``; the
+        executor (concurrent.futures.ProcessPoolExecutor | None):
+            A pool from ``spawn_pool``; the
             layers are built in this process when None.
         max_workers (int | None): Size of ``executor``.
 
     Returns:
-        list[TextLayer | None]: One entry per job, None where a page has no layer.
+        list[scantailor.core.text_layer.TextLayer | None]:
+            One entry per job, None where a page has no layer.
     """
     sources: dict[str, pikepdf.Pdf] = {}
 

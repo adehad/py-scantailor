@@ -41,9 +41,10 @@ def refine_text_lines(
     """Move traced lines onto the middle of the text they follow.
 
     Args:
-        gray (NDArray[np.uint8]): 2-D gray page at about 200 dpi, dark text on
+        gray (numpy.ndarray of numpy.uint8):
+            2-D gray page at about 200 dpi, dark text on
             a light background.
-        polylines (list[NDArray[np.float64]]): Traced lines, each of shape
+        polylines (list[numpy.ndarray of numpy.float64]): Traced lines, each of shape
             ``(n, 2)`` with x, y in pixels.
         unit_down (tuple[float, float]): Unit vector pointing down the page
             along the text columns.
@@ -51,7 +52,7 @@ def refine_text_lines(
             stages.
 
     Returns:
-        list[NDArray[np.float64]]: One refined line per input line, the nodes
+        list[numpy.ndarray of numpy.float64]: One refined line per input line, the nodes
             of its snake. A line too short to carry two nodes comes back as one
             node.
     """

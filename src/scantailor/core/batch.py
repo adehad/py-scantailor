@@ -168,8 +168,8 @@ def output_file_names(
     Args:
         pages (Iterable[PageId]): Pages in project order; the order decides
             which colliding source file gets which label.
-        layout_direction (LayoutDirection): Reading direction of the project.
-        file_labels (Mapping[Path, int] | None): Labels already given to source
+        layout_direction (str): Reading direction of the project.
+        file_labels (Mapping[pathlib.Path, int] | None): Labels already given to source
             files, as stored in ``Project.output_file_labels``. They win over the
             order of ``pages``; a file without one is labelled after the others
             of its name, as the C++ FileNameDisambiguator does when it registers
@@ -225,18 +225,18 @@ def erase_output_files(
 
     Args:
         removed (Iterable[PageId]): Pages being removed.
-        output_dir (Path): The project's output folder.
+        output_dir (pathlib.Path): The project's output folder.
         project_pages (Sequence[PageId]): The project's pages as they were
             before the removal; labels that tell same-named source files apart
             depend on them.
-        layout_direction (LayoutDirection): Reading direction, for file names.
-        keep (Iterable[Path]): Files that must survive, such as the source
+        layout_direction (str): Reading direction, for file names.
+        keep (Iterable[pathlib.Path]): Files that must survive, such as the source
             images when the output folder is also the input folder.
-        file_labels (Mapping[Path, int] | None): Stored labels of source files,
+        file_labels (Mapping[pathlib.Path, int] | None): Stored labels of source files,
             as passed to ``output_file_names``.
 
     Returns:
-        list[Path]: The files that were deleted.
+        list[pathlib.Path]: The files that were deleted.
     """
     removed = list(removed)
     variants = [
@@ -283,16 +283,17 @@ def rename_split_outputs(
     overwrites a file that is itself being renamed.
 
     Args:
-        output_dir (Path): The project's output folder.
+        output_dir (pathlib.Path): The project's output folder.
         pages (Sequence[PageId]): All pages of the project.
-        old_direction (LayoutDirection): Reading direction the files were named
+        old_direction (str): Reading direction the files were named
             under.
-        new_direction (LayoutDirection): Reading direction to name them for.
-        file_labels (Mapping[Path, int] | None): Stored labels of source files,
+        new_direction (str): Reading direction to name them for.
+        file_labels (Mapping[pathlib.Path, int] | None): Stored labels of source files,
             as passed to ``output_file_names``.
 
     Returns:
-        list[tuple[Path, Path]]: Old and new path of every file that was renamed.
+        list[tuple[pathlib.Path, pathlib.Path]]:
+            Old and new path of every file that was renamed.
             A file that cannot be renamed is logged and left where it is.
     """
     old_names = output_file_names(pages, old_direction, file_labels)
@@ -364,22 +365,23 @@ def run_pool[Job, Result](
     finish and are reported. Outcomes are reported from the calling thread.
 
     Args:
-        function (Callable[[Job], Result]): Picklable module-level callable.
-        jobs (Sequence[Job]): Picklable job arguments, run in order.
-        on_outcome (Callable[[Job, Result | None, BaseException | None], None]):
+        function (Callable[[Any], Any]): Picklable module-level callable.
+        jobs (Sequence[Any]): Picklable job arguments, run in order.
+        on_outcome (Callable[[Any, Any | None, BaseException | None], None]):
             Called with ``(job, result, None)`` on success and
             ``(job, None, error)`` on failure.
         max_workers (int | None): Pool size; defaults to the CPU count.
-        cancel (Event | None): When set, no further jobs are scheduled.
+        cancel (threading.Event | None): When set, no further jobs are scheduled.
         initializer (Callable[..., None] | None): Picklable callable run once in
             each worker after the thread limits are applied.
         initargs (tuple[Any, ...]): Arguments for ``initializer``.
-        executor (ProcessPoolExecutor | None): A pool from ``spawn_pool`` to
+        executor (concurrent.futures.ProcessPoolExecutor | None):
+            A pool from ``spawn_pool`` to
             reuse, so consecutive phases pay the worker start-up cost once;
             ``max_workers`` must then be its size. It is left running.
 
     Returns:
-        list[Job]: Jobs that were never scheduled because of cancellation.
+        list[Any]: Jobs that were never scheduled because of cancellation.
     """
     workers = pool_size(max_workers)
     if executor is None:
@@ -402,7 +404,7 @@ def spawn_pool(
         initargs (tuple[Any, ...]): Arguments for ``initializer``.
 
     Returns:
-        ProcessPoolExecutor: A pool to use as a context manager.
+        concurrent.futures.ProcessPoolExecutor: A pool to use as a context manager.
     """
     return ProcessPoolExecutor(
         max_workers=workers,
@@ -696,25 +698,28 @@ def run_batch(
     Args:
         stages (StageSequence): Settings of the project; updated by detection.
         pages (Sequence[PageId]): Pages to process, in project order.
-        output_dir (Path): Directory for the output files; created if missing.
-        layout_direction (LayoutDirection): Reading direction, for file names.
+        output_dir (pathlib.Path): Directory for the output files; created if missing.
+        layout_direction (str): Reading direction, for file names.
         default_dpi (float): Resolution for sources that do not define one.
         max_workers (int | None): Worker processes; defaults to the CPU count.
-        on_progress (Callable[[BatchEvent], None] | None): Receives a
+        on_progress (Callable[[PageDetected | PageDone | PageFailed], None] | None):
+            Receives a
             ``PageDetected`` per measured page, then a ``PageDone`` or
             ``PageFailed`` for every page that is attempted, from the calling
             thread.
-        cancel (Event | None): Setting it stops further pages from starting;
+        cancel (threading.Event | None): Setting it stops further pages from starting;
             pages already running finish and are reported.
-        dpi_overrides (DpiOverrides | None): Project resolutions that win over
+        dpi_overrides (Mapping[ImageId, Dpi] | None): Project resolutions that win over
             each image file's; handed to the workers as plain data.
-        executor (ProcessPoolExecutor | None): A pool from ``spawn_pool`` to
+        executor (concurrent.futures.ProcessPoolExecutor | None):
+            A pool from ``spawn_pool`` to
             reuse across phases; ``max_workers`` must then be its size. It is
             left running. A private pool is used and closed when None.
         tiff_compressions (TiffCompressions | None): Methods for the written
             files, handed to the workers as plain data; the application settings
             as they are when the batch starts when None.
-        file_labels (Mapping[Path, int] | None): Stored output file labels of the
+        file_labels (Mapping[pathlib.Path, int] | None):
+            Stored output file labels of the
             sources, as in ``output_file_names``.
 
     Returns:

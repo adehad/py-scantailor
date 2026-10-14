@@ -74,12 +74,13 @@ def trace_top_bottom_edges(
     """Find the curves that bound the page at its top and bottom.
 
     Args:
-        gray (NDArray[np.uint8]): 2-D gray image.
-        bounds (tuple[Line, Line]): The two vertical content bounds, as lines
+        gray (numpy.ndarray of numpy.uint8): 2-D gray image.
+        bounds (tuple[tuple, tuple]): The two vertical content bounds, as lines
             in the pixels of ``gray``.
 
     Returns:
-        list[NDArray[np.float64]]: Up to two curves, each of shape ``(n, 2)``,
+        list[numpy.ndarray of numpy.float64]:
+            Up to two curves, each of shape ``(n, 2)``,
             in the pixels of ``gray``. They run from the second bound towards
             the first. Empty when the bounds are degenerate or miss the image.
             A straight curve along the first or last row of the image is not
@@ -147,7 +148,8 @@ def is_image_border(curve: NDArray[np.float64], height: int) -> bool:
     """Tell a straight curve along the first or last row of the image.
 
     Args:
-        curve (NDArray[np.float64]): Knots of a traced edge, shape ``(n, 2)``,
+        curve (numpy.ndarray of numpy.float64):
+            Knots of a traced edge, shape ``(n, 2)``,
             in the pixels of the traced image.
         height (int): Rows of the traced image.
 
@@ -425,12 +427,13 @@ def _path_to_snake(
     """Follow a path back from its end and keep a knot about every 15 pixels.
 
     Args:
-        previous (NDArray[np.int8]): Neighbour index each cell was reached from,
+        previous (numpy.ndarray of numpy.int8):
+            Neighbour index each cell was reached from,
             -1 at a path start, with one cell of padding.
         endpoint (tuple[int, int]): Where the path ends.
 
     Returns:
-        NDArray[np.float64]: Knots from the end point back to the path start,
+        numpy.ndarray of numpy.float64: Knots from the end point back to the path start,
             shape ``(n, 2)``.
     """
     max_dist_sq = _MAX_KNOT_DIST * _MAX_KNOT_DIST
@@ -482,15 +485,16 @@ def _run_snake(
     """Move a snake into the gradient valley, or onto the gradient ridge.
 
     Args:
-        snake (NDArray[np.float64]): Knots, shape ``(n, 2)``.
-        grid (NDArray[np.float32]): Blurred gradient magnitude for the downhill
+        snake (numpy.ndarray of numpy.float64): Knots, shape ``(n, 2)``.
+        grid (numpy.ndarray of numpy.float32):
+            Blurred gradient magnitude for the downhill
             pass, the gradient magnitude for the uphill one.
         direction (tuple[float, float]): Knots only move to neighbours that lie
             this way.
         uphill (bool): True for the uphill pass.
 
     Returns:
-        NDArray[np.float64]: The moved knots in the same order.
+        numpy.ndarray of numpy.float64: The moved knots in the same order.
     """
     if len(snake) <= 1:
         return snake

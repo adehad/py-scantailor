@@ -30,12 +30,12 @@ def remove_horizontal_shadows(binary: NDArray[np.uint8], dpi: Dpi) -> NDArray[np
     shadow, and the whole connected component of ink it touches is removed.
 
     Args:
-        binary (NDArray[np.uint8]): 2-D page with 0 for ink and 255 for
+        binary (numpy.ndarray of numpy.uint8): 2-D page with 0 for ink and 255 for
             background. Not modified.
         dpi (Dpi): Resolution of ``binary``; the axes may differ.
 
     Returns:
-        NDArray[np.uint8]: New array of the same shape and values with the
+        numpy.ndarray of numpy.uint8: New array of the same shape and values with the
             shadows painted as background.
     """
     ink = (binary == _INK).astype(np.uint8)
@@ -89,12 +89,12 @@ def _upscale_integer_times(
     """Repeat each pixel a whole number of times, padding the rest with zeros.
 
     Args:
-        mask (NDArray[np.uint8]): Reduced mask.
+        mask (numpy.ndarray of numpy.uint8): Reduced mask.
         shape (tuple[int, ...]): Height and width to reach; at least as large
             as ``mask``.
 
     Returns:
-        NDArray[np.uint8]: Mask of ``shape``.
+        numpy.ndarray of numpy.uint8: Mask of ``shape``.
     """
     y_scale = shape[0] // mask.shape[0]
     x_scale = shape[1] // mask.shape[1]

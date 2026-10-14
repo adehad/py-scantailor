@@ -586,14 +586,15 @@ def _constrain_spline_point_to_line(
     """Linear constraint ``a . d + b = 0`` keeping the spline point at ``t`` on a line.
 
     Args:
-        pos (NDArray[np.float64]): Control points.
-        tension (NDArray[np.float64]): Tension of each control point.
+        pos (numpy.ndarray of numpy.float64): Control points.
+        tension (numpy.ndarray of numpy.float64): Tension of each control point.
         t (float): Position on the spline.
         p1x (float): X of the line's first point.
         p1y (float): Y of the line's first point.
         p2x (float): X of the line's second point.
         p2y (float): Y of the line's second point.
-        out_a (NDArray[np.float64]): Row of length ``2 * count`` that receives ``a``.
+        out_a (numpy.ndarray of numpy.float64):
+            Row of length ``2 * count`` that receives ``a``.
 
     Returns:
         float: The constant ``b``.
@@ -1049,8 +1050,8 @@ class FittedSpline:
     """An X-spline as the fit leaves it.
 
     Attributes:
-        positions (NDArray[np.float64]): Control points, shape ``(n, 2)``.
-        tensions (NDArray[np.float64]): Tension of each control point.
+        positions (numpy.ndarray of numpy.float64): Control points, shape ``(n, 2)``.
+        tensions (numpy.ndarray of numpy.float64): Tension of each control point.
     """
 
     positions: NDArray[np.float64]
@@ -1070,7 +1071,7 @@ class FittedSpline:
                 neighbouring samples.
 
         Returns:
-            NDArray[np.float64]: Points, shape ``(m, 2)``, head to tail.
+            numpy.ndarray of numpy.float64: Points, shape ``(m, 2)``, head to tail.
         """
         return sample_spline(
             self.positions,
@@ -1089,8 +1090,10 @@ def sample_spline(
     """Adaptive samples along an X-spline.
 
     Args:
-        positions (NDArray[np.float64]): Control points, shape ``(n, 2)``, n >= 2.
-        tensions (NDArray[np.float64]): Tension of each control point, in [-1, 1].
+        positions (numpy.ndarray of numpy.float64):
+            Control points, shape ``(n, 2)``, n >= 2.
+        tensions (numpy.ndarray of numpy.float64):
+            Tension of each control point, in [-1, 1].
         max_dist_from_spline (float): Largest distance from the chord between
             two samples to the spline between them.
         max_dist_between_samples (float): Largest distance between samples.
@@ -1124,7 +1127,7 @@ def linear_combination_at(
     """Control points and weights that make up the spline point at ``t``.
 
     Args:
-        tensions (NDArray[np.float64]): Tension of each control point.
+        tensions (numpy.ndarray of numpy.float64): Tension of each control point.
         t (float): Position on the spline, 0 to 1.
 
     Returns:
@@ -1142,11 +1145,11 @@ def lu_solve(
     """Solve ``matrix @ x = rhs`` with the C++ solver's pivoting and singularity rule.
 
     Args:
-        matrix (NDArray[np.float64]): Square matrix.
-        rhs (NDArray[np.float64]): Right-hand side vector.
+        matrix (numpy.ndarray of numpy.float64): Square matrix.
+        rhs (numpy.ndarray of numpy.float64): Right-hand side vector.
 
     Returns:
-        NDArray[np.float64] | None: The solution, or None when the matrix is
+        numpy.ndarray of numpy.float64 | None: The solution, or None when the matrix is
             singular by the solver's tolerance.
     """
     solution, ok = _lu_solve(
@@ -1185,7 +1188,7 @@ def fit_extended_spline(
     an internal force keeps the control points evenly spread, weaker each round.
 
     Args:
-        polyline (NDArray[np.float64]): Trimmed polyline, shape ``(n, 2)``,
+        polyline (numpy.ndarray of numpy.float64): Trimmed polyline, shape ``(n, 2)``,
             n >= 2, running from the first bound to the second.
         bound_first (tuple): Line the spline's start must lie on.
         bound_second (tuple): Line the spline's end must lie on.

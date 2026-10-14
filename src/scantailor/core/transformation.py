@@ -468,7 +468,8 @@ class ImageTransformation:
             rect (Rect): Rectangle in original image coordinates.
 
         Returns:
-            NDArray[np.float64]: Its four corners after pre-scale and pre-rotate,
+            numpy.ndarray of numpy.float64:
+                Its four corners after pre-scale and pre-rotate,
             shape (4, 2); the coordinates ``set_pre_crop_area`` takes.
         """
         return _transform_polygon(
@@ -716,13 +717,14 @@ def render_transformed(
     exact.
 
     Args:
-        image (NDArray[np.uint8]): Source image, (H, W) or (H, W, C) with at
+        image (numpy.ndarray of numpy.uint8): Source image, (H, W) or (H, W, C) with at
             most 4 channels. Its size must match transformation.orig_rect.
         transformation (ImageTransformation): Maps source to resulting
             coordinates.
 
     Returns:
-        NDArray[np.uint8]: New array with the same channel layout as the input
+        numpy.ndarray of numpy.uint8:
+            New array with the same channel layout as the input
         and the size of transformation.resulting_rect, rounded to whole pixels
         and at least 1x1. The input is not modified.
 
