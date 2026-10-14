@@ -82,30 +82,24 @@ and assembling multi-page documents are out of scope of this project.
 
 ## Building
 
-Go to [this repository](https://github.com/ScanTailor-Advanced/scantailor-libs-build) and follow the instructions given there.
+**Windows download:** every `v*` tag publishes `ScanTailor-<tag>-windows-x64.zip` on the [GitHub Releases](https://github.com/adehad/py-scantailor-advanced/releases) page. Unzip it anywhere and run `ScanTailor\ScanTailor.exe`; `ScanTailor\scantailor-cli.exe` in the same folder is the headless command line. The folder carries its own Python, Qt and Visual C++ runtime, so nothing else needs installing. Nothing in the pipeline uses a GPU, so there is one build for every machine.
 
-**Windows – large JPEG/PNG (issue #20):** If large-format JPEG or PNG files fail to load on Windows, ensure the build uses **libjpeg-turbo** (or libjpeg 9+) and a recent libpng. The [scantailor-libs-build](https://github.com/ScanTailor-Advanced/scantailor-libs-build) repository provides compatible libraries.
+The first launch of a new build compiles the image-processing kernels in the background and caches them under `%LOCALAPPDATA%\numba`; later launches load that cache.
 
-**Windows – Visual C++ runtime (issue #101):** Pre-built binaries are linked with **Microsoft Visual C++** (MSVC) runtimes. If the application does not start and Windows reports missing **`VCRUNTIME*.dll`**, **`MSVCP*.dll`**, or similar, install the **latest supported x64 “Visual C++ Redistributable”** from Microsoft’s page: [Latest supported VC++ Redistributable downloads](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170). Match **x64** vs **x86** to the build you run.
+**From source** (Windows, Linux or macOS) needs Python 3.12 and [PDM](https://pdm-project.org):
 
-**Windows – supported OS versions (issue #101):** Release builds follow upstream **Qt** and **toolchain** support policies; **legacy Windows** (for example Windows 7) is **not** exercised in this project’s CI and is **best-effort only**. You may need an **older tagged release** or a **self-built** binary against an older Qt/MSVC stack. Community reports (including compatibility tips) are welcome in the issue tracker.
+```bash
+pdm install
+pdm run translations        # compile the .ts catalogues into the gitignored .qm files
+pdm run scantailor          # the application
+pdm run scantailor-cli --help
+```
 
-**Linux – Wayland (issue #97):** On Qt5 builds, if `XDG_SESSION_TYPE` is `wayland` and `QT_QPA_PLATFORM` is not set, the application defaults to the X11 (`xcb`) platform plugin to avoid broken dialogs and painting. Set **`SCANTAILOR_NO_XCB_FALLBACK=1`** in the environment to keep native Wayland and, if needed, set `QT_QPA_PLATFORM=wayland` or `QT_QPA_PLATFORM=xcb` yourself.
+**Linux packages:** there is no frozen Linux build of this port yet; run it from source. The manifest in [`flatpak/`](flatpak/org.scantailor.Advanced.json) and [`.github/workflows/flatpak.yml`](.github/workflows/flatpak.yml) still build the upstream C++ v1.1.1 release, not this port.
 
-**Linux – Flatpak / Flathub ([issue #105](https://github.com/ScanTailor-Advanced/scantailor-advanced/issues/105)):**
+**Community examples / test data:** See also [scantailor-testing](https://github.com/ImageProcessing-ElectronicPublications/scantailor-testing).
 
-| | |
-|--|--|
-| **Day-to-day binaries** | Prefer [GitHub Releases](https://github.com/ScanTailor-Advanced/scantailor-advanced/releases) when the project publishes `.deb` / AppImage (or other) builds for a tagged version. |
-| **Install from Flathub** | There is **no** official Flathub listing yet for this fork under the new ID. Shipping there requires a maintainer to follow [Flathub submission](https://docs.flathub.org/docs/for-app-authors/submission/) (separate repo/PR to [flathub/flathub](https://github.com/flathub/flathub)), AppStream metainfo, screenshots, and reviewer feedback. The in-repo manifest is meant to make that step mostly mechanical; issue [#105](https://github.com/ScanTailor-Advanced/scantailor-advanced/issues/105) tracks coordination. |
-| **Local Flatpak (maintainers / QA)** | Manifest: [`flatpak/org.scantailor.Advanced.json`](flatpak/org.scantailor.Advanced.json). Example: `flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo` then `flatpak-builder --user --install-deps-from=flathub --force-clean build-dir flatpak/org.scantailor.Advanced.json` (installs the KDE runtime/SDK from Flathub on first run). |
-| **CI smoke build** | On each **`v*` tag** push (and via **workflow dispatch**), [`.github/workflows/flatpak.yml`](.github/workflows/flatpak.yml) runs `flatpak-builder` and uploads a **`.flatpak` bundle** as a workflow artifact for smoke testing. This is **not** the Flathub build pipeline. |
-
-**Application ID:** the manifest uses `org.scantailor.Advanced` so it does **not** replace the legacy `com.github._4lex4.*` Flatpak. Author docs: [for app authors](https://docs.flathub.org/docs/for-app-authors/).
-
-**Linux – GitHub Releases (.deb / AppImage, [issue #64](https://github.com/ScanTailor-Advanced/scantailor-advanced/issues/64)):** Version tags matching `v*` run [`.github/workflows/release.yml`](.github/workflows/release.yml), which produces a `.deb` ([`build-deb.sh`](build-deb.sh)) and an AppImage attached to the GitHub Release when the workflow is enabled. The AppImage is built on **Ubuntu 24.04** (`ubuntu-latest`) and requires a compatible **glibc** (typically **Ubuntu 24.04+** or equivalent). On **Ubuntu 22.04** and similar older bases, use the **`.deb`** package or build from source. Report problems with those binaries in [issue #64](https://github.com/ScanTailor-Advanced/scantailor-advanced/issues/64).
-
-**Community examples / test data:** See also [scantailor-testing](https://github.com/ImageProcessing-ElectronicPublications/scantailor-testing) (community repository; issue [#43](https://github.com/ScanTailor-Advanced/scantailor-advanced/issues/43)).
+See [Building (detailed)](#building-detailed) for building the executables and cutting a release.
 
 ## About this fork
 
@@ -460,55 +454,24 @@ This software is licensed under GNU GPLv3, you can read more about it on our [LI
 
 ## Building (detailed)
 
-#### Building on Linux (Ubuntu / Debian)
-
-Install the required dependencies:
+#### Building the executables
 
 ```bash
-sudo apt install build-essential cmake \
-  qt5-qmake qtbase5-dev libqt5svg5-dev qttools5-dev \
-  libboost-test-dev libboost-dev \
-  libjpeg-dev libpng-dev libtiff-dev zlib1g-dev
+pdm install
+pdm run exe
 ```
 
-Configure and build (out-of-tree build is required):
+`pdm run exe` compiles the translations, then runs PyInstaller on [`app.spec`](app.spec). The result is one folder, `dist/ScanTailor/`, holding the windowed `ScanTailor.exe` and the console `scantailor-cli.exe`, which share the bundled libraries. The entry scripts in [`tools/pyinstaller/`](tools/pyinstaller/) call `multiprocessing.freeze_support()` so the batch worker processes start correctly from a frozen executable. PyInstaller only builds for the platform it runs on.
+
+#### Releasing
+
+Push a tag that starts with `v`:
 
 ```bash
-mkdir build && cd build
-cmake ..
-make -j$(nproc)
+git tag v1.0.0-rc1
+git push origin v1.0.0-rc1
 ```
 
-For **offline or minimal chroot** builds where unit tests cannot be built (issue #61), use `cmake -DBUILD_TESTS=OFF ..` to skip the test targets.
+[`.github/workflows/release.yml`](.github/workflows/release.yml) then compiles the translations, runs the default test suite, builds the executables, zips `dist/ScanTailor/` and creates a GitHub Release for the tag with the zip attached and generated release notes. Tags containing `-rc`, `-alpha` or `-beta` are published as pre-releases.
 
-The executable will be in the `build` directory. To install system-wide: `sudo make install`.
-
-To build a `.deb` package (with application icon and menu entry):
-
-```bash
-./build-deb.sh
-```
-
-This compiles the project and produces `scantailor-advanced_<version>_<arch>.deb` in the project root. Install with `sudo dpkg -i scantailor-advanced_*.deb`.
-
-#### Building a Windows .exe from Linux (cross-compile)
-
-You can cross-compile the Windows executable from Linux using [MXE](https://mxe.cc/) (M Cross Environment). One-time MXE setup (builds Qt5 and dependencies; can take 1–2 hours):
-
-```bash
-git clone https://github.com/mxe/mxe.git ~/mxe
-cd ~/mxe
-make MXE_TARGETS=x86_64-w64-mingw32.static qt5 jpeg libpng tiff zlib boost
-```
-
-Then from the ScanTailor Advanced source directory:
-
-```bash
-./build-windows.sh
-```
-
-This produces `build-win-static/scantailor.exe`. Use `./build-windows.sh shared` for a smaller build that requires shipping DLLs from MXE’s `usr/x86_64-w64-mingw32.shared/bin/` alongside the .exe.
-
-#### Building on Windows (native)
-
-Go to [this repository](https://github.com/4lex4/scantailor-libs-build) and follow the instructions given there.
+Only Windows is built today. The build job is a matrix keyed by runner, so adding macOS or Linux means adding an entry to its `include` list with that runner's `os`, a `label` for the archive name, and the path of its `cli` executable for the smoke test.
