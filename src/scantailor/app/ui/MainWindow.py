@@ -37,7 +37,7 @@ from scantailor.app.ui.dialogs.default_params import DefaultParamsDialog
 from scantailor.app.ui.dialogs.fix_dpi import FixDpiDialog
 from scantailor.app.ui.dialogs.load_files_status import LoadFilesStatusDialog
 from scantailor.app.ui.dialogs.pdf_export import PdfExportDialog, PdfExportOptions
-from scantailor.app.ui.dialogs.pdf_import import DEFAULT_IMPORT_DPI, PdfImportDialog
+from scantailor.app.ui.dialogs.pdf_import import DEFAULT_IMPORT_DPI
 from scantailor.app.ui.dialogs.pdf_progress import PdfProgressDialog
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
 from scantailor.app.ui.dialogs.relinking import RelinkingDialog
@@ -48,7 +48,6 @@ from scantailor.app.ui.icons import icon
 from scantailor.app.ui.page_renderer import PageRenderer, render_thumbnail
 from scantailor.app.ui.panels.new_open_project import NewOpenProjectPanel
 from scantailor.app.ui.pdf_worker import (
-    ImportedPdf,
     PagePlan,
     PdfExportRequest,
     PdfExportResult,
@@ -57,7 +56,6 @@ from scantailor.app.ui.pdf_worker import (
     StoredTextRequest,
     TextRequest,
     export_pdf_pages,
-    import_pdf_pages,
 )
 from scantailor.app.ui.stage_panels import StagePanels
 from scantailor.app.ui.thumbnails import ThumbnailListWidget
@@ -154,7 +152,6 @@ LoadStatusPresenter = Callable[
 SavePrompt = Callable[[], SaveChoice]
 FixDpiDialogFactory = Callable[[list[ImageInfo], QWidget], FixDpiDialog]
 RelinkingDialogFactory = Callable[[list[pathlib.Path], QWidget], RelinkingDialog]
-PdfImportDialogFactory = Callable[[pathlib.Path, QWidget], PdfImportDialog]
 PdfExportDialogFactory = Callable[[pathlib.Path, bool, QWidget], PdfExportDialog]
 # Arguments: pages without output, pages in the project.
 RunBatchPrompt = Callable[[int, int], bool]
@@ -162,6 +159,27 @@ RunBatchPrompt = Callable[[int, int], bool]
 # else whether the output files of the pages are to be erased too.
 RemovePagesPrompt = Callable[[int, QWidget], bool | None]
 PageMetadata = list[tuple[ImageId, ImageMetadata]]
+
+
+def _add_pdf_sources(project: Project, sources: list[PdfSource]) -> None:
+    """Record extracted PDFs on a project, merging pages of a PDF already there.
+
+    Args:
+        project (Project): The project to add the sources to.
+        sources (list[PdfSource]): Sources of freshly extracted pages.
+    """
+    for source in sources:
+        for position, existing in enumerate(project.pdf_sources):
+            if (
+                existing.pdf_path == source.pdf_path
+                and existing.pages_dir == source.pages_dir
+            ):
+                project.pdf_sources[position] = existing.model_copy(
+                    update={"pages": {**existing.pages, **source.pages}}
+                )
+                break
+        else:
+            project.pdf_sources.append(source)
 
 
 def _create_directory(directory: pathlib.Path) -> None:
@@ -299,9 +317,6 @@ class MainWindowManager:
         self.relinking_dialog_factory: RelinkingDialogFactory = (
             relinking_dialog_factory or RelinkingDialog
         )
-        self.pdf_import_dialog_factory: PdfImportDialogFactory = (
-            self._default_pdf_import_dialog
-        )
         self.pdf_export_dialog_factory: PdfExportDialogFactory = (
             self._default_pdf_export_dialog
         )
@@ -338,7 +353,6 @@ class MainWindowManager:
         self._pdf_progress: PdfProgressDialog | None = None
         self._pdf_on_done: Callable[[Any], None] | None = None
         self._render_info: dict[PageId, RenderInfo] = {}
-        self.pdf_source: PdfSource | None = None
         self.last_pdf_export: PdfExportResult | None = None
         self._modified = False
         self._auto_save_timer = QtCore.QTimer(self.ui)
@@ -1766,15 +1780,6 @@ class MainWindowManager:
             self.ui.tr("Batch processing failed.") + f"\n{message}",
         )
 
-    def _default_pdf_import_dialog(
-        self, pdf_path: pathlib.Path, parent: QWidget
-    ) -> PdfImportDialog:
-        """Build the import resolution dialog, offering the last one used."""
-        dpi = cast(
-            int, self.settings.value(_LAST_PDF_DPI_KEY, DEFAULT_IMPORT_DPI, type=int)
-        )
-        return PdfImportDialog(pdf_path, dpi, parent)
-
     def _default_pdf_export_dialog(
         self, default_path: pathlib.Path, can_carry_text: bool, parent: QWidget
     ) -> PdfExportDialog:
@@ -1796,8 +1801,14 @@ class MainWindowManager:
         return answer == QMessageBox.StandardButton.Yes
 
     def openPdf(self, _checked: bool = False) -> None:
-        """Ask for a PDF, render its pages in the background, open them as a project."""
+        """Ask for a PDF, extract its pages, then open New Project with them added.
+
+        The pages go to ``<stem>_pages`` beside the PDF, which is also the output
+        folder's parent. Cancelling at any step leaves the open project alone.
+        """
         if self.pdf_job.is_running or self.batch_runner.is_running:
+            return
+        if not self._close_project_interactive():
             return
         start_dir = str(
             self.settings.value(_LAST_PDF_DIR_KEY, self._last_project_dir(), type=str)
@@ -1808,43 +1819,16 @@ class MainWindowManager:
         if not chosen:
             return
         pdf_path = pathlib.Path(chosen)
-        dialog = self.pdf_import_dialog_factory(pdf_path, self.ui)
-        accepted = dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted
-        dpi = dialog.dpi()
-        dialog.deleteLater()
-        if not accepted:
-            return
         self.settings.setValue(_LAST_PDF_DIR_KEY, str(pdf_path.parent))
-        self.settings.setValue(_LAST_PDF_DPI_KEY, dpi)
+        dialog = self.project_files_dialog_factory(self.ui)
         pages_dir = pdf_path.with_name(f"{pdf_path.stem}_pages")
-        self._run_pdf_job(
-            self.ui.tr("Open PDF"),
-            lambda report, cancel: import_pdf_pages(
-                pdf_path, pages_dir, dpi, report, cancel
-            ),
-            lambda imported: self._open_imported_pdf(imported, dpi),
-        )
-
-    def _open_imported_pdf(self, imported: ImportedPdf, dpi: int) -> None:
-        """Replace the open project with one made of the rendered PDF pages."""
-        if not self._close_project_interactive():
+        dialog.set_input_directory(pdf_path.parent)
+        dialog.set_output_directory(pages_dir / "out")
+        if not dialog.extract_pdf(pdf_path, self.ui):
+            dialog.deleteLater()
             return
-        pages = self._read_pages(imported.images)
-        if not pages:
-            return
-        pages_dir = imported.images[0].parent
-        project = Project(
-            output_directory=pages_dir / "out", pdf_source=imported.source
-        )
-        for image_id, metadata in pages:
-            project.add_image(image_id, metadata)
-        _create_directory(project.output_directory)
-        stages = StageSequence()
-        apply_default_params(
-            stages, [image_id for image_id, _ in pages], active_default_params()
-        )
-        stages.output_filter.settings.set_default_dpi(Dpi.uniform(dpi))
-        self._install_project(project, stages, project_file=None, modified=True)
+        if self._run_dialog(dialog):
+            self._open_project_from_dialog(dialog)
 
     def exportPdf(self, _checked: bool = False) -> None:
         """Write the processed pages of the project to one PDF in the background."""
@@ -1863,8 +1847,7 @@ class MainWindowManager:
             if self.run_batch_prompt(len(unprocessed), len(pages)):
                 self._start_batch(unprocessed)
             return
-        source = self.pdf_source
-        can_carry_text = source is not None and source.is_available
+        can_carry_text = any(source.is_available for source in self.pdf_sources)
         dialog = self.pdf_export_dialog_factory(
             self._default_pdf_path(), can_carry_text, self.ui
         )
@@ -1882,9 +1865,10 @@ class MainWindowManager:
 
     def _default_pdf_path(self) -> pathlib.Path:
         """Return where the exported PDF goes unless the user picks another place."""
-        source = self.pdf_source
-        if source is not None:
-            return source.pdf_path.with_name(f"{source.pdf_path.stem}_processed.pdf")
+        sources = self.pdf_sources
+        if len(sources) == 1:
+            pdf_path = sources[0].pdf_path
+            return pdf_path.with_name(f"{pdf_path.stem}_processed.pdf")
         output_directory = self.project.output_directory if self.project else None
         return (output_directory or pathlib.Path.cwd()) / "output.pdf"
 
@@ -1901,8 +1885,8 @@ class MainWindowManager:
             PdfExportRequest: Plain data; a page carries text only when its
             geometry is known from a batch run, in this session or a saved one.
         """
-        source = self.pdf_source
-        carries_text = source is not None and options.carry_text
+        project = self.project
+        carries_text = bool(self.pdf_sources) and options.carry_text
         output_settings = self.stages.output_filter.settings
         plans: list[PagePlan] = []
         for page, file in files.items():
@@ -1911,9 +1895,14 @@ class MainWindowManager:
                 info.output_dpi if info else output_settings.get_params(page).output_dpi
             )
             text = None
+            source = (
+                project.source_of(page.image_id.file_path)
+                if project is not None and carries_text
+                else None
+            )
             index = (
                 source.page_index(page.image_id.file_path)
-                if source is not None and carries_text
+                if source is not None
                 else None
             )
             if index is not None and info is not None:
@@ -1924,19 +1913,24 @@ class MainWindowManager:
                     info.was_dewarped,
                     info.dewarp,
                 )
-            elif index is not None and self.project is not None:
-                stored = self.project.text_geometry_of(page)
+            elif index is not None and project is not None:
+                stored = project.text_geometry_of(page)
                 if stored is not None:
                     text = StoredTextRequest(index, TextGeometry.model_validate(stored))
             plans.append(
-                PagePlan(file, (float(dpi.horizontal), float(dpi.vertical)), text)
+                PagePlan(
+                    file,
+                    (float(dpi.horizontal), float(dpi.vertical)),
+                    text,
+                    source if text is not None else None,
+                )
             )
         return PdfExportRequest(
             plans,
             options.out_path,
             options.bilevel_codec,
             options.jpeg_quality,
-            source,
+            list(self.pdf_sources),
             carry_text=options.carry_text,
         )
 
@@ -2381,12 +2375,20 @@ class MainWindowManager:
         dialog = self.project_files_dialog_factory(self.ui)
         if not self._run_dialog(dialog):
             return
-        # The dialog is deleted once the event loop runs again, e.g. in a nested
-        # dialog, so read everything it holds first.
+        self._open_project_from_dialog(dialog)
+
+    def _open_project_from_dialog(self, dialog: ProjectFilesDialog) -> None:
+        """Make a project from the pages an accepted files dialog holds.
+
+        Args:
+            dialog (ProjectFilesDialog): The accepted dialog. Everything is read
+                here, since the dialog is deleted once the event loop runs again.
+        """
         input_dir = dialog.get_input_directory()
         files = sort_smart(dialog.get_project_paths())
         output_dir = dialog.get_output_directory()
         layout_direction: LayoutDirection = "RTL" if dialog.is_rtl_layout() else "LTR"
+        imported = dialog.get_imported_pdfs()
         if input_dir is None or not files:
             QMessageBox.warning(
                 self.ui,
@@ -2405,11 +2407,16 @@ class MainWindowManager:
         )
         for image_id, metadata in pages:
             project.add_image(image_id, metadata)
+        _add_pdf_sources(project, [item.source for item in imported])
         _create_directory(project.output_directory)
         stages = StageSequence()
         apply_default_params(
             stages, [image_id for image_id, _ in pages], active_default_params()
         )
+        if imported:
+            pdf_dpi = imported[-1].source.dpi
+            stages.output_filter.settings.set_default_dpi(Dpi.uniform(pdf_dpi))
+            self.settings.setValue(_LAST_PDF_DPI_KEY, pdf_dpi)
         self._install_project(project, stages, project_file=None, modified=True)
         self.settings.setValue(_LAST_INPUT_DIR_KEY, str(input_dir))
 
@@ -2450,6 +2457,7 @@ class MainWindowManager:
         dialog = self.project_files_dialog_factory(self.ui)
         if not self._run_dialog(dialog):
             return
+        imported = dialog.get_imported_pdfs()
         present = {info.id.file_path for info in project.images}
         paths = [
             path
@@ -2465,6 +2473,7 @@ class MainWindowManager:
         project.register_output_file_labels()
         if not project.insert_images(infos, existing, before=before):
             return
+        _add_pdf_sources(project, [item.source for item in imported])
         propagation.seed_new_pages(
             self.stages, [info.id for info in infos], active_default_params()
         )
@@ -2615,12 +2624,10 @@ class MainWindowManager:
         self._remember_aggregate_size()
         self.thumbnails.set_project(project)
         self.projectFile = str(project_file) if project_file else ""
-        if project.pdf_source is None:
-            project.pdf_source = PdfSource.find(
-                info.id.file_path for info in project.images
-            )
-            modified = modified or project.pdf_source is not None
-        self.pdf_source = project.pdf_source
+        if not project.pdf_sources:
+            found = PdfSource.find(info.id.file_path for info in project.images)
+            project.pdf_sources = found
+            modified = modified or bool(found)
         self._render_info = {}
         self._modified = modified
         self._saved_state = None if modified else self._state_snapshot()
@@ -2649,11 +2656,20 @@ class MainWindowManager:
         if self.project and self.project.images:
             input_dir = self.project.images[0].id.file_path.parent
             output_dir = self.project.output_directory
+        pdf_dpi = cast(
+            int, self.settings.value(_LAST_PDF_DPI_KEY, DEFAULT_IMPORT_DPI, type=int)
+        )
         return ProjectFilesDialog(
             input_dir=input_dir,
             output_dir=output_dir,
             parent=parent,
+            pdf_dpi=pdf_dpi,
         )
+
+    @property
+    def pdf_sources(self) -> list[PdfSource]:
+        """The PDFs the open project pages were rendered from; empty when none."""
+        return self.project.pdf_sources if self.project is not None else []
 
     @staticmethod
     def _default_load_status_presenter(
@@ -2734,7 +2750,7 @@ class MainWindowManager:
             return False
         self._saved_state = self._state_snapshot()
         self.modified = False
-        if project.pdf_source is not None:
+        if project.pdf_sources:
             PdfSource.discard_sidecars(info.id.file_path for info in project.images)
         return True
 
@@ -2819,7 +2835,6 @@ class MainWindowManager:
         self._bind_thumbnail_stages()
         self.thumbnails.set_project(None)
         self.projectFile = ""
-        self.pdf_source = None
         self._render_info = {}
         self.current_page = None
         self._modified = False

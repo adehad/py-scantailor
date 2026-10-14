@@ -10,43 +10,49 @@ SOURCE_FILE_NAME = "pdf_source.json"
 
 
 class PdfSource(BaseModel):
-    """The PDF a project's pages were rendered from.
+    """A PDF whose pages were rendered into a project.
 
-    The project stores this model in its own file.
+    A project can hold several sources. The same image file name recurs in every
+    extraction, so a page is matched by its folder as well as its name.
 
     Attributes:
-        pdf_path: The PDF the pages were rendered from.
-        dpi: Resolution the pages were rendered at.
-        pages: Zero-based PDF page index per image file name.
+        pdf_path (pathlib.Path): The PDF the pages were rendered from.
+        dpi (int): Resolution the pages were rendered at.
+        pages_dir (pathlib.Path | None): Folder holding the rendered images. None for a
+            source stored by an earlier version, which matches by name alone.
+        pages (dict[str, int]): Zero-based PDF page index per image file name.
     """
 
     pdf_path: Path
     dpi: int = Field(gt=0)
+    pages_dir: Path | None = None
     pages: dict[str, int] = Field(default_factory=dict)
 
     @classmethod
     def _read_sidecar(cls, directory: Path) -> "PdfSource | None":
         try:
-            return cls.model_validate_json(
+            source = cls.model_validate_json(
                 (directory / SOURCE_FILE_NAME).read_text(encoding="utf-8")
             )
         except (OSError, ValueError):
             return None
+        return source.model_copy(update={"pages_dir": directory})
 
     @classmethod
-    def find(cls, image_files: Iterable[Path]) -> "PdfSource | None":
-        """Return the first mapping found beside any of ``image_files``, keeping it.
+    def find(cls, image_files: Iterable[Path]) -> list["PdfSource"]:
+        """Return the mappings stored beside the image files, one per folder.
 
         Args:
-            image_files: Image files of the project.
+            image_files (Iterable[pathlib.Path]): Image files of the project.
 
         Returns:
-            PdfSource | None: The mapping, or None when no readable file was found.
+            list[PdfSource]: The readable mappings, in the order of their folders.
         """
+        found: list[PdfSource] = []
         for directory in dict.fromkeys(file.parent for file in image_files):
             if (source := cls._read_sidecar(directory)) is not None:
-                return source
-        return None
+                found.append(source)
+        return found
 
     @classmethod
     def discard_sidecars(cls, image_files: Iterable[Path]) -> None:
@@ -55,7 +61,7 @@ class PdfSource(BaseModel):
         Call once the project file that holds the mapping is saved.
 
         Args:
-            image_files: Image files of the project.
+            image_files (Iterable[pathlib.Path]): Image files of the project.
         """
         for directory in dict.fromkeys(file.parent for file in image_files):
             try:
@@ -65,7 +71,16 @@ class PdfSource(BaseModel):
                 pass
 
     def page_index(self, image_file: Path) -> int | None:
-        """Return the PDF page an image file was rendered from, if it was."""
+        """Return the zero-based PDF page an image was rendered from, if it was.
+
+        Args:
+            image_file (pathlib.Path): Image file of the project, with its folder.
+
+        Returns:
+            int | None: The page index, or None when this source did not render it.
+        """
+        if self.pages_dir is not None and image_file.parent != self.pages_dir:
+            return None
         return self.pages.get(image_file.name)
 
     @property
