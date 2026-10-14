@@ -11,14 +11,6 @@ from scantailor.app.ui.utils import get_cwidget
 _UI_FOLDER = Path(__file__).parent
 
 
-_THIRD_PARTY_NOTICES_HTML = (
-    "<hr><h3>Third-party assets</h3>"
-    "<p><b>Lucide icons</b>: ISC licence, with MIT for the icons derived from "
-    "Feather. Full text in the bundled LICENSE file.</p>"
-    "<p><b>Inter</b> and <b>Noto Sans KR</b> fonts: SIL Open Font License 1.1.</p>"
-)
-
-
 class AboutDialog(QtWidgets.QDialog):
     """About Dialog."""
 
@@ -38,7 +30,10 @@ class AboutDialog(QtWidgets.QDialog):
 
     def set_version(self):
         """Set the version on the dialog."""
-        self.version_label.setText("version " + __about__.__version__)
+        self.version_label.setText(
+            QtCore.QCoreApplication.translate("MainWindow", "version ")
+            + __about__.__version__
+        )
 
     def set_license(self):
         """Set the license text from the resource file."""
@@ -53,4 +48,15 @@ class AboutDialog(QtWidgets.QDialog):
 
     def add_third_party_notices(self) -> None:
         """Append the licences of the bundled icons and fonts to the licence tab."""
-        self.license_viewer.append(_THIRD_PARTY_NOTICES_HTML)
+        self.license_viewer.append(
+            self.tr("<hr><h3>Third-party assets</h3>")
+            + self.tr(
+                "<p><b>Lucide icons</b>: ISC licence, with MIT for the icons "
+                "derived from "
+                "Feather. Full text in the bundled LICENSE file.</p>"
+            )
+            + self.tr(
+                "<p><b>Inter</b> and <b>Noto Sans KR</b> fonts: "
+                "SIL Open Font License 1.1.</p>"
+            )
+        )

@@ -7,18 +7,19 @@ class ProcessingIndicator(QtWidgets.QWidget):
     """A label with an endless progress bar, visible only while work runs."""
 
     def __init__(
-        self, text: str = "Processing...", parent: QtWidgets.QWidget | None = None
+        self, text: str | None = None, parent: QtWidgets.QWidget | None = None
     ) -> None:
         """Build the indicator, initially inactive.
 
         Args:
-            text (str): Label shown beside the bar.
+            text (str | None): Label shown beside the bar; "Processing..." when None.
             parent (QtWidgets.QWidget | None): Owner of the widget.
         """
         super().__init__(parent)
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(QtWidgets.QLabel(text, self))
+        label = self.tr("Processing...") if text is None else text
+        layout.addWidget(QtWidgets.QLabel(label, self))
         bar = QtWidgets.QProgressBar(self)
         bar.setRange(0, 0)
         bar.setTextVisible(False)

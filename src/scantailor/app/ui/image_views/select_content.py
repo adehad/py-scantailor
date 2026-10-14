@@ -9,10 +9,17 @@ box. A double click on content adjusts the content box to it.
 import math
 from collections.abc import Callable
 from enum import Enum, auto
-from typing import ClassVar
+from typing import ClassVar, cast
 
 from PySide6 import QtGui, QtWidgets
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import (
+    QT_TRANSLATE_NOOP,
+    QCoreApplication,
+    QPointF,
+    QRectF,
+    Qt,
+    Signal,
+)
 from PySide6.QtGui import QAction, QKeySequence, QPainter, QPen
 
 from scantailor.app.ui.image_views.base import (
@@ -24,11 +31,37 @@ from scantailor.app.ui.image_views.base import (
 from scantailor.app.ui.theme.tokens import view_color
 from scantailor.core.content_mask import ContentMask
 
-_CONTENT_RESIZE_TIP = "Drag lines or corners to resize the content box."
-_PAGE_RESIZE_TIP = "Drag lines or corners to resize the page box."
-_CONTENT_MOVE_TIP = "Hold left mouse button to drag the content box."
-_PAGE_MOVE_TIP = "Hold left mouse button to drag the page box."
-_FINISH_DRAG_TIP = "Release left mouse button to finish dragging."
+_SELECT_CONTENT_CONTEXT = "select_content::ImageView"
+_CONTENT_RESIZE_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        _SELECT_CONTENT_CONTEXT, "Drag lines or corners to resize the content box."
+    ),
+)
+_PAGE_RESIZE_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        _SELECT_CONTENT_CONTEXT, "Drag lines or corners to resize the page box."
+    ),
+)
+_CONTENT_MOVE_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        _SELECT_CONTENT_CONTEXT, "Hold left mouse button to drag the content box."
+    ),
+)
+_PAGE_MOVE_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        _SELECT_CONTENT_CONTEXT, "Hold left mouse button to drag the page box."
+    ),
+)
+_FINISH_DRAG_TIP = cast(
+    str,
+    QT_TRANSLATE_NOOP(
+        _SELECT_CONTENT_CONTEXT, "Release left mouse button to finish dragging."
+    ),
+)
 # Half the side, in mask pixels, of the square searched for content around a click.
 _SNAP_SEARCH_RADIUS = 15
 
@@ -54,11 +87,16 @@ class SelectContentImageView(ImageViewBase):
     manual_content_rect_set = Signal(QRectF)
     manual_page_rect_set = Signal(QRectF)
 
-    default_status_tip = (
-        "Use the context menu to enable / disable the content box. Hold Shift to "
-        "drag a box. Use double-click on content to automatically adjust the "
-        "content area."
+    default_status_tip = cast(
+        str,
+        QT_TRANSLATE_NOOP(
+            "select_content::ImageView",
+            "Use the context menu to enable / disable the content box. Hold Shift to "
+            "drag a box. Use double-click on content to automatically adjust the "
+            "content area.",
+        ),
     )
+    default_status_tip_context = "select_content::ImageView"
 
     CORNER_HIT_RADIUS = 10
     EDGE_HIT_DISTANCE = 8
@@ -109,14 +147,24 @@ class SelectContentImageView(ImageViewBase):
 
     def _build_context_menus(self) -> None:
         self._no_content_menu = QtWidgets.QMenu(self)
-        create = QAction("Create Content Box", self)
+        create = QAction(
+            QCoreApplication.translate(
+                "select_content::ImageView", "Create Content Box"
+            ),
+            self,
+        )
         create.setShortcut(QKeySequence("Ins"))
         create.triggered.connect(self._create_content_box)
         self._no_content_menu.addAction(create)
         self.addAction(create)
 
         self._have_content_menu = QtWidgets.QMenu(self)
-        remove = QAction("Remove Content Box", self)
+        remove = QAction(
+            QCoreApplication.translate(
+                "select_content::ImageView", "Remove Content Box"
+            ),
+            self,
+        )
         remove.setShortcut(QKeySequence("Delete"))
         remove.triggered.connect(self._remove_content_box)
         self._have_content_menu.addAction(remove)
@@ -374,8 +422,10 @@ class SelectContentImageView(ImageViewBase):
         kind, edges = hit
         content = kind == BoxKind.CONTENT
         if edges == Edge.NONE:
-            return _CONTENT_MOVE_TIP if content else _PAGE_MOVE_TIP
-        return _CONTENT_RESIZE_TIP if content else _PAGE_RESIZE_TIP
+            tip = _CONTENT_MOVE_TIP if content else _PAGE_MOVE_TIP
+            return QCoreApplication.translate("select_content::ImageView", tip)
+        tip = _CONTENT_RESIZE_TIP if content else _PAGE_RESIZE_TIP
+        return QCoreApplication.translate("select_content::ImageView", tip)
 
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
         """Pick up a box, a side or a corner.
@@ -392,7 +442,11 @@ class SelectContentImageView(ImageViewBase):
                 grab = self.widget_to_virtual_point(event.position())
                 self._drag_offset = self._grab_offset(self._rects[kind], edges, grab)
                 if edges == Edge.NONE:
-                    self.set_status_tip(_FINISH_DRAG_TIP)
+                    self.set_status_tip(
+                        QCoreApplication.translate(
+                            "select_content::ImageView", _FINISH_DRAG_TIP
+                        )
+                    )
                 event.accept()
                 return
         super().mousePressEvent(event)

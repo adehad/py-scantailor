@@ -6,6 +6,7 @@ a batch processing launch button.
 
 from PySide6.QtCore import (
     QAbstractTableModel,
+    QCoreApplication,
     QModelIndex,
     QPersistentModelIndex,
     Qt,
@@ -97,12 +98,14 @@ class StageListModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.DisplayRole and col == 0:
             # Get stage name
             stage_names = [
-                "Fix Orientation",
-                "Split Pages",
-                "Deskew",
-                "Select Content",
-                "Margins",
-                "Output",
+                QCoreApplication.translate(
+                    "fix_orientation::Filter", "Fix Orientation"
+                ),
+                QCoreApplication.translate("page_split::Filter", "Split Pages"),
+                QCoreApplication.translate("deskew::Filter", "Deskew"),
+                QCoreApplication.translate("select_content::Filter", "Select Content"),
+                QCoreApplication.translate("page_layout::Filter", "Margins"),
+                QCoreApplication.translate("output::Filter", "Output"),
             ]
             if 0 <= row < len(stage_names):
                 return stage_names[row]
@@ -205,7 +208,7 @@ class StageListView(QTableView):
         self._launch_btn = QToolButton(self.viewport())
         self._launch_btn.setIcon(icon("play"))
         self._launch_btn.setMinimumSize(18, 18)
-        self._launch_btn.setToolTip("Launch batch processing")
+        self._launch_btn.setToolTip(self.tr("Launch batch processing"))
         self._launch_btn.hide()
         self._launch_btn.clicked.connect(self.launch_batch_processing.emit)
 
