@@ -50,3 +50,7 @@ repos:
         entry: pdm run typecheck
         types_or: [python, pyi]
         pass_filenames: false
+
+# pre-commit.ci has no pdm; the test workflow runs the type check instead.
+ci:
+  skip: [typecheck]
