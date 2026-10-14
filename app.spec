@@ -43,7 +43,7 @@ datas = [
     *_beside_package(sorted(PACKAGE.rglob("*.ui"))),
     *_beside_package(translations),
     *_beside_package(sorted((PACKAGE / "resources" / "fonts" / "noto-sans-kr").iterdir())),
-    *copy_metadata("scantailor"),
+    *copy_metadata("py-scantailor"),
 ]
 
 # QtSvg gives PyInstaller's hook the qsvg image-format plugin that draws the glyphs.

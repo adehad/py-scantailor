@@ -19,7 +19,7 @@ pdm run exe                               # Build the executables with PyInstall
 
 **Application**: ScanTailor - document scanning post-processor, written in Python with PySide6
 **Origin**: a port of [ScanTailor Advanced](https://github.com/ScanTailor-Advanced/scantailor-advanced) (C++/Qt). The C++ code is not in this repository; read it upstream when you need to compare behaviour.
-**Tracking**: work and known defects are GitHub issues on `adehad/py-scantailor-advanced`
+**Tracking**: work and known defects are GitHub issues on `adehad/py-scantailor`
 
 ## Source Code Locations
 

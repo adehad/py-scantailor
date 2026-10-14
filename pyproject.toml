@@ -1,5 +1,5 @@
 [project]
-name = "scantailor"
+name = "py-scantailor"
 description = "Python port of the ScanTailor Application"
 authors = [{ name = "Adel H", email = "26027314+adehad@users.noreply.github.com" }]
 dependencies = [
@@ -27,6 +27,13 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
 ]
 dynamic = ["version"]
+
+
+[project.urls]
+Homepage = "https://github.com/adehad/py-scantailor"
+Documentation = "https://py-scantailor.readthedocs.io/"
+Issues = "https://github.com/adehad/py-scantailor/issues"
+Releases = "https://github.com/adehad/py-scantailor/releases"
 
 [project.scripts]
 scantailor-cli = "scantailor.cli.main:main"
