@@ -91,7 +91,7 @@ def test_cancelled_second_import_leaves_the_earlier_import_untouched(
 
     with pytest.raises(PdfCancelled):
         import_pdf(
-            _write_pdf(tmp_path / "book.pdf", shade="1"),
+            _write_pdf(tmp_path / "other.pdf", shade="1"),
             pages,
             dpi=72,
             cancel=cancel,

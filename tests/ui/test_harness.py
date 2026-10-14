@@ -69,3 +69,11 @@ def test_respond_to_modal_rejects_blocking_dialog(qtbot: QtBot, respond_to_modal
     respond_to_modal(accept=False)
 
     assert dialog.exec() == QtWidgets.QDialog.DialogCode.Rejected
+
+
+def test_each_test_starts_with_the_cursor_in_the_screen_corner(
+    qapp: QtWidgets.QApplication,
+):
+    corner = qapp.primaryScreen().geometry().bottomRight()
+
+    assert QtGui.QCursor.pos() == corner

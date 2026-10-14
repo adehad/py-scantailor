@@ -3,9 +3,10 @@
 from collections.abc import Iterator
 from pathlib import Path
 
+import cv2
 import numpy as np
 import pytest
-from PySide6 import QtCore, QtGui
+from PySide6 import QtCore, QtGui, QtWidgets
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.image_views.output import (
@@ -503,3 +504,20 @@ class TestDewarpingGridWaitsForItsTab:
         view.set_current_tab(ImageViewTab.DEWARPING)
 
         assert len(fed) == 1
+
+
+def test_a_decode_that_ends_after_the_widgets_are_deleted_is_dropped(
+    qtbot: QtBot, tmp_path: Path
+):
+    scan = tmp_path / "scan.png"
+    assert cv2.imwrite(str(scan), np.full((400, 600), 200, dtype=np.uint8))
+    panels = StagePanels(FilterStage.FIX_ORIENTATION, StageSequence())
+    panels.set_page(PageId(image_id=ImageId(file_path=scan)))
+    panels.options.deleteLater()
+    panels.view.deleteLater()
+    QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
+    panels._source_pool.waitForDone()
+
+    QtWidgets.QApplication.processEvents()
+
+    assert panels._source is None
