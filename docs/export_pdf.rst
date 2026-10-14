@@ -27,6 +27,41 @@ folder inside that folder. The rendered pages are then processed like scanned
 images. The source PDF is kept with the project, which lets Export PDF carry its
 text over.
 
+.. _pdf-in-new-project:
+
+PDFs in the New Project dialog
+------------------------------
+
+.. screenshot:: open_pdf
+   :alt: The New Project dialog with a sample PDF selected and its Extract pages prompt
+
+A PDF can also join a new project next to scanned images. The New Project dialog
+lists the PDFs of the input folder before the images, each with its page count.
+**Add PDF...** adds one from any other folder. Select a PDF and press the right
+arrow button, and the **Extract pages** prompt asks what to render:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Control
+     - What it does
+   * - All pages
+     - Renders every page of the PDF.
+   * - Pages ... to ...
+     - Renders only the pages in this range.
+   * - Render at
+     - The resolution, from 72 to 1200 DPI. 300 at first.
+   * - Write to
+     - The folder the pages go to: the PDF's name with ``_pages`` added, next to
+       the PDF. It cannot be changed.
+   * - Extract
+     - Renders the pages and adds them to Files In Project.
+
+If that folder already holds rendered pages, you are asked whether to use them or
+to render again. Rendering again replaces the old pages only once every new page
+is done. A PDF whose pages were extracted shows ``extracted`` after its page count.
+
 Export PDF
 ----------
 

@@ -101,6 +101,9 @@ Insert, remove and add pages
 Right-click a thumbnail to insert or remove pages. Right-click the empty space
 after the last page to add pages at the end.
 
+.. screenshot:: thumbnail_menu
+   :alt: The menu of a page thumbnail
+
 .. list-table::
    :header-rows: 1
    :widths: 30 70
@@ -117,9 +120,12 @@ after the last page to add pages at the end.
      - Removes the selected pages after a confirmation. Input files are never
        deleted.
 
-The removal confirmation has a **Remove output files too** box. Ticking it also
-deletes the output files written for the removed pages. Leave it off to keep
-them.
+.. screenshot:: remove_pages
+   :alt: The removal confirmation with Remove output files too ticked
+
+The removal confirmation has a **Remove output files too** box, ticked when the
+confirmation opens. Ticked, it also deletes the output files written for the
+removed pages. Untick it to keep them.
 
 Images already in the project are skipped when you insert or add files.
 **File > Add Files ...** appends the chosen images to the end of the project.
@@ -147,6 +153,9 @@ right.
 
 Missing folders and relinking
 -----------------------------
+
+.. screenshot:: relinking
+   :alt: The Relinking dialog with the folder of the sample pages selected
 
 A project keeps the paths of its input files and its output folder. When one of
 those folders has moved, the **Relinking** dialog opens on opening the project.
