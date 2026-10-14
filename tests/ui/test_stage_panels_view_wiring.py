@@ -445,3 +445,61 @@ def test_panels_are_plain_qt_objects():
     panels = _panels(FilterStage.PAGE_SPLIT)
 
     assert isinstance(panels, QtCore.QObject)
+
+
+class TestDewarpingGridWaitsForItsTab:
+    """Laying out the grid is slow on a large page, so only an open tab gets it."""
+
+    @staticmethod
+    def _show_output(panels: StagePanels) -> list[DistortionModelSpec]:
+        """Show a rendered page with a stored model; return what the grid is fed."""
+        filter_ = panels.sequence.output_filter
+        filter_.set_params(PAGE, filter_.get_params(PAGE).with_distortion_model(MODEL))
+        view = panels.view
+        assert isinstance(view, OutputImageView)
+        fed: list[DistortionModelSpec] = []
+        feed = view.set_distortion_model
+
+        def record(model: DistortionModelSpec, depth: float) -> None:
+            fed.append(model)
+            feed(model, depth)
+
+        view.set_distortion_model = record  # type: ignore[method-assign]
+        output = np.full((HEIGHT, WIDTH), 200, dtype=np.uint8)
+        panels._stage_image = output
+        view.set_image(output)
+        panels.set_output_extras(OutputExtras(output, None, 300))
+        xform = ImageTransformation.from_size(WIDTH, HEIGHT, Dpi.uniform(300))
+        panels._output_transformation = xform
+        panels._feed_output_tabs(view, filter_.get_params(PAGE), xform, np.ones(2))
+        return fed
+
+    def test_the_grid_is_not_laid_out_while_its_tab_is_closed(self):
+        panels = _panels(FilterStage.OUTPUT)
+
+        fed = self._show_output(panels)
+
+        assert fed == []
+
+    def test_opening_the_dewarping_tab_lays_out_the_stored_model(self):
+        panels = _panels(FilterStage.OUTPUT)
+        fed = self._show_output(panels)
+        view = panels.view
+        assert isinstance(view, OutputImageView)
+
+        view.set_current_tab(ImageViewTab.DEWARPING)
+
+        assert len(fed) == 1
+        assert np.array(fed[0].top) == pytest.approx(np.array(MODEL.top))
+
+    def test_opening_the_tab_again_does_not_lay_out_the_same_model_again(self):
+        panels = _panels(FilterStage.OUTPUT)
+        fed = self._show_output(panels)
+        view = panels.view
+        assert isinstance(view, OutputImageView)
+
+        view.set_current_tab(ImageViewTab.DEWARPING)
+        view.set_current_tab(ImageViewTab.OUTPUT)
+        view.set_current_tab(ImageViewTab.DEWARPING)
+
+        assert len(fed) == 1

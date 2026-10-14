@@ -52,7 +52,11 @@ from scantailor.app.ui.dialogs.remove_pages import RemovePagesDialog
 from scantailor.app.ui.dialogs.settings import SettingsDialog
 from scantailor.app.ui.dialogs.split_mode import SplitModeDialog
 from scantailor.app.ui.icons import icon
-from scantailor.app.ui.page_renderer import PageRenderer, render_thumbnail
+from scantailor.app.ui.page_renderer import (
+    PageRenderer,
+    render_thumbnail,
+    shrink_to_thumbnail,
+)
 from scantailor.app.ui.panels.new_open_project import NewOpenProjectPanel
 from scantailor.app.ui.pdf_worker import (
     PagePlan,
@@ -617,13 +621,21 @@ class MainWindowManager:
     def _render_page_thumbnail(self, page: PageId, stage: str) -> QtGui.QImage:
         """Render a thumbnail on a worker thread; settings are only read.
 
-        The render the user is waiting for goes first.
+        The render the user is waiting for goes first. When that render is of
+        this page and stage with the same parameters, its image is shrunk
+        instead of running the pipeline again.
         """
         self.renderer.wait_until_idle()
+        end_stage = FilterStage(int(stage))
+        shown = self.renderer.rendered(
+            page, end_stage, self._thumbnail_digest(page, stage)
+        )
+        if shown is not None:
+            return shrink_to_thumbnail(shown, self.thumbnails.render_size)
         return render_thumbnail(
             page,
             self.stages,
-            FilterStage(int(stage)),
+            end_stage,
             self.thumbnails.render_size,
             self._dpi_overrides,
             self.renderer.sources,
@@ -1321,13 +1333,19 @@ class MainWindowManager:
             return
         self._show_not_ready(False)
         self._set_render_pending(True)
+        at_output = panels.stage == FilterStage.OUTPUT
         self.renderer.request(
             self._current_page,
             self.stages,
             panels.stage,
             self._dpi_overrides,
-            pixels=panels.stage == FilterStage.OUTPUT,
-            extras=panels.stage == FilterStage.OUTPUT,
+            pixels=at_output,
+            extras=at_output,
+            tag=(
+                self._thumbnail_digest(self._current_page, str(int(panels.stage)))
+                if at_output
+                else None
+            ),
         )
 
     def _cancel_render(self) -> None:

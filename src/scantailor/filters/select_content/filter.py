@@ -77,6 +77,13 @@ def _mapped_page_box(
     return PageBox(x=mapped.x, y=mapped.y, width=mapped.width, height=mapped.height)
 
 
+def _made(
+    image: NDArray[np.uint8] | Callable[[], NDArray[np.uint8]],
+) -> NDArray[np.uint8]:
+    """Return the image, making it first when it is given as a function."""
+    return image() if callable(image) else image
+
+
 def _content_within_page(params: Params) -> bool:
     """Tell whether the stored content box lies inside the stored page box."""
     if params.content_box.is_empty() or params.page_box.is_empty():
@@ -248,13 +255,14 @@ class Filter:
 
     def process(
         self,
-        image: NDArray[np.uint8],
+        image: NDArray[np.uint8] | Callable[[], NDArray[np.uint8]],
         page_id: PageId,
         dpi: float = 300.0,
         outside: NDArray[np.bool_] | Callable[[], NDArray[np.bool_]] | None = None,
         outside_key: Hashable | None = None,
         page_outline: Sequence[tuple[float, float]] | None = None,
         view_transform: NDArray[np.float64] | None = None,
+        image_size: tuple[int, int] | None = None,
     ) -> Params:
         """Process an image to detect content and page boundaries.
 
@@ -268,7 +276,8 @@ class Filter:
         then clipped.
 
         Args:
-            image: Grayscale or color image.
+            image: Grayscale or color image, or a function making it. A
+                function is only called when detection must run.
             page_id: Page identifier.
             dpi: Image resolution.
             outside: Mask of the pixels of ``image`` that have no source pixel
@@ -281,12 +290,23 @@ class Filter:
             view_transform: 3x3 matrix from the source image's pixels to those
                 of ``image``; remembered so that hand-drawn boxes can follow a
                 later change of view.
+            image_size: (width, height) of the image a function ``image``
+                makes; required with a function, ignored with an array.
 
         Returns:
             Updated parameters with detected/stored boxes.
+
+        Raises:
+            ValueError: If ``image`` is a function and ``image_size`` is None.
         """
         params = self.get_params(page_id)
-        h, w = image.shape[:2]
+        if callable(image):
+            if image_size is None:
+                msg = "image_size is required when image is a function"
+                raise ValueError(msg)
+            w, h = image_size
+        else:
+            h, w = image.shape[:2]
         outline = [] if page_outline is None else list(page_outline)
         to_new_view = _view_change(params.dependencies.view_transform, view_transform)
         update_content, update_page = self.update_needs(page_id, page_outline)
@@ -294,7 +314,7 @@ class Filter:
         # Handle page detection
         if params.is_page_auto():
             if update_page:
-                self.detect_page(image, page_id, dpi=dpi)
+                self.detect_page(_made(image), page_id, dpi=dpi)
                 params = self.get_params(page_id)
                 update_content = update_content or not _content_within_page(params)
         elif params.is_page_disabled():
@@ -319,7 +339,7 @@ class Filter:
         if params.is_content_auto():
             if update_content:
                 self.detect_content(
-                    image,
+                    _made(image),
                     page_id,
                     dpi=dpi,
                     outside=outside,

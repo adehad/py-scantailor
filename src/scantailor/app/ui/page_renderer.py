@@ -1,7 +1,7 @@
 """Background rendering of a page up to a filter stage."""
 
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 
 import cv2
 import numpy as np
@@ -104,7 +104,8 @@ def render_page_with_model(
         keep_source (bool): Whether a source decoded for this render stays in
             ``sources``. False for pages that are not the one on screen.
         pixels (bool): False when the caller does not draw the rendered image,
-            which then comes back as an empty array without being converted.
+            which then comes back as an empty array without being resampled
+            or converted. Output is still generated in full.
         on_extras (Callable[[OutputExtras], None] | None): Called with the
             pictures the Output view's tabs show, when the render reaches the
             Output stage; they are not produced without it.
@@ -128,6 +129,7 @@ def render_page_with_model(
         dpi=page.horizontal_dpi(),
         keep_output_extras=on_extras is not None,
         should_cancel=should_cancel,
+        render_image=pixels,
     )
     result = pipeline.process_page(page.pixels, page_id, sequence, options)
     if on_extras is not None and result.output_extras is not None:
@@ -176,11 +178,29 @@ def render_thumbnail(
         sources=sources,
         keep_source=False,
     )[0]
+    return shrink_to_thumbnail(image, max_size)
+
+
+def shrink_to_thumbnail(
+    image: NDArray[np.uint8], max_size: QtCore.QSize
+) -> QtGui.QImage:
+    """Shrink a rendered page to fit ``max_size``; smaller pages keep their size.
+
+    Args:
+        image (NDArray[np.uint8]): Display image, ``(H, W)`` gray or ``(H, W, 3)``
+            RGB, as ``render_page_with_model`` returns it; only read.
+        max_size (QtCore.QSize): Bounding size of the result.
+
+    Returns:
+        QtGui.QImage: Detached image, 8-bit gray or RGB888.
+    """
     height, width = image.shape[:2]
     scale = min(max_size.width() / width, max_size.height() / height, 1.0)
     if scale < 1.0:
         size = (max(1, round(width * scale)), max(1, round(height * scale)))
-        image = cv2.resize(image, size, interpolation=cv2.INTER_AREA)
+        image = np.asarray(
+            cv2.resize(image, size, interpolation=cv2.INTER_AREA), dtype=np.uint8
+        )
     image = np.ascontiguousarray(image)
     pixel_format = (
         QtGui.QImage.Format.Format_Grayscale8
@@ -229,6 +249,7 @@ class _RenderTask(QtCore.QRunnable):
         self._pixels = pixels
         self._finished = finished
         self._extras = extras
+        self.image: NDArray[np.uint8] | None = None
 
     def run(self) -> None:
         """Render on a pool thread and report unless cancelled."""
@@ -264,9 +285,20 @@ class _RenderTask(QtCore.QRunnable):
                 self._signals.failed.emit(self._generation, self._page_id, str(error))
             return
         if not self.cancelled.is_set():
+            self.image = image
             if model is not None:
                 self._signals.model_found.emit(self._generation, self._page_id, model)
             self._signals.done.emit(self._generation, self._page_id, image)
+
+    @property
+    def page_id(self) -> PageId:
+        """The page this task renders."""
+        return self._page_id
+
+    @property
+    def stage(self) -> FilterStage:
+        """The last stage this task runs."""
+        return self._stage
 
 
 class PageRenderer(QtCore.QObject):
@@ -312,6 +344,10 @@ class PageRenderer(QtCore.QObject):
         self._sources = SourceCache()
         self._state = threading.Lock()
         self._task: _RenderTask | None = None
+        self._task_tag: Hashable | None = None
+        self._kept: tuple[PageId, FilterStage, Hashable, NDArray[np.uint8]] | None = (
+            None
+        )
         self._idle = threading.Event()
         self._idle.set()
 
@@ -328,6 +364,7 @@ class PageRenderer(QtCore.QObject):
         dpi_overrides: DpiOverrides | None = None,
         pixels: bool = True,
         extras: bool = False,
+        tag: Hashable | None = None,
     ) -> None:
         """Start rendering a page, cancelling any render still pending.
 
@@ -342,6 +379,10 @@ class PageRenderer(QtCore.QObject):
                 carries an empty array.
             extras (bool): True to also report the pictures of the Output
                 view's tabs through ``output_extras_found``.
+            tag (Hashable | None): Names the parameters the render is made
+                with. A tagged render's image is kept, and ``rendered`` hands it
+                out for the same page, stage and tag until the next request
+                or cancel.
         """
         self.cancel()
         task = _RenderTask(
@@ -358,13 +399,38 @@ class PageRenderer(QtCore.QObject):
         )
         with self._state:
             self._task = task
+            self._task_tag = tag
             self._idle.clear()
         self._pool.start(task)
 
+    def rendered(
+        self, page_id: PageId, stage: FilterStage, tag: Hashable
+    ) -> NDArray[np.uint8] | None:
+        """Return the image of the last finished render, if it is the one asked for.
+
+        Safe to call from worker threads. Lets a thumbnail of the page on screen
+        reuse the render instead of running the pipeline again.
+
+        Args:
+            page_id (PageId): The page wanted.
+            stage (FilterStage): The last stage wanted.
+            tag (Hashable): The tag the render must have been requested with.
+
+        Returns:
+            NDArray[np.uint8] | None: The display image, not to be modified, or
+                None when the last render was of something else.
+        """
+        with self._state:
+            kept = self._kept
+        if kept is None or kept[:3] != (page_id, stage, tag):
+            return None
+        return kept[3]
+
     def cancel(self) -> None:
-        """Drop the pending render, if any."""
+        """Drop the pending render, if any, and the image a tagged render kept."""
         with self._state:
             task, self._task = self._task, None
+            self._kept = None
             self._idle.set()
         if task is not None:
             task.cancelled.set()
@@ -387,6 +453,8 @@ class PageRenderer(QtCore.QObject):
     def _on_task_finished(self, task: _RenderTask) -> None:
         with self._state:
             if task is self._task:
+                if self._task_tag is not None and task.image is not None:
+                    self._kept = (task.page_id, task.stage, self._task_tag, task.image)
                 self._idle.set()
 
     def wait_for_done(self, timeout_ms: int = -1) -> bool:
