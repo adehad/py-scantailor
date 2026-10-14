@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import cast
 
 import numpy as np
+import shiboken6
 from loguru import logger
 from numpy.typing import NDArray
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -590,9 +591,17 @@ class StagePanels(QtCore.QObject):
         pixels: NDArray[np.uint8],
         dpi: float,
     ) -> None:
-        if generation != self._source_generation:
+        if generation != self._source_generation or not self._widgets_alive():
             return
         self._adopt_source(image_id, pixels, dpi)
+
+    def _widgets_alive(self) -> bool:
+        """Return whether the options and view still exist.
+
+        The widgets have no Qt parent, so their owner can delete them while a
+        decode is still running; a late result must not reach them then.
+        """
+        return shiboken6.isValid(self.options) and shiboken6.isValid(self.view)
 
     def _adopt_source(
         self, image_id: ImageId, pixels: NDArray[np.uint8], dpi: float

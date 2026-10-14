@@ -18,7 +18,6 @@ def register_promoted_widgets(loader: QtUiTools.QUiLoader) -> None:
     """
     # Imported here because these modules import this package.
     from scantailor.app.ui.panels.system_load import SystemLoadWidget
-    from scantailor.app.ui.widgets.non_owning_widget import NonOwningWidget
     from scantailor.app.ui.widgets.relinkable_path_visualization import (
         RelinkablePathVisualization,
     )
@@ -27,7 +26,6 @@ def register_promoted_widgets(loader: QtUiTools.QUiLoader) -> None:
 
     for widget_class in (
         StageListView,
-        NonOwningWidget,
         SystemLoadWidget,
         RelinkingListView,
         RelinkablePathVisualization,

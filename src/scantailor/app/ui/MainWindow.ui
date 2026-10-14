@@ -827,7 +827,7 @@
           <number>0</number>
          </property>
          <item>
-          <widget class="NonOwningWidget" name="filterOptions" native="true"/>
+          <widget class="QWidget" name="filterOptions" native="true"/>
          </item>
         </layout>
        </widget>
@@ -1297,12 +1297,6 @@
    <class>StageListView</class>
    <extends>QTableView</extends>
    <header>scantailor.app.ui.widgets.stage_list_view</header>
-  </customwidget>
-  <customwidget>
-   <class>NonOwningWidget</class>
-   <extends>QWidget</extends>
-   <header>scantailor.app.ui.widgets.non_owning_widget</header>
-   <container>1</container>
   </customwidget>
  </customwidgets>
  <resources>
