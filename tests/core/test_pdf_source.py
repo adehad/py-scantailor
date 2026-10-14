@@ -1,4 +1,4 @@
-"""Sidecar files of earlier versions are read, then deleted after a save."""
+"""Rendered-page sources: earlier sidecars, and matching pages by folder."""
 
 from pathlib import Path
 
@@ -49,11 +49,57 @@ def test_a_sidecar_that_cannot_be_deleted_is_left_without_an_error(
 def test_a_damaged_sidecar_gives_nothing(tmp_path: Path) -> None:
     (tmp_path / SOURCE_FILE_NAME).write_text("{", encoding="utf-8")
 
-    assert PdfSource.find([tmp_path / "a.png"]) is None
+    assert PdfSource.find([tmp_path / "a.png"]) == []
 
 
-def test_finding_leaves_the_file_where_it_is(tmp_path: Path) -> None:
+def test_finding_reads_the_sidecar_and_leaves_the_file_where_it_is(
+    tmp_path: Path,
+) -> None:
     sidecar = _write_sidecar(tmp_path)
 
-    assert PdfSource.find([tmp_path / "a.png"]) == SOURCE
+    found = PdfSource.find([tmp_path / "a.png"])
+
+    assert found == [SOURCE.model_copy(update={"pages_dir": tmp_path})]
     assert sidecar.exists()
+
+
+def test_finding_returns_one_source_per_folder_that_has_a_sidecar(
+    tmp_path: Path,
+) -> None:
+    other = SOURCE.model_copy(update={"pdf_path": Path("other.pdf")})
+    _write_sidecar(tmp_path / "one")
+    _write_sidecar(tmp_path / "two", other)
+
+    found = PdfSource.find([tmp_path / "one" / "a.png", tmp_path / "two" / "a.png"])
+
+    assert [source.pdf_path for source in found] == [
+        Path("book.pdf"),
+        Path("other.pdf"),
+    ]
+
+
+def test_a_page_matches_only_the_source_whose_folder_holds_it(tmp_path: Path) -> None:
+    first = PdfSource(
+        pdf_path=Path("one.pdf"),
+        dpi=300,
+        pages_dir=tmp_path / "one_pages",
+        pages={"page_0001.png": 0},
+    )
+    second = PdfSource(
+        pdf_path=Path("two.pdf"),
+        dpi=300,
+        pages_dir=tmp_path / "two_pages",
+        pages={"page_0001.png": 4},
+    )
+
+    assert first.page_index(tmp_path / "one_pages" / "page_0001.png") == 0
+    assert second.page_index(tmp_path / "two_pages" / "page_0001.png") == 4
+    assert first.page_index(tmp_path / "two_pages" / "page_0001.png") is None
+
+
+def test_a_source_without_a_folder_matches_pages_by_name_alone(tmp_path: Path) -> None:
+    legacy = PdfSource(pdf_path=Path("old.pdf"), dpi=300, pages={"page_0002.png": 1})
+
+    assert legacy.pages_dir is None
+    assert legacy.page_index(tmp_path / "anywhere" / "page_0002.png") == 1
+    assert legacy.page_index(tmp_path / "anywhere" / "page_0009.png") is None

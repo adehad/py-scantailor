@@ -146,7 +146,7 @@ def test_text_option_is_offered_only_for_projects_made_from_a_pdf(
     assert pdf_dialogs.created[0][1] is True
 
     # Pages of plain image files have no source PDF.
-    pdf_window.pdf_source = None
+    pdf_window.project.pdf_sources = []
     pdf_window.pdf_export_dialog_factory = plain_dialogs
     respond(accept=False)
     pdf_window.actionExportPdf.trigger()
@@ -392,7 +392,7 @@ def test_export_refuses_to_overwrite_its_own_source_pdf(
     request = PdfExportRequest(
         [PagePlan(image, (300.0, 300.0))],
         source_pdf,
-        source=PdfSource(pdf_path=source_pdf, dpi=300),
+        sources=[PdfSource(pdf_path=source_pdf, dpi=300)],
     )
 
     with pytest.raises(ValueError, match="source PDF"):
@@ -444,5 +444,5 @@ def test_export_without_text_still_guards_the_source_pdf(
 
     request = pdf_window._pdf_export_request(files, options)
 
-    assert request.source is not None
+    assert request.sources
     assert request.carry_text is False

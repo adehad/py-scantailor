@@ -702,11 +702,24 @@ class TestPdfSourceAndTextGeometry:
     def _page(path: Path) -> PageId:
         return PageId(image_id=ImageId(file_path=path), sub_page=SubPage.SINGLE_PAGE)
 
-    def test_the_pdf_source_round_trips_with_relative_paths(self, tmp_path: Path):
-        pdf = tmp_path / "scans" / "book.pdf"
+    def test_the_pdf_sources_round_trip_with_relative_paths(self, tmp_path: Path):
+        pages = tmp_path / "scans" / "book_pages"
         project = Project(
             output_directory=tmp_path / "out",
-            pdf_source=PdfSource(pdf_path=pdf, dpi=300, pages={"page_0001.png": 0}),
+            pdf_sources=[
+                PdfSource(
+                    pdf_path=tmp_path / "scans" / "book.pdf",
+                    dpi=300,
+                    pages_dir=pages,
+                    pages={"page_0001.png": 0},
+                ),
+                PdfSource(
+                    pdf_path=tmp_path / "scans" / "other.pdf",
+                    dpi=150,
+                    pages_dir=tmp_path / "scans" / "other_pages",
+                    pages={"page_0001.png": 0},
+                ),
+            ],
         )
         project_file = tmp_path / "p.json"
 
@@ -714,8 +727,54 @@ class TestPdfSourceAndTextGeometry:
         stored = json.loads(project_file.read_text(encoding="utf-8"))
         loaded = Project.load(project_file)
 
-        assert stored["pdf_source"]["pdf_path"] == "scans/book.pdf"
-        assert loaded.pdf_source == project.pdf_source
+        assert stored["pdf_sources"][0]["pdf_path"] == "scans/book.pdf"
+        assert stored["pdf_sources"][0]["pages_dir"] == "scans/book_pages"
+        assert loaded.pdf_sources == project.pdf_sources
+
+    def test_a_project_file_with_the_single_pdf_source_field_loads_as_a_list(
+        self, tmp_path: Path
+    ):
+        project_file = tmp_path / "old.json"
+        legacy = {"pdf_path": "scans/book.pdf", "dpi": 300, "pages": {"a.png": 0}}
+        project_file.write_text(
+            json.dumps({"version": 1, "pdf_source": legacy}), encoding="utf-8"
+        )
+
+        loaded = Project.load(project_file)
+
+        assert loaded.pdf_sources == [
+            PdfSource(
+                pdf_path=tmp_path / "scans" / "book.pdf", dpi=300, pages={"a.png": 0}
+            )
+        ]
+
+    def test_a_null_single_pdf_source_field_loads_with_no_sources(self, tmp_path: Path):
+        project_file = tmp_path / "old.json"
+        project_file.write_text(
+            json.dumps({"version": 1, "pdf_source": None}), encoding="utf-8"
+        )
+
+        assert Project.load(project_file).pdf_sources == []
+
+    def test_source_of_picks_the_source_whose_folder_holds_the_page(
+        self, tmp_path: Path
+    ):
+        first = PdfSource(
+            pdf_path=tmp_path / "one.pdf",
+            dpi=300,
+            pages_dir=tmp_path / "one_pages",
+            pages={"page_0001.png": 0},
+        )
+        second = PdfSource(
+            pdf_path=tmp_path / "two.pdf",
+            dpi=300,
+            pages_dir=tmp_path / "two_pages",
+            pages={"page_0001.png": 0},
+        )
+        project = Project(pdf_sources=[first, second])
+
+        assert project.source_of(tmp_path / "two_pages" / "page_0001.png") == second
+        assert project.source_of(tmp_path / "loose" / "scan.png") is None
 
     def test_text_geometry_round_trips_with_relative_paths(self, tmp_path: Path):
         image = tmp_path / "pages" / "page_0001.png"
@@ -764,5 +823,5 @@ class TestPdfSourceAndTextGeometry:
 
         project = Project.load(project_file)
 
-        assert project.pdf_source is None
+        assert project.pdf_sources == []
         assert project.text_geometry == []
