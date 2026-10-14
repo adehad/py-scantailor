@@ -145,6 +145,9 @@ class PipelineOptions:
         should_cancel: Asked before each stage; when it returns True the run
             stops with ``PipelineCancelled``. Called on the thread that runs
             the pipeline.
+        render_image: False when a run that ends before Output is only wanted
+            for its parameters and transformation; ``PipelineResult.image`` is
+            then the source instead of a resampled view.
     """
 
     start_stage: FilterStage = FilterStage.FIX_ORIENTATION
@@ -154,6 +157,7 @@ class PipelineOptions:
     detect_only: bool = False
     keep_output_extras: bool = False
     should_cancel: Callable[[], bool] | None = None
+    render_image: bool = True
 
 
 class _PageState:
@@ -196,6 +200,14 @@ class _PageState:
         if self._view is None:
             self._view = render_transformed(self.source, self.xform)
         return self._view
+
+    def view_size(self) -> tuple[int, int]:
+        """Return the (width, height) of ``view`` without resampling."""
+        if self._view is not None:
+            height, width = self._view.shape[:2]
+            return width, height
+        rect = self.xform.resulting_rect
+        return max(1, round(rect.width)), max(1, round(rect.height))
 
     def crop_to(self, area: NDArray[np.float64]) -> None:
         """Crop to a polygon given in source coordinates."""
@@ -266,7 +278,12 @@ def process_page(
     if options is None:
         options = PipelineOptions()
     return _run_stages(
-        image, page_id, sequence, options, detect_from=options.start_stage
+        image,
+        page_id,
+        sequence,
+        options,
+        detect_from=options.start_stage,
+        render=options.render_image,
     )
 
 
@@ -493,11 +510,9 @@ def _outside_source_mask(state: _PageState) -> NDArray[np.bool_]:
         NDArray[np.bool_]: (H, W) mask of the transformed view, True where the
         resampling had nothing to sample.
     """
-    rendered = render_transformed(np.zeros_like(state.source), state.xform)
-    mask = rendered > 127
-    if mask.ndim == 3:
-        return np.any(mask, axis=2)
-    return mask
+    # Every channel resamples alike, so one channel gives the same mask.
+    blank = np.zeros(state.source.shape[:2], dtype=np.uint8)
+    return render_transformed(blank, state.xform) > 127
 
 
 def _outside_source_key(state: _PageState) -> tuple:
@@ -528,13 +543,14 @@ def _process_select_content(
     filter_ = sequence.select_content_filter
     if detect:
         params = filter_.process(
-            state.view(),
+            state.view,
             page_id,
             dpi=options.dpi,
             outside=lambda: _outside_source_mask(state),
             outside_key=_outside_source_key(state),
             page_outline=_polygon_points(state.xform.resulting_pre_crop_area),
             view_transform=state.xform.transform,
+            image_size=state.view_size(),
         )
     else:
         params = filter_.get_params(page_id)
