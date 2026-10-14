@@ -69,6 +69,7 @@ from scantailor.app.ui.pdf_worker import (
     TextRequest,
     export_pdf_pages,
 )
+from scantailor.app.ui.retranslation import LanguageChangeWatcher, retranslate_ui
 from scantailor.app.ui.stage_panels import StagePanels
 from scantailor.app.ui.thumbnails import ThumbnailListWidget
 from scantailor.app.ui.thumbnails.stage_orders import is_page_incomplete
@@ -121,6 +122,7 @@ from scantailor.filters.page_split.layout_type import LayoutType
 
 PROJECT_SUFFIX = ".ScanTailor"
 APP_TITLE = "ScanTailor Advanced"
+_MAIN_WINDOW_UI = UI_FOLDER / "MainWindow.ui"
 _LAST_DIR_KEY = "project/lastDir"
 _LAST_INPUT_DIR_KEY = "project/lastInputDir"
 _LAST_PDF_DIR_KEY = "project/lastPdfDir"
@@ -328,7 +330,7 @@ class MainWindowManager:
                 dialog that points moved image folders at their new location.
         """
         super().__init__()
-        self.ui = load_ui_widget(UI_FOLDER / "MainWindow.ui")
+        self.ui = load_ui_widget(_MAIN_WINDOW_UI)
 
         self.project_files_dialog_factory: ProjectFilesDialogFactory = (
             project_files_dialog_factory or self._default_project_files_dialog
@@ -508,25 +510,20 @@ class MainWindowManager:
         self.pauseSortingBtn = get_cwidget(self.ui, QToolButton, "pauseSortingBtn")
         self.pauseSortingBtn.setIcon(icon("pause", "play"))
         self.filterList = get_cwidget(self.ui, StageListView, "filterList")
-        self.actionAddFiles = QtGui.QAction(self.ui.tr("Add Files..."), self.ui)
+        self.actionAddFiles = QtGui.QAction(self.ui)
         self._insert_add_files_action()
-        self.actionOpenPdf = QtGui.QAction(self.ui.tr("Open PDF..."), self.ui)
-        self.actionExportPdf = QtGui.QAction(self.ui.tr("Export PDF..."), self.ui)
+        self.actionOpenPdf = QtGui.QAction(self.ui)
+        self.actionExportPdf = QtGui.QAction(self.ui)
         self._insert_pdf_actions()
-        self.menuOpenRecent = QtWidgets.QMenu(self.ui.tr("Open Recent"), self.ui)
+        self.menuOpenRecent = QtWidgets.QMenu(self.ui)
         self._insert_recent_menu()
 
         # Layouts
         self.imageFrameLayout = QStackedLayout(self.imageViewFrame)
-        self.not_ready_widget = _message_widget(
-            self.ui.tr(
-                "Output is not yet possible, as the final size of pages is not "
-                "yet known.\nTo determine it, run batch processing at "
-                '"Select Content" or "Margins".'
-            )
-        )
+        self.not_ready_widget = _message_widget("")
         self.imageFrameLayout.addWidget(self.not_ready_widget)
-        self.processing_indicator = ProcessingIndicator(self.ui.tr("Processing..."))
+        self._translate_own_text()
+        self.processing_indicator = ProcessingIndicator()
         self.units_provider = UnitsProvider.get_instance()
         self.status_panel = StatusBarPanel(self.units_provider)
         status_bar = get_cwidget(self.ui, QtWidgets.QStatusBar, "statusBar")
@@ -588,6 +585,8 @@ class MainWindowManager:
 
         self._close_guard = _CloseGuard(self._close_project_interactive, self.ui)
         self.ui.installEventFilter(self._close_guard)
+        self._language_watcher = LanguageChangeWatcher(self._retranslate, self.ui)
+        self.ui.installEventFilter(self._language_watcher)
 
         # if self.settings.value("mainWindow/maximized") == False:
         #    if not self.restoreGeometry(geom.toByteArray()):
@@ -1481,6 +1480,49 @@ class MainWindowManager:
         if not loaded:
             self.pauseSortingBtn.setChecked(False)
 
+    def tr(self, source_text: str, disambiguation: str | None = None) -> str:
+        """Translate text of this window in the context lupdate files it under.
+
+        lupdate files ``self.tr`` calls under the enclosing class name, but this
+        class is not a QObject, so the context is passed explicitly.
+
+        Args:
+            source_text (str): The English text.
+            disambiguation (str | None): Tells apart equal texts with other meanings.
+
+        Returns:
+            str: The text in the installed language.
+        """
+        return QtCore.QCoreApplication.translate(
+            "MainWindowManager", source_text, disambiguation
+        )
+
+    def _translate_own_text(self) -> None:
+        """Give the actions and labels this class builds in code their text."""
+        self.actionAddFiles.setText(self.tr("Add Files..."))
+        self.actionOpenPdf.setText(self.tr("Open PDF..."))
+        self.actionExportPdf.setText(self.tr("Export PDF..."))
+        self.menuOpenRecent.setTitle(self.tr("Open Recent"))
+        self.not_ready_widget.setText(
+            self.tr(
+                "Output is not yet possible, as the final size of pages is not "
+                "yet known.\nTo determine it, run batch processing at "
+                '"Select Content" or "Margins".'
+            )
+        )
+
+    def _retranslate(self) -> None:
+        """Show the window's lasting text in the language just installed.
+
+        Panels, views and dialogs that are rebuilt as the user works pick the
+        language up when next built, as upstream's do.
+        """
+        retranslate_ui(self.ui, _MAIN_WINDOW_UI)
+        self._translate_own_text()
+        self._update_window_title()
+        if self._welcome_widget is not None:
+            self._update_welcome_panel()
+
     def _update_window_title(self) -> None:
         """Show the project name and, via ``[*]``, the unsaved-changes marker."""
         if not self.is_project_loaded:
@@ -1490,7 +1532,7 @@ class MainWindowManager:
         name = (
             pathlib.Path(self.projectFile).stem
             if self.projectFile
-            else self.ui.tr("Unnamed")
+            else self.tr("Unnamed")
         )
         self.ui.setWindowTitle(f"{name}[*] - {APP_TITLE}")
         self.ui.setWindowModified(self._modified)
@@ -1642,14 +1684,14 @@ class MainWindowManager:
     def _apply_dialog_title(self, stage: FilterStage, part: str) -> str:
         """Return the title of the apply dialog for a stage and settings part."""
         if stage == FilterStage.OUTPUT and part:
-            return self.ui.tr(OUTPUT_GROUP_TITLES[ApplyGroup(part)])
+            return self.tr(OUTPUT_GROUP_TITLES[ApplyGroup(part)])
         if stage == FilterStage.DESKEW:
-            return self.ui.tr(DESKEW_TITLE)
+            return self.tr(DESKEW_TITLE)
         titles = {
-            "margins": self.ui.tr("Apply Margins"),
-            "alignment": self.ui.tr("Apply Alignment"),
+            "margins": self.tr("Apply Margins"),
+            "alignment": self.tr("Apply Alignment"),
         }
-        return titles.get(part, self.ui.tr("Apply to"))
+        return titles.get(part, self.tr("Apply to"))
 
     def apply_to_pages(
         self,
@@ -1832,8 +1874,8 @@ class MainWindowManager:
             self.batch_dialog = None
         QMessageBox.warning(
             self.ui,
-            self.ui.tr("Batch processing"),
-            self.ui.tr("Batch processing failed.") + f"\n{message}",
+            self.tr("Batch processing"),
+            self.tr("Batch processing failed.") + f"\n{message}",
         )
 
     def _default_pdf_export_dialog(
@@ -1848,8 +1890,8 @@ class MainWindowManager:
         """Ask whether to process the pages that have no output yet."""
         answer = QMessageBox.question(
             self.ui,
-            self.ui.tr("Export PDF"),
-            self.ui.tr(
+            self.tr("Export PDF"),
+            self.tr(
                 "{unprocessed} of {total} pages have not been processed yet.\n"
                 "Process them now? Export the PDF again once processing is done."
             ).format(unprocessed=unprocessed, total=total),
@@ -1870,7 +1912,7 @@ class MainWindowManager:
             self.settings.value(_LAST_PDF_DIR_KEY, self._last_project_dir(), type=str)
         )
         chosen, _selected_filter = QFileDialog.getOpenFileName(
-            self.ui, self.ui.tr("Open PDF"), start_dir, "PDF (*.pdf)"
+            self.ui, self.tr("Open PDF"), start_dir, "PDF (*.pdf)"
         )
         if not chosen:
             return
@@ -1914,7 +1956,7 @@ class MainWindowManager:
             return
         request = self._pdf_export_request(files, options)
         self._run_pdf_job(
-            self.ui.tr("Export PDF"),
+            self.tr("Export PDF"),
             lambda report, cancel: export_pdf_pages(request, report, cancel),
             self._on_pdf_exported,
         )
@@ -1992,13 +2034,11 @@ class MainWindowManager:
 
     def _on_pdf_exported(self, result: PdfExportResult) -> None:
         self.last_pdf_export = result
-        message = self.ui.tr("Exported {pages} pages to {path}").format(
+        message = self.tr("Exported {pages} pages to {path}").format(
             pages=result.pages, path=result.out_path
         )
         if result.text_pages:
-            message += self.ui.tr(" ({count} with text)").format(
-                count=result.text_pages
-            )
+            message += self.tr(" ({count} with text)").format(count=result.text_pages)
         get_cwidget(self.ui, QtWidgets.QStatusBar, "statusBar").showMessage(
             message, 10000
         )
@@ -2043,21 +2083,21 @@ class MainWindowManager:
     def _on_pdf_cancelled(self) -> None:
         self._end_pdf_job()
         get_cwidget(self.ui, QtWidgets.QStatusBar, "statusBar").showMessage(
-            self.ui.tr("Cancelled"), 5000
+            self.tr("Cancelled"), 5000
         )
 
     def _on_pdf_failed(self, message: str) -> None:
         self._end_pdf_job()
         _LOG.warning(f"PDF job failed: {message}")
-        QMessageBox.warning(self.ui, self.ui.tr("PDF"), message)
+        QMessageBox.warning(self.ui, self.tr("PDF"), message)
 
     def openProject(self, _checked: bool = False) -> None:
         """Ask for a project file and open it, replacing the current project."""
         project_file, _project_filter = QFileDialog.getOpenFileName(
             self.ui,
-            self.ui.tr("Open Project"),
+            self.tr("Open Project"),
             self._last_project_dir(),
-            f"{self.ui.tr('Scan Tailor Projects')} (*{PROJECT_SUFFIX})",
+            f"{self.tr('Scan Tailor Projects')} (*{PROJECT_SUFFIX})",
         )
         if project_file:
             self.open_project_file(pathlib.Path(project_file))
@@ -2133,8 +2173,8 @@ class MainWindowManager:
         _LOG.warning(f"Cannot open project {path}: {error}")
         QMessageBox.warning(
             self.ui,
-            self.ui.tr("Error"),
-            self.ui.tr("Unable to open the project file.") + f"\n{error}",
+            self.tr("Error"),
+            self.tr("Unable to open the project file.") + f"\n{error}",
         )
 
     @staticmethod
@@ -2296,8 +2336,8 @@ class MainWindowManager:
             return
         number, accepted = QInputDialog.getInt(
             self.ui,
-            self.ui.tr("Go To Page"),
-            self.ui.tr("Enter the page number:"),
+            self.tr("Go To Page"),
+            self.tr("Enter the page number:"),
             max(self._display_position(), 0) + 1,
             1,
             len(pages),
@@ -2448,8 +2488,8 @@ class MainWindowManager:
         if input_dir is None or not files:
             QMessageBox.warning(
                 self.ui,
-                self.ui.tr("Error"),
-                self.ui.tr("No files were added to the project."),
+                self.tr("Error"),
+                self.tr("No files were added to the project."),
             )
             return
         pages = self._read_pages(files)
@@ -2765,7 +2805,7 @@ class MainWindowManager:
             self.ui,
             "",
             self._last_project_dir(),
-            f"{self.ui.tr('Scan Tailor Projects')} (*{PROJECT_SUFFIX})",
+            f"{self.tr('Scan Tailor Projects')} (*{PROJECT_SUFFIX})",
         )
         if not chosen:
             return False
@@ -2800,8 +2840,8 @@ class MainWindowManager:
             _LOG.warning(f"Cannot save project {path}: {error}")
             QMessageBox.warning(
                 self.ui,
-                self.ui.tr("Error"),
-                self.ui.tr("Error saving the project file!") + f"\n{error}",
+                self.tr("Error"),
+                self.tr("Error saving the project file!") + f"\n{error}",
             )
             return False
         self._saved_state = self._state_snapshot()
@@ -2909,8 +2949,8 @@ class MainWindowManager:
         """
         box = QMessageBox(
             QMessageBox.Icon.Question,
-            self.ui.tr("Save Project"),
-            self.ui.tr("Save this project?"),
+            self.tr("Save Project"),
+            self.tr("Save this project?"),
             buttons=QMessageBox.StandardButton.Save
             | QMessageBox.StandardButton.Discard
             | QMessageBox.StandardButton.Cancel,

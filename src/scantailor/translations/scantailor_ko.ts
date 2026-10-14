@@ -144,68 +144,68 @@
         <translation type="obsolete">사전 기울기 보정</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="694"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="710"/>
         <source>Apply to</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>적용 대상</translation>
+        <translation>적용 대상</translation>
     </message>
     <message>
         <source>This page only</source>
         <translation type="obsolete">이 페이지만</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="659"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="675"/>
         <source>This page only (already applied)</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지만 (이미 적용되어 있음)</translation>
+        <translation>이 페이지만 (이미 적용되어 있음)</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="663"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="679"/>
         <source>All pages</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>모든 페이지</translation>
+        <translation>모든 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="669"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="685"/>
         <source>This page and the following ones</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지와 다음 페이지</translation>
+        <translation>이 페이지와 다음 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="676"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="692"/>
         <source>This page and the following every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지와 모든 짝수(홀수) 페이지</translation>
+        <translation>이 페이지와 모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="680"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="696"/>
         <source>Every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>모든 짝수(홀수) 페이지</translation>
+        <translation>모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="684"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="700"/>
         <source>Selected pages</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>선택된 페이지</translation>
+        <translation>선택된 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="690"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="706"/>
         <source>Every other selected page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>선택된 모든 짝수(홀수) 페이지</translation>
+        <translation>선택된 모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="701"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="717"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Ctrl+Click / Shift+Click 으로 여러 페이지를 선택 가능합니다</translation>
+        <translation>Ctrl+Click / Shift+Click 으로 여러 페이지를 선택 가능합니다</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="707"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="723"/>
         <source>The current page will be included.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>현재 페이지도 포함됩니다.</translation>
+        <translation>현재 페이지도 포함됩니다.</translation>
     </message>
 </context>
 <context>
@@ -239,68 +239,68 @@
         <translation type="obsolete">DPI</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="631"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="647"/>
         <source>Apply to</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>적용 대상</translation>
+        <translation>적용 대상</translation>
     </message>
     <message>
         <source>This page only</source>
         <translation type="obsolete">이 페이지만</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="597"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="613"/>
         <source>This page only (already applied)</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지만 (이미 적용되어 있음)</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="601"/>
-        <source>All pages</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>모든 페이지</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="607"/>
-        <source>This page and the following ones</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지와 다음 페이지</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="613"/>
-        <source>This page and the following every other page</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지와 모든 짝수(홀수) 페이지</translation>
+        <translation>이 페이지만 (이미 적용되어 있음)</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/apply_to.py" line="617"/>
+        <source>All pages</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>모든 페이지</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="623"/>
+        <source>This page and the following ones</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>이 페이지와 다음 페이지</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="629"/>
+        <source>This page and the following every other page</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>이 페이지와 모든 짝수(홀수) 페이지</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="633"/>
         <source>Every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>모든 짝수(홀수) 페이지</translation>
+        <translation>모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="621"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="637"/>
         <source>Selected pages</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>선택된 페이지</translation>
+        <translation>선택된 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="627"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="643"/>
         <source>Every other selected page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>선택된 모든 짝수(홀수) 페이지</translation>
+        <translation>선택된 모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="638"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="654"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Ctrl+Click / Shift+Click 으로 여러 페이지를 선택 가능합니다</translation>
+        <translation>Ctrl+Click / Shift+Click 으로 여러 페이지를 선택 가능합니다</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="644"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="660"/>
         <source>The current page will be included.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>현재 페이지도 포함됩니다.</translation>
+        <translation>현재 페이지도 포함됩니다.</translation>
     </message>
 </context>
 <context>
@@ -310,139 +310,139 @@
         <translation type="obsolete">적용 모드</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="569"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="585"/>
         <source>Apply to</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>적용 대상</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="537"/>
-        <source>This page only (already applied)</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지만 (이미 적용되어 있음)</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="541"/>
-        <source>All pages</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>모든 페이지</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="547"/>
-        <source>This page and the following ones</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지와 다음 페이지</translation>
+        <translation>적용 대상</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/apply_to.py" line="553"/>
-        <source>This page and the following every other page</source>
+        <source>This page only (already applied)</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지와 모든 짝수(홀수) 페이지</translation>
+        <translation>이 페이지만 (이미 적용되어 있음)</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/apply_to.py" line="557"/>
+        <source>All pages</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>모든 페이지</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="563"/>
+        <source>This page and the following ones</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>이 페이지와 다음 페이지</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="569"/>
+        <source>This page and the following every other page</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>이 페이지와 모든 짝수(홀수) 페이지</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="573"/>
         <source>Every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>모든 짝수(홀수) 페이지</translation>
+        <translation>모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="561"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="577"/>
         <source>Selected pages</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>선택된 페이지</translation>
+        <translation>선택된 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="565"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="581"/>
         <source>Every other selected page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>선택된 모든 짝수(홀수) 페이지</translation>
+        <translation>선택된 모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="576"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="592"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Ctrl+Click / Shift+Click 으로 여러 페이지를 선택 가능합니다</translation>
+        <translation>Ctrl+Click / Shift+Click 으로 여러 페이지를 선택 가능합니다</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="582"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="598"/>
         <source>The current page will be included.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>현재 페이지도 포함됩니다.</translation>
+        <translation>현재 페이지도 포함됩니다.</translation>
     </message>
 </context>
 <context>
     <name>ApplyDeskewDialog</name>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="285"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="301"/>
         <source>Apply to</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>적용 대상</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="253"/>
-        <source>This page only (already applied)</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지만 (이미 적용되어 있음)</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="257"/>
-        <source>All pages</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>모든 페이지</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="263"/>
-        <source>This page and the following ones</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지와 다음 페이지</translation>
+        <translation>적용 대상</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/apply_to.py" line="269"/>
-        <source>This page and the following every other page</source>
+        <source>This page only (already applied)</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지와 모든 짝수(홀수) 페이지</translation>
+        <translation>이 페이지만 (이미 적용되어 있음)</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/apply_to.py" line="273"/>
+        <source>All pages</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>모든 페이지</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="279"/>
+        <source>This page and the following ones</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>이 페이지와 다음 페이지</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="285"/>
+        <source>This page and the following every other page</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>이 페이지와 모든 짝수(홀수) 페이지</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="289"/>
         <source>Every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>모든 짝수(홀수) 페이지</translation>
+        <translation>모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="277"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="293"/>
         <source>Selected pages</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>선택된 페이지</translation>
+        <translation>선택된 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="292"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="308"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Ctrl+Click / Shift+Click 으로 여러 페이지를 선택 가능합니다</translation>
+        <translation>Ctrl+Click / Shift+Click 으로 여러 페이지를 선택 가능합니다</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="302"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="318"/>
         <source>Deskew angle and mode</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>기울기 보정 각도와 모드</translation>
+        <translation>기울기 보정 각도와 모드</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="306"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="322"/>
         <source>Oblique angle and mode</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>기울임 각도와 모드</translation>
+        <translation>기울임 각도와 모드</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="281"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="297"/>
         <source>Every other selected page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>선택된 모든 짝수(홀수) 페이지</translation>
+        <translation>선택된 모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="298"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="314"/>
         <source>The current page will be included.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>현재 페이지도 포함됩니다.</translation>
+        <translation>현재 페이지도 포함됩니다.</translation>
     </message>
 </context>
 <context>
@@ -452,157 +452,157 @@
         <translation type="obsolete">방향 수정</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="356"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="372"/>
         <source>Apply to</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>적용 대상</translation>
+        <translation>적용 대상</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="321"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="337"/>
         <source>This page only (already applied)</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지만 (이미 적용되어 있음)</translation>
+        <translation>이 페이지만 (이미 적용되어 있음)</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="325"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="341"/>
         <source>All pages</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>모든 페이지</translation>
+        <translation>모든 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="331"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="347"/>
         <source>This page and the following ones</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지와 다음 페이지</translation>
+        <translation>이 페이지와 다음 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="338"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="354"/>
         <source>This page and the following every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지와 모든 짝수(홀수) 페이지</translation>
+        <translation>이 페이지와 모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="342"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="358"/>
         <source>Every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>모든 짝수(홀수) 페이지</translation>
+        <translation>모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="346"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="362"/>
         <source>Selected pages</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>선택된 페이지</translation>
+        <translation>선택된 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="363"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="379"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Ctrl+Click / Shift+Click 으로 여러 페이지를 선택 가능합니다</translation>
+        <translation>Ctrl+Click / Shift+Click 으로 여러 페이지를 선택 가능합니다</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="352"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="368"/>
         <source>Every other selected page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>선택된 모든 짝수(홀수) 페이지</translation>
+        <translation>선택된 모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="369"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="385"/>
         <source>The current page will be included.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>현재 페이지도 포함됩니다.</translation>
+        <translation>현재 페이지도 포함됩니다.</translation>
     </message>
 </context>
 <context>
     <name>ApplyPageLayoutDialog</name>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="418"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="434"/>
         <source>Apply to</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>적용 대상</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="384"/>
-        <source>This page only (already applied)</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지만 (이미 적용되어 있음)</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="388"/>
-        <source>All pages</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>모든 페이지</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="394"/>
-        <source>This page and the following ones</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지와 다음 페이지</translation>
+        <translation>적용 대상</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/apply_to.py" line="400"/>
-        <source>This page and the following every other page</source>
+        <source>This page only (already applied)</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지와 모든 짝수(홀수) 페이지</translation>
+        <translation>이 페이지만 (이미 적용되어 있음)</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/apply_to.py" line="404"/>
+        <source>All pages</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>모든 페이지</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="410"/>
+        <source>This page and the following ones</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>이 페이지와 다음 페이지</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="416"/>
+        <source>This page and the following every other page</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>이 페이지와 모든 짝수(홀수) 페이지</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="420"/>
         <source>Every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>모든 짝수(홀수) 페이지</translation>
+        <translation>모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="408"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="424"/>
         <source>Selected pages</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>선택된 페이지</translation>
+        <translation>선택된 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="425"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="441"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Ctrl+Click / Shift+Click 으로 여러 페이지를 선택 가능합니다</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="435"/>
-        <source>Left</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>왼쪽</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="439"/>
-        <source>Right</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>오른쪽</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="443"/>
-        <source>Top</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>위</translation>
-    </message>
-    <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="447"/>
-        <source>Bottom</source>
-        <extracomment>Machine draft, pending native review.</extracomment>
-<translation>아래</translation>
+        <translation>Ctrl+Click / Shift+Click 으로 여러 페이지를 선택 가능합니다</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/apply_to.py" line="451"/>
+        <source>Left</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>왼쪽</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="455"/>
+        <source>Right</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>오른쪽</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="459"/>
+        <source>Top</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>위</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="463"/>
+        <source>Bottom</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>아래</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="467"/>
         <source>Apply margins</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>테두리 적용</translation>
+        <translation>테두리 적용</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="414"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="430"/>
         <source>Every other selected page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>선택된 모든 짝수(홀수) 페이지</translation>
+        <translation>선택된 모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="431"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="447"/>
         <source>The current page will be included.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>현재 페이지도 포함됩니다.</translation>
+        <translation>현재 페이지도 포함됩니다.</translation>
     </message>
 </context>
 <context>
@@ -616,76 +616,76 @@
         <translation type="obsolete">옵션</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="522"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="538"/>
         <source>Apply page box</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>페이지 박스 적용</translation>
+        <translation>페이지 박스 적용</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="518"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="534"/>
         <source>Apply content box</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>컨텐츠 박스 적용</translation>
+        <translation>컨텐츠 박스 적용</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="501"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="517"/>
         <source>Apply to</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>적용 대상</translation>
+        <translation>적용 대상</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="466"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="482"/>
         <source>This page only (already applied)</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지만 (이미 적용되어 있음)</translation>
+        <translation>이 페이지만 (이미 적용되어 있음)</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="470"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="486"/>
         <source>All pages</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>모든 페이지</translation>
+        <translation>모든 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="476"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="492"/>
         <source>This page and the following ones</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지와 다음 페이지</translation>
+        <translation>이 페이지와 다음 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="483"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="499"/>
         <source>This page and the following every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>이 페이지와 모든 짝수(홀수) 페이지</translation>
+        <translation>이 페이지와 모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="487"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="503"/>
         <source>Every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>모든 짝수(홀수) 페이지</translation>
+        <translation>모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="491"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="507"/>
         <source>Selected pages</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>선택된 페이지</translation>
+        <translation>선택된 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="508"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="524"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Ctrl+Click / Shift+Click 으로 여러 페이지를 선택 가능합니다</translation>
+        <translation>Ctrl+Click / Shift+Click 으로 여러 페이지를 선택 가능합니다</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="497"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="513"/>
         <source>Every other selected page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>선택된 모든 짝수(홀수) 페이지</translation>
+        <translation>선택된 모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="514"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="530"/>
         <source>The current page will be included.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>현재 페이지도 포함됩니다.</translation>
+        <translation>현재 페이지도 포함됩니다.</translation>
     </message>
 </context>
 <context>
@@ -726,57 +726,57 @@
         <translation>선택된 모든 짝수(홀수) 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="82"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="98"/>
         <source>Deskew angle and mode</source>
         <translation>기울기 보정 각도와 모드</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="85"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="101"/>
         <source>Oblique angle and mode</source>
         <translation>기울임 각도와 모드</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="91"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="107"/>
         <source>Left</source>
         <translation>왼쪽</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="92"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="108"/>
         <source>Right</source>
         <translation>오른쪽</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="93"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="109"/>
         <source>Top</source>
         <translation>위</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="94"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="110"/>
         <source>Bottom</source>
         <translation>아래</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="146"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="162"/>
         <source>Apply to</source>
         <translation>적용 대상</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="160"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="176"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <translation>Ctrl+클릭 / Shift+클릭으로 여러 페이지를 선택하세요.</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="164"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="180"/>
         <source>The current page will be included.</source>
         <translation>현재 페이지도 포함됩니다.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="140"/>
+        <location filename="../app/ui/MainWindow.py" line="147"/>
         <source>Apply content box</source>
         <translation>컨텐츠 박스 적용</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="141"/>
+        <location filename="../app/ui/MainWindow.py" line="148"/>
         <source>Apply page box</source>
         <translation>페이지 박스 적용</translation>
     </message>
@@ -1150,7 +1150,7 @@
         <location filename="../app/ui/dialogs/DefaultParamsDialog.ui" line="2219"/>
         <source>G</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>G</translation>
+        <translation>G</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/DefaultParamsDialog.ui" line="2232"/>
@@ -1161,7 +1161,7 @@
         <location filename="../app/ui/dialogs/DefaultParamsDialog.ui" line="2254"/>
         <source>B</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>B</translation>
+        <translation>B</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/DefaultParamsDialog.ui" line="2267"/>
@@ -2128,6 +2128,199 @@ To determine it, run batch processing at &quot;Select Content&quot; or &quot;Mar
         <location filename="../app/ui/MainWindow.ui" line="1285"/>
         <source>Reload current page</source>
         <translation>현재 페이지 다시 불러오기</translation>
+    </message>
+</context>
+<context>
+    <name>MainWindowManager</name>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1502"/>
+        <source>Add Files...</source>
+        <translation>파일 추가...</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1503"/>
+        <source>Open PDF...</source>
+        <translation>PDF 열기...</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1504"/>
+        <source>Export PDF...</source>
+        <translation>PDF 내보내기...</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1505"/>
+        <source>Open Recent</source>
+        <translation>최근 항목 열기</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1512"/>
+        <source>Output is not yet possible, as the final size of pages is not yet known.
+To determine it, run batch processing at &quot;Select Content&quot; or &quot;Margins&quot;.</source>
+        <translation>페이지의 최종 크기를 아직 알 수 없어 출력할 수 없습니다.
+이를 확인하려면 &quot;컨텐츠 선택&quot; 또는 &quot;테두리&quot;에서 일괄 작업을 실행하세요.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1536"/>
+        <source>Unnamed</source>
+        <translation>이름 없음</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1691"/>
+        <source>Apply Margins</source>
+        <translation>테두리 적용</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1692"/>
+        <source>Apply Alignment</source>
+        <translation>위치 조정 적용</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1694"/>
+        <source>Apply to</source>
+        <translation>적용 대상</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1877"/>
+        <source>Batch processing</source>
+        <translation>일괄 작업</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1878"/>
+        <source>Batch processing failed.</source>
+        <translation>일괄 작업에 실패했습니다.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1893"/>
+        <location filename="../app/ui/MainWindow.py" line="1959"/>
+        <source>Export PDF</source>
+        <translation>PDF 내보내기</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1897"/>
+        <source>{unprocessed} of {total} pages have not been processed yet.
+Process them now? Export the PDF again once processing is done.</source>
+        <translation>{total}개 중 {unprocessed}개 페이지가 아직 처리되지 않았습니다.
+지금 처리할까요? 처리가 끝나면 PDF를 다시 내보내세요.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1915"/>
+        <source>Open PDF</source>
+        <translation>PDF 열기</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2037"/>
+        <source>Exported {pages} pages to {path}</source>
+        <translation>{pages}개 페이지를 {path}(으)로 내보냈습니다.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2041"/>
+        <source> ({count} with text)</source>
+        <translation> (텍스트 포함 {count}개)</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2086"/>
+        <source>Cancelled</source>
+        <translation>취소됨</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2092"/>
+        <source>PDF</source>
+        <translation>PDF</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2098"/>
+        <source>Open Project</source>
+        <translation>프로젝트 열기</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2176"/>
+        <location filename="../app/ui/MainWindow.py" line="2491"/>
+        <location filename="../app/ui/MainWindow.py" line="2843"/>
+        <source>Error</source>
+        <translation>오류</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2177"/>
+        <source>Unable to open the project file.</source>
+        <translation>프로젝트 파일을 열 수 없습니다.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2339"/>
+        <source>Go To Page</source>
+        <translation>페이지로 이동</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2340"/>
+        <source>Enter the page number:</source>
+        <translation>페이지 번호를 입력하세요:</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2492"/>
+        <source>No files were added to the project.</source>
+        <translation>프로젝트에 추가된 파일이 없습니다.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2844"/>
+        <source>Error saving the project file!</source>
+        <translation>프로젝트 파일을 저장하는 중 오류가 발생했습니다!</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2952"/>
+        <source>Save Project</source>
+        <translation>프로젝트 저장</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2953"/>
+        <source>Save this project?</source>
+        <translation>이 프로젝트를 저장하겠습니까?</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="72"/>
+        <source>Apply Output Resolution</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>출력 해상도 적용</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="75"/>
+        <source>Apply Color Settings</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>색상 설정 적용</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="78"/>
+        <source>Apply Splitting Settings</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>분할 설정 적용</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="81"/>
+        <source>Apply Binarization Settings</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>이진화 설정 적용</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="85"/>
+        <source>Apply Despeckling Level</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>얼룩 제거 레벨 적용</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="88"/>
+        <source>Apply Dewarping Mode</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>왜곡 보정 모드 적용</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="91"/>
+        <source>Apply Depth Perception</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>깊이 인식 적용</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="93"/>
+        <source>Apply Deskew</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>기울기 보정 적용하기</translation>
     </message>
 </context>
 <context>
@@ -3721,52 +3914,52 @@ You should remove them from the project.</source>
         <translation>컬러 압축</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="30"/>
+        <location filename="../app/ui/dialogs/settings.py" line="31"/>
         <source>Your hardware / driver don&apos;t provide the necessary features</source>
         <translation>하드웨어 / 드라이버가 필요한 기능을 제공하지 않습니다.</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="163"/>
+        <location filename="../app/ui/dialogs/settings.py" line="164"/>
         <source>Dark</source>
         <translation>다크</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="162"/>
+        <location filename="../app/ui/dialogs/settings.py" line="163"/>
         <source>Light</source>
         <translation>라이트</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="161"/>
+        <location filename="../app/ui/dialogs/settings.py" line="162"/>
         <source>Auto</source>
         <translation>자동</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="178"/>
+        <location filename="../app/ui/dialogs/settings.py" line="179"/>
         <source>Rectangular</source>
         <translation>직사각형</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="192"/>
+        <location filename="../app/ui/dialogs/settings.py" line="193"/>
         <source>None</source>
         <translation>없음</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="193"/>
+        <location filename="../app/ui/dialogs/settings.py" line="194"/>
         <source>LZW</source>
         <translation>LZW</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="194"/>
+        <location filename="../app/ui/dialogs/settings.py" line="195"/>
         <source>Deflate</source>
         <translation>Deflate</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="188"/>
+        <location filename="../app/ui/dialogs/settings.py" line="189"/>
         <source>CCITT G4</source>
         <translation>CCITT G4</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="189"/>
+        <location filename="../app/ui/dialogs/settings.py" line="190"/>
         <source>JPEG</source>
         <translation>JPEG</translation>
     </message>
@@ -5522,151 +5715,120 @@ Unchecked: white text on black background</source>
 <context>
     <name>self.ui</name>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="506"/>
         <source>Add Files...</source>
-        <translation>파일 추가...</translation>
+        <translation type="vanished">파일 추가...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="508"/>
         <source>Open PDF...</source>
-        <translation>PDF 열기...</translation>
+        <translation type="vanished">PDF 열기...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="509"/>
         <source>Export PDF...</source>
-        <translation>PDF 내보내기...</translation>
+        <translation type="vanished">PDF 내보내기...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="511"/>
         <source>Open Recent</source>
-        <translation>최근 항목 열기</translation>
+        <translation type="vanished">최근 항목 열기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="522"/>
         <source>Output is not yet possible, as the final size of pages is not yet known.
 To determine it, run batch processing at &quot;Select Content&quot; or &quot;Margins&quot;.</source>
-        <translation>페이지의 최종 크기를 아직 알 수 없어 출력할 수 없습니다.
+        <translation type="vanished">페이지의 최종 크기를 아직 알 수 없어 출력할 수 없습니다.
 이를 확인하려면 &quot;컨텐츠 선택&quot; 또는 &quot;테두리&quot;에서 일괄 작업을 실행하세요.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="524"/>
         <source>Processing...</source>
-        <translation>작업 중...</translation>
+        <translation type="vanished">작업 중...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1475"/>
         <source>Unnamed</source>
-        <translation>이름 없음</translation>
+        <translation type="vanished">이름 없음</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1630"/>
         <source>Apply Margins</source>
-        <translation>테두리 적용</translation>
+        <translation type="vanished">테두리 적용</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1631"/>
         <source>Apply Alignment</source>
-        <translation>위치 조정 적용</translation>
+        <translation type="vanished">위치 조정 적용</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1633"/>
         <source>Apply to</source>
-        <translation>적용 대상</translation>
+        <translation type="vanished">적용 대상</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1816"/>
         <source>Batch processing</source>
-        <translation>일괄 작업</translation>
+        <translation type="vanished">일괄 작업</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1817"/>
         <source>Batch processing failed.</source>
-        <translation>일괄 작업에 실패했습니다.</translation>
+        <translation type="vanished">일괄 작업에 실패했습니다.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1832"/>
-        <location filename="../app/ui/MainWindow.py" line="1898"/>
         <source>Export PDF</source>
-        <translation>PDF 내보내기</translation>
+        <translation type="vanished">PDF 내보내기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1836"/>
         <source>{unprocessed} of {total} pages have not been processed yet.
 Process them now? Export the PDF again once processing is done.</source>
-        <translation>{total}개 중 {unprocessed}개 페이지가 아직 처리되지 않았습니다.
+        <translation type="vanished">{total}개 중 {unprocessed}개 페이지가 아직 처리되지 않았습니다.
 지금 처리할까요? 처리가 끝나면 PDF를 다시 내보내세요.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1854"/>
         <source>Open PDF</source>
-        <translation>PDF 열기</translation>
+        <translation type="vanished">PDF 열기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1976"/>
         <source>Exported {pages} pages to {path}</source>
-        <translation>{pages}개 페이지를 {path}(으)로 내보냈습니다.</translation>
+        <translation type="vanished">{pages}개 페이지를 {path}(으)로 내보냈습니다.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1980"/>
         <source> ({count} with text)</source>
-        <translation> (텍스트 포함 {count}개)</translation>
+        <translation type="vanished"> (텍스트 포함 {count}개)</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2027"/>
         <source>Cancelled</source>
-        <translation>취소됨</translation>
+        <translation type="vanished">취소됨</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2033"/>
         <source>PDF</source>
-        <translation>PDF</translation>
+        <translation type="vanished">PDF</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2039"/>
         <source>Open Project</source>
-        <translation>프로젝트 열기</translation>
+        <translation type="vanished">프로젝트 열기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2117"/>
-        <location filename="../app/ui/MainWindow.py" line="2432"/>
-        <location filename="../app/ui/MainWindow.py" line="2784"/>
         <source>Error</source>
-        <translation>오류</translation>
+        <translation type="vanished">오류</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2118"/>
         <source>Unable to open the project file.</source>
-        <translation>프로젝트 파일을 열 수 없습니다.</translation>
+        <translation type="vanished">프로젝트 파일을 열 수 없습니다.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2280"/>
         <source>Go To Page</source>
-        <translation>페이지로 이동</translation>
+        <translation type="vanished">페이지로 이동</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2281"/>
         <source>Enter the page number:</source>
-        <translation>페이지 번호를 입력하세요:</translation>
+        <translation type="vanished">페이지 번호를 입력하세요:</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2433"/>
         <source>No files were added to the project.</source>
-        <translation>프로젝트에 추가된 파일이 없습니다.</translation>
+        <translation type="vanished">프로젝트에 추가된 파일이 없습니다.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2785"/>
         <source>Error saving the project file!</source>
-        <translation>프로젝트 파일을 저장하는 중 오류가 발생했습니다!</translation>
+        <translation type="vanished">프로젝트 파일을 저장하는 중 오류가 발생했습니다!</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2892"/>
         <source>Save Project</source>
-        <translation>프로젝트 저장</translation>
+        <translation type="vanished">프로젝트 저장</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2893"/>
         <source>Save this project?</source>
-        <translation>이 프로젝트를 저장하겠습니까?</translation>
+        <translation type="vanished">이 프로젝트를 저장하겠습니까?</translation>
     </message>
 </context>
 </TS>

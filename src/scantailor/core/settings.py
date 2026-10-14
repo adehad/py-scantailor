@@ -123,7 +123,8 @@ class ApplicationSettings(BaseModel):
     # Display settings; the colour scheme lives in QSettings under the key the
     # theme reads, so a change applies at once and at the next start.
     opengl_enabled: bool = Field(default=False)
-    language: str = Field(default="en")
+    # Empty follows the operating system's locale, as upstream's default does.
+    language: str = Field(default="")
     units: Units = Field(default=Units.MILLIMETERS)
 
     # Project settings
