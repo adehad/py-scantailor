@@ -14,7 +14,7 @@ class UnitsProvider(QtCore.QObject):
 
     units_changed = QtCore.Signal(object)
 
-    _instance: "UnitsProvider | None" = None
+    _instance: UnitsProvider | None = None
 
     def __init__(self, units: Units = Units.MILLIMETERS) -> None:
         """Create a provider; use ``get_instance`` for the shared one.
@@ -26,7 +26,7 @@ class UnitsProvider(QtCore.QObject):
         self._units = units
 
     @classmethod
-    def get_instance(cls) -> "UnitsProvider":
+    def get_instance(cls) -> UnitsProvider:
         """Return the shared provider, starting from the stored setting.
 
         Returns:

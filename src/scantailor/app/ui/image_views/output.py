@@ -246,7 +246,7 @@ class ViewZone:
     fill_color: tuple[int, int, int] = (255, 255, 255)
     properties: object | None = None
 
-    def copy(self) -> "ViewZone":
+    def copy(self) -> ViewZone:
         """Return a copy with its own polygon."""
         return ViewZone(
             self.kind, QPolygonF(self.polygon), self.fill_color, self.properties

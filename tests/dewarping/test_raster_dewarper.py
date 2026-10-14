@@ -161,7 +161,7 @@ class TestDewarpImage:
                 model_domain=(0.5, 0, 0.5, 1),  # Zero width
             )
 
-        with pytest.raises(ValueError, match="positive.*height"):
+        with pytest.raises(ValueError, match=r"positive.*height"):
             dewarp_image(
                 src,
                 simple_dewarper,

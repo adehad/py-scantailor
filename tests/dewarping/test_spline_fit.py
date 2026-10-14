@@ -113,7 +113,7 @@ class TestSampling:
 
     def test_chords_stay_within_the_requested_distance_of_the_curve(self) -> None:
         positions, tensions = _random_spline()
-        ts, points, _ = sample_spline(positions, tensions, 0.2)
+        _ts, points, _ = sample_spline(positions, tensions, 0.2)
         dense = np.array(
             [spline_point_at(positions, tensions, t) for t in np.linspace(0, 1, 4000)]
         )

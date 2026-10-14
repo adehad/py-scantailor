@@ -45,7 +45,7 @@ class _Snapshot:
     icon_name: str
 
     @classmethod
-    def of(cls, menu: QtWidgets.QMenu) -> list["_Snapshot"]:
+    def of(cls, menu: QtWidgets.QMenu) -> list[_Snapshot]:
         return [
             cls(a.text(), a.isCheckable(), a.isChecked(), a.icon().name())
             for a in menu.actions()

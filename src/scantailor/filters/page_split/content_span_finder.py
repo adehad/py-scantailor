@@ -22,7 +22,7 @@ class Span:
         return 0.5 * (self.begin + self.end)
 
     @staticmethod
-    def between(left: "Span | int", right: "Span | int") -> "Span":
+    def between(left: Span | int, right: Span | int) -> Span:
         """Return the gap between two spans or positions.
 
         A span stands for its inner edge: its end when it is on the left, its

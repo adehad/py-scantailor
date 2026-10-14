@@ -132,7 +132,7 @@ def test_output_dpi_defaults_to_the_import_dpi(pdf_window: MainWindowManager):  
 
 def test_saved_project_still_knows_its_source_pdf_when_reopened(
     pdf_window: MainWindowManager,  # noqa: F811
-    file_dialogs: "FileDialogStub",
+    file_dialogs: FileDialogStub,
     tmp_path: Path,
 ):
     file_dialogs.save_file = str(tmp_path / "book.ScanTailor")
@@ -148,7 +148,7 @@ def test_saved_project_still_knows_its_source_pdf_when_reopened(
 
 def test_project_saved_with_a_sidecar_mapping_still_finds_its_source_pdf(
     pdf_window: MainWindowManager,  # noqa: F811
-    file_dialogs: "FileDialogStub",
+    file_dialogs: FileDialogStub,
     tmp_path: Path,
 ):
     source = pdf_window.pdf_sources[0]
@@ -171,7 +171,7 @@ def test_project_saved_with_a_sidecar_mapping_still_finds_its_source_pdf(
 
 def test_cancelling_the_extract_prompt_creates_no_project(
     main_window: MainWindowManager,
-    file_dialogs: "FileDialogStub",
+    file_dialogs: FileDialogStub,
     respond_to_modal,
     source_pdf: Path,  # noqa: F811
 ):
@@ -185,7 +185,7 @@ def test_cancelling_the_extract_prompt_creates_no_project(
 
 
 def test_cancelling_the_file_dialog_does_nothing(
-    main_window: MainWindowManager, file_dialogs: "FileDialogStub"
+    main_window: MainWindowManager, file_dialogs: FileDialogStub
 ):
     file_dialogs.open_file = ""
 
@@ -197,7 +197,7 @@ def test_cancelling_the_file_dialog_does_nothing(
 def test_cancelling_a_running_extraction_discards_the_pages(
     qtbot: QtBot,
     main_window: MainWindowManager,
-    file_dialogs: "FileDialogStub",
+    file_dialogs: FileDialogStub,
     respond_to_modal,
     source_pdf: Path,  # noqa: F811
     monkeypatch: pytest.MonkeyPatch,
@@ -242,7 +242,7 @@ def test_cancelling_a_running_extraction_discards_the_pages(
 
 def test_unreadable_pdf_reports_the_error_and_creates_no_project(
     main_window: MainWindowManager,
-    file_dialogs: "FileDialogStub",
+    file_dialogs: FileDialogStub,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -264,7 +264,7 @@ def test_unreadable_pdf_reports_the_error_and_creates_no_project(
 
 def test_reopening_a_pdf_can_use_the_pages_it_already_has(
     pdf_window: MainWindowManager,  # noqa: F811
-    file_dialogs: "FileDialogStub",
+    file_dialogs: FileDialogStub,
     respond_to_modal,
     source_pdf: Path,  # noqa: F811
     monkeypatch: pytest.MonkeyPatch,
@@ -297,7 +297,7 @@ def test_reopening_a_pdf_can_use_the_pages_it_already_has(
 
 def test_rendering_again_replaces_the_pages_and_leaves_other_files(
     pdf_window: MainWindowManager,  # noqa: F811
-    file_dialogs: "FileDialogStub",
+    file_dialogs: FileDialogStub,
     respond_to_modal,
     source_pdf: Path,  # noqa: F811
     monkeypatch: pytest.MonkeyPatch,
@@ -329,7 +329,7 @@ def test_rendering_again_replaces_the_pages_and_leaves_other_files(
 
 def test_the_extraction_uses_the_resolution_chosen_in_the_prompt(
     main_window: MainWindowManager,
-    file_dialogs: "FileDialogStub",
+    file_dialogs: FileDialogStub,
     respond_to_modal,
     source_pdf: Path,  # noqa: F811
     monkeypatch: pytest.MonkeyPatch,

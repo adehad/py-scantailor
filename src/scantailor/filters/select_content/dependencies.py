@@ -25,7 +25,7 @@ class Dependencies(BaseModel):
     rotated_page_outline: list[tuple[float, float]] = []
     view_transform: list[list[float]] = []
 
-    def same_outline(self, other: "Dependencies") -> bool:
+    def same_outline(self, other: Dependencies) -> bool:
         """Tell whether both outlines describe the same polygon, up to float noise."""
         if len(self.rotated_page_outline) != len(other.rotated_page_outline):
             return False
@@ -40,7 +40,7 @@ class Dependencies(BaseModel):
             )
         )
 
-    def needs_content_update(self, other: "Dependencies") -> bool:
+    def needs_content_update(self, other: Dependencies) -> bool:
         """Check if content box needs to be recomputed.
 
         Content needs update if:
@@ -51,7 +51,7 @@ class Dependencies(BaseModel):
             return True
         return not self.same_outline(other)
 
-    def needs_page_update(self, other: "Dependencies") -> bool:
+    def needs_page_update(self, other: Dependencies) -> bool:
         """Check if page box needs to be recomputed.
 
         Page box needs update if:
@@ -70,7 +70,7 @@ class Dependencies(BaseModel):
             return True
         return False
 
-    def is_compatible_with(self, other: "Dependencies") -> bool:
+    def is_compatible_with(self, other: Dependencies) -> bool:
         """Check if cached results are still valid.
 
         Returns True if neither content nor page boxes need updating.

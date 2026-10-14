@@ -145,7 +145,7 @@ def accept_project_files_dialog(timeout_ms: int = 30000) -> list[bool]:
 def pdf_window(
     qtbot: QtBot,
     main_window: MainWindowManager,
-    file_dialogs: "FileDialogStub",
+    file_dialogs: FileDialogStub,
     respond_to_modal: Callable[..., None],
     source_pdf: Path,
 ) -> MainWindowManager:

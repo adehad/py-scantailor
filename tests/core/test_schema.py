@@ -132,7 +132,7 @@ class TestValidateProjectJson:
         project_json = '{"version": 1}'
 
         # Pydantic provides defaults, so this should still be valid
-        is_valid, errors = validate_project_json(project_json)
+        is_valid, _errors = validate_project_json(project_json)
 
         # images has a default_factory, so it's valid
         assert is_valid is True
@@ -210,7 +210,7 @@ class TestValidateProjectFile:
         project_path = tmp_path / "invalid.json"
         project_path.write_text('{"version": "invalid"}', encoding="utf-8")
 
-        is_valid, errors = validate_project_file(project_path)
+        is_valid, _errors = validate_project_file(project_path)
 
         assert is_valid is False
 
@@ -278,7 +278,7 @@ class TestMigrateProject:
         invalid_json = '{"version": "invalid"}'
 
         with pytest.raises(
-            ValueError, match="Cannot migrate.*version must be an integer"
+            ValueError, match=r"Cannot migrate.*version must be an integer"
         ):
             migrate_project(invalid_json, target_version=1)
 

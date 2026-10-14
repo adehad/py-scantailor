@@ -5,6 +5,7 @@ and which are missing (red) using colored rounded rectangles on the right side.
 """
 
 from dataclasses import dataclass
+from enum import IntEnum
 
 from PySide6.QtCore import QModelIndex, QPersistentModelIndex, QRect, Qt
 from PySide6.QtGui import QBrush, QColor, QPainter, QPaintEvent, QPen
@@ -17,7 +18,7 @@ from PySide6.QtWidgets import (
 
 
 # Status constants matching the C++ RelinkingModel
-class RelinkingStatus:
+class RelinkingStatus(IntEnum):
     """Status values for relinking items."""
 
     EXISTS = 0
@@ -40,7 +41,7 @@ class IndicationGroup:
 class RelinkingListViewDelegate(QStyledItemDelegate):
     """Custom delegate that allows the list view to draw status indicators."""
 
-    def __init__(self, owner: "RelinkingListView") -> None:
+    def __init__(self, owner: RelinkingListView) -> None:
         """Initialize the delegate.
 
         Args:
@@ -62,8 +63,8 @@ class RelinkingListViewDelegate(QStyledItemDelegate):
             option: Style options for the item.
             index: The model index of the item.
         """
-        # QStyleOption.rect missing from PySide6 stubs (PYSIDE-3034)
-        # pyrefly: ignore[missing-attribute]
+        # QStyleOption.rect is typed as `...` in the PySide6 stubs (PYSIDE-3034)
+        # pyrefly: ignore[bad-argument-type]
         self._owner._maybe_draw_status_layer(painter, index, option.rect)
         super().paint(painter, option, index)
 

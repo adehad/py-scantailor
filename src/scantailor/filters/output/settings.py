@@ -35,7 +35,7 @@ class Settings:
         self._default_color_mode: ColorMode = self.DEFAULT_COLOR_MODE
         self._default_despeckle: DespeckleLevel = self.DEFAULT_DESPECKLE
 
-    def get_params(self, page_id: "PageId") -> Params:
+    def get_params(self, page_id: PageId) -> Params:
         """Get parameters for a page.
 
         Args:
@@ -53,7 +53,7 @@ class Settings:
             return stored
         return Params(output_dpi=dpi, color_mode=mode, despeckle_level=despeckle)
 
-    def set_params(self, page_id: "PageId", params: Params) -> None:
+    def set_params(self, page_id: PageId, params: Params) -> None:
         """Set parameters for a page.
 
         Args:
@@ -63,7 +63,7 @@ class Settings:
         with self._lock:
             self._params[page_id] = params
 
-    def set_post_deskew_angle(self, page_id: "PageId", angle: float) -> bool:
+    def set_post_deskew_angle(self, page_id: PageId, angle: float) -> bool:
         """Record the rotation applied to a dewarped page that has stored parameters.
 
         Args:
@@ -83,7 +83,7 @@ class Settings:
             )
             return True
 
-    def is_params_set(self, page_id: "PageId") -> bool:
+    def is_params_set(self, page_id: PageId) -> bool:
         """Check if parameters have been explicitly set for a page.
 
         Args:
@@ -95,7 +95,7 @@ class Settings:
         with self._lock:
             return page_id in self._params
 
-    def clear_params(self, page_id: "PageId") -> None:
+    def clear_params(self, page_id: PageId) -> None:
         """Clear parameters for a page, reverting to defaults.
 
         Args:
@@ -146,7 +146,7 @@ class Settings:
         with self._lock:
             self._default_despeckle = level
 
-    def apply_params_to_pages(self, page_ids: list["PageId"], params: Params) -> None:
+    def apply_params_to_pages(self, page_ids: list[PageId], params: Params) -> None:
         """Apply the same parameters to multiple pages.
 
         Args:

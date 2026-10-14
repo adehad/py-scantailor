@@ -37,23 +37,23 @@ class Params(BaseModel):
     split_line_mode: AutoManualMode = AutoManualMode.AUTO
     dependencies: Dependencies = Dependencies()
 
-    def with_layout_type(self, layout_type: LayoutType) -> "Params":
+    def with_layout_type(self, layout_type: LayoutType) -> Params:
         """Create a copy with a different layout type."""
         return self.model_copy(update={"layout_type": layout_type})
 
     def with_page_layout(
         self, page_layout: PageLayout, mode: AutoManualMode = AutoManualMode.AUTO
-    ) -> "Params":
+    ) -> Params:
         """Create a copy with a different page layout."""
         return self.model_copy(
             update={"page_layout": page_layout, "split_line_mode": mode}
         )
 
-    def with_manual_layout(self, page_layout: PageLayout) -> "Params":
+    def with_manual_layout(self, page_layout: PageLayout) -> Params:
         """Create a copy with a manually set page layout."""
         return self.with_page_layout(page_layout, AutoManualMode.MANUAL)
 
-    def with_auto_layout(self, page_layout: PageLayout) -> "Params":
+    def with_auto_layout(self, page_layout: PageLayout) -> Params:
         """Create a copy with an auto-detected page layout."""
         return self.with_page_layout(page_layout, AutoManualMode.AUTO)
 
@@ -65,7 +65,7 @@ class Params(BaseModel):
         """Return True if the split line was manually set."""
         return self.split_line_mode == AutoManualMode.MANUAL
 
-    def with_manual_mode(self, is_manual: bool) -> "Params":
+    def with_manual_mode(self, is_manual: bool) -> Params:
         """Create a copy with a different split line mode."""
         mode = AutoManualMode.MANUAL if is_manual else AutoManualMode.AUTO
         return self.model_copy(update={"split_line_mode": mode})

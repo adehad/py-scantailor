@@ -6,6 +6,8 @@ from .tokens import Tokens
 CONTROL_HEIGHT = 32
 RADIUS_PANEL = 12
 RADIUS_CONTROL = 8
+FIELD_BORDER = 1
+FIELD_PADDING_X = 8
 
 
 def build_stylesheet(t: Tokens, glyphs: dict[str, str]) -> str:
@@ -113,8 +115,8 @@ QPushButton:disabled, QToolButton:disabled {{
 }}
 
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QPlainTextEdit, QTextEdit {{
-    min-height: {control}px; padding: 0 8px;
-    background: {t.field}; border: 1px solid {t.field_border};
+    min-height: {control}px; padding: 0 {FIELD_PADDING_X}px;
+    background: {t.field}; border: {FIELD_BORDER}px solid {t.field_border};
     border-radius: {RADIUS_CONTROL}px;
     selection-background-color: {t.accent}; selection-color: {t.accent_text};
 }}
