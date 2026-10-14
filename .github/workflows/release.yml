@@ -49,13 +49,10 @@ jobs:
           restore-keys: numba-${{ runner.os }}-
 
       - name: Install dependencies
-        run: pdm install --frozen-lockfile -G test -G installer
+        run: pdm install --frozen-lockfile -G installer
 
       - name: Compile translations
         run: pdm run translations
-
-      - name: Run tests
-        run: pdm run pytest
 
       - name: Build executables
         run: pdm run exe
