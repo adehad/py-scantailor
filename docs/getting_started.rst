@@ -52,10 +52,15 @@ The New Project dialog has these controls:
      - Where the processed TIFF files are written. Left empty, the output goes to
        an ``out`` folder inside the input folder.
    * - Files Not In Project
-     - Image files of the input folder that are not in the project yet. Supported
-       types are PNG, JPEG, TIFF, BMP and GIF. **Select All** selects every file.
+     - Image files and PDFs of the input folder that are not in the project yet.
+       Supported image types are PNG, JPEG, TIFF, BMP and GIF. PDFs come first,
+       with their page count. **Select All** selects every file.
+   * - Add PDF...
+     - Adds a PDF from any folder to Files Not In Project. See
+       :ref:`pdf-in-new-project`.
    * - Right arrow button
-     - Adds the selected files to the project.
+     - Adds the selected files to the project. A selected PDF first asks which
+       pages to extract.
    * - Left arrow button
      - Removes the selected files from the project.
    * - Files In Project
@@ -103,16 +108,19 @@ asks for a value. It opens:
   is opened. Cancelling the dialog cancels the action;
 - from **Tools > Fix DPI ...** for every page of the open project.
 
+.. screenshot:: fix_dpi
+   :alt: The Fix DPI dialog on its All Pages tab with one page selected
+
 .. list-table::
    :header-rows: 1
    :widths: 30 70
 
    * - Part of the dialog
      - What it does
-   * - First tab
+   * - Need Fixing
      - Lists the images whose resolution is undefined. This is the tab that
        needs work.
-   * - Second tab
+   * - All Pages
      - Lists every image, with the resolution each one has now.
    * - DPI preset
      - Custom, 300, 400, 600 or 1200. A preset fills the x and y fields.

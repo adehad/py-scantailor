@@ -11,6 +11,7 @@ Run with ``pytest -m docs_screenshot``, or ``tools/docs_screenshots.py``.
 
 import importlib.util
 import os
+import shutil
 import tempfile
 import time
 from collections.abc import Callable
@@ -20,7 +21,7 @@ from types import ModuleType
 import numpy as np
 import pytest
 from PIL import Image
-from PySide6 import QtCore, QtTest, QtWidgets
+from PySide6 import QtCore, QtGui, QtTest, QtWidgets
 
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
 from scantailor.app.ui.image_views.output import ImageViewTab, OutputImageView
@@ -102,7 +103,6 @@ def _output_dir() -> Path:
 def test_manual_screenshots_capture_every_named_shot(
     scheme: str,
     qapp: QtWidgets.QApplication,
-    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Drive the window through the manual's stages and save every named PNG.
@@ -110,18 +110,17 @@ def test_manual_screenshots_capture_every_named_shot(
     Args:
         scheme (str): ``light`` or ``dark``; selects the theme and the subfolder.
         qapp (QtWidgets.QApplication): The application, from pytest-qt.
-        tmp_path (Path): Scratch folder for the sample book and the output.
         monkeypatch (pytest.MonkeyPatch): Sets the theme for this test only.
     """
     monkeypatch.setenv("SCANTAILOR_THEME", scheme)
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     apply_theme(qapp)
-    sample = _load_tool("sample_book")
-    book = sample.write_sample_book(tmp_path / "sample")
     shots = _output_dir() / scheme
     shots.mkdir(parents=True, exist_ok=True)
+    # Paths show in several dialogs; a short folder keeps them readable.
     work_dir = Path(tempfile.mkdtemp(prefix="st-docs-work-"))
     (work_dir / "out").mkdir()
+    book = _load_tool("sample_book").write_sample_book(work_dir / "sample")
     sample_dir = book.pages[0].parent
     names = [path.name for path in book.pages]
 
@@ -144,15 +143,24 @@ def test_manual_screenshots_capture_every_named_shot(
         widget.grab().save(str(shots / f"{name}.png"))
 
     def in_modal(
-        name: str, trigger: Callable[[], object], *, accept: bool = False
+        name: str,
+        trigger: Callable[[], object],
+        *,
+        accept: bool = False,
+        prepare: Callable[[QtWidgets.QWidget], None] | None = None,
     ) -> None:
-        """Run ``trigger``, which blocks in a dialog, grab that dialog and close it."""
+        """Run ``trigger``, which blocks in a dialog, grab that dialog and close it.
+
+        ``prepare`` gets the dialog first, to pick a tab or a row for the shot.
+        """
 
         def shoot() -> None:
             dialog = app.activeModalWidget()
             if dialog is None:
                 QtCore.QTimer.singleShot(100, shoot)
                 return
+            if prepare is not None:
+                prepare(dialog)
             pump(0.5)
             save(dialog, name)
             if accept:
@@ -218,6 +226,16 @@ def test_manual_screenshots_capture_every_named_shot(
         assert found is not None, name
         return found
 
+    def save_part(widget: QtWidgets.QWidget, name: str, margin: int = 8) -> None:
+        """Save the part of the window around ``widget``, cropped from the window."""
+        origin = widget.mapTo(manager.ui, QtCore.QPoint(0, 0))
+        area = QtCore.QRect(origin, widget.size()).adjusted(
+            -margin, -margin, margin, margin
+        )
+        manager.ui.grab(area.intersected(manager.ui.rect())).save(
+            str(shots / f"{name}.png")
+        )
+
     def output_view() -> OutputImageView:
         view = manager.imageFrameLayout.currentWidget()
         assert isinstance(view, OutputImageView)
@@ -240,6 +258,18 @@ def test_manual_screenshots_capture_every_named_shot(
 
     in_modal("new_project", manager.actionNewProject.trigger, accept=True)
     pump_until(lambda: len(manager.pages()) == len(names), 60.0, "the project")
+    pdf_folder = work_dir / "scans"
+    pdf_folder.mkdir()
+    for path in (book.pdf, *book.pages[:2]):
+        shutil.copy(path, pdf_folder)
+    capture_open_pdf(
+        app,
+        ProjectFilesDialog(
+            input_dir=pdf_folder, output_dir=work_dir / "out", parent=manager.ui
+        ),
+        lambda image: image.save(str(shots / "open_pdf.png")),
+        pump,
+    )
 
     show(1, SIDEWAYS, "stage1_fix_orientation")
     manager.current_page = page_named(manager, OFFCUT)
@@ -254,6 +284,12 @@ def test_manual_screenshots_capture_every_named_shot(
     show(3, SKEWED, "stage3_deskew")
     save_sorting_panel("thumbnails_incomplete")
     show(4, OFFCUT, "stage4_select_content")
+    save_part(manager.filterList, "stage_play_button")
+    capture_page_box_auto(
+        options_child,
+        finish_render,
+        lambda: save(manager.ui, "stage4_select_content_page_box_auto"),
+    )
     show(5, SINGLE, "stage5_margins")
     in_modal(
         "stage5_margins_apply",
@@ -339,6 +375,16 @@ def test_manual_screenshots_capture_every_named_shot(
     output_view().set_current_tab(ImageViewTab.DESPECKLING)
     pump(3.0)
     save(manager.ui, "stage6_tab_despeckling")
+    despeckle = options_child(QtWidgets.QSlider, "despeckleSlider")
+    previous_level = despeckle.value()
+    despeckle.setValue(despeckle.maximum())
+    reveal(options_child(QtWidgets.QWidget, "despeckleGroup"))
+    # The despeckling tab delays the render until the slider has rested.
+    pump(2.0)
+    finish_render()
+    save(manager.ui, "stage6_output_despeckle_levels")
+    despeckle.setValue(previous_level)
+    finish_render()
     output_view().set_current_tab(ImageViewTab.OUTPUT)
 
     manager.current_page = page_named(manager, PICTURES)
@@ -383,19 +429,139 @@ def test_manual_screenshots_capture_every_named_shot(
     save(tools, "tools_menu")
     tools.hide()
 
-    show(3, OBLIQUE, "stage3_deskew_oblique", settle_s=6.0)
+    page_menu = manager.thumbnails.page_menu(manager.current_page)
+    page_menu.popup(manager.ui.mapToGlobal(QtCore.QPoint(120, 240)))
+    pump(0.5)
+    save(page_menu, "thumbnail_menu")
+    page_menu.hide()
+    page_menu.deleteLater()
+    in_modal("remove_pages", lambda: manager.remove_pages([manager.current_page]))
+
+    show(3, OBLIQUE)
+    options_child(QtWidgets.QAbstractButton, "obliqueAutoBtn").click()
+    finish_render()
+    pump(4.0)
+    oblique = options_child(QtWidgets.QDoubleSpinBox, "obliqueSpinBox").value()
+    assert abs(oblique) > 1.0, f"the oblique page was not detected: {oblique}"
+    save(manager.ui, "stage3_deskew_oblique")
 
     capture_split_and_guides(manager, show, visit_stage, shots, save, pump)
 
     in_modal("settings", manager.actionSettings.trigger)
     in_modal("default_parameters", manager.actionDefaults.trigger)
     in_modal("export_pdf", manager.exportPdf)
+    in_modal("fix_dpi", manager.actionFixDpi.trigger, prepare=show_all_pages_tab)
+    in_modal("relinking", manager.actionRelinking.trigger, prepare=select_first_row)
 
     manager.modified = False
     manager.ui.close()
     pump(0.2)
+    shutil.rmtree(work_dir, ignore_errors=True)
 
     _assert_complete(shots)
+
+
+def select_first_row(dialog: QtWidgets.QWidget) -> None:
+    """Select the first row of the dialog's list, so its details show.
+
+    Args:
+        dialog (QtWidgets.QWidget): A dialog with one item view.
+    """
+    view = dialog.findChild(QtWidgets.QAbstractItemView)
+    assert view is not None
+    view.setCurrentIndex(view.model().index(0, 0))
+
+
+def show_all_pages_tab(dialog: QtWidgets.QWidget) -> None:
+    """Turn the Fix DPI dialog to All Pages, which lists the sample's pages.
+
+    The sample pages all carry a resolution, so the Need Fixing tab is empty.
+
+    Args:
+        dialog (QtWidgets.QWidget): The Fix DPI dialog.
+    """
+    tabs = dialog.findChild(QtWidgets.QTabWidget, "tabWidget")
+    view = dialog.findChild(QtWidgets.QTreeView, "allPagesView")
+    assert tabs is not None and view is not None
+    tabs.setCurrentIndex(1)
+    view.setCurrentIndex(view.model().index(0, 0))
+    view.resizeColumnToContents(0)
+    dialog.resize(max(dialog.width(), 460), max(dialog.height(), 420))
+
+
+def capture_open_pdf(
+    app: QtWidgets.QApplication,
+    dialog: ProjectFilesDialog,
+    save_image: Callable[[QtGui.QPixmap], object],
+    pump: Callable[[float], None],
+) -> None:
+    """Pick the sample PDF in the New Project dialog and save its Extract prompt.
+
+    The prompt is painted over the dialog that opened it, as the user sees them.
+    It is cancelled, so nothing is rendered.
+
+    Args:
+        app (QtWidgets.QApplication): The application, to find the prompt.
+        dialog (ProjectFilesDialog): A New Project dialog on the sample folder.
+        save_image (Callable[[QtGui.QPixmap], object]): Writes the shot.
+        pump (Callable[[float], None]): Runs the event loop for some seconds.
+    """
+    dialog.show()
+    pump(0.5)
+    files = dialog.findChild(QtWidgets.QListView, "offProjectList")
+    assert files is not None
+    files.setCurrentIndex(files.model().index(0, 0))
+    assert str(files.currentIndex().data()).startswith("sample_book.pdf")
+
+    def shoot() -> None:
+        prompt = app.activeModalWidget()
+        if prompt is None or prompt is dialog:
+            QtCore.QTimer.singleShot(100, shoot)
+            return
+        pump(0.5)
+        base = dialog.grab()
+        overlay = prompt.grab()
+        # Below the PDF's row, so the list stays readable under the prompt.
+        row = files.visualRect(files.model().index(0, 0))
+        top = files.viewport().mapTo(dialog, row.bottomLeft()).y() + 2 * row.height()
+        corner = QtCore.QPoint(max(0, (base.width() - overlay.width()) // 2), top)
+        shot = QtGui.QPixmap(
+            base.size().expandedTo(
+                QtCore.QSize(
+                    corner.x() + overlay.width(), corner.y() + overlay.height()
+                )
+            )
+        )
+        shot.fill(dialog.palette().color(QtGui.QPalette.ColorRole.Window))
+        painter = QtGui.QPainter(shot)
+        painter.drawPixmap(0, 0, base)
+        painter.drawPixmap(corner, overlay)
+        painter.setPen(dialog.palette().color(QtGui.QPalette.ColorRole.Mid))
+        painter.drawRect(QtCore.QRect(corner, overlay.size()).adjusted(0, 0, -1, -1))
+        painter.end()
+        save_image(shot)
+        prompt.reject()
+
+    QtCore.QTimer.singleShot(300, shoot)
+    add = dialog.findChild(QtWidgets.QToolButton, "addToProjectBtn")
+    assert add is not None
+    add.click()
+    dialog.reject()
+    dialog.deleteLater()
+
+
+def capture_page_box_auto(options_child, finish_render, save_auto) -> None:
+    """Set the page box to Auto and save the window, then restore its mode."""
+    modes = [
+        options_child(QtWidgets.QAbstractButton, name)
+        for name in ("pageDetectDisableBtn", "pageDetectAutoBtn", "pageDetectManualBtn")
+    ]
+    previous = next(button for button in modes if button.isChecked())
+    modes[1].click()
+    finish_render()
+    save_auto()
+    previous.click()
+    finish_render()
 
 
 def capture_trim(options_child, finish_render, save_trim) -> None:
