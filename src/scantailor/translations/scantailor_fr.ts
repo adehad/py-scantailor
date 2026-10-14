@@ -8,7 +8,7 @@
         <source>ScanTailor Advanced</source>
         <translatorcomment>Software name was not translated at all, neither was any of its related versions (universal, plus, etc).</translatorcomment>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>ScanTailor Advanced</translation>
+        <translation>ScanTailor Advanced</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/AboutDialog.ui" line="27"/>
@@ -29,7 +29,7 @@
         <location filename="../app/ui/dialogs/AboutDialog.ui" line="141"/>
         <source>Joseph Artsimovich</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Joseph Artsimovich</translation>
+        <translation>Joseph Artsimovich</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/AboutDialog.ui" line="168"/>
@@ -65,7 +65,7 @@
         <location filename="../app/ui/dialogs/AboutDialog.ui" line="225"/>
         <source>Alexander Trufanov - ver. Universal</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Alexander Trufanov - ver. Universal</translation>
+        <translation>Alexander Trufanov - ver. Universal</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/AboutDialog.ui" line="252"/>
@@ -86,7 +86,7 @@
         <location filename="../app/ui/dialogs/AboutDialog.ui" line="158"/>
         <source>4lex4</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>4lex4</translation>
+        <translation>4lex4</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/AboutDialog.ui" line="204"/>
@@ -144,7 +144,7 @@
         <translation type="vanished">Post-redressement</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="694"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="710"/>
         <source>Apply to</source>
         <translation>Appliquer à</translation>
     </message>
@@ -153,53 +153,53 @@
         <translation type="vanished">Cette page seulement</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="659"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="675"/>
         <source>This page only (already applied)</source>
         <translation>Cette page seulement (déjà appliquée)</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="663"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="679"/>
         <source>All pages</source>
         <translation>Toutes les pages</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="669"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="685"/>
         <source>This page and the following ones</source>
         <translation>Cette page et les suivantes</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="676"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="692"/>
         <source>This page and the following every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Cette page et les suivantes, en alternance</translation>
+        <translation>Cette page et les suivantes, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="680"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="696"/>
         <source>Every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Toutes les pages, en alternance</translation>
+        <translation>Toutes les pages, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="684"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="700"/>
         <source>Selected pages</source>
         <translation>Pages sélectionnées</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="690"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="706"/>
         <source>Every other selected page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Pages sélectionnées, en alternance</translation>
+        <translation>Pages sélectionnées, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="701"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="717"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <translation>Utiliser Ctrl+Clic / Maj+Ctrl+Clic pour sélectionner plusieurs pages.</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="707"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="723"/>
         <source>The current page will be included.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>La page courante sera incluse.</translation>
+        <translation>La page courante sera incluse.</translation>
     </message>
 </context>
 <context>
@@ -233,7 +233,7 @@
         <translation type="vanished">DPI</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="631"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="647"/>
         <source>Apply to</source>
         <translation>Appliquer à</translation>
     </message>
@@ -242,53 +242,53 @@
         <translation type="vanished">Cette page seulement</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="597"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="613"/>
         <source>This page only (already applied)</source>
         <translation>Cette page seulement (déjà appliquée)</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="601"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="617"/>
         <source>All pages</source>
         <translation>Toutes les pages</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="607"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="623"/>
         <source>This page and the following ones</source>
         <translation>Cette page et les suivantes</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="613"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="629"/>
         <source>This page and the following every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Cette page et les suivantes, en alternance</translation>
+        <translation>Cette page et les suivantes, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="617"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="633"/>
         <source>Every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Toutes les pages, en alternance</translation>
+        <translation>Toutes les pages, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="621"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="637"/>
         <source>Selected pages</source>
         <translation>Pages sélectionnées</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="627"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="643"/>
         <source>Every other selected page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Pages sélectionnées, en alternance</translation>
+        <translation>Pages sélectionnées, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="638"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="654"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <translation>Utiliser Ctrl+Clic / Maj+Ctrl+Clic pour sélectionner plusieurs pages.</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="644"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="660"/>
         <source>The current page will be included.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>La page courante sera incluse.</translation>
+        <translation>La page courante sera incluse.</translation>
     </message>
 </context>
 <context>
@@ -298,121 +298,121 @@
         <translation type="vanished">Appliquer le mode</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="569"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="585"/>
         <source>Apply to</source>
         <translation>Appliquer à</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="537"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="553"/>
         <source>This page only (already applied)</source>
         <translation>Cette page seulement (déjà appliqué)</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="541"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="557"/>
         <source>All pages</source>
         <translation>Toutes les pages</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="547"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="563"/>
         <source>This page and the following ones</source>
         <translation>Cette page et les suivantes</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="553"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="569"/>
         <source>This page and the following every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Cette page et les suivantes, en alternance</translation>
+        <translation>Cette page et les suivantes, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="557"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="573"/>
         <source>Every other page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Toutes les pages, en alternance</translation>
+        <translation>Toutes les pages, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="561"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="577"/>
         <source>Selected pages</source>
         <translation>Pages sélectionnées</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="565"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="581"/>
         <source>Every other selected page</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Pages sélectionnées, en alternance</translation>
+        <translation>Pages sélectionnées, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="576"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="592"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <translation>Utiliser Ctrl+Clic / Maj+Ctrl+Clic pour sélectionner plusieurs pages.</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="582"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="598"/>
         <source>The current page will be included.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>La page courante sera incluse.</translation>
+        <translation>La page courante sera incluse.</translation>
     </message>
 </context>
 <context>
     <name>ApplyDeskewDialog</name>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="285"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="301"/>
         <source>Apply to</source>
         <translation>Appliquer à</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="253"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="269"/>
         <source>This page only (already applied)</source>
         <translation>Cette page seulement (déjà appliqué)</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="257"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="273"/>
         <source>All pages</source>
         <translation>Toutes les pages</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="263"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="279"/>
         <source>This page and the following ones</source>
         <translation>Cette page et les suivantes</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="269"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="285"/>
         <source>This page and the following every other page</source>
         <translation>Cette page et les suivantes, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="273"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="289"/>
         <source>Every other page</source>
         <translation>Toutes les pages, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="277"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="293"/>
         <source>Selected pages</source>
         <translation>Pages sélectionnées</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="292"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="308"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <translation>Utiliser Ctrl+Clic / Maj+Ctrl+Clic pour sélectionner plusieurs pages.</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="302"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="318"/>
         <source>Deskew angle and mode</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Angle et mode de redressement</translation>
+        <translation>Angle et mode de redressement</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="306"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="322"/>
         <source>Oblique angle and mode</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Angle et mode de l&apos;oblique</translation>
+        <translation>Angle et mode de l&apos;oblique</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="281"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="297"/>
         <source>Every other selected page</source>
         <translation>Pages sélectionnées, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="298"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="314"/>
         <source>The current page will be included.</source>
         <translation>La page courante sera incluse.</translation>
     </message>
@@ -424,52 +424,52 @@
         <translation type="vanished">Corriger l&apos;orientation</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="356"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="372"/>
         <source>Apply to</source>
         <translation>Appliquer à</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="321"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="337"/>
         <source>This page only (already applied)</source>
         <translation>Cette page seulement (déjà appliqué)</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="325"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="341"/>
         <source>All pages</source>
         <translation>Toutes les pages</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="331"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="347"/>
         <source>This page and the following ones</source>
         <translation>Cette page et les suivantes</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="338"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="354"/>
         <source>This page and the following every other page</source>
         <translation>Cette page et les suivantes, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="342"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="358"/>
         <source>Every other page</source>
         <translation>Toutes les pages, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="346"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="362"/>
         <source>Selected pages</source>
         <translation>Pages sélectionnées</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="363"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="379"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <translation>Utiliser Ctrl+Clic / Maj+Ctrl+Clic pour sélectionner plusieurs pages.</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="352"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="368"/>
         <source>Every other selected page</source>
         <translation>Pages sélectionnées, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="369"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="385"/>
         <source>The current page will be included.</source>
         <translation>La page courante sera incluse.</translation>
     </message>
@@ -477,82 +477,82 @@
 <context>
     <name>ApplyPageLayoutDialog</name>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="418"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="434"/>
         <source>Apply to</source>
         <translation>Appliquer à</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="384"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="400"/>
         <source>This page only (already applied)</source>
         <translation>Cette page seulement (déjà appliqué)</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="388"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="404"/>
         <source>All pages</source>
         <translation>Toutes les pages</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="394"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="410"/>
         <source>This page and the following ones</source>
         <translation>Cette page et les suivantes</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="400"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="416"/>
         <source>This page and the following every other page</source>
         <translation>Cette page et les suivantes, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="404"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="420"/>
         <source>Every other page</source>
         <translation>Toutes les pages, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="408"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="424"/>
         <source>Selected pages</source>
         <translation>Pages sélectionnées</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="425"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="441"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <translation>Utiliser Ctrl+Clic / Maj+Ctrl+Clic pour sélectionner plusieurs pages.</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="435"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="451"/>
         <source>Left</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Gauche</translation>
+        <translation>Gauche</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="439"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="455"/>
         <source>Right</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Droite</translation>
+        <translation>Droite</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="443"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="459"/>
         <source>Top</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Haut</translation>
+        <translation>Haut</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="447"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="463"/>
         <source>Bottom</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Bas</translation>
+        <translation>Bas</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="451"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="467"/>
         <source>Apply margins</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Appliquer les marges</translation>
+        <translation>Appliquer les marges</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="414"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="430"/>
         <source>Every other selected page</source>
         <translation>Pages sélectionnées, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="431"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="447"/>
         <source>The current page will be included.</source>
         <translation>La page courante sera incluse.</translation>
     </message>
@@ -568,62 +568,62 @@
         <translation type="vanished">Options</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="518"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="534"/>
         <source>Apply content box</source>
         <translation>Appliquer les bornes du contenu</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="522"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="538"/>
         <source>Apply page box</source>
         <translation>Appliquer les bornes de la page</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="501"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="517"/>
         <source>Apply to</source>
         <translation>Appliquer à</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="466"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="482"/>
         <source>This page only (already applied)</source>
         <translation>Cette page seulement (déjà appliqué)</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="470"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="486"/>
         <source>All pages</source>
         <translation>Toutes les pages</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="476"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="492"/>
         <source>This page and the following ones</source>
         <translation>Cette page et les suivantes</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="483"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="499"/>
         <source>This page and the following every other page</source>
         <translation>Cette page et les suivantes, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="487"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="503"/>
         <source>Every other page</source>
         <translation>Toutes les pages, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="491"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="507"/>
         <source>Selected pages</source>
         <translation>Pages sélectionnées</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="508"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="524"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <translation>Utiliser Ctrl+Clic / Maj+Ctrl+Clic pour sélectionner plusieurs pages.</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="497"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="513"/>
         <source>Every other selected page</source>
         <translation>Pages sélectionnées, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="514"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="530"/>
         <source>The current page will be included.</source>
         <translation>La page courante sera incluse.</translation>
     </message>
@@ -666,57 +666,57 @@
         <translation>Pages sélectionnées, en alternance</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="82"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="98"/>
         <source>Deskew angle and mode</source>
         <translation>Angle et mode de redressement</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="85"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="101"/>
         <source>Oblique angle and mode</source>
         <translation>Angle et mode de l&apos;oblique</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="91"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="107"/>
         <source>Left</source>
         <translation>Gauche</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="92"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="108"/>
         <source>Right</source>
         <translation>Droite</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="93"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="109"/>
         <source>Top</source>
         <translation>Haut</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="94"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="110"/>
         <source>Bottom</source>
         <translation>Bas</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="146"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="162"/>
         <source>Apply to</source>
         <translation>Appliquer à</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="160"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="176"/>
         <source>Use Ctrl+Click / Shift+Click to select multiple pages.</source>
         <translation>Utiliser Ctrl+Clic / Maj+Clic pour sélectionner plusieurs pages.</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/apply_to.py" line="164"/>
+        <location filename="../app/ui/dialogs/apply_to.py" line="180"/>
         <source>The current page will be included.</source>
         <translation>La page courante sera incluse.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="140"/>
+        <location filename="../app/ui/MainWindow.py" line="147"/>
         <source>Apply content box</source>
         <translation>Appliquer les bornes du contenu</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="141"/>
+        <location filename="../app/ui/MainWindow.py" line="148"/>
         <source>Apply page box</source>
         <translation>Appliquer les bornes de la page</translation>
     </message>
@@ -836,7 +836,7 @@
         <location filename="../app/ui/dialogs/DefaultParamsDialog.ui" line="1804"/>
         <source>...</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>...</translation>
+        <translation>...</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/DefaultParamsDialog.ui" line="326"/>
@@ -1155,7 +1155,7 @@
         <location filename="../app/ui/dialogs/DefaultParamsDialog.ui" line="2695"/>
         <source>0</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>0</translation>
+        <translation>0</translation>
     </message>
     <message>
         <location filename="../app/ui/dialogs/DefaultParamsDialog.ui" line="2750"/>
@@ -1597,7 +1597,7 @@
         <location filename="../app/ui/MainWindow.ui" line="20"/>
         <source>MainWindow</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Fenêtre principale</translation>
+        <translation>Fenêtre principale</translation>
     </message>
     <message>
         <location filename="../app/ui/MainWindow.ui" line="65"/>
@@ -1971,12 +1971,205 @@ Pour la déterminer, exécuter le traitement de toutes les images à l&apos;éta
     </message>
 </context>
 <context>
+    <name>MainWindowManager</name>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1502"/>
+        <source>Add Files...</source>
+        <translation>Ajouter des fichiers...</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1503"/>
+        <source>Open PDF...</source>
+        <translation>Ouvrir un PDF...</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1504"/>
+        <source>Export PDF...</source>
+        <translation>Exporter en PDF...</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1505"/>
+        <source>Open Recent</source>
+        <translation>Projets récents</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1512"/>
+        <source>Output is not yet possible, as the final size of pages is not yet known.
+To determine it, run batch processing at &quot;Select Content&quot; or &quot;Margins&quot;.</source>
+        <translation>La sortie n&apos;est pas encore possible, car la taille finale des pages n&apos;est pas encore connue.
+Pour la déterminer, lancez le traitement par lots aux étapes « Contenu » ou « Marges ».</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1536"/>
+        <source>Unnamed</source>
+        <translation>Sans nom</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1691"/>
+        <source>Apply Margins</source>
+        <translation>Appliquer les marges</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1692"/>
+        <source>Apply Alignment</source>
+        <translation>Appliquer l&apos;alignement</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1694"/>
+        <source>Apply to</source>
+        <translation>Appliquer à</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1877"/>
+        <source>Batch processing</source>
+        <translation>Traitement par lots</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1878"/>
+        <source>Batch processing failed.</source>
+        <translation>Le traitement par lots a échoué.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1893"/>
+        <location filename="../app/ui/MainWindow.py" line="1959"/>
+        <source>Export PDF</source>
+        <translation>Exporter le PDF</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1897"/>
+        <source>{unprocessed} of {total} pages have not been processed yet.
+Process them now? Export the PDF again once processing is done.</source>
+        <translation>{unprocessed} pages sur {total} n&apos;ont pas encore été traitées.
+Les traiter maintenant? Exportez à nouveau le PDF une fois le traitement terminé.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="1915"/>
+        <source>Open PDF</source>
+        <translation>Ouvrir un PDF</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2037"/>
+        <source>Exported {pages} pages to {path}</source>
+        <translation>{pages} pages exportées vers {path}</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2041"/>
+        <source> ({count} with text)</source>
+        <translation> ({count} avec texte)</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2086"/>
+        <source>Cancelled</source>
+        <translation>Annulé</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2092"/>
+        <source>PDF</source>
+        <translation>PDF</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2098"/>
+        <source>Open Project</source>
+        <translation>Ouvrir un projet</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2176"/>
+        <location filename="../app/ui/MainWindow.py" line="2491"/>
+        <location filename="../app/ui/MainWindow.py" line="2843"/>
+        <source>Error</source>
+        <translation>Erreur</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2177"/>
+        <source>Unable to open the project file.</source>
+        <translation>Impossible d&apos;ouvrir le fichier de projet.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2339"/>
+        <source>Go To Page</source>
+        <translation>Aller à la page</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2340"/>
+        <source>Enter the page number:</source>
+        <translation>Saisissez le numéro de page:</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2492"/>
+        <source>No files were added to the project.</source>
+        <translation>Aucun fichier n&apos;a été ajouté au projet.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2844"/>
+        <source>Error saving the project file!</source>
+        <translation>Erreur lors de l&apos;enregistrement du fichier de projet!</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2952"/>
+        <source>Save Project</source>
+        <translation>Enregistrer le projet</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.py" line="2953"/>
+        <source>Save this project?</source>
+        <translation>Enregistrer ce projet?</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="72"/>
+        <source>Apply Output Resolution</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Appliquer la résolution de sortie</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="75"/>
+        <source>Apply Color Settings</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Appliquer les paramètres de couleur</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="78"/>
+        <source>Apply Splitting Settings</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Appliquer les paramètres de séparation</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="81"/>
+        <source>Apply Binarization Settings</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Appliquer les paramètres de binarisation</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="85"/>
+        <source>Apply Despeckling Level</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Appliquer le niveau de détachage</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="88"/>
+        <source>Apply Dewarping Mode</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Appliquer le mode de dégauchissement</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="91"/>
+        <source>Apply Depth Perception</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Appliquer la perception de la profondeur</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="93"/>
+        <source>Apply Deskew</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Appliquer le redressement</translation>
+    </message>
+</context>
+<context>
     <name>NewOpenProjectPanel</name>
     <message>
         <location filename="../app/ui/panels/NewOpenProjectPanel.ui" line="20"/>
         <source>Form</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Formulaire</translation>
+        <translation>Formulaire</translation>
     </message>
     <message>
         <location filename="../app/ui/panels/NewOpenProjectPanel.ui" line="67"/>
@@ -2613,7 +2806,7 @@ Vous devriez les retirer du projet.</translation>
         <location filename="../app/ui/RelinkingDialog.ui" line="100"/>
         <source>...</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>...</translation>
+        <translation>...</translation>
     </message>
     <message>
         <source>Substitution File for %1</source>
@@ -2794,52 +2987,52 @@ Vous devriez les retirer du projet.</translation>
         <translation>Compression couleur: </translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="30"/>
+        <location filename="../app/ui/dialogs/settings.py" line="31"/>
         <source>Your hardware / driver don&apos;t provide the necessary features</source>
         <translation>Votre matériel ou votre pilote ne fournit pas les caractéristiques nécessaires</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="163"/>
+        <location filename="../app/ui/dialogs/settings.py" line="164"/>
         <source>Dark</source>
         <translation>Foncé</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="162"/>
+        <location filename="../app/ui/dialogs/settings.py" line="163"/>
         <source>Light</source>
         <translation>Pâle</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="161"/>
+        <location filename="../app/ui/dialogs/settings.py" line="162"/>
         <source>Auto</source>
         <translation>Auto</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="178"/>
+        <location filename="../app/ui/dialogs/settings.py" line="179"/>
         <source>Rectangular</source>
         <translation>Rectangulaire</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="192"/>
+        <location filename="../app/ui/dialogs/settings.py" line="193"/>
         <source>None</source>
         <translation>Aucune</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="193"/>
+        <location filename="../app/ui/dialogs/settings.py" line="194"/>
         <source>LZW</source>
         <translation>LZW</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="194"/>
+        <location filename="../app/ui/dialogs/settings.py" line="195"/>
         <source>Deflate</source>
         <translation>Deflate</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="188"/>
+        <location filename="../app/ui/dialogs/settings.py" line="189"/>
         <source>CCITT G4</source>
         <translation>CCITT G4</translation>
     </message>
     <message>
-        <location filename="../app/ui/dialogs/settings.py" line="189"/>
+        <location filename="../app/ui/dialogs/settings.py" line="190"/>
         <source>JPEG</source>
         <translation>JPEG</translation>
     </message>
@@ -2935,7 +3128,7 @@ Vous devriez les retirer du projet.</translation>
         <location filename="../app/ui/panels/StatusBarPanel.ui" line="14"/>
         <source>Form</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Formulaire</translation>
+        <translation>Formulaire</translation>
     </message>
     <message>
         <location filename="../app/ui/panels/StatusBarPanel.ui" line="44"/>
@@ -3017,7 +3210,7 @@ Vous devriez les retirer du projet.</translation>
         <location filename="../app/ui/panels/SystemLoadWidget.ui" line="14"/>
         <source>Form</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>Formulaire</translation>
+        <translation>Formulaire</translation>
     </message>
     <message>
         <location filename="../app/ui/panels/SystemLoadWidget.ui" line="23"/>
@@ -3029,7 +3222,7 @@ Vous devriez les retirer du projet.</translation>
         <location filename="../app/ui/panels/SystemLoadWidget.ui" line="124"/>
         <source>...</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-<translation>...</translation>
+        <translation>...</translation>
     </message>
 </context>
 <context>
@@ -4506,151 +4699,120 @@ p, li { white-space: pre-wrap; }
 <context>
     <name>self.ui</name>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="506"/>
         <source>Add Files...</source>
-        <translation>Ajouter des fichiers...</translation>
+        <translation type="vanished">Ajouter des fichiers...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="508"/>
         <source>Open PDF...</source>
-        <translation>Ouvrir un PDF...</translation>
+        <translation type="vanished">Ouvrir un PDF...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="509"/>
         <source>Export PDF...</source>
-        <translation>Exporter en PDF...</translation>
+        <translation type="vanished">Exporter en PDF...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="511"/>
         <source>Open Recent</source>
-        <translation>Projets récents</translation>
+        <translation type="vanished">Projets récents</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="522"/>
         <source>Output is not yet possible, as the final size of pages is not yet known.
 To determine it, run batch processing at &quot;Select Content&quot; or &quot;Margins&quot;.</source>
-        <translation>La sortie n&apos;est pas encore possible, car la taille finale des pages n&apos;est pas encore connue.
+        <translation type="vanished">La sortie n&apos;est pas encore possible, car la taille finale des pages n&apos;est pas encore connue.
 Pour la déterminer, lancez le traitement par lots aux étapes « Contenu » ou « Marges ».</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="524"/>
         <source>Processing...</source>
-        <translation>Traitement...</translation>
+        <translation type="vanished">Traitement...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1475"/>
         <source>Unnamed</source>
-        <translation>Sans nom</translation>
+        <translation type="vanished">Sans nom</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1630"/>
         <source>Apply Margins</source>
-        <translation>Appliquer les marges</translation>
+        <translation type="vanished">Appliquer les marges</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1631"/>
         <source>Apply Alignment</source>
-        <translation>Appliquer l&apos;alignement</translation>
+        <translation type="vanished">Appliquer l&apos;alignement</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1633"/>
         <source>Apply to</source>
-        <translation>Appliquer à</translation>
+        <translation type="vanished">Appliquer à</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1816"/>
         <source>Batch processing</source>
-        <translation>Traitement par lots</translation>
+        <translation type="vanished">Traitement par lots</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1817"/>
         <source>Batch processing failed.</source>
-        <translation>Le traitement par lots a échoué.</translation>
+        <translation type="vanished">Le traitement par lots a échoué.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1832"/>
-        <location filename="../app/ui/MainWindow.py" line="1898"/>
         <source>Export PDF</source>
-        <translation>Exporter le PDF</translation>
+        <translation type="vanished">Exporter le PDF</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1836"/>
         <source>{unprocessed} of {total} pages have not been processed yet.
 Process them now? Export the PDF again once processing is done.</source>
-        <translation>{unprocessed} pages sur {total} n&apos;ont pas encore été traitées.
+        <translation type="vanished">{unprocessed} pages sur {total} n&apos;ont pas encore été traitées.
 Les traiter maintenant? Exportez à nouveau le PDF une fois le traitement terminé.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1854"/>
         <source>Open PDF</source>
-        <translation>Ouvrir un PDF</translation>
+        <translation type="vanished">Ouvrir un PDF</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1976"/>
         <source>Exported {pages} pages to {path}</source>
-        <translation>{pages} pages exportées vers {path}</translation>
+        <translation type="vanished">{pages} pages exportées vers {path}</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="1980"/>
         <source> ({count} with text)</source>
-        <translation> ({count} avec texte)</translation>
+        <translation type="vanished"> ({count} avec texte)</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2027"/>
         <source>Cancelled</source>
-        <translation>Annulé</translation>
+        <translation type="vanished">Annulé</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2033"/>
         <source>PDF</source>
-        <translation>PDF</translation>
+        <translation type="vanished">PDF</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2039"/>
         <source>Open Project</source>
-        <translation>Ouvrir un projet</translation>
+        <translation type="vanished">Ouvrir un projet</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2117"/>
-        <location filename="../app/ui/MainWindow.py" line="2432"/>
-        <location filename="../app/ui/MainWindow.py" line="2784"/>
         <source>Error</source>
-        <translation>Erreur</translation>
+        <translation type="vanished">Erreur</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2118"/>
         <source>Unable to open the project file.</source>
-        <translation>Impossible d&apos;ouvrir le fichier de projet.</translation>
+        <translation type="vanished">Impossible d&apos;ouvrir le fichier de projet.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2280"/>
         <source>Go To Page</source>
-        <translation>Aller à la page</translation>
+        <translation type="vanished">Aller à la page</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2281"/>
         <source>Enter the page number:</source>
-        <translation>Saisissez le numéro de page:</translation>
+        <translation type="vanished">Saisissez le numéro de page:</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2433"/>
         <source>No files were added to the project.</source>
-        <translation>Aucun fichier n&apos;a été ajouté au projet.</translation>
+        <translation type="vanished">Aucun fichier n&apos;a été ajouté au projet.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2785"/>
         <source>Error saving the project file!</source>
-        <translation>Erreur lors de l&apos;enregistrement du fichier de projet!</translation>
+        <translation type="vanished">Erreur lors de l&apos;enregistrement du fichier de projet!</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2892"/>
         <source>Save Project</source>
-        <translation>Enregistrer le projet</translation>
+        <translation type="vanished">Enregistrer le projet</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.py" line="2893"/>
         <source>Save this project?</source>
-        <translation>Enregistrer ce projet?</translation>
+        <translation type="vanished">Enregistrer ce projet?</translation>
     </message>
 </context>
 </TS>

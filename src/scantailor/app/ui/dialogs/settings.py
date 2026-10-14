@@ -18,6 +18,7 @@ from scantailor.core.settings import (
     Units,
     ZoneCreationMode,
 )
+from scantailor.translations import load_translation, locale_for_language
 
 _UI_FOLDER = Path(__file__).parent
 _TRANSLATIONS_FOLDER = _UI_FOLDER.parents[2] / "translations"
@@ -34,7 +35,6 @@ _THUMBNAIL_ASPECT = 16.0 / 25.0
 # Options that nothing in the application reads yet; they stay visible but cannot
 # be edited, and keep the stored value.
 _UNWIRED_WIDGETS = (
-    "languageBox",
     "blackOnWhiteDetectionCB",
     "blackOnWhiteDetectionAtOutputCB",
     "highlightDeviationCB",
@@ -213,7 +213,7 @@ class SettingsDialog(QtWidgets.QDialog):
             str(QtCore.QSettings().value(SETTINGS_KEY, AUTO)).strip().lower(),
         )
         self._select_data(self._units_box, settings.units)
-        self._select_data(self._language_box, settings.language)
+        self._select_language(settings.language)
         self._select_data(self._zone_mode_box, settings.default_zone_creation_mode)
 
         self._thumbnail_quality_sb.setValue(settings.thumbnail_quality_width)
@@ -278,9 +278,32 @@ class SettingsDialog(QtWidgets.QDialog):
         )
         self._color_scheme_box.currentIndexChanged.connect(self._preview_appearance)
 
+    def _select_language(self, language: str) -> None:
+        """Select the bundled catalogue Qt loads for the saved language setting.
+
+        Args:
+            language (str): Saved setting; a regional code such as pt_BR or the
+                system locale selects its bare language, anything else English.
+        """
+        name = locale_for_language(language).name()
+        for code in (name, name.split("_")[0], _SOURCE_LANGUAGE):
+            index = self._language_box.findData(code)
+            if index != -1:
+                self._language_box.setCurrentIndex(index)
+                return
+
+    def _apply_language(self) -> None:
+        """Translate the running application to the saved language."""
+        app = QtWidgets.QApplication.instance()
+        if isinstance(app, QtWidgets.QApplication):
+            load_translation(app, locale_for_language(self._settings.language))
+
     def _save_and_accept(self) -> None:
         """Commit the values and close the dialog."""
+        previous_language = self._settings.language
         self._save_settings()
+        if self._settings.language != previous_language:
+            self._apply_language()
         self._store_appearance()
         self._units_provider.set_units(self._settings.units)
         self.settings_changed.emit()
