@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from scantailor.__about__ import APP_NAME, __version__
 from scantailor.app.ui import UI_FOLDER, load_ui_widget
 from scantailor.app.ui.batch_runner import BatchRunner
 from scantailor.app.ui.dialogs.about import AboutDialog
@@ -121,7 +122,7 @@ from scantailor.filters.page_layout.settings import MARGIN_SIDES
 from scantailor.filters.page_split.layout_type import LayoutType
 
 PROJECT_SUFFIX = ".ScanTailor"
-APP_TITLE = "ScanTailor Advanced"
+APP_TITLE = f"{APP_NAME} - {__version__}"
 _MAIN_WINDOW_UI = UI_FOLDER / "MainWindow.ui"
 _LAST_DIR_KEY = "project/lastDir"
 _LAST_INPUT_DIR_KEY = "project/lastInputDir"
