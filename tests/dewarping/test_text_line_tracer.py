@@ -428,3 +428,37 @@ class TestRecordedWalks:
         np.testing.assert_array_equal(cells, recorded(f"walk{case}_cells"))
         assert cells.dtype == np.int64
         assert cells.shape[1] == 2
+
+
+class TestWalksAlongTheBorder:
+    """A walk on the first row skips the neighbours outside the image."""
+
+    @staticmethod
+    def _maps() -> tuple[np.ndarray, np.ndarray]:
+        height, width = 40, 120
+        mask = np.zeros((height, width), dtype=bool)
+        mask[:2] = True
+        yy, xx = np.mgrid[0:height, 0:width]
+        ridge = (((xx * 7 + yy * 5) % 23) - 11).astype(np.float32) / np.float32(4.0)
+        ridge[0] += 10
+        return tracer._squared_distance_map(mask), ridge
+
+    @pytest.mark.parametrize(("line_x", "seed"), [(5.0, (100, 0)), (115.0, (10, 1))])
+    def test_it_matches_the_walk_on_a_map_padded_with_cells_it_never_enters(
+        self, line_x: float, seed: tuple[int, int]
+    ) -> None:
+        sedm, ridge = self._maps()
+        line = np.array([[line_x, 0.0], [line_x, 40.0]])
+        pad = 2
+        # Zero distance and the lowest ridge value never win a step.
+        padded_sedm = np.pad(sedm, pad)
+        padded_ridge = np.pad(ridge, pad, constant_values=np.finfo(np.float32).min)
+
+        cells = tracer._trace_towards_line(sedm, ridge, line, *seed, 10.0)
+        padded_cells = tracer._trace_towards_line(
+            padded_sedm, padded_ridge, line + pad, seed[0] + pad, seed[1] + pad, 10.0
+        )
+
+        assert (cells[:, 1] == 0).all()
+        assert abs(int(cells[-1, 0]) - line_x) < 1
+        np.testing.assert_array_equal(cells, padded_cells - pad)

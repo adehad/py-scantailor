@@ -397,7 +397,8 @@ def _trace_towards_line(
     p1x = float(line[0, 0])
     p1y = float(line[0, 1])
     nx, ny = _normal_towards_line(line, seed_x, seed_y)
-    steps = _steps_towards(nx, ny)
+    # Each step with its offset in the flat arrays.
+    moves = [(dx, dy, dy * width + dx) for dx, dy in _steps_towards(nx, ny)]
 
     max_sqdist = math.floor(max_dist * max_dist + 0.5)
     cells: list[tuple[int, int]] = []
@@ -407,38 +408,40 @@ def _trace_towards_line(
     while not finished:
         cur_x = last_x
         cur_y = last_y
+        last_side = nx * (last_x - p1x) + ny * (last_y - p1y)
         reported = False
         while True:
+            here = cur_y * width + cur_x
+            # Away from the border every neighbour is inside the grid.
+            inside = 0 < cur_x < width - 1 and 0 < cur_y < height - 1
             best_dm = None
             best_pm = None
             best_sqd = 0
             best_prob = -_FLOAT_MAX
-            for step in steps:
-                x = cur_x + step[0]
-                y = cur_y + step[1]
-                if x < 0 or y < 0 or x >= width or y >= height:
+            for move in moves:
+                dx, dy, offset = move
+                if not inside and not (
+                    0 <= cur_x + dx < width and 0 <= cur_y + dy < height
+                ):
                     continue
-                index = y * width + x
-                sqd = distance_at[index]
+                sqd = distance_at[here + offset]
                 if sqd > best_sqd:
                     best_sqd = sqd
-                    best_dm = step
-                probability = ridge_at[index]
+                    best_dm = move
+                probability = ridge_at[here + offset]
                 if probability > best_prob:
                     best_prob = probability
-                    best_pm = step
+                    best_pm = move
             if best_dm is None or best_pm is None:
                 finished = True
                 break
             best = best_pm
             # A neighbour deeper in the mask than this cell wins over the ridge.
-            if best_sqd > distance_at[cur_y * width + cur_x]:
+            if best_sqd > distance_at[here]:
                 best = best_dm
             new_x = cur_x + best[0]
             new_y = cur_y + best[1]
-            side1 = nx * (new_x - p1x) + ny * (new_y - p1y)
-            side2 = nx * (last_x - p1x) + ny * (last_y - p1y)
-            if side1 * side2 < 0:
+            if (nx * (new_x - p1x) + ny * (new_y - p1y)) * last_side < 0:
                 finished = True
                 break
             cur_x = new_x

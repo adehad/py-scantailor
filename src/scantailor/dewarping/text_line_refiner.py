@@ -33,8 +33,6 @@ _FLOAT_EPS = 1.1920929e-07
 _FLOAT_MAX = 3.4028235e38
 # Candidate moves of a node, in units of the current step: stay, forward, back.
 _MOVES = np.array([0.0, 1.0, -1.0])
-# Transition costs that let candidate m follow only candidate m of the node before.
-_PASS_THROUGH = np.where(np.eye(3, dtype=bool), 0.0, np.inf)
 
 FloatArray = NDArray[np.float64]
 IntArray = NDArray[np.int64]
@@ -301,8 +299,10 @@ def _node_energy(
     Opposite-signed gradient is not penalised, because an edge sometimes has to
     cross the wrong ridge on its way to the right one.
     """
-    top = grid.sample(cx - rib * nx, cy - rib * ny)
-    bottom = grid.sample(cx + rib * nx, cy + rib * ny)
+    rib_x = rib * nx
+    rib_y = rib * ny
+    top = grid.sample(cx - rib_x, cy - rib_y)
+    bottom = grid.sample(cx + rib_x, cy + rib_y)
     top_energy = _TOP_EXTERNAL_WEIGHT * np.minimum(top, 0.0)
     bottom_energy = _BOTTOM_EXTERNAL_WEIGHT * np.maximum(bottom, 0.0)
     return top_energy - bottom_energy
@@ -493,95 +493,89 @@ def _tangent_movement(
         cy[rows, last, None],
         avg,
     )
-    # Elasticity of node k's candidate m after node k - 1's candidate p, at
-    # [:, k, m, p].
-    transition = np.zeros((*xs.shape, 3))
-    transition[:, 1:] = _elasticity_energy(
+    # Elasticity of the segment from candidate p of node k - 1 to candidate m
+    # of node k, at [:, k - 1, m, p].
+    elasticity = _elasticity_energy(
         xs[:, 1:, :, None],
         ys[:, 1:, :, None],
         xs[:, :-1, None, :],
         ys[:, :-1, None, :],
         avg[:, :, None, None],
     )
-    _pass_through_after(final, base, transition)
     # The first inner node's only predecessor is the fixed first node.
-    cost = base[:, 1] + _elasticity_energy(
+    first_cost = base[:, 1] + _elasticity_energy(
         xs[:, 1], ys[:, 1], cx[:, :1], cy[:, :1], avg
     )
-    choices = _identity_choices(xs.shape)
+    programme = _Programme(first_cost, 1, xs.shape)
     for k in range(2, xs.shape[1]):
-        cost = _dp_step(
-            base[:, k, :, None] + cost[:, None, :] + transition[:, k], choices, k
-        )
-    path = _best_path(choices, np.argmin(cost, axis=1), 1)
+        programme.extend(base[:, k], elasticity[:, k - 1])
+    path = programme.best_paths(final)
     return _move_along_path(cx, cy, xs, ys, path, 1, final, moving)
 
 
-def _pass_through_after(
-    final: IntArray, base: FloatArray, transition: FloatArray
-) -> None:
-    """Make the nodes after each snake's final node carry its paths unchanged.
+class _Programme:
+    """Cheapest paths through the three candidates of successive nodes.
 
-    Such a node costs nothing, and its candidate ``m`` can only follow the
-    previous node's candidate ``m``, so every path keeps its cost and the
-    best one can be read back from the last node of the batch.
-
-    Args:
-        final (numpy.ndarray of numpy.int64): Final node of each snake's path.
-        base (numpy.ndarray of numpy.float64): Node energies, ``(s, n, 3)``,
-            changed in place.
-        transition (numpy.ndarray of numpy.float64): Transition costs into each
-            node, ``(s, n, 3, 3)``, changed in place.
+    All snakes advance one node at a time. Nodes past a snake's own final node
+    are scored too, but its path is read back from its final node.
     """
-    after = np.arange(base.shape[1]) > final[:, None]
-    base[after] = 0.0
-    transition[after] = _PASS_THROUGH
 
+    def __init__(self, cost: FloatArray, node: int, shape: tuple[int, ...]) -> None:
+        """Start the paths at one node.
 
-def _identity_choices(shape: tuple[int, ...]) -> IntArray:
-    """Choices that map each candidate to the same candidate of the node before."""
-    return np.broadcast_to(np.arange(shape[-1]), shape).copy()
+        Args:
+            cost (numpy.ndarray of numpy.float64): Cost of each candidate of
+                the starting node, shape ``(s, 3)``.
+            node (int): The starting node.
+            shape (tuple[int, ...]): Snakes, nodes and candidates, ``(s, n, 3)``.
+        """
+        snakes, nodes, candidates = shape
+        self.first = node
+        self.node = node
+        # Node first, so that each step writes one contiguous block.
+        self.costs = np.zeros((nodes, snakes, candidates))
+        self.costs[node] = cost
+        # choices[k, :, m] is the candidate of node k - 1 on the cheapest path
+        # to candidate m of node k.
+        self.choices = np.zeros((nodes, snakes, candidates), dtype=np.int64)
 
+    def extend(self, base: FloatArray, transition: FloatArray) -> None:
+        """Add the next node; the first of equally cheap predecessors wins.
 
-def _dp_step(candidates: FloatArray, choices: IntArray, node: int) -> FloatArray:
-    """One step of the dynamic programme for all snakes.
+        Args:
+            base (numpy.ndarray of numpy.float64): Cost of each candidate m of
+                the new node, shape ``(s, 3)``.
+            transition (numpy.ndarray of numpy.float64): Extra cost of
+                candidate m after candidate p of the node before, at
+                ``[:, m, p]``.
+        """
+        total = base[:, :, None] + self.costs[self.node, :, None, :]
+        total += transition
+        self.node += 1
+        total.argmin(axis=2, out=self.choices[self.node])
+        np.minimum.reduce(total, axis=2, out=self.costs[self.node])
 
-    Args:
-        candidates (numpy.ndarray of numpy.float64): Path cost of each candidate
-            ``m`` of the node through each candidate ``p`` of the previous one,
-            shape ``(s, 3, p)``.
-        choices (numpy.ndarray of numpy.int64): ``choices[:, node]`` receives the
-            best ``p`` for each ``m``; the first of equal costs wins.
-        node (int): The node.
+    def best_paths(self, final: IntArray) -> IntArray:
+        """Candidate of every node on each snake's cheapest path to its final node.
 
-    Returns:
-        numpy.ndarray of numpy.float64: Path costs at this node.
-    """
-    choices[:, node] = np.argmin(candidates, axis=2)
-    return candidates.min(axis=2)
+        Args:
+            final (numpy.ndarray of numpy.int64): Each snake's final node.
 
-
-def _best_path(choices: IntArray, pick: IntArray, first: int) -> IntArray:
-    """Candidate of every node on the best paths, read back from the last node.
-
-    Args:
-        choices (numpy.ndarray of numpy.int64): ``choices[:, k, m]`` is the
-            candidate of node k - 1 on the best path to candidate m of node k.
-        pick (numpy.ndarray of numpy.int64): Candidate at the last node.
-        first (int): First node the paths cover.
-
-    Returns:
-        numpy.ndarray of numpy.int64: Candidate per node, shape ``(s, n)``;
-            zero before ``first``.
-    """
-    snakes, nodes, options = choices.shape
-    flat = choices.ravel()
-    offsets = np.arange(snakes) * (nodes * options)
-    path = np.zeros((snakes, nodes), dtype=np.int64)
-    for k in range(nodes - 1, first - 1, -1):
-        path[:, k] = pick
-        pick = flat[offsets + k * options + pick]
-    return path
+        Returns:
+            numpy.ndarray of numpy.int64: Candidate per node, shape ``(s, n)``;
+                zero outside the first to the final node.
+        """
+        rows = np.arange(len(final))
+        picks = self.costs[final, rows].argmin(axis=1).tolist()
+        choices = self.choices.tolist()
+        paths = np.zeros((len(final), self.costs.shape[0]), dtype=np.int64)
+        for row, (pick, end) in enumerate(zip(picks, final.tolist(), strict=True)):
+            path = [0] * (end + 1)
+            for k in range(end, self.first - 1, -1):
+                path[k] = pick
+                pick = choices[k][row][pick]
+            paths[row, : end + 1] = path
+        return paths
 
 
 def _move_along_path(
@@ -643,30 +637,23 @@ def _normal_movement(
     # Bending at node k - 1 for candidates m of node k, p of node k - 1 and b of
     # node k - 2, at [:, k, m, p, b].
     bending = _bending_energies(xs, ys)
-    after = np.arange(cx.shape[1]) > last[:, None]
-    base[after] = 0.0
-    bending[after] = _PASS_THROUGH[:, :, None]
     # Paths through the first two nodes, numbered 3 * a + b for candidates a, b.
     pair_cost = (base[:, 0, :, None] + base[:, 1, None, :]).reshape(-1, 1, 9)
     pair_bending = bending[:, 2].transpose(0, 1, 3, 2).reshape(-1, 3, 9)
     candidates = base[:, 2, :, None] + pair_cost + pair_bending
     pair_choice = np.argmin(candidates, axis=2)
-    cost = candidates.min(axis=2)
-    choices = _identity_choices(xs.shape)
-    choices[:, 2] = pair_choice % 3
-    # The bending into node k reads, for each candidate p of node k - 1, the
-    # candidate b of node k - 2 on the best path to p.
-    flat_bending = bending.reshape(-1)
-    stride = bending.strides[1] // bending.itemsize
-    offsets = np.arange(cx.shape[0])[:, None, None] * (cx.shape[1] * stride) + (
-        np.arange(3)[None, :, None] * 9 + np.arange(3)[None, None, :] * 3
-    )
+    programme = _Programme(candidates.min(axis=2), 2, xs.shape)
+    programme.choices[2] = pair_choice % 3
+    # With these, bending[snake, k, m, p, b] has shape (s, 3, 3) and holds the
+    # bending of every snake for every m and p, b varying with snake and p.
+    snake = rows[:, None, None]
+    m = np.arange(3)[None, :, None]
+    p = np.arange(3)[None, None, :]
     for k in range(3, cx.shape[1]):
-        before = choices[:, k - 1]
-        bend = flat_bending[offsets + k * stride + before[:, None, :]]
-        cost = _dp_step(base[:, k, :, None] + cost[:, None, :] + bend, choices, k)
+        b = programme.choices[k - 1, :, None, :]
+        programme.extend(base[:, k], bending[snake, k, m, p, b])
 
-    path = _best_path(choices, np.argmin(cost, axis=1), 2)
+    path = programme.best_paths(last)
     pair = pair_choice[rows, path[:, 2]]
     path[:, 0] = pair // 3
     path[:, 1] = pair % 3
