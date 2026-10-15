@@ -271,62 +271,96 @@ def _band_pairs(
     top = max(0, first_row - halo)
     window = nodes[top : min(nodes.shape[0], stop_row + halo + 1)]
     ink = window >= 0
-    sources = ink & claims[window]
+    sources = ink if claims.all() else ink & claims[window]
     if not sources.any():
         empty = np.empty(0, dtype=np.int64)
         return empty, empty, empty
 
     # Stretching rows makes the Euclidean transform use the scaled metric. Row
     # r of the stretched grid shows row r // scale of the image.
-    stretched = np.repeat(np.where(sources, 0, 255).astype(np.uint8), scale, 0)
+    stretched = np.repeat(np.where(sources, np.uint8(0), np.uint8(255)), scale, 0)
     _, label_image = cv2.distanceTransformWithLabels(
         stretched, cv2.DIST_L2, 3, labelType=cv2.DIST_LABEL_PIXEL
     )
-    cells: NDArray[np.int32] = np.asarray(label_image, dtype=np.int32)
+    # Only the first stretched copy of each image row is looked at, so the
+    # neighbours compared are the 4-connected pixels of the image.
+    cells: NDArray[np.int32] = np.asarray(label_image, dtype=np.int32)[::scale]
+    source_flat, source_node = _sources_by_label(window, sources, scale)
 
-    source_y, source_x = np.nonzero(sources)
-    stretched_y = (source_y * scale)[:, None] + np.arange(scale)
-    cell_ids = cells[stretched_y, source_x[:, None]].reshape(-1)
-    table_x = np.zeros(cell_ids.max() + 1, dtype=np.int32)
-    table_y = np.zeros_like(table_x)
-    table_node = np.full_like(table_x, -1)
-    table_x[cell_ids] = np.repeat(source_x, scale)
-    table_y[cell_ids] = np.repeat(source_y, scale)
-    table_node[cell_ids] = np.repeat(window[source_y, source_x], scale)
-
-    own = ink & ~sources if rest_is_fixed else np.zeros(window.shape, dtype=bool)
     lo, hi, sq_dist = _border_pairs(
         cells,
-        scale,
-        table_x,
-        table_y,
-        table_node,
+        source_flat,
+        source_node,
         window,
-        own,
+        ink & ~sources if rest_is_fixed else None,
         first_row - top,
         stop_row - top,
     )
     return _min_per_pair(lo, hi, sq_dist, claims.size)
 
 
+def _sources_by_label(
+    nodes: NDArray[np.int32],
+    sources: NDArray[np.bool_],
+    scale: int,
+) -> tuple[NDArray[np.int64], NDArray[np.int32]]:
+    """List the source pixel behind every label of the stretched transform.
+
+    OpenCV numbers the zero pixels of a ``DIST_LABEL_PIXEL`` transform from 1 in
+    row-major order. The stretched image repeats each image row ``scale`` times,
+    so in label order the sources of each row come ``scale`` times in a row.
+
+    Args:
+        nodes (NDArray[np.int32]): Node id per pixel of the unstretched image.
+        sources (NDArray[np.bool_]): Pixels that were zero before stretching.
+        scale (int): Number of stretched rows per image row.
+
+    Returns:
+        tuple: ``(flat, node)`` indexed by label: the flat index into ``nodes``
+            of the label's source pixel and that pixel's node. Entry 0 is unused.
+    """
+    flat = np.flatnonzero(sources)
+    node = nodes.reshape(-1)[flat]
+    row_counts = np.count_nonzero(sources, axis=1)
+    row_ends = np.cumsum(row_counts)
+    row_starts = row_ends - row_counts
+    rows_in_label_order = [
+        slice(start, end)
+        for start, end in zip(row_starts, row_ends, strict=True)
+        for _ in range(scale)
+    ]
+    return (
+        np.concatenate([[0], *(flat[row] for row in rows_in_label_order)]),
+        np.concatenate([[-1], *(node[row] for row in rows_in_label_order)]),
+    )
+
+
 def _border_pairs(
     cells: NDArray[np.int32],
-    scale: int,
-    table_x: NDArray[np.int32],
-    table_y: NDArray[np.int32],
-    table_node: NDArray[np.int32],
+    source_flat: NDArray[np.int64],
+    source_node: NDArray[np.int32],
     nodes: NDArray[np.int32],
-    own: NDArray[np.bool_],
+    own: NDArray[np.bool_] | None,
     row_start: int,
     row_stop: int,
 ) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
     """List the squared source distance at every border between two components.
 
-    Only the first of the stretched rows that show an image row is looked at, so
-    the neighbours compared are the 4-connected pixels of the image. A pixel in
-    ``own`` belongs to its own node and is its own source; any other pixel
-    belongs to the source of its cell. A pixel is compared with its left and its
-    upper neighbour, for the rows ``row_start`` to ``row_stop`` exclusive.
+    A pixel in ``own`` belongs to its own node and is its own source; any other
+    pixel belongs to the source of its cell. A pixel is compared with its left
+    and its upper neighbour, for the rows ``row_start`` to ``row_stop``
+    exclusive. Every pixel has a node, because every cell has a source.
+
+    Args:
+        cells (NDArray[np.int32]): Distance label of every pixel.
+        source_flat (NDArray[np.int64]): Flat index into ``nodes`` of the
+            source of each label.
+        source_node (NDArray[np.int32]): Node of the source of each label.
+        nodes (NDArray[np.int32]): Node id per pixel, -1 for background.
+        own (NDArray[np.bool_] | None): Pixels that are their own source, or
+            None for none.
+        row_start (int): First row whose pixels are compared.
+        row_stop (int): Row after the last row whose pixels are compared.
 
     Returns:
         tuple: Parallel arrays of the lower node, the higher node and the squared
@@ -334,65 +368,52 @@ def _border_pairs(
             particular order.
     """
     first = max(row_start - 1, 0)
-    rows = slice(first, row_stop)
-    cell = cells[first * scale : row_stop * scale : scale]
-    own_rows = own[rows]
-    node = np.where(own_rows, nodes[rows], table_node[cell])
-    source_x = np.where(
-        own_rows, np.arange(cell.shape[1], dtype=np.int32), table_x[cell]
-    )
-    source_y = np.where(
-        own_rows,
-        np.arange(first, row_stop, dtype=np.int32)[:, None],
-        table_y[cell],
-    )
+    cell = cells[first:row_stop]
+    node = source_node[cell]
+    own_rows = None if own is None else own[first:row_stop]
+    if own_rows is not None:
+        np.copyto(node, nodes[first:row_stop], where=own_rows)
+    width = nodes.shape[1]
+
+    def source_of(
+        pixels: tuple[NDArray[np.intp], NDArray[np.intp]],
+    ) -> NDArray[np.int64]:
+        flat = source_flat[cell[pixels]]
+        if own_rows is None:
+            return flat
+        rows, cols = pixels
+        return np.where(own_rows[pixels], (rows + first) * width + cols, flat)
+
+    def pairs_between(
+        a: tuple[NDArray[np.intp], NDArray[np.intp]],
+        b: tuple[NDArray[np.intp], NDArray[np.intp]],
+    ) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
+        node_a = node[a].astype(np.int64)
+        node_b = node[b].astype(np.int64)
+        y_a, x_a = np.divmod(source_of(a), width)
+        y_b, x_b = np.divmod(source_of(b), width)
+        dx = x_a - x_b
+        dy = y_a - y_b
+        return np.minimum(node_a, node_b), np.maximum(node_a, node_b), dx * dx + dy * dy
+
     # The upper row is context only when the band does not start at the top.
     own_first = row_start - first
-    pairs = [
-        _pairs_between(
-            (node[own_first:, 1:], node[own_first:, :-1]),
-            (source_x[own_first:, 1:], source_x[own_first:, :-1]),
-            (source_y[own_first:, 1:], source_y[own_first:, :-1]),
-        ),
-        _pairs_between(
-            (node[1:], node[:-1]),
-            (source_x[1:], source_x[:-1]),
-            (source_y[1:], source_y[:-1]),
-        ),
-    ]
+    rows, cols = _true_pixels(node[own_first:, 1:] != node[own_first:, :-1])
+    rows += own_first
+    left = pairs_between((rows, cols + 1), (rows, cols))
+    rows, cols = _true_pixels(node[1:] != node[:-1])
+    up = pairs_between((rows + 1, cols), (rows, cols))
     return (
-        np.concatenate([pair[0] for pair in pairs]),
-        np.concatenate([pair[1] for pair in pairs]),
-        np.concatenate([pair[2] for pair in pairs]),
+        np.concatenate([left[0], up[0]]),
+        np.concatenate([left[1], up[1]]),
+        np.concatenate([left[2], up[2]]),
     )
 
 
-def _pairs_between(
-    node: tuple[NDArray[np.int32], NDArray[np.int32]],
-    source_x: tuple[NDArray[np.int32], NDArray[np.int32]],
-    source_y: tuple[NDArray[np.int32], NDArray[np.int32]],
-) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
-    """Border pairs between two aligned pixel grids, such as a grid and its shift.
-
-    Args:
-        node (tuple[NDArray[np.int32], NDArray[np.int32]]): Node of every pixel
-            of the two grids, -1 for none.
-        source_x (tuple[NDArray[np.int32], NDArray[np.int32]]): Column of the
-            source pixel of every pixel of the two grids.
-        source_y (tuple[NDArray[np.int32], NDArray[np.int32]]): Row of the
-            source pixel of every pixel of the two grids.
-
-    Returns:
-        tuple: Lower node, higher node and squared source distance of every
-            pixel pair whose two nodes differ and are both components.
-    """
-    a, b = node
-    border = (a != b) & (a >= 0) & (b >= 0)
-    node_a = a[border].astype(np.int64)
-    node_b = b[border].astype(np.int64)
-    dx = source_x[0][border].astype(np.int64) - source_x[1][border]
-    dy = source_y[0][border].astype(np.int64) - source_y[1][border]
-    return np.minimum(node_a, node_b), np.maximum(node_a, node_b), dx * dx + dy * dy
+def _true_pixels(mask: NDArray[np.bool_]) -> tuple[NDArray[np.intp], ...]:
+    """Return ``np.nonzero(mask)``, faster for a sparse 2-D mask."""
+    # np.nonzero on a 2-D mask costs about ten times more than on a flat one.
+    return np.unravel_index(np.flatnonzero(mask), mask.shape)
 
 
 def _min_per_pair(
