@@ -13,7 +13,7 @@ from scantailor.dewarping.spline_fit import (
     HEAD_SAMPLE,
     JUNCTION_SAMPLE,
     TAIL_SAMPLE,
-    _point_and_derivs,
+    _points_and_derivs,
     control_points_attraction_force,
     fit_extended_spline,
     junction_points_attraction_force,
@@ -23,6 +23,7 @@ from scantailor.dewarping.spline_fit import (
     spline_point_at,
 )
 from scantailor.math.spline import XSpline
+from tests.dewarping.kernel_reference import recorded
 
 TENSIONS = np.array([1.0, -1.0, 0.3, -0.5, 1.0, 0.0])
 
@@ -54,7 +55,7 @@ class TestEvaluation:
 
         first = (point(t + step) - point(t - step)) / (2 * step)
         second = (point(t + step) - 2 * point(t) + point(t - step)) / step**2
-        derivs = _point_and_derivs(positions, tensions, t)
+        derivs = _points_and_derivs(positions, tensions, np.array([t]))[0]
 
         assert derivs[2:4] == pytest.approx(first, abs=1e-4)
         assert derivs[4:] == pytest.approx(second, abs=1e-2)
@@ -320,3 +321,46 @@ class TestFittingAnExtendedSpline:
 
         assert first is not None and second is not None
         np.testing.assert_array_equal(first.positions, second.positions)
+
+
+class TestRecordedOutputs:
+    """Fits of traced lines and spline samples come out as recorded."""
+
+    @pytest.mark.parametrize("case", range(10))
+    def test_fitted_control_points_and_their_polyline_match_the_recording(
+        self, case: int
+    ) -> None:
+        bounds = recorded(f"fit{case}_bounds")
+
+        spline = fit_extended_spline(
+            recorded(f"fit{case}_polyline"), bounds[0], bounds[1]
+        )
+
+        assert spline is not None
+        np.testing.assert_array_equal(
+            spline.positions, recorded(f"fit{case}_positions")
+        )
+        np.testing.assert_array_equal(
+            spline.to_polyline(), recorded(f"fit{case}_polyline_out")
+        )
+
+    @pytest.mark.parametrize(
+        ("spline", "limits"),
+        [(spline, limits) for spline in range(6) for limits in range(3)],
+    )
+    def test_samples_match_the_recording(self, spline: int, limits: int) -> None:
+        max_dist, max_between = [(0.2, np.inf), (0.2, 10.0), (1.5, 25.0)][limits]
+
+        ts, points, flags = sample_spline(
+            recorded(f"spline{spline}_positions"),
+            recorded(f"spline{spline}_tensions"),
+            max_dist,
+            max_between,
+        )
+
+        np.testing.assert_array_equal(ts, recorded(f"spline{spline}_{limits}_t"))
+        np.testing.assert_array_equal(
+            points, recorded(f"spline{spline}_{limits}_points")
+        )
+        np.testing.assert_array_equal(flags, recorded(f"spline{spline}_{limits}_flags"))
+        assert flags.dtype == np.int64

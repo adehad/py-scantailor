@@ -5,6 +5,8 @@ Reference values marked "C++" come from compiling the upstream sources of
 with g++ 12 and running them on the same gradient.
 """
 
+import heapq
+
 import cv2
 import numpy as np
 import pytest
@@ -15,6 +17,7 @@ from scantailor.dewarping.line_geometry import grid_line_cells
 from scantailor.dewarping.text_line_tracer import trace_text_lines
 from scantailor.dewarping.top_bottom_edge_tracer import trace_top_bottom_edges
 from tests.dewarping.book_pages import BentPage, bent_book_page, justified_text_page
+from tests.dewarping.kernel_reference import formula_grid, recorded
 
 CONTENT = (160, 200, 890, 1090)
 
@@ -234,3 +237,128 @@ class TestAgainstCpp:
         np.testing.assert_allclose(ridge[0], [179.5, 36.0], atol=1e-3)
         np.testing.assert_allclose(ridge[5], [104.5, 39.5], atol=1e-3)
         np.testing.assert_allclose(ridge[-1], [44.5, 36.0], atol=1e-3)
+
+
+_UNREACHED = np.float32(3.4028235e38)
+
+
+def _priority_queue_search(
+    deriv: np.ndarray, starts: list[tuple[int, int]], direction: tuple[float, float]
+) -> np.ndarray:
+    """Minimax path costs from a textbook priority queue search, with padding."""
+    height, width = deriv.shape
+    step = np.float32(1.0) - np.abs(deriv)
+    cost = np.full((height, width), _UNREACHED, dtype=np.float32)
+    dx, dy = float(np.float32(direction[0])), float(np.float32(direction[1]))
+    moves = [
+        (vx, vy)
+        for vx, vy in edges._NEIGHBOUR_VECTORS.tolist()
+        if vx * dx + vy * dy > 0
+    ]
+    queue = []
+    for x, y in starts:
+        cost[y, x] = 0.0
+        heapq.heappush(queue, (0.0, y, x))
+    while queue:
+        value, y, x = heapq.heappop(queue)
+        if value > cost[y, x]:
+            continue
+        leaving = max(cost[y, x], step[y, x])
+        for vx, vy in moves:
+            ny, nx = y + vy, x + vx
+            if 0 <= ny < height and 0 <= nx < width and leaving < cost[ny, nx]:
+                cost[ny, nx] = leaving
+                heapq.heappush(queue, (float(leaving), ny, nx))
+    padded = np.full((height + 2, width + 2), -1.0, dtype=np.float32)
+    padded[1:-1, 1:-1] = cost
+    return padded
+
+
+class TestShortestPathsAgainstAPriorityQueueSearch:
+    """The sweep gives a priority queue search's costs, and valid back-pointers."""
+
+    @pytest.mark.parametrize(
+        "direction",
+        [
+            (1.0, 0.0),
+            (0.0, 1.0),
+            (-1.0, 0.0),
+            (0.0, -1.0),
+            (0.7071, 0.7071),
+            (-0.6, 0.8),
+            (0.3, -0.95),
+            (-0.99, -0.1),
+            (0.999, 0.04),
+            (0.0, 0.0),
+        ],
+    )
+    def test_costs_are_equal_and_every_cell_points_to_a_neighbour_offering_its_cost(
+        self, direction: tuple[float, float]
+    ) -> None:
+        rng = np.random.default_rng(11)
+        # Coarse levels make many paths tie.
+        deriv = (rng.integers(-10, 11, (37, 53)) / 10).astype(np.float32)
+        starts = sorted(
+            {(int(x), int(y)) for x, y in rng.integers(0, (53, 37), (12, 2))}
+        )
+
+        cost, previous = edges._propagate_shortest_paths(deriv, starts, direction)
+
+        np.testing.assert_array_equal(
+            cost, _priority_queue_search(deriv, starts, direction)
+        )
+        step = np.zeros_like(cost)
+        step[1:-1, 1:-1] = np.float32(1.0) - np.abs(deriv)
+        leaving = np.maximum(cost, step)
+        ys, xs = np.nonzero(previous >= 0)
+        vectors = edges._NEIGHBOUR_VECTORS[previous[ys, xs]]
+        np.testing.assert_array_equal(
+            leaving[ys + vectors[:, 1], xs + vectors[:, 0]], cost[ys, xs]
+        )
+        # The step from that neighbour leads the path's way.
+        assert np.all(-vectors[:, 0] * direction[0] - vectors[:, 1] * direction[1] > 0)
+        reached = (cost >= 0) & (cost < _UNREACHED)
+        start_cells = np.zeros_like(reached)
+        for x, y in starts:
+            start_cells[y + 1, x + 1] = True
+        np.testing.assert_array_equal(previous >= 0, reached & ~start_cells)
+
+
+class TestRecordedSnakes:
+    """Snakes on a formula grid move as recorded."""
+
+    @pytest.mark.parametrize("case", range(5))
+    def test_a_snake_moves_as_recorded(self, case: int) -> None:
+        grid = np.abs(formula_grid(160, 260, 19, 29))
+
+        moved = edges._run_snake(
+            recorded(f"edge{case}_snake"),
+            grid,
+            tuple(recorded(f"edge{case}_direction").tolist()),
+            bool(recorded(f"edge{case}_uphill")),
+        )
+
+        np.testing.assert_array_equal(moved, recorded(f"edge{case}_out"))
+
+    def test_a_snake_on_flat_ground_moves_as_recorded(self) -> None:
+        flat = np.zeros((80, 200), dtype=np.float32)
+        flat[40:, :] = 0.5
+
+        moved = edges._run_snake(recorded("flat_snake"), flat, (0.0, 1.0), False)
+
+        np.testing.assert_array_equal(moved, recorded("flat_out"))
+
+    @pytest.mark.parametrize("uphill", [False, True])
+    def test_snakes_moved_together_move_as_they_do_alone(self, uphill: bool) -> None:
+        grid = np.abs(formula_grid(160, 260, 19, 29))
+        snakes = [recorded(f"edge{case}_snake") for case in range(5)]
+        directions = [
+            tuple(recorded(f"edge{case}_direction").tolist()) for case in range(5)
+        ]
+
+        together = edges._run_snakes(snakes, grid, directions, uphill)
+
+        for snake, direction, moved in zip(snakes, directions, together, strict=True):
+            np.testing.assert_array_equal(
+                moved, edges._run_snake(snake, grid, direction, uphill)
+            )

@@ -9,13 +9,18 @@ which is simpler and leverages optimized implementations.
 """
 
 from enum import Enum
+from typing import NamedTuple
 
 import cv2
 import numpy as np
-from numba import njit
 from numpy.typing import NDArray
 
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
+
+# Rows of the maps computed at once: few enough that the float64 scratch arrays
+# stay in cache, many enough that the per-band overhead is small.
+_MAP_BAND_ROWS = 32
+_DEGENERATE_DENOMINATOR = 1e-10
 
 
 class InterpolationMethod(Enum):
@@ -262,62 +267,119 @@ def _compute_dewarp_maps(
     generatrices = dewarper.map_generatrices(
         left + (np.arange(dst_width) + 0.5) * x_scale
     )
-    starts = generatrices.start
     directions = generatrices.end - generatrices.start
     homographies = generatrices.pln2img_1d
-
-    columns = np.ascontiguousarray(
-        np.column_stack(
-            [
-                starts[:, 0],
-                starts[:, 1],
+    columns = _GeneratrixColumns(
+        *(
+            np.ascontiguousarray(values)
+            for values in (
+                generatrices.start[:, 0],
+                generatrices.start[:, 1],
                 directions[:, 0],
                 directions[:, 1],
                 homographies[:, 0, 0],
                 homographies[:, 0, 1],
                 homographies[:, 1, 0],
                 homographies[:, 1, 1],
-            ]
-        ).T,
-        dtype=np.float64,
+            )
+        )
     )
+    model_ys = np.asarray(
+        top + (np.arange(dst_height) + 0.5) * y_scale, dtype=np.float64
+    )
+
     map_x = np.empty((dst_height, dst_width), dtype=np.float32)
     map_y = np.empty((dst_height, dst_width), dtype=np.float32)
-    _fill_maps(columns, top, y_scale, np.float32(shift), map_x, map_y)
+    buffers = tuple(np.empty((_MAP_BAND_ROWS, dst_width)) for _ in range(3))
+    for band_start in range(0, dst_height, _MAP_BAND_ROWS):
+        band = slice(band_start, min(band_start + _MAP_BAND_ROWS, dst_height))
+        _fill_map_band(
+            columns,
+            model_ys[band, None],
+            np.float32(shift),
+            map_x[band],
+            map_y[band],
+            buffers,
+        )
     return map_x, map_y
 
 
-@njit(cache=True)
-def _fill_maps(
-    columns: NDArray[np.float64],
-    top: float,
-    y_scale: float,
+class _GeneratrixColumns(NamedTuple):
+    """Per-column constants of the generatrices, one value per output column.
+
+    Attributes:
+        start_x (numpy.ndarray of numpy.float64): Generatrix start x.
+        start_y (numpy.ndarray of numpy.float64): Generatrix start y.
+        dir_x (numpy.ndarray of numpy.float64): Generatrix direction x.
+        dir_y (numpy.ndarray of numpy.float64): Generatrix direction y.
+        h00 (numpy.ndarray of numpy.float64): 1-D homography, numerator slope.
+        h01 (numpy.ndarray of numpy.float64): 1-D homography, numerator offset.
+        h10 (numpy.ndarray of numpy.float64): 1-D homography, denominator slope.
+        h11 (numpy.ndarray of numpy.float64): 1-D homography, denominator offset.
+    """
+
+    start_x: NDArray[np.float64]
+    start_y: NDArray[np.float64]
+    dir_x: NDArray[np.float64]
+    dir_y: NDArray[np.float64]
+    h00: NDArray[np.float64]
+    h01: NDArray[np.float64]
+    h10: NDArray[np.float64]
+    h11: NDArray[np.float64]
+
+
+def _fill_map_band(
+    columns: _GeneratrixColumns,
+    model_y: NDArray[np.float64],
     shift: np.float32,
     map_x: NDArray[np.float32],
     map_y: NDArray[np.float32],
+    buffers: tuple[NDArray[np.float64], ...],
 ) -> None:
-    """Fill the maps row by row from the per-column generatrix constants.
+    """Fill a band of rows of both maps in place.
 
-    ``columns`` rows are the generatrix start x and y, its direction x and y
-    and the four entries of its 1-D homography. A degenerate homography
-    (denominator near zero) maps to the middle of the generatrix.
+    Each output pixel's model y goes through its column's 1-D homography to a
+    position along the generatrix; a degenerate homography (denominator near
+    zero) maps to the middle of the generatrix.
+
+    Args:
+        columns (_GeneratrixColumns): Per-column generatrix constants.
+        model_y (numpy.ndarray of numpy.float64): Model y of each row of the
+            band, shape ``(rows, 1)``.
+        shift (numpy.float32): Subtracted from every coordinate after its
+            conversion to float32.
+        map_x (numpy.ndarray of numpy.float32): Band of the x map, written.
+        map_y (numpy.ndarray of numpy.float32): Band of the y map, written.
+        buffers (tuple[numpy.ndarray of numpy.float64, ...]): Three scratch
+            arrays of at least the band's shape, so no band allocates.
     """
-    height, width = map_x.shape
-    for row in range(height):
-        model_y = top + (row + 0.5) * y_scale
-        for col in range(width):
-            numerator = columns[4, col] * model_y + columns[5, col]
-            denominator = columns[6, col] * model_y + columns[7, col]
-            if abs(denominator) < 1e-10:
-                along = 0.5
-            else:
-                along = numerator / denominator
-            map_x[row, col] = (
-                np.float32(columns[0, col] + along * columns[2, col]) - shift
-            )
-            map_y[row, col] = (
-                np.float32(columns[1, col] + along * columns[3, col]) - shift
-            )
+    rows = map_x.shape[0]
+    along, denominator, scratch = (buffer[:rows] for buffer in buffers)
+    np.multiply(columns.h00, model_y, out=along)
+    along += columns.h01
+    np.multiply(columns.h10, model_y, out=denominator)
+    denominator += columns.h11
+    # The denominator is monotonic down a column, so when the first and last
+    # rows of the band are clear of zero on the same side, every row is.
+    ends = denominator[[0, -1]]
+    clear = (ends > _DEGENERATE_DENOMINATOR).all(axis=0) | (
+        ends < -_DEGENERATE_DENOMINATOR
+    ).all(axis=0)
+    degenerate = None if clear.all() else np.abs(denominator) < _DEGENERATE_DENOMINATOR
+    with np.errstate(divide="ignore", invalid="ignore"):
+        np.divide(along, denominator, out=along)
+    if degenerate is not None:
+        along[degenerate] = 0.5
+
+    # Each coordinate is rounded to float32 first, then shifted in float32.
+    np.multiply(along, columns.dir_x, out=scratch)
+    scratch += columns.start_x
+    map_x[...] = scratch
+    map_x -= shift
+    np.multiply(along, columns.dir_y, out=scratch)
+    scratch += columns.start_y
+    map_y[...] = scratch
+    map_y -= shift
 
 
 def compute_dewarped_size(
