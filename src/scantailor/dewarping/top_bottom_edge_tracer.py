@@ -736,10 +736,9 @@ def _snake_round(
     num_disp = batch.displacements.shape[1]
     sx = current[:, :, 0, None] + batch.displacements[:, None, :, 0]
     sy = current[:, :, 1, None] + batch.displacements[:, None, :, 1]
-    cur_energy = _energy_at(grid, current[:, :, 0], current[:, :, 1], uphill)[
-        :, :, None
-    ]
     adjusted = _energy_at(grid, sx, sy, uphill)
+    # The first displacement stands still.
+    cur_energy = adjusted[:, :, :1]
     stay = np.zeros(sx.shape, dtype=bool)
     usable = np.broadcast_to(batch.real_displacement[:, None, :], sx.shape).copy()
     if uphill:
@@ -753,6 +752,8 @@ def _snake_round(
             & (cur_energy - adjusted[:, :, 1:] < _FLAT_ENERGY_LEVEL)
         )
     path_cost = np.where(stay, _STAY_PENALTY, 0.0) + external_weight * adjusted
+    # A candidate that may not be used costs infinity, so no path joins it.
+    own_cost = np.where(usable, path_cost, np.inf)
 
     # Terms of a move to candidate d of knot k after candidate p of knot k - 1,
     # at [:, k - 1, d, p].
@@ -766,28 +767,23 @@ def _snake_round(
     bending = _snake_bending(sx, sy, vx, vy, vec_len, close, bending_weight)
 
     fresh = num_disp
-    fallback = np.where(usable, path_cost, np.inf)
-    # bending[s, k - 1, d, p, b] sits at index[k - 1, s, d, p] + b of the flat array.
-    index = (
-        np.arange(num_snakes)[None, :, None, None] * bending[0].size
-        + np.arange(num_knots - 1)[:, None, None, None] * bending[0, 0].size
-        + np.arange(num_disp)[:, None] * bending[0, 0, 0].size
-        + np.arange(num_disp) * (num_disp + 1)
-    )
-    flat_bending = bending.ravel()
+    # With these, bending[snake, k, d, p, b] has shape (s, d, d) and holds the
+    # bending of every snake for every d and p, b varying with snake and p.
+    snake = np.arange(num_snakes)[:, None, None]
+    d = np.arange(num_disp)[None, :, None]
+    p = np.arange(num_disp)[None, None, :]
     step_costs = np.empty(sx.shape)
-    step_costs[:, 0] = fallback[:, 0]
+    step_costs[:, 0] = own_cost[:, 0]
     came_from = np.full(sx.shape, fresh, dtype=np.int64)
     for k in range(1, num_knots):
-        cost = path_cost[:, k, :, None] + step_costs[:, k - 1, None, :]
+        cost = own_cost[:, k, :, None] + step_costs[:, k - 1, None, :]
         cost += too_close[:, k - 1]
         cost += elastic[:, k - 1]
-        cost += flat_bending[index[k - 1] + came_from[:, k - 1, None, :]]
-        best = np.argmin(cost, axis=2)
-        best_cost = cost.min(axis=2)
+        cost += bending[snake, k - 1, d, p, came_from[:, k - 1, None, :]]
+        best_cost = np.minimum.reduce(cost, axis=2)
         joined = best_cost < _FLOAT32_MAX
-        came_from[:, k] = np.where(joined, best, fresh)
-        step_costs[:, k] = np.where(joined & usable[:, k], best_cost, fallback[:, k])
+        came_from[:, k] = np.where(joined, cost.argmin(axis=2), fresh)
+        step_costs[:, k] = np.where(joined, best_cost, own_cost[:, k])
     final_cost = step_costs[np.arange(num_snakes), batch.counts - 1]
     for row in range(num_snakes):
         _read_back(
