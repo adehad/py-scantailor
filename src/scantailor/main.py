@@ -2,7 +2,7 @@
 
 import pathlib
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 from .app._ui import resources_rc
 from .app.ui.MainWindow import MainWindowManager
@@ -18,6 +18,20 @@ def setup_qcore():
     QtCore.QCoreApplication.setAttribute(
         QtCore.Qt.ApplicationAttribute.AA_ShareOpenGLContexts
     )
+
+
+APP_ICON = ":/appicon.svg"
+
+
+def set_window_icon(app: QtWidgets.QApplication) -> None:
+    """Give the main window and every dialog the application icon.
+
+    Without it each title bar shows the platform's generic window icon.
+
+    Args:
+        app (QtWidgets.QApplication): Application whose windows get the icon.
+    """
+    app.setWindowIcon(QtGui.QIcon(APP_ICON))
 
 
 def install_saved_language(
@@ -41,6 +55,7 @@ def main() -> int:
     setup_qcore()
     app = QtWidgets.QApplication([])
     apply_theme(app)
+    set_window_icon(app)
     install_saved_language(app)
     main_window = MainWindowManager()
     main_window.show()
