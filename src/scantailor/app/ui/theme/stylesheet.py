@@ -124,7 +124,7 @@ QDockWidget::close-button:hover, QDockWidget::float-button:hover {{
 QDockWidget::title {{
     background: transparent; padding: 8px 12px; text-align: left;
 }}
-QWidget#dockWidgetContents, QWidget#dockWidgetContents_2,
+QWidget#dockWidgetContents_5, QWidget#dockWidgetContents_2,
 QScrollArea > QWidget > QWidget {{ background: transparent; }}
 QMainWindow::separator {{ background: transparent; width: 8px; height: 8px; }}
 
@@ -137,6 +137,8 @@ QGroupBox {{
     padding: {SPACE_XS + header + SPACE_S}px {SPACE_M}px {SPACE_M}px {SPACE_M}px;
     font-weight: {SEMIBOLD};
 }}
+QGroupBox[untitled="true"] {{ padding-top: {SPACE_M}px; }}
+QGroupBox QGroupBox[untitled="true"] {{ padding-top: 0; }}
 QGroupBox::title {{
     subcontrol-origin: padding; subcontrol-position: top left;
     left: {SPACE_M}px; top: {SPACE_XS + (header - line) // 2}px; padding: 0;

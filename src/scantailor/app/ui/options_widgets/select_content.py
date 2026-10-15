@@ -79,6 +79,7 @@ class OptionsWidget(QWidget):
 
         # Outer groupbox (no title, just groups content)
         outer_group = QGroupBox(self)
+        outer_group.setProperty("untitled", True)
         outer_layout = QVBoxLayout(outer_group)
 
         # Page Box group
