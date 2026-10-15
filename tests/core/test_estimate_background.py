@@ -296,7 +296,6 @@ class TestMatchesTheDirectEvaluation:
 class TestSpeed:
     def test_normalising_is_faster_than_rendering_the_whole_surface(self):
         page = _noisy_page(3500, 2500, seed=1)
-        normalize_illumination_gray(page[:64, :64])  # compile
 
         timings = {}
         for name, run in (

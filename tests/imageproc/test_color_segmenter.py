@@ -1,5 +1,8 @@
 """Tests for colour segmentation of binarised ink."""
 
+from collections import deque
+
+import cv2
 import numpy as np
 import pytest
 
@@ -173,3 +176,62 @@ class TestThresholds:
 
         assert tuple(plain[20, 30]) != tuple(plain[20, 90])
         assert tuple(merged[20, 30]) == tuple(merged[20, 90])
+
+
+def _spread_one_pixel_at_a_time(labels: np.ndarray, ink: np.ndarray) -> np.ndarray:
+    """Reference: a plain FIFO queue, popping one pixel and offering in turn."""
+    height, width = labels.shape
+    sources = labels != 0
+    result = labels.copy()
+    reach = np.where(ink & ~sources, np.iinfo(np.int32).max, 0).astype(np.int64)
+    vector = np.zeros((height, width, 2), dtype=np.int64)
+    neighbours = [(-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1)]
+    queue = deque(zip(*np.nonzero(sources), strict=True))
+    while queue:
+        y, x = queue.popleft()
+        vx, vy = vector[y, x]
+        for dy, dx in neighbours:
+            ny, nx = y + dy, x + dx
+            if not (0 <= ny < height and 0 <= nx < width):
+                continue
+            offer_x, offer_y = vx - dx, vy - dy
+            distance = offer_x * offer_x + offer_y * offer_y
+            if distance < reach[ny, nx]:
+                result[ny, nx] = result[y, x]
+                reach[ny, nx] = distance
+                vector[ny, nx] = (offer_x, offer_y)
+                queue.append((ny, nx))
+    return result
+
+
+class TestLabelSpreadMatchesOnePixelAtATime:
+    """The batched spread takes the same pixels in the same order as a plain queue."""
+
+    @pytest.mark.parametrize("seed", range(40))
+    def test_random_blobs_with_few_sources_get_identical_labels(self, seed):
+        rng = np.random.default_rng(seed)
+        height, width = rng.integers(5, 70, 2)
+        blur = rng.uniform(0.5, 3.0)
+        noise = cv2.GaussianBlur(rng.random((height, width)), (0, 0), blur)
+        ink = noise > rng.uniform(0.4, 0.6)
+        labels = np.zeros(ink.shape, dtype=np.int32)
+        ys, xs = np.nonzero(ink)
+        if ys.size:
+            picks = rng.choice(ys.size, min(int(rng.integers(1, 12)), ys.size), False)
+            labels[ys[picks], xs[picks]] = rng.integers(1, 5, picks.size)
+
+        np.testing.assert_array_equal(
+            color_segmenter._extend_into_ink(labels, ink),
+            _spread_one_pixel_at_a_time(labels, ink),
+        )
+
+    def test_equidistant_sources_resolve_by_queue_order(self):
+        ink = np.ones((1, 5), dtype=bool)
+        labels = np.array([[1, 0, 0, 0, 2]], dtype=np.int32)
+
+        extended = color_segmenter._extend_into_ink(labels, ink)
+
+        np.testing.assert_array_equal(extended, [[1, 1, 1, 2, 2]])
+        np.testing.assert_array_equal(
+            extended, _spread_one_pixel_at_a_time(labels, ink)
+        )

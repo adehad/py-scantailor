@@ -2,18 +2,20 @@
 
 Source positions are tracked in 1/32 pixel units and every destination pixel is
 the integer-rounded weighted mean of the source pixels its window overlaps. The
-two axes are independent, so each axis becomes a sparse matrix of integer
-weights and the image is multiplied by both.
+two axes are independent, so each axis becomes a few taps per destination
+pixel, a source index and an integer weight each, applied to rows then columns.
 """
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy import sparse
 
 _UNIT = 32
 _UNIT_SHIFT = 5
 
-Axis = tuple[sparse.csr_array, NDArray[np.int64]]
+# Per axis: source index and weight of every tap, both (taps, destination
+# length), and the total weight of every destination pixel. Taps a pixel does
+# not use have weight 0.
+Axis = tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]
 
 
 def transform_scale_to_gray(
@@ -85,11 +87,16 @@ def _q_round(value: float) -> int:
 
 
 def _apply(src: NDArray[np.uint8], x_axis: Axis, y_axis: Axis) -> NDArray[np.uint8]:
-    """Multiply ``src`` by the two axis matrices and divide by the window areas."""
-    x_matrix, x_area = x_axis
-    y_matrix, y_area = y_axis
-    rows = y_matrix @ src.astype(np.int64)
-    sums = (x_matrix @ rows.T).T
+    """Weight and sum ``src`` along both axes and divide by the window areas."""
+    x_sources, x_weights, x_area = x_axis
+    y_sources, y_weights, y_area = y_axis
+    # Integer sums keep the result exact; int32 is about twice as fast as int64
+    # and suffices unless the windows are very large.
+    largest_sum = 255 * int(x_area.max(initial=0)) * int(y_area.max(initial=0))
+    total = np.int32 if largest_sum <= np.iinfo(np.int32).max else np.int64
+    rows = _weighted_rows(src, y_sources, y_weights, total)
+    sums = _weighted_rows(np.ascontiguousarray(rows.T), x_sources, x_weights, total)
+    sums = sums.T.astype(np.int64)
     area = np.outer(y_area, x_area)
     inside = area > 0
     out = np.zeros(sums.shape, dtype=np.uint8)
@@ -98,21 +105,33 @@ def _apply(src: NDArray[np.uint8], x_axis: Axis, y_axis: Axis) -> NDArray[np.uin
     return out
 
 
-def _weight_matrix(
-    rows: NDArray[np.int64],
-    cols: NDArray[np.int64],
+def _weighted_rows(
+    image: NDArray,
+    sources: NDArray[np.int64],
     weights: NDArray[np.int64],
-    shape: tuple[int, int],
-) -> sparse.csr_array:
-    """Build a sparse matrix holding ``weights`` at ``(rows, cols)``."""
-    order = np.argsort(rows, kind="stable")
-    row_ends = np.cumsum(np.bincount(rows, minlength=shape[0]))
-    indptr = np.concatenate([[0], row_ends])
-    return sparse.csr_array((weights[order], cols[order], indptr), shape=shape)
+    total: type[np.signedinteger],
+) -> NDArray:
+    """Sum the rows of ``image`` that every destination row takes, by weight.
+
+    Args:
+        image (NDArray): (H, W) integer image.
+        sources (NDArray[np.int64]): (taps, destination rows) source row indices.
+        weights (NDArray[np.int64]): (taps, destination rows) weights.
+        total (type[np.signedinteger]): Integer type wide enough for the sums.
+
+    Returns:
+        NDArray: (destination rows, W) weighted sums of type ``total``.
+    """
+    sums = np.zeros((sources.shape[1], image.shape[1]), dtype=total)
+    term = np.empty_like(sums)
+    for source, weight in zip(sources, weights.astype(total), strict=True):
+        np.multiply(image[source], weight[:, None], out=term)
+        sums += term
+    return sums
 
 
 def _overlap_axis(src_len: int, lo: NDArray[np.int64], hi: NDArray[np.int64]) -> Axis:
-    """Weights of the source pixels under windows [lo, hi) given in 1/32 pixels.
+    """Taps of the source pixels under windows [lo, hi) given in 1/32 pixels.
 
     Windows are clipped to the image; a window left empty by the clip gets no
     weights and an area of 0.
@@ -124,23 +143,13 @@ def _overlap_axis(src_len: int, lo: NDArray[np.int64], hi: NDArray[np.int64]) ->
     last = (hi - 1) >> _UNIT_SHIFT
     taps = int((last - first)[valid].max()) + 1 if valid.any() else 1
 
-    rows, cols, weights = [], [], []
-    index = np.arange(len(lo))
-    for k in range(taps):
-        pixel = first + k
-        member = valid & (pixel <= last)
-        left = np.maximum(lo, pixel * _UNIT)
-        right = np.minimum(hi, (pixel + 1) * _UNIT)
-        rows.append(index[member])
-        cols.append(pixel[member])
-        weights.append((right - left)[member])
-    matrix = _weight_matrix(
-        np.concatenate(rows),
-        np.concatenate(cols),
-        np.concatenate(weights),
-        (len(lo), src_len),
-    )
-    return matrix, np.where(valid, hi - lo, 0)
+    pixel = first + np.arange(taps)[:, None]
+    member = valid & (pixel <= last)
+    left = np.maximum(lo, pixel * _UNIT)
+    right = np.minimum(hi, (pixel + 1) * _UNIT)
+    sources = np.where(member, pixel, 0)
+    weights = np.where(member, right - left, 0)
+    return sources, weights, np.where(valid, hi - lo, 0)
 
 
 def _window_axis(src_len: int, dst_len: int, step32: float, window: int) -> Axis:
@@ -181,11 +190,6 @@ def _bilinear_axis(src_len: int, dst_len: int) -> Axis:
     pos32 = (np.arange(dst_len) * ratio).astype(np.int64)
     pixel = pos32 >> _UNIT_SHIFT
     right = pos32 & (_UNIT - 1)
-    index = np.arange(dst_len)
-    matrix = _weight_matrix(
-        np.concatenate([index, index]),
-        np.concatenate([pixel, pixel + 1]),
-        np.concatenate([_UNIT - right, right]),
-        (dst_len, src_len),
-    )
-    return matrix, np.full(dst_len, _UNIT, dtype=np.int64)
+    sources = np.stack([pixel, pixel + 1])
+    weights = np.stack([_UNIT - right, right])
+    return sources, weights, np.full(dst_len, _UNIT, dtype=np.int64)

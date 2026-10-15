@@ -8,12 +8,11 @@ from collections.abc import Sequence
 
 import cv2
 import numpy as np
-from numba import njit
 from numpy.typing import NDArray
-from skimage.morphology import reconstruction
 
 from scantailor.imageproc.polynomial_line import fit_polynomial_lines
 from scantailor.imageproc.polynomial_surface import PolynomialSurface, _axis_basis
+from scantailor.imageproc.reconstruction import reconstruction
 
 # Longest side of the working image. Fitting at this size is cheap; the surface
 # is then evaluated exactly at every pixel of the page.
@@ -46,10 +45,7 @@ def _fill_dark_holes(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
     seed[-1, :] = image[-1, :]
     seed[:, 0] = image[:, 0]
     seed[:, -1] = image[:, -1]
-    filled = reconstruction(
-        seed, image, method="erosion", footprint=np.ones((3, 3), bool)
-    )
-    return np.asarray(filled, dtype=np.uint8)
+    return reconstruction(seed, image, "erosion", 8)
 
 
 def _fill_vertically(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
@@ -184,31 +180,32 @@ def estimate_background(
     )
 
 
-def _normalisation_table() -> NDArray[np.uint8]:
-    """Return ``table[background, gray]``, the normalised level for each pair."""
-    bg = np.arange(256, dtype=np.uint32)[:, None]
-    src = np.arange(256, dtype=np.uint32)[None, :]
-    scaled = np.minimum((src * 255 + bg // 2) // np.maximum(bg, 1), 255)
-    return np.where(bg.astype(np.int32) - src.astype(np.int32) < 1, 255, scaled).astype(
-        np.uint8
-    )
+_LEVELS = np.arange(256, dtype=np.float32).reshape(1, 256)
+_SCALED_LEVEL = _LEVELS * 255
+_HALF_LEVEL = np.floor(_LEVELS / 2)
+_RECIPROCAL = 1 / np.maximum(_LEVELS, 1)
+# A whole number divided by a level of at most 255 is either whole or at least
+# 1/255 away from the next whole number, far more than float32 error. Rounding
+# after this shift therefore gives the exact floor of the quotient.
+_FLOOR_SHIFT = -0.498
 
 
-_NORMALISATION_TABLE = _normalisation_table()
-
-
-@njit(cache=True)
 def _apply_table(
     gray: NDArray[np.uint8],
     background: NDArray[np.uint8],
-    table: NDArray[np.uint8],
     out: NDArray[np.uint8],
 ) -> None:
-    flat_gray = gray.reshape(-1)
-    flat_background = background.reshape(-1)
-    flat_out = out.reshape(-1)
-    for i in range(flat_gray.size):
-        flat_out[i] = table[flat_background[i], flat_gray[i]]
+    """Write the normalised level of every pixel into ``out``.
+
+    The level is ``(gray * 255 + background // 2) // background``, and 255
+    where ``gray`` is not below ``background``. All three arrays have one shape
+    and rows OpenCV can address.
+    """
+    quotient = cv2.LUT(gray, _SCALED_LEVEL)
+    quotient += cv2.LUT(background, _HALF_LEVEL)
+    quotient *= cv2.LUT(background, _RECIPROCAL)
+    cv2.convertScaleAbs(quotient, out, alpha=1.0, beta=_FLOOR_SHIFT)
+    cv2.max(out, cv2.compare(gray, background, cv2.CMP_GE), dst=out)
 
 
 def raise_above_background(
@@ -227,13 +224,12 @@ def raise_above_background(
     Returns:
         NDArray[np.uint8]: Normalised image.
     """
+    gray = np.ascontiguousarray(gray)
+    background = np.ascontiguousarray(background)
     out = np.empty(gray.shape, dtype=np.uint8)
-    _apply_table(
-        np.ascontiguousarray(gray),
-        np.ascontiguousarray(background),
-        _NORMALISATION_TABLE,
-        out,
-    )
+    for start in range(0, gray.shape[0], _BAND_ROWS):
+        band = slice(start, start + _BAND_ROWS)
+        _apply_table(gray[band], background[band], out[band])
     return out
 
 
@@ -280,7 +276,6 @@ def normalize_illumination_gray(
         _apply_table(
             gray[start:stop],
             _render_band(left_factor, hor_basis_t, start, stop),
-            _NORMALISATION_TABLE,
             out[start:stop],
         )
     return out

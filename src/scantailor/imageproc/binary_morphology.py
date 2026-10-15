@@ -3,9 +3,6 @@
 import cv2
 import numpy as np
 from numpy.typing import NDArray
-from scipy import ndimage
-
-_EIGHT_CONNECTED = np.ones((3, 3), dtype=np.bool_)
 
 
 def open_brick(
@@ -78,8 +75,12 @@ def seed_fill(seed: NDArray[np.bool_], mask: NDArray[np.bool_]) -> NDArray[np.bo
     Returns:
         NDArray[np.bool_]: New image, a subset of ``mask``.
     """
-    labels, count = ndimage.label(mask, structure=_EIGHT_CONNECTED)
-    hit = np.zeros(count + 1, dtype=np.bool_)
+    if mask.size == 0:
+        return np.zeros(mask.shape, dtype=np.bool_)
+    count, labels = cv2.connectedComponents(
+        mask.astype(np.uint8), connectivity=8, ltype=cv2.CV_32S
+    )
+    hit = np.zeros(count, dtype=np.bool_)
     hit[labels[seed & mask]] = True
     hit[0] = False
     return hit[labels]

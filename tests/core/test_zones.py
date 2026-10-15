@@ -107,8 +107,6 @@ class TestZoneSpline:
 
     def test_to_polygon_smooth(self) -> None:
         """Smooth spline returns interpolated polygon."""
-        pytest.importorskip("scipy")
-
         points = [[0, 0], [100, 0], [100, 100], [0, 100]]
         spline = ZoneSpline(points=points, is_smooth=True)
         polygon = spline.to_polygon(num_samples=50)
@@ -117,6 +115,61 @@ class TestZoneSpline:
         assert len(polygon) == 50
         # Should be different from input
         assert polygon.shape != spline.points.shape
+
+    @pytest.mark.parametrize(
+        ("points", "expected"),
+        [
+            (
+                [[10, 10], [200, 30], [220, 180], [60, 210], [5, 120]],
+                [
+                    [10.0, 10.0],
+                    [91.593690493, -17.02661551],
+                    [190.554159173, 21.407507969],
+                    [237.757266918, 109.206495574],
+                    [207.278770587, 193.415169053],
+                    [114.982358717, 223.960638869],
+                    [34.507670973, 187.227912711],
+                    [0.14277718, 97.901700745],
+                    [10.0, 10.0],
+                ],
+            ),
+            (
+                [[0, 0], [100, 0], [100, 100], [0, 100]],
+                [
+                    [0.0, 0.0],
+                    [50.0, -18.75],
+                    [100.0, 0.0],
+                    [118.75, 50.0],
+                    [100.0, 100.0],
+                    [50.0, 118.75],
+                    [0.0, 100.0],
+                    [-18.75, 50.0],
+                    [0.0, 0.0],
+                ],
+            ),
+        ],
+    )
+    def test_to_polygon_smooth_matches_the_closed_spline_scipy_fits(
+        self, points: list[list[int]], expected: list[list[float]]
+    ) -> None:
+        """Samples equal scipy's splprep(s=0, per=True) curve, rounded to 1e-9."""
+        polygon = ZoneSpline(points=points, is_smooth=True).to_polygon(num_samples=9)
+
+        np.testing.assert_allclose(polygon, expected, rtol=0, atol=1e-8)
+
+    def test_to_polygon_smooth_passes_through_every_vertex(self) -> None:
+        """Equal sides put the vertices at every other of 9 samples."""
+        points = np.array([[0, 0], [300, 0], [300, 300], [0, 300]], dtype=np.float64)
+        polygon = ZoneSpline(points=points, is_smooth=True).to_polygon(num_samples=9)
+
+        np.testing.assert_allclose(polygon[::2][:4], points, atol=1e-9)
+
+    def test_to_polygon_smooth_repeated_point_falls_back_to_polygon(self) -> None:
+        """A vertex given twice in a row has no curve through it."""
+        points = [[0, 0], [0, 0], [100, 0], [100, 100], [0, 100]]
+        spline = ZoneSpline(points=points, is_smooth=True)
+
+        np.testing.assert_array_equal(spline.to_polygon(), spline.points)
 
     def test_to_polygon_smooth_insufficient_points(self) -> None:
         """Smooth spline with <4 points returns original."""
