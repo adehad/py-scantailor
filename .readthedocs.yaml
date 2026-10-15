@@ -7,8 +7,8 @@ build:
   os: ubuntu-24.04
   tools:
     python: "3.14"
-  # Shared libraries the PySide6 and opencv-python wheels load. The docs build
-  # imports both for autodoc, and the screenshot step starts the real window on
+  # Shared libraries the PySide6 wheels load. The docs build
+  # imports it for autodoc, and the screenshot step starts the real window on
   # Qt's offscreen platform.
   apt_packages:
     - libgl1

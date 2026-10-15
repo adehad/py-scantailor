@@ -9,7 +9,7 @@ dependencies = [
     "numpy>=2.5",
     # OpenCV 5 draws putText in a new font, which redraws every generated test and
     # sample page; moving to it means re-tuning those pages first.
-    "opencv-python>=4.14,<5",
+    "opencv-python-headless>=4.14,<5",
     "scikit-image>=0.26",
     "scipy>=1.18",
     "pillow>=12.3",
