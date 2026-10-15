@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>ScanTailor Advanced</string>
+   <string notr="true">pyScanTailor</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
@@ -63,7 +63,7 @@
 font-weight: bold;</string>
          </property>
          <property name="text">
-          <string notr="true">ScanTailor Advanced</string>
+          <string notr="true">pyScanTailor</string>
          </property>
          <property name="alignment">
           <set>Qt::AlignBottom|Qt::AlignHCenter</set>

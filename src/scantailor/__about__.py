@@ -1,5 +1,7 @@
 """Project Metadata."""
 
+APP_NAME = "pyScanTailor"
+
 try:
     import importlib.metadata
 
