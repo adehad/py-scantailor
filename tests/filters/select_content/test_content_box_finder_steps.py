@@ -1,11 +1,13 @@
 """Tests for the individual steps of the content box finder."""
 
+import cv2
 import numpy as np
 import pytest
 
 from scantailor.filters.select_content import content_box_finder as finder
 from scantailor.filters.select_content.content_box_finder import Rect
 from scantailor.imageproc.binarize import binarize_wolf
+from tests.filters.select_content.test_content_rect_pages import _page
 
 
 def _mask(shape: tuple[int, int], *boxes: tuple[int, int, int, int]) -> np.ndarray:
@@ -89,6 +91,46 @@ class TestTrimBlocksToContent:
         assert not finder._trim_blocks_to_content(
             content, np.zeros((10, 10), dtype=bool)
         ).any()
+
+    def test_block_keeps_only_its_own_pixels_where_another_reaches_in(self) -> None:
+        """An L-shaped block's box covers a separate block, which keeps its own box."""
+        blocks = _mask((40, 40), (2, 30, 2, 6), (26, 30, 2, 30), (10, 20, 10, 20))
+        content = _mask((40, 40), (3, 4, 3, 4), (28, 29, 28, 29), (12, 13, 12, 13))
+
+        trimmed = finder._trim_blocks_to_content(content, blocks)
+
+        assert np.array_equal(
+            trimmed, _mask((40, 40), (3, 29, 3, 6), (26, 29, 3, 29), (12, 13, 12, 13))
+        )
+
+    @pytest.mark.parametrize("seed", [0, 1, 4, 6])
+    def test_matches_a_label_by_label_reference_on_a_seeded_page(
+        self, seed: int
+    ) -> None:
+        ink = _page(seed) < 128
+        blocks = cv2.dilate(ink.view(np.uint8), np.ones((3, 7), np.uint8)).view(bool)
+        content = ink & (np.random.default_rng(seed).random(ink.shape) < 0.5)
+        count, labels = cv2.connectedComponents(blocks.view(np.uint8), connectivity=4)
+        rows, cols = np.nonzero(content & (labels > 0))
+        owner = labels[rows, cols]
+        first_row = np.full(count, np.iinfo(np.int64).max)
+        first_col = first_row.copy()
+        last_row = np.full(count, -1)
+        last_col = last_row.copy()
+        np.minimum.at(first_row, owner, rows)
+        np.minimum.at(first_col, owner, cols)
+        np.maximum.at(last_row, owner, rows)
+        np.maximum.at(last_col, owner, cols)
+        expected = np.zeros_like(blocks)
+        for label in np.unique(owner):
+            box = (
+                slice(first_row[label], last_row[label] + 1),
+                slice(first_col[label], last_col[label] + 1),
+            )
+            expected[box] |= labels[box] == label
+
+        assert count > 20
+        assert np.array_equal(finder._trim_blocks_to_content(content, blocks), expected)
 
 
 class TestRemoveBlocksTouchingBorders:
@@ -222,6 +264,51 @@ class TestSegmentGarbage:
 
         assert vertical[100:110, 100:110].all()
         assert horizontal[100:110, 100:110].all()
+
+    def test_pixel_as_far_from_both_kinds_of_seed_is_horizontal(self) -> None:
+        """A diagonal from a top-edge seed to a left-edge seed, split at its middle."""
+        garbage = np.zeros((21, 21), dtype=bool)
+        for step in range(11):
+            garbage[step, 10 - step] = True
+
+        vertical, horizontal = finder._segment_garbage(garbage)
+
+        rows = np.arange(11)
+        assert horizontal[rows, 10 - rows].tolist() == [True] * 6 + [False] * 5
+        assert vertical[rows, 10 - rows].tolist() == [False] * 6 + [True] * 5
+
+    @pytest.mark.parametrize("seed", range(4))
+    def test_garbage_joins_the_nearest_kind_of_seed(self, seed: int) -> None:
+        """Brute-force nearest seeds on blobs that touch the edges of a small image."""
+        rng = np.random.default_rng(seed)
+        garbage = cv2.dilate(
+            (rng.random((40, 50)) < 0.03).view(np.uint8), np.ones((5, 5), np.uint8)
+        ).view(bool)
+        horizontal_seeds = np.zeros_like(garbage)
+        horizontal_seeds[[0, -1]] = garbage[[0, -1]]
+        vertical_seeds = np.zeros_like(garbage)
+        vertical_seeds[:, [0, -1]] = garbage[:, [0, -1]]
+        vertical_seeds &= ~horizontal_seeds
+
+        vertical, horizontal = finder._segment_garbage(garbage)
+
+        rows, cols = np.indices(garbage.shape)
+
+        def squared_distance(seeds: np.ndarray) -> np.ndarray:
+            seed_rows, seed_cols = np.nonzero(seeds)
+            if seed_rows.size == 0:
+                return np.full(garbage.shape, np.inf)
+            return (
+                (rows[..., None] - seed_rows) ** 2 + (cols[..., None] - seed_cols) ** 2
+            ).min(axis=-1)
+
+        nearer_vertical = squared_distance(vertical_seeds) < squared_distance(
+            horizontal_seeds
+        )
+        reached = finder._fill_from_seeds(vertical_seeds | horizontal_seeds, garbage, 8)
+        assert reached.any()
+        assert np.array_equal(vertical & reached, reached & nearer_vertical)
+        assert np.array_equal(horizontal & reached, reached & ~nearer_vertical)
 
 
 class TestTrim:

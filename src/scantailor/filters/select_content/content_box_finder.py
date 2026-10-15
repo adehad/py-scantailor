@@ -13,9 +13,7 @@ from dataclasses import dataclass, replace
 
 import cv2
 import numpy as np
-from numba import njit
 from numpy.typing import NDArray
-from scipy import ndimage
 
 from scantailor.imageproc.binarize import binarize_wolf
 from scantailor.imageproc.despeckle import despeckle
@@ -334,47 +332,30 @@ def _trim_blocks_to_content(
     content: NDArray[np.bool_],
     blocks: NDArray[np.bool_],
 ) -> NDArray[np.bool_]:
-    """Shrink every block to the bounding box of the content inside it."""
-    count, labels = cv2.connectedComponents(blocks.view(np.uint8), connectivity=4)
-    if count == 1:
-        return np.zeros_like(blocks)
-    boxes = ndimage.find_objects(np.where(content, labels, 0), max_label=count - 1)
-    empty = (np.iinfo(np.int32).max, -1)
-    rows = np.array([(b[0].start, b[0].stop - 1) if b else empty for b in boxes])
-    cols = np.array([(b[1].start, b[1].stop - 1) if b else empty for b in boxes])
-    rows = np.vstack([[empty], rows])
-    cols = np.vstack([[empty], cols])
+    """Shrink every block to the bounding box of the content inside it.
 
-    return _keep_inside_label_boxes(np.asarray(labels, dtype=np.int32), rows, cols)
-
-
-@njit(cache=True)
-def _keep_inside_label_boxes(
-    labels: NDArray[np.int32],
-    rows: NDArray[np.int64],
-    cols: NDArray[np.int64],
-) -> NDArray[np.bool_]:
-    """Keep the pixels of each label that lie inside that label's box.
-
-    Args:
-        labels (numpy.ndarray of numpy.int32): Component labels, 0 for background.
-        rows (numpy.ndarray of numpy.int64): First and last row of every label's box.
-        cols (numpy.ndarray of numpy.int64): First and last column of every label's box.
-
-    Returns:
-        numpy.ndarray of numpy.bool: Mask of the pixels kept.
+    Blocks are the 4-connected parts of ``blocks``. A block keeps only its own
+    pixels inside the box, even where another block reaches into it.
     """
-    height, width = labels.shape
-    kept = np.zeros((height, width), dtype=np.bool_)
-    for y in range(height):
-        for x in range(width):
-            label = labels[y, x]
-            if (
-                label > 0
-                and rows[label, 0] <= y <= rows[label, 1]
-                and cols[label, 0] <= x <= cols[label, 1]
-            ):
-                kept[y, x] = True
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(
+        blocks.view(np.uint8), connectivity=4
+    )
+    kept = np.zeros_like(blocks)
+    for label in range(1, count):
+        left = int(stats[label, cv2.CC_STAT_LEFT])
+        top = int(stats[label, cv2.CC_STAT_TOP])
+        around = (
+            slice(top, top + int(stats[label, cv2.CC_STAT_HEIGHT])),
+            slice(left, left + int(stats[label, cv2.CC_STAT_WIDTH])),
+        )
+        block = labels[around] == label
+        box = _bounding_box(block & content[around])
+        if box.is_empty:
+            continue
+        inside = box.window()
+        kept[
+            top + box.top : top + box.bottom + 1, left + box.left : left + box.right + 1
+        ] |= block[inside]
     return kept
 
 
@@ -614,8 +595,9 @@ def _segment_garbage(
     """Split garbage into the parts attached to vertical and horizontal edges.
 
     Long straight runs of garbage seed each class and the rest of a connected
-    piece of garbage joins the nearest seed. Garbage that touches no seed
-    belongs to both classes.
+    piece of garbage joins the nearest seed. Seeds of both kinds, and pixels
+    exactly as far from both kinds, count as horizontal. Garbage that touches
+    no seed belongs to both classes.
 
     Returns:
         tuple[numpy.ndarray of numpy.bool, numpy.ndarray of numpy.bool]:
@@ -629,21 +611,22 @@ def _segment_garbage(
     vertical[:, 0] |= garbage[:, 0]
     vertical[:, -1] |= garbage[:, -1]
 
-    seeds = vertical | horizontal
-    seed_class = np.zeros(garbage.shape, dtype=np.uint8)
-    seed_class[vertical] = 1
-    seed_class[horizontal] = 2
-    reached = _fill_from_seeds(seeds, garbage, 8)
+    reached = _fill_from_seeds(vertical | horizontal, garbage, 8)
 
-    nearest_row, nearest_col = ndimage.distance_transform_edt(
-        ~seeds, return_distances=False, return_indices=True
-    )
-    nearest_class = seed_class[nearest_row, nearest_col]
+    vertical &= ~horizontal
+    nearer_vertical = _distance_to_seeds(vertical) < _distance_to_seeds(horizontal)
     unconnected = garbage & ~reached
     return (
-        (reached & (nearest_class == 1)) | unconnected,
-        (reached & (nearest_class == 2)) | unconnected,
+        (reached & nearer_vertical) | unconnected,
+        (reached & ~nearer_vertical) | unconnected,
     )
+
+
+def _distance_to_seeds(seeds: NDArray[np.bool_]) -> NDArray[np.float32]:
+    """Exact Euclidean distance from every pixel to the nearest seed, inf if none."""
+    if not seeds.any():
+        return np.full(seeds.shape, np.inf, dtype=np.float32)
+    return _distance_to_zero(~seeds)
 
 
 class _Garbage:
