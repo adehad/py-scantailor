@@ -670,3 +670,10 @@ class TestStatusBar:
         panel = project_window.status_panel
         assert panel.page_no_label.text() == ""
         assert panel.phys_size_label.text() == ""
+
+
+def test_options_panel_scrolls_sideways_when_its_content_is_wider(main_window):
+    scroll = main_window.ui.findChild(QtWidgets.QScrollArea, "scrollArea")
+    assert scroll is not None
+    policy = scroll.horizontalScrollBarPolicy()
+    assert policy == QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
