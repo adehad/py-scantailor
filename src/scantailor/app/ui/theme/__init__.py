@@ -16,6 +16,7 @@ from scantailor.app.ui.icons import IconBinder, set_semantic_colors
 from .assets import write_assets
 from .docks import DockSizer
 from .fonts import TabularFigures, apply_fonts
+from .layout_style import LayoutStyle
 from .palette import build_palette
 from .spin_boxes import SpinBoxTextInset
 from .stylesheet import build_stylesheet
@@ -94,7 +95,8 @@ class _ThemeController(QtCore.QObject):
         self._app = app
         self._requested: str | None = None
         self.scheme = "light"
-        app.setStyle("Fusion")  # native styles ignore palette and several QSS rules
+        # Native styles ignore the palette and several QSS rules.
+        app.setStyle(LayoutStyle(QtWidgets.QStyleFactory.create("Fusion")))
         apply_fonts(app)
         app.installEventFilter(IconBinder(self))
         app.installEventFilter(TabularFigures(self))
