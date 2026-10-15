@@ -21,7 +21,6 @@ import math
 from dataclasses import dataclass
 from enum import Enum
 
-import cv2
 import numpy as np
 from numpy.typing import NDArray
 
@@ -37,7 +36,6 @@ ContentRect = tuple[float, float, float, float]
 
 # The outer border may lean this many degrees before a curve is extended.
 _MAX_BORDER_SKEW_DEG = 2.75
-_WARM_UP_SIZE = (720, 520)
 
 
 class ModelOutcome(Enum):
@@ -137,33 +135,6 @@ class AutoModelResult:
 
     model: DistortionModel | None
     metrics: DewarpMetrics
-
-
-def warm_up_kernels() -> None:
-    """Run the automatic model builder once on a small page to compile its kernels.
-
-    Each numba kernel compiles on its first call, which takes seconds, and the
-    result is cached on disk. A page with a few lines of text between dark page
-    edges reaches every kernel of the tracers and the spline fit.
-    """
-    height, width = _WARM_UP_SIZE
-    columns = np.arange(width)
-    sag = 14 * np.sin(np.pi * columns / width)
-    top = np.linspace(80, 60, width) + sag
-    bottom = np.linspace(660, 640, width) - 0.7 * sag
-    rows = np.arange(height)[:, None]
-    page = np.full((height, width), 45, dtype=np.uint8)
-    page[(rows > top[None, :]) & (rows < bottom[None, :])] = 235
-    rng = np.random.default_rng(0)
-    words = "the quick brown fox jumps over lazy dog and runs far".split()
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    for baseline in range(130, 600, 28):
-        x = 70
-        while x < 420:
-            word = words[int(rng.integers(len(words)))]
-            cv2.putText(page, word, (x, baseline), font, 0.55, 25, 1, cv2.LINE_AA)
-            x += cv2.getTextSize(word, font, 0.55, 1)[0][0] + 14
-    build_auto_distortion_model(page, 200, (60.0, 100.0, 320.0, 420.0))
 
 
 def trivial_distortion_model(content_rect: ContentRect) -> DistortionModel:

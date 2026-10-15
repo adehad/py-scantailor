@@ -104,10 +104,8 @@ class TestOutputFileNames:
         assert names[second] == "b(1)_page0002_2R.tif"
 
 
-def _thread_counts(_: int) -> tuple[int, str | None]:
-    import os
-
-    return cv2.getNumThreads(), os.environ.get("NUMBA_NUM_THREADS")
+def _thread_counts(_: int) -> int:
+    return cv2.getNumThreads()
 
 
 def _slow_square(value: int) -> int:
@@ -134,17 +132,16 @@ def _set_offset(offset: int) -> None:
 
 @pytest.mark.slow
 class TestWorkerThreads:
-    def test_initializer_limits_opencv_and_numba_to_one_thread(self):
+    def test_initializer_limits_opencv_to_one_thread(self):
         context = multiprocessing.get_context("spawn")
         with ProcessPoolExecutor(
             max_workers=1,
             mp_context=context,
             initializer=batch.configure_worker_threads,
         ) as executor:
-            cv_threads, numba_threads = executor.submit(_thread_counts, 0).result()
+            cv_threads = executor.submit(_thread_counts, 0).result()
 
         assert cv_threads == 1
-        assert numba_threads == "1"
 
     def test_run_pool_applies_thread_limits_and_extra_initializer(self):
         seen: dict[int, int] = {}
