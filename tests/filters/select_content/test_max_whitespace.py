@@ -11,6 +11,7 @@ from scantailor.filters.select_content.content_box_finder import _block_found
 from scantailor.filters.select_content.max_whitespace import (
     WhitespaceRect,
     WhitespaceSearch,
+    _maximal_rectangles,
     largest_whitespace,
 )
 from tests.filters.select_content.test_content_rect_pages import _page
@@ -111,6 +112,27 @@ def _brute_force(
                     if width >= min_width and height >= min_height:
                         best = max(best, width**width_power * height**height_power)
     return best
+
+
+def _maximal_by_brute_force(obstacles: np.ndarray) -> set[tuple[int, int, int, int]]:
+    """Every obstacle-free rectangle that no free row or column can extend."""
+    rows, cols = obstacles.shape
+    found = set()
+    for top in range(rows):
+        for bottom in range(top + 1, rows + 1):
+            for left in range(cols):
+                for right in range(left + 1, cols + 1):
+                    if obstacles[top:bottom, left:right].any():
+                        break
+                    grows = (
+                        (top > 0 and not obstacles[top - 1, left:right].any())
+                        or (bottom < rows and not obstacles[bottom, left:right].any())
+                        or (left > 0 and not obstacles[top:bottom, left - 1].any())
+                        or (right < cols and not obstacles[top:bottom, right].any())
+                    )
+                    if not grows:
+                        found.add((top, left, bottom, right))
+    return found
 
 
 def _blocked_mask(
@@ -228,6 +250,34 @@ class TestLargestWhitespace:
         assert found == WhitespaceRect(left=3, top=1, width=2, height=3)
         assert found == _reference(obstacles, 1, 1, 1, 1)
 
+    @pytest.mark.parametrize("density", [0.0, 0.1, 0.3, 1.0])
+    def test_scan_lists_exactly_the_maximal_rectangles(self, density: float) -> None:
+        rng = np.random.default_rng(17)
+        for _ in range(6):
+            obstacles = rng.random((7, 9)) < density
+
+            listed = {
+                tuple(edges) for edges in _maximal_rectangles(obstacles).T.tolist()
+            }
+
+            assert listed == _maximal_by_brute_force(obstacles)
+
+    @pytest.mark.parametrize("shape", [(33_000, 4), (4, 33_000)])
+    def test_image_too_long_for_16_bit_edges_matches_the_stack_scan(
+        self, shape: tuple[int, int]
+    ) -> None:
+        """One free line runs the whole long side, past the 16-bit range."""
+        obstacles = np.random.default_rng(13).random(shape) < 0.3
+        if shape[0] > shape[1]:
+            obstacles[:, 1] = False
+        else:
+            obstacles[1, :] = False
+
+        for powers in ((1, 1), (2, 1), (1, 2)):
+            assert largest_whitespace(obstacles, *powers) == _reference(
+                obstacles, *powers, 1, 1
+            )
+
 
 class TestWhitespaceSearch:
     @pytest.mark.parametrize("powers", [(1, 1), (2, 1), (1, 2)])
@@ -280,6 +330,34 @@ class TestWhitespaceSearch:
         search.block(0, 0, 5, 6)
 
         assert search.largest() is None
+
+    @pytest.mark.parametrize("min_size", [1, 3])
+    def test_search_with_other_powers_matches_a_new_search_of_the_unblocked_image(
+        self, min_size: int
+    ) -> None:
+        """Blocks before or after the split stay in the search they were made on."""
+        obstacles = np.random.default_rng(11).random((40, 55)) < 0.05
+        wide = WhitespaceSearch(obstacles, 2, 1, min_size, min_size)
+        wide.block(5, 5, 30, 40)
+
+        tall = wide.with_powers(1, 2)
+        fresh = WhitespaceSearch(obstacles, 1, 2, min_size, min_size)
+        for _ in range(15):
+            found = fresh.largest()
+            assert tall.largest() == found
+            if found is None:
+                break
+            bottom, right = found.top + found.height, found.left + found.width
+            tall.block(found.top, found.left, bottom, right)
+            fresh.block(found.top, found.left, bottom, right)
+
+        assert wide.largest() == _reference(
+            obstacles | _blocked_mask(obstacles.shape, 5, 5, 30, 40),
+            2,
+            1,
+            min_size,
+            min_size,
+        )
 
     def test_many_blocks_on_one_search_match_fresh_scans(self) -> None:
         """Enough blocks to fill the spare room of the rectangle table several times."""
