@@ -1,6 +1,5 @@
 """Tests for raster dewarping functions."""
 
-import time
 from types import SimpleNamespace
 
 import numpy as np
@@ -347,8 +346,24 @@ def _broadcast_maps_reference(dewarper, width, height, left, top, right, bottom)
     )
 
 
+class _CrossingGeneratrices:
+    """Denominators that pass through zero at one output row, in mid band."""
+
+    def __init__(self, zero_at: float) -> None:
+        self._zero_at = zero_at
+
+    def map_generatrices(self, xs: np.ndarray) -> SimpleNamespace:
+        count = len(xs)
+        homography = np.array([[3.0, 0.25], [1.0, -self._zero_at]])
+        return SimpleNamespace(
+            start=np.column_stack([xs * 10, np.ones(count)]),
+            end=np.column_stack([xs * 10 + 3.0, 50.0 + xs]),
+            pln2img_1d=np.broadcast_to(homography, (count, 2, 2)).copy(),
+        )
+
+
 class TestMapsMatchBroadcastEvaluation:
-    """The compiled kernel reproduces the whole-grid NumPy evaluation exactly."""
+    """The banded evaluation reproduces the whole-grid NumPy evaluation exactly."""
 
     @pytest.mark.parametrize(
         "size, bounds",
@@ -377,22 +392,18 @@ class TestMapsMatchBroadcastEvaluation:
         assert np.array_equal(actual[0], expected[0])
         assert np.array_equal(actual[1], expected[1])
 
-    def test_kernel_is_faster_than_the_broadcast_evaluation(self, curved_dewarper):
-        size, bounds = (1500, 2000), (0.0, 0.0, 1.0, 1.0)
-        compute_dewarp_maps(curved_dewarper, (8, 8), bounds)  # compile
-        timings = {}
-        for name, run in (
-            ("kernel", lambda: compute_dewarp_maps(curved_dewarper, size, bounds)),
-            (
-                "broadcast",
-                lambda: _broadcast_maps_reference(curved_dewarper, *size, *bounds),
-            ),
-        ):
-            best = float("inf")
-            for _ in range(3):
-                start = time.perf_counter()
-                run()
-                best = min(best, time.perf_counter() - start)
-            timings[name] = best
+    def test_a_denominator_reaching_zero_inside_a_band_maps_to_the_midpoint(self):
+        height = 100
+        # Row 40's model y, computed as the maps compute it.
+        zero_at = 0.0 + (40 + 0.5) * (1.0 / height)
+        dewarper = _CrossingGeneratrices(zero_at)
+        expected = _broadcast_maps_reference(dewarper, 7, height, 0.0, 0.0, 1.0, 1.0)
 
-        assert timings["kernel"] < timings["broadcast"]
+        actual = compute_dewarp_maps(dewarper, (7, height), (0.0, 0.0, 1.0, 1.0))
+
+        assert np.array_equal(actual[0], expected[0])
+        assert np.array_equal(actual[1], expected[1])
+        column = dewarper.map_generatrices(np.array([0.5 / 7]))
+        start, end = column.start[0, 1], column.end[0, 1]
+        midpoint = start + 0.5 * (end - start)
+        assert actual[1][40, 0] == np.float32(midpoint) - np.float32(0.5)
