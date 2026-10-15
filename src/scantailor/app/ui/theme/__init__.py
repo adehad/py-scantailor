@@ -3,7 +3,9 @@
 The look follows the operating system colour scheme and updates when it changes.
 Type sizes follow the application font and update when it changes.
 The QSettings key ``appearance/theme`` (``auto``, ``light`` or ``dark``) forces a
-scheme, and the ``SCANTAILOR_THEME`` environment variable overrides both.
+scheme, and the ``SCANTAILOR_THEME`` environment variable overrides both. The key
+``appearance/header_hover`` (``neutral`` or ``accent``) picks the fill behind a
+hovered group header or splitter.
 """
 
 import os
@@ -23,12 +25,17 @@ from .stylesheet import build_stylesheet
 from .tokens import DARK, LIGHT, set_active_tokens
 
 __all__ = [
+    "ACCENT",
     "AUTO",
+    "HOVER_KEY",
+    "HOVER_STYLES",
+    "NEUTRAL",
     "SCHEMES",
     "SETTINGS_KEY",
     "THEME_ENV_VAR",
     "THEME_MODES",
     "apply_theme",
+    "resolve_hover",
     "resolve_mode",
     "resolve_scheme",
 ]
@@ -39,6 +46,10 @@ SETTINGS_KEY = "appearance/theme"
 _TOKENS = {"light": LIGHT, "dark": DARK}
 SCHEMES = tuple(_TOKENS)
 THEME_MODES = (AUTO, *SCHEMES)
+HOVER_KEY = "appearance/header_hover"
+NEUTRAL = "neutral"
+ACCENT = "accent"
+HOVER_STYLES = (NEUTRAL, ACCENT)
 _CONTROLLER_NAME = "scantailorThemeController"
 
 
@@ -56,6 +67,16 @@ def resolve_mode() -> str:
         logger.warning("Unknown theme {!r}; using {!r}", raw, AUTO)
         return AUTO
     return mode
+
+
+def resolve_hover() -> str:
+    """Read the header hover style from QSettings.
+
+    Returns:
+        str: A name in HOVER_STYLES; anything else falls back to "neutral".
+    """
+    hover = str(QtCore.QSettings().value(HOVER_KEY, NEUTRAL)).strip().lower()
+    return hover if hover in HOVER_STYLES else NEUTRAL
 
 
 def resolve_scheme(app: QtWidgets.QApplication, mode: str) -> str:
@@ -94,6 +115,7 @@ class _ThemeController(QtCore.QObject):
         self.setObjectName(_CONTROLLER_NAME)
         self._app = app
         self._requested: str | None = None
+        self._requested_hover: str | None = None
         self.scheme = "light"
         # Native styles ignore the palette and several QSS rules.
         app.setStyle(LayoutStyle(QtWidgets.QStyleFactory.create("Fusion")))
@@ -105,9 +127,10 @@ class _ThemeController(QtCore.QObject):
         app.styleHints().colorSchemeChanged.connect(self._on_scheme_changed)
         app.installEventFilter(self)
 
-    def apply(self, mode: str | None) -> str:
-        """Draw the look for a mode; None re-reads the environment and settings."""
+    def apply(self, mode: str | None, hover: str | None) -> str:
+        """Draw the look; a None mode or hover re-reads the environment and settings."""
         self._requested = mode
+        self._requested_hover = hover
         return self._draw()
 
     def _draw(self) -> str:
@@ -118,8 +141,14 @@ class _ThemeController(QtCore.QObject):
         set_active_tokens(tokens)
         set_semantic_colors(QtGui.QColor(tokens.positive), QtGui.QColor(tokens.danger))
         self._app.setPalette(build_palette(tokens))
+        hover = self._requested_hover or resolve_hover()
         self._app.setStyleSheet(
-            build_stylesheet(tokens, write_assets(tokens, scheme), self._app.font())
+            build_stylesheet(
+                tokens,
+                write_assets(tokens, scheme),
+                self._app.font(),
+                accent_hover=hover == ACCENT,
+            )
         )
         return scheme
 
@@ -146,7 +175,9 @@ class _ThemeController(QtCore.QObject):
             self._draw()
 
 
-def apply_theme(app: QtWidgets.QApplication, mode: str | None = None) -> str:
+def apply_theme(
+    app: QtWidgets.QApplication, mode: str | None = None, hover: str | None = None
+) -> str:
     """Apply the look to the application and keep it in step with the OS.
 
     Safe to call again, for example after the setting changed.
@@ -155,6 +186,8 @@ def apply_theme(app: QtWidgets.QApplication, mode: str | None = None) -> str:
         app (QtWidgets.QApplication): The running application.
         mode (str | None): "auto", "light" or "dark"; None resolves it from the
             environment and settings, and is resolved again on every OS change.
+        hover (str | None): "neutral" or "accent" header hover fill; None reads
+            it from settings.
 
     Returns:
         str: The scheme drawn now, "light" or "dark".
@@ -165,4 +198,7 @@ def apply_theme(app: QtWidgets.QApplication, mode: str | None = None) -> str:
     controller = app.findChild(_ThemeController, _CONTROLLER_NAME)
     if controller is None:
         controller = _ThemeController(app)
-    return controller.apply(mode)
+    if hover is not None and hover not in HOVER_STYLES:
+        logger.warning("Unknown hover style {!r}; using {!r}", hover, NEUTRAL)
+        hover = NEUTRAL
+    return controller.apply(mode, hover)

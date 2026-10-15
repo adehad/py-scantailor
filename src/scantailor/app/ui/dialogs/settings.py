@@ -8,7 +8,15 @@ from PySide6 import QtCore, QtWidgets
 
 from scantailor.app.ui import embed_ui, load_ui_widget
 from scantailor.app.ui.icons import icon
-from scantailor.app.ui.theme import AUTO, SETTINGS_KEY, apply_theme
+from scantailor.app.ui.theme import (
+    ACCENT,
+    AUTO,
+    HOVER_KEY,
+    NEUTRAL,
+    SETTINGS_KEY,
+    apply_theme,
+    resolve_hover,
+)
 from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.app.ui.utils import get_cwidget
 from scantailor.core.settings import (
@@ -118,6 +126,7 @@ class SettingsDialog(QtWidgets.QDialog):
         )
         self._auto_save_cb = get_cwidget(ui, check, "autoSaveProjectCB")
         self._color_scheme_box = get_cwidget(ui, combo, "colorSchemeBox")
+        self._hover_box = get_cwidget(ui, combo, "hoverHighlightBox")
         self._language_box = get_cwidget(ui, combo, "languageBox")
         self._units_box = get_cwidget(ui, combo, "unitsBox")
         self._zone_mode_box = get_cwidget(ui, combo, "zoneCreationModeBox")
@@ -163,6 +172,8 @@ class SettingsDialog(QtWidgets.QDialog):
             (self.tr("Dark"), "dark"),
         ):
             self._color_scheme_box.addItem(text, mode)
+        self._hover_box.addItem(self.tr("Neutral"), NEUTRAL)
+        self._hover_box.addItem(self.tr("Accent colour"), ACCENT)
 
         for text, units in (
             ("Pixels", Units.PIXELS),
@@ -212,6 +223,7 @@ class SettingsDialog(QtWidgets.QDialog):
             self._color_scheme_box,
             str(QtCore.QSettings().value(SETTINGS_KEY, AUTO)).strip().lower(),
         )
+        self._select_data(self._hover_box, resolve_hover())
         self._select_data(self._units_box, settings.units)
         self._select_language(settings.language)
         self._select_data(self._zone_mode_box, settings.default_zone_creation_mode)
@@ -277,6 +289,7 @@ class SettingsDialog(QtWidgets.QDialog):
             self._black_on_white_output_cb.setEnabled
         )
         self._color_scheme_box.currentIndexChanged.connect(self._preview_appearance)
+        self._hover_box.currentIndexChanged.connect(self._preview_appearance)
 
     def _select_language(self, language: str) -> None:
         """Select the bundled catalogue Qt loads for the saved language setting.
@@ -368,14 +381,20 @@ class SettingsDialog(QtWidgets.QDialog):
 
     def _store_appearance(self) -> None:
         """Remember the chosen appearance and show it right away."""
-        QtCore.QSettings().setValue(SETTINGS_KEY, self._color_scheme_box.currentData())
+        settings = QtCore.QSettings()
+        settings.setValue(SETTINGS_KEY, self._color_scheme_box.currentData())
+        settings.setValue(HOVER_KEY, self._hover_box.currentData())
         self._apply_stored_appearance()
 
     def _preview_appearance(self) -> None:
-        """Show the chosen scheme without remembering it."""
+        """Show the chosen scheme and hover highlight without remembering them."""
         app = QtWidgets.QApplication.instance()
         if isinstance(app, QtWidgets.QApplication):
-            apply_theme(app, self._color_scheme_box.currentData())
+            apply_theme(
+                app,
+                self._color_scheme_box.currentData(),
+                self._hover_box.currentData(),
+            )
 
     @staticmethod
     def _apply_stored_appearance() -> None:
