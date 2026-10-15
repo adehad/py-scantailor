@@ -30,7 +30,8 @@ repos:
         args: ["-L", "datas"]
         require_serial: false
         additional_dependencies: []
-        exclude: src/scantailor/translations/
+        # used_modules.txt lists module names such as scipy.special._ufuncs.
+        exclude: src/scantailor/translations/|tools/pyinstaller/used_modules.txt
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: "v0.17.0"
     hooks:
