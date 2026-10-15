@@ -1,57 +1,60 @@
 """Tests for the largest obstacle-free rectangle search."""
 
+import json
 import time
+from pathlib import Path
 
 import numpy as np
 import pytest
-from numba import njit
-from numpy.typing import NDArray
 
+from scantailor.filters.select_content.content_box_finder import _block_found
 from scantailor.filters.select_content.max_whitespace import (
     WhitespaceRect,
     WhitespaceSearch,
     largest_whitespace,
 )
+from tests.filters.select_content.test_content_rect_pages import _page
+
+_CUTS_FIXTURE = (
+    Path(__file__).parents[2] / "fixtures" / "select_content" / ("whitespace_cuts.json")
+)
+
+# Name -> (powers, minimum size, shrink of each block, most cuts), as the
+# content box finder runs its three searches.
+_SEARCHES = {
+    "wide": ((2, 1), 1, "height", 80),
+    "tall": ((1, 2), 1, "width", 40),
+    "area": ((1, 1), 4, None, 10),
+}
 
 
-@njit(cache=True)
 def _reference_scan(
-    obstacles: NDArray[np.bool_],
+    obstacles: np.ndarray,
     width_power: int,
     height_power: int,
     min_width: int,
     min_height: int,
 ) -> tuple[int, int, int, int]:
-    """Full monotone stack scan of every row; the behaviour to be matched."""
+    """Monotone stack scan of every row; the behaviour, ties included, to match."""
     rows, cols = obstacles.shape
-    heights = np.zeros(cols + 1, dtype=np.int32)
-    stack_start = np.empty(cols + 1, dtype=np.int32)
-    stack_height = np.empty(cols + 1, dtype=np.int32)
+    heights = [0] * (cols + 1)
     best_quality = -1
     best = (0, 0, 0, 0)
     for y in range(rows):
         for x in range(cols):
             heights[x] = 0 if obstacles[y, x] else heights[x] + 1
-        depth = 0
+        stack: list[tuple[int, int]] = []
         for x in range(cols + 1):
             start = x
-            while depth > 0 and stack_height[depth - 1] >= heights[x]:
-                depth -= 1
-                popped_height = stack_height[depth]
-                start = stack_start[depth]
+            while stack and stack[-1][1] >= heights[x]:
+                start, popped_height = stack.pop()
                 width = x - start
                 if popped_height >= min_height and width >= min_width:
-                    quality = 1
-                    for _ in range(width_power):
-                        quality *= width
-                    for _ in range(height_power):
-                        quality *= popped_height
+                    quality = width**width_power * popped_height**height_power
                     if quality > best_quality:
                         best_quality = quality
                         best = (start, y - popped_height + 1, width, popped_height)
-            stack_start[depth] = start
-            stack_height[depth] = heights[x]
-            depth += 1
+            stack.append((start, heights[x]))
     return best
 
 
@@ -198,6 +201,33 @@ class TestLargestWhitespace:
 
         assert (found.area if found else 0) == expected
 
+    @pytest.mark.parametrize("period", [3, 4, 6])
+    @pytest.mark.parametrize("powers", [(1, 1), (2, 1), (1, 2)])
+    def test_ties_on_a_regular_grid_resolve_like_the_stack_scan(
+        self, period: int, powers: tuple[int, int]
+    ) -> None:
+        """Equal cells everywhere: the top row, then the left end, then the taller."""
+        obstacles = np.zeros((30, 40), dtype=bool)
+        obstacles[::period, :] = True
+        obstacles[:, ::period] = True
+
+        assert largest_whitespace(obstacles, *powers) == _reference(
+            obstacles, *powers, 1, 1
+        )
+
+    def test_equal_quality_rectangles_ending_in_one_column_pick_the_taller(
+        self,
+    ) -> None:
+        """A 2 x 3 and a 3 x 2 rectangle with the same right edge and area 6."""
+        obstacles = np.ones((4, 5), dtype=bool)
+        obstacles[1:4, 3:5] = False
+        obstacles[2:4, 2:5] = False
+
+        found = largest_whitespace(obstacles)
+
+        assert found == WhitespaceRect(left=3, top=1, width=2, height=3)
+        assert found == _reference(obstacles, 1, 1, 1, 1)
+
 
 class TestWhitespaceSearch:
     @pytest.mark.parametrize("powers", [(1, 1), (2, 1), (1, 2)])
@@ -251,6 +281,23 @@ class TestWhitespaceSearch:
 
         assert search.largest() is None
 
+    def test_many_blocks_on_one_search_match_fresh_scans(self) -> None:
+        """Enough blocks to fill the spare room of the rectangle table several times."""
+        rng = np.random.default_rng(9)
+        obstacles = rng.random((60, 70)) < 0.05
+        search = WhitespaceSearch(obstacles, 1, 1)
+        current = obstacles.copy()
+        for _ in range(60):
+            top, left = int(rng.integers(0, 60)), int(rng.integers(0, 70))
+            bottom, right = (
+                top + int(rng.integers(1, 6)),
+                left + int(rng.integers(1, 6)),
+            )
+            search.block(top, left, bottom, right)
+            current[top:bottom, left:right] = True
+
+            assert search.largest() == largest_whitespace(current)
+
 
 def _page_like_map(rng: np.random.Generator) -> np.ndarray:
     """Text-like obstacle map: many short ink runs in lines on a 900 x 640 page."""
@@ -281,12 +328,14 @@ def _cut_sequence(finder_factory, obstacles: np.ndarray) -> list:
     return found_all
 
 
-class _ReferenceFinder:
+class _RescanningFinder:
+    """Search the whole updated map afresh on every query."""
+
     def __init__(self, obstacles: np.ndarray) -> None:
         self._map = obstacles.copy()
 
     def largest(self) -> WhitespaceRect | None:
-        return _reference(self._map, 2, 1, 1, 1)
+        return largest_whitespace(self._map, 2, 1, 1, 1)
 
     def block(self, top: int, left: int, bottom: int, right: int) -> None:
         self._map[top:bottom, left:right] = True
@@ -295,16 +344,38 @@ class _ReferenceFinder:
 class TestWhitespaceSearchSpeed:
     def test_block_cutting_loop_is_much_faster_than_rescanning(self) -> None:
         obstacles = _page_like_map(np.random.default_rng(5))
-        _cut_sequence(lambda m: WhitespaceSearch(m, 2, 1), obstacles[:20, :20])
-        _reference(obstacles[:20, :20], 2, 1, 1, 1)
 
         start = time.perf_counter()
-        expected = _cut_sequence(_ReferenceFinder, obstacles)
-        reference_time = time.perf_counter() - start
+        expected = _cut_sequence(_RescanningFinder, obstacles)
+        rescan_time = time.perf_counter() - start
         start = time.perf_counter()
         actual = _cut_sequence(lambda m: WhitespaceSearch(m, 2, 1), obstacles)
         incremental_time = time.perf_counter() - start
 
         assert actual == expected
         assert len(actual) > 20
-        assert reference_time / incremental_time >= 3
+        assert rescan_time / incremental_time >= 3
+
+
+def _cuts(ink: np.ndarray, search: str) -> list[list[int]]:
+    """Cut whitespace from a page the way the content box finder does."""
+    powers, min_size, shrink, max_count = _SEARCHES[search]
+    area_threshold = min(ink.shape)
+    finder = WhitespaceSearch(ink, *powers, min_size, min_size)
+    found_all = []
+    for _ in range(max_count):
+        found = finder.largest()
+        if found is None or found.area < area_threshold:
+            break
+        found_all.append(list(found))
+        _block_found(finder, found, shrink)
+    return found_all
+
+
+@pytest.mark.parametrize("search", sorted(_SEARCHES))
+@pytest.mark.parametrize("seed", [0, 1, 4, 6])
+def test_cuts_on_a_seeded_page_match_the_recorded_ones(seed: int, search: str) -> None:
+    """Every rectangle, tie-breaks included, as recorded from the stack scan."""
+    expected = json.loads(_CUTS_FIXTURE.read_text())[str(seed)][search]
+
+    assert _cuts(_page(seed) < 128, search) == expected

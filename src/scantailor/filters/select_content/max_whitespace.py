@@ -3,10 +3,12 @@
 from typing import NamedTuple
 
 import numpy as np
-from numba import njit
 from numpy.typing import NDArray
 
-_NONE = -1
+# Rows of a rectangle table: one column per rectangle, far edges exclusive.
+_TOP, _LEFT, _BOTTOM, _RIGHT = range(4)
+# Quality of a removed rectangle; real qualities are never negative.
+_GONE = -1
 
 
 class WhitespaceRect(NamedTuple):
@@ -30,184 +32,119 @@ class WhitespaceRect(NamedTuple):
         return self.width * self.height
 
 
-@njit(cache=True)
-def _scan_row(
-    free_above: NDArray[np.int32],
-    width_power: int,
-    height_power: int,
-    min_width: int,
-    min_height: int,
-    stack_start: NDArray[np.int32],
-    stack_height: NDArray[np.int32],
-) -> tuple[int, int, int, int]:
-    """Find the best rectangle whose bottom edge lies on one row.
+def _pixel_rectangles(
+    obstacles: NDArray[np.bool_],
+) -> tuple[NDArray[np.int32], NDArray[np.int32], NDArray[np.int32]]:
+    """Find the largest rectangle each free pixel bounds from below.
 
-    Every maximal obstacle-free rectangle is popped from a monotone stack of
-    column heights exactly once, so a quality that never decreases when a
-    rectangle grows is maximised over all of them. Among equal qualities the
-    first one popped wins.
+    That rectangle is as high as the free run above the pixel and as wide as
+    every row of the run allows, so its left edge is the largest "first free
+    column" over the rows of the run, and likewise for the right edge. The
+    rows are walked one at a time: whole-row ufuncs are faster than a
+    cumulative maximum down the columns, which would also need a trick to
+    restart at every obstacle.
+
+    Args:
+        obstacles (NDArray[np.bool_]): 2-D mask, True where a rectangle may not reach.
 
     Returns:
-        tuple[int, int, int, int]: quality, left, width and height of the best
-            rectangle, with a quality of -1 when none reaches the minimum size.
+        tuple[NDArray[np.int32], NDArray[np.int32], NDArray[np.int32]]: Height,
+            first column and last column of the rectangle of every free pixel;
+            0 height on obstacles, where the columns are meaningless.
     """
-    cols = free_above.shape[0]
-    best_quality = _NONE
-    best_left = 0
-    best_width = 0
-    best_height = 0
-    depth = 0
-    for x in range(cols + 1):
-        current = free_above[x] if x < cols else 0
-        start = x
-        while depth > 0 and stack_height[depth - 1] >= current:
-            depth -= 1
-            popped_height = stack_height[depth]
-            start = stack_start[depth]
-            width = x - start
-            if popped_height >= min_height and width >= min_width:
-                quality = 1
-                for _ in range(width_power):
-                    quality *= width
-                for _ in range(height_power):
-                    quality *= popped_height
-                if quality > best_quality:
-                    best_quality = quality
-                    best_left = start
-                    best_width = width
-                    best_height = popped_height
-        stack_start[depth] = start
-        stack_height[depth] = current
-        depth += 1
-    return best_quality, best_left, best_width, best_height
-
-
-@njit(cache=True)
-def _scan_all_rows(
-    obstacles: NDArray[np.bool_],
-    width_power: int,
-    height_power: int,
-    min_width: int,
-    min_height: int,
-) -> tuple[
-    NDArray[np.int32],
-    NDArray[np.int64],
-    NDArray[np.int32],
-    NDArray[np.int32],
-    NDArray[np.int32],
-]:
-    """Build the free-run heights and the best rectangle of every bottom row."""
     rows, cols = obstacles.shape
-    free_above = np.zeros((rows, cols), dtype=np.int32)
-    quality = np.full(rows, _NONE, dtype=np.int64)
-    left = np.zeros(rows, dtype=np.int32)
-    width = np.zeros(rows, dtype=np.int32)
-    height = np.zeros(rows, dtype=np.int32)
-    stack_start = np.empty(cols + 1, dtype=np.int32)
-    stack_height = np.empty(cols + 1, dtype=np.int32)
-    for y in range(rows):
-        for x in range(cols):
-            if not obstacles[y, x]:
-                free_above[y, x] = 1 + (free_above[y - 1, x] if y > 0 else 0)
-        found = _scan_row(
-            free_above[y],
-            width_power,
-            height_power,
-            min_width,
-            min_height,
-            stack_start,
-            stack_height,
-        )
-        quality[y], left[y], width[y], height[y] = found
-    return free_above, quality, left, width, height
+    col_index = np.arange(cols, dtype=np.int32)
+    free = (~obstacles).astype(np.int32)
+    first_free = np.maximum.accumulate(
+        np.where(obstacles, col_index + 1, np.int32(0)), axis=1
+    )
+    # Counting columns from the right turns the right edge into a maximum too.
+    mirrored_last_free = np.maximum.accumulate(
+        np.where(obstacles, cols - col_index, np.int32(0))[:, ::-1], axis=1
+    )[:, ::-1]
+    height = np.empty((rows, cols), dtype=np.int32)
+    left = np.empty((rows, cols), dtype=np.int32)
+    mirrored_right = np.empty((rows, cols), dtype=np.int32)
+    height[0] = free[0]
+    left[0] = first_free[0] * free[0]
+    mirrored_right[0] = mirrored_last_free[0] * free[0]
+    for y in range(1, rows):
+        np.add(height[y - 1], free[y], out=height[y])
+        height[y] *= free[y]
+        np.maximum(left[y - 1], first_free[y], out=left[y])
+        left[y] *= free[y]
+        np.maximum(mirrored_right[y - 1], mirrored_last_free[y], out=mirrored_right[y])
+        mirrored_right[y] *= free[y]
+    return height, left, cols - 1 - mirrored_right
 
 
-@njit(cache=True)
-def _block_rectangle(
-    free_above: NDArray[np.int32],
-    quality: NDArray[np.int64],
-    left: NDArray[np.int32],
-    width: NDArray[np.int32],
-    height: NDArray[np.int32],
-    stale: NDArray[np.bool_],
-    block_top: int,
-    block_bottom: int,
-    block_left: int,
-    block_right: int,
-) -> None:
-    """Make a rectangle an obstacle and flag the rows whose best it destroys."""
-    rows = free_above.shape[0]
-    for y in range(block_top, block_bottom):
-        free_above[y, block_left:block_right] = 0
-    # Below the block each column changes only down to its next obstacle.
-    for x in range(block_left, block_right):
-        for y in range(block_bottom, rows):
-            if free_above[y, x] == 0:
-                break
-            free_above[y, x] = free_above[y - 1, x] + 1
-    for y in range(rows):
-        if quality[y] == _NONE:
-            continue
-        if (
-            y >= block_top
-            and y - height[y] + 1 < block_bottom
-            and left[y] < block_right
-            and left[y] + width[y] > block_left
-        ):
-            stale[y] = True
+def _maximal_rectangles(obstacles: NDArray[np.bool_]) -> NDArray[np.int32]:
+    """List every maximal obstacle-free rectangle.
 
+    The rectangle a free pixel bounds from below cannot grow up, left or
+    right. It is maximal when it cannot grow down either: when the pixel below
+    is an obstacle or bounds a rectangle of other columns. A run of pixels of
+    equal height names one rectangle, so only the first pixel of each run
+    counts; the few repeats left are harmless.
 
-@njit(cache=True)
-def _best_row(
-    free_above: NDArray[np.int32],
-    quality: NDArray[np.int64],
-    left: NDArray[np.int32],
-    width: NDArray[np.int32],
-    height: NDArray[np.int32],
-    stale: NDArray[np.bool_],
-    width_power: int,
-    height_power: int,
-    min_width: int,
-    min_height: int,
-) -> int:
-    """Return the bottom row of the best rectangle, or -1 when there is none.
+    Args:
+        obstacles (NDArray[np.bool_]): 2-D mask, True where a rectangle may not reach.
 
-    Rows flagged stale hold an upper bound of their best quality, because
-    obstacles only remove candidates. The row with the highest bound is
-    rescanned until it is up to date; then no other row can beat it.
+    Returns:
+        NDArray[np.int32]: Rectangle table, one column of top, left, bottom
+            and right per rectangle.
     """
-    rows, cols = free_above.shape
-    stack_start = np.empty(cols + 1, dtype=np.int32)
-    stack_height = np.empty(cols + 1, dtype=np.int32)
-    while True:
-        best = _NONE
-        best_row = -1
-        for y in range(rows):
-            if quality[y] > best:
-                best = quality[y]
-                best_row = y
-        if best_row < 0 or not stale[best_row]:
-            return best_row
-        found = _scan_row(
-            free_above[best_row],
-            width_power,
-            height_power,
-            min_width,
-            min_height,
-            stack_start,
-            stack_height,
-        )
-        quality[best_row], left[best_row], width[best_row], height[best_row] = found
-        stale[best_row] = False
+    height, left, right = _pixel_rectangles(obstacles)
+    named_here = height > 0
+    named_here[:, 1:] &= height[:, 1:] != height[:, :-1]
+    named_here[:-1] &= (
+        obstacles[1:] | (left[1:] != left[:-1]) | (right[1:] != right[:-1])
+    )
+    rows, cols = np.nonzero(named_here)
+    table = np.empty((4, rows.size), dtype=np.int32)
+    table[_TOP] = rows - height[rows, cols] + 1
+    table[_LEFT] = left[rows, cols]
+    table[_BOTTOM] = rows + 1
+    table[_RIGHT] = right[rows, cols] + 1
+    return table
+
+
+def _parts_beside(
+    rectangles: NDArray[np.int32], top: int, left: int, bottom: int, right: int
+) -> NDArray[np.int32]:
+    """Cut the parts above, below, left and right of a block out of rectangles.
+
+    A rectangle inside one of them that misses the block lies wholly on one
+    side of the block, so the four parts hold every maximal rectangle the
+    block leaves behind.
+
+    Args:
+        rectangles (NDArray[np.int32]): Rectangle table; every one overlaps the block.
+        top (int): First row of the block.
+        left (int): First column of the block.
+        bottom (int): One past the last row of the block.
+        right (int): One past the last column of the block.
+
+    Returns:
+        NDArray[np.int32]: Rectangle table of the parts that are not empty.
+    """
+    above, below, before, after = (rectangles.copy() for _ in range(4))
+    np.minimum(above[_BOTTOM], top, out=above[_BOTTOM])
+    np.maximum(below[_TOP], bottom, out=below[_TOP])
+    np.minimum(before[_RIGHT], left, out=before[_RIGHT])
+    np.maximum(after[_LEFT], right, out=after[_LEFT])
+    parts = np.concatenate([above, below, before, after], axis=1)
+    return parts[:, (parts[_TOP] < parts[_BOTTOM]) & (parts[_LEFT] < parts[_RIGHT])]
 
 
 class WhitespaceSearch:
     """Repeated largest-whitespace queries on an image that gains obstacles.
 
-    The first query scans the whole image. Later queries rescan only the rows
-    whose best rectangle was hit by an obstacle added since, so a sequence of
-    "find the best rectangle, block it, find the next" costs little more than
-    one scan. Results are identical to a fresh scan of the updated image.
+    The image is scanned once for every maximal obstacle-free rectangle. A
+    block replaces the rectangles it overlaps by their parts beside it, so a
+    sequence of "find the best rectangle, block it, find the next" costs
+    little more than the scan. Results are identical to a fresh scan of the
+    updated image.
 
     Args:
         obstacles (numpy.ndarray of numpy.bool):
@@ -227,44 +164,58 @@ class WhitespaceSearch:
         min_width: int = 1,
         min_height: int = 1,
     ) -> None:
-        """Scan the whole image once for the best rectangle of every bottom row."""
+        """List the maximal rectangles of the image."""
         self._powers = (width_power, height_power)
         self._minimum = (max(1, min_width), max(1, min_height))
-        self._is_empty = obstacles.size == 0
         self._shape = obstacles.shape
-        if self._is_empty:
-            return
-        (
-            self._free_above,
-            self._quality,
-            self._left,
-            self._width,
-            self._height,
-        ) = _scan_all_rows(
-            np.ascontiguousarray(obstacles), *self._powers, *self._minimum
+        if obstacles.size == 0:
+            found = np.zeros((4, 0), dtype=np.int32)
+        else:
+            found = _maximal_rectangles(np.asarray(obstacles, dtype=bool))
+        self._store(*self._rate(found))
+
+    def _rate(
+        self, rectangles: NDArray[np.int32]
+    ) -> tuple[NDArray[np.int32], NDArray[np.int64]]:
+        """Keep the rectangles that reach the minimum size, with their qualities.
+
+        Args:
+            rectangles (NDArray[np.int32]): Rectangle table.
+
+        Returns:
+            tuple[NDArray[np.int32], NDArray[np.int64]]: The rectangles kept and
+                their qualities.
+        """
+        width = rectangles[_RIGHT] - rectangles[_LEFT]
+        height = rectangles[_BOTTOM] - rectangles[_TOP]
+        quality = np.power(width, self._powers[0], dtype=np.int64) * np.power(
+            height, self._powers[1], dtype=np.int64
         )
-        self._stale = np.zeros(obstacles.shape[0], dtype=np.bool_)
+        # A quality past the int64 range wraps around; negative ones never win.
+        kept = (
+            (width >= self._minimum[0]) & (height >= self._minimum[1]) & (quality >= 0)
+        )
+        return rectangles[:, kept], quality[kept]
 
     def largest(self) -> WhitespaceRect | None:
-        """Return the best rectangle now, or None when none reaches the minimum."""
-        if self._is_empty:
+        """Return the best rectangle now, or None when none reaches the minimum.
+
+        Among equal qualities the rectangle whose bottom edge is highest wins,
+        then the one ending furthest left, then the taller one: the order in
+        which a monotone stack of column heights, run along each row from the
+        top, meets them.
+        """
+        best = self._quality.max(initial=_GONE)
+        if best == _GONE:
             return None
-        row = _best_row(
-            self._free_above,
-            self._quality,
-            self._left,
-            self._width,
-            self._height,
-            self._stale,
-            *self._powers,
-            *self._minimum,
+        tied = self._found[:, self._quality == best]
+        top, left, bottom, right = (
+            int(edge)
+            for edge in tied[
+                :, np.lexsort((tied[_TOP], tied[_RIGHT], tied[_BOTTOM]))[0]
+            ]
         )
-        if row < 0:
-            return None
-        height = int(self._height[row])
-        return WhitespaceRect(
-            int(self._left[row]), row - height + 1, int(self._width[row]), height
-        )
+        return WhitespaceRect(left, top, right - left, bottom - top)
 
     def block(self, top: int, left: int, bottom: int, right: int) -> None:
         """Make rows ``top:bottom`` and columns ``left:right`` an obstacle.
@@ -275,25 +226,62 @@ class WhitespaceSearch:
             bottom (int): One past the last row.
             right (int): One past the last column.
         """
-        if self._is_empty:
-            return
         rows, cols = self._shape
         top, left = max(top, 0), max(left, 0)
         bottom, right = min(bottom, rows), min(right, cols)
-        if top >= bottom or left >= right:
+        found = self._found
+        hit = np.flatnonzero((found[_TOP] < bottom) & (found[_BOTTOM] > top))
+        hit = hit[
+            (found[_LEFT, hit] < right)
+            & (found[_RIGHT, hit] > left)
+            & (self._quality[hit] != _GONE)
+        ]
+        if hit.size == 0:
             return
-        _block_rectangle(
-            self._free_above,
-            self._quality,
-            self._left,
-            self._width,
-            self._height,
-            self._stale,
-            top,
-            bottom,
-            left,
-            right,
+        parts, quality = self._rate(
+            _parts_beside(found[:, hit], top, left, bottom, right)
         )
+        self._quality[hit] = _GONE
+        self._append(parts, quality)
+
+    def _store(self, rectangles: NDArray[np.int32], quality: NDArray[np.int64]) -> None:
+        """Hold rectangles in tables with as much room again to add more.
+
+        Args:
+            rectangles (NDArray[np.int32]): Rectangle table.
+            quality (NDArray[np.int64]): Their qualities.
+        """
+        capacity = 2 * quality.size + 64
+        self._found = np.zeros((4, capacity), dtype=np.int32)
+        self._found[:, : quality.size] = rectangles
+        self._quality = np.full(capacity, _GONE, dtype=np.int64)
+        self._quality[: quality.size] = quality
+        self._used = quality.size
+
+    def _append(
+        self, rectangles: NDArray[np.int32], quality: NDArray[np.int64]
+    ) -> None:
+        """Add rectangles after the others, dropping removed ones when room runs out.
+
+        Removed rectangles stay in place with a quality that never wins, so a
+        block does not copy the whole table each time.
+
+        Args:
+            rectangles (NDArray[np.int32]): Rectangle table to add.
+            quality (NDArray[np.int64]): Their qualities.
+        """
+        end = self._used + quality.size
+        if end > self._quality.size:
+            used = slice(0, self._used)
+            kept = self._quality[used] != _GONE
+            self._store(
+                np.concatenate([self._found[:, used][:, kept], rectangles], axis=1),
+                np.concatenate([self._quality[used][kept], quality]),
+            )
+            return
+        self._found[:, self._used : end] = rectangles
+        self._quality[self._used : end] = quality
+        self._used = end
 
 
 def largest_whitespace(
