@@ -255,51 +255,37 @@ def _content_blocks(
     area_threshold = min(width, height)
     blocks = np.ones_like(content)
 
-    _cut_whitespace(
-        blocks, despeckled, (2, 1), _MAX_HORIZONTAL_BLOCKS, area_threshold, "height"
-    )
-    _cut_whitespace(
-        blocks, despeckled, (1, 2), _MAX_VERTICAL_BLOCKS, area_threshold, "width"
-    )
+    wide = WhitespaceSearch(despeckled, 2, 1)
+    tall = wide.with_powers(1, 2)
+    _cut_whitespace(blocks, wide, _MAX_HORIZONTAL_BLOCKS, area_threshold, "height")
+    _cut_whitespace(blocks, tall, _MAX_VERTICAL_BLOCKS, area_threshold, "width")
     blocks = _trim_blocks_to_content(despeckled, blocks)
 
-    obstacles = content | ~blocks
-    _cut_whitespace(
-        blocks,
-        obstacles,
-        (1, 1),
-        _MAX_EXTRA_BLOCKS,
-        area_threshold,
-        None,
-        min_size=_EXTRA_MIN_SIZE,
-    )
+    extra = WhitespaceSearch(content | ~blocks, 1, 1, _EXTRA_MIN_SIZE, _EXTRA_MIN_SIZE)
+    _cut_whitespace(blocks, extra, _MAX_EXTRA_BLOCKS, area_threshold, None)
     return _trim_blocks_to_content(despeckled, blocks)
 
 
 def _cut_whitespace(
     blocks: NDArray[np.bool_],
-    obstacles: NDArray[np.bool_],
-    powers: tuple[int, int],
+    search: WhitespaceSearch,
     max_count: int,
     area_threshold: int,
     shrink: str | None,
-    min_size: int = 1,
 ) -> None:
     """Clear the largest whitespace rectangles from ``blocks`` in place.
 
     Args:
         blocks (numpy.ndarray of numpy.bool): Block mask; modified.
-        obstacles (numpy.ndarray of numpy.bool): Ink the rectangles must avoid. Not
-            modified.
-        powers (tuple[int, int]): Width and height exponents of the quality.
+        search (WhitespaceSearch): Search over the ink the rectangles must
+            avoid, with the quality exponents and minimum size; each cut is
+            blocked in it.
         max_count (int): Most rectangles to cut.
         area_threshold (int): Rectangles with a smaller area end the search.
         shrink (str | None): "height" or "width" shrinks the obstacle added
             after each cut by a fifth of that dimension on both sides, so later
             rectangles may overlap it. None adds the whole rectangle.
-        min_size (int): Smallest width and height of a rectangle.
     """
-    search = WhitespaceSearch(obstacles, *powers, min_size, min_size)
     for _ in range(max_count):
         found = search.largest()
         if found is None or found.area < area_threshold:

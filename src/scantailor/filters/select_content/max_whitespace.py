@@ -1,5 +1,6 @@
 """Largest obstacle-free rectangle of a bilevel image."""
 
+import copy
 from typing import NamedTuple
 
 import numpy as np
@@ -32,50 +33,51 @@ class WhitespaceRect(NamedTuple):
         return self.width * self.height
 
 
-def _pixel_rectangles(
-    obstacles: NDArray[np.bool_],
-) -> tuple[NDArray[np.int32], NDArray[np.int32], NDArray[np.int32]]:
+def _rectangle_edges(obstacles: NDArray[np.bool_]) -> NDArray[np.signedinteger]:
     """Find the largest rectangle each free pixel bounds from below.
 
     That rectangle is as high as the free run above the pixel and as wide as
     every row of the run allows, so its left edge is the largest "first free
-    column" over the rows of the run, and likewise for the right edge. The
-    rows are walked one at a time: whole-row ufuncs are faster than a
-    cumulative maximum down the columns, which would also need a trick to
-    restart at every obstacle.
+    column" over the rows of the run, and likewise for the right edge. Each
+    row follows from the one above with one maximum and one minimum over all
+    three edges at once: the maximum carries the run down and narrows it to
+    the free span of the row, and the minimum, which only bites on obstacles,
+    starts a new run below them. Edges are stored so that both steps act the
+    same way on every edge.
 
     Args:
         obstacles (NDArray[np.bool_]): 2-D mask, True where a rectangle may not reach.
 
     Returns:
-        tuple[NDArray[np.int32], NDArray[np.int32], NDArray[np.int32]]: Height,
-            first column and last column of the rectangle of every free pixel;
-            0 height on obstacles, where the columns are meaningless.
+        NDArray[np.signedinteger]: Array of shape (rows, 3, cols) holding, per
+            pixel, minus the top row, the left column, and the number of
+            columns between the right edge and the right of the image.
+            Obstacles hold a negative value in every channel.
     """
     rows, cols = obstacles.shape
-    col_index = np.arange(cols, dtype=np.int32)
-    free = (~obstacles).astype(np.int32)
-    first_free = np.maximum.accumulate(
-        np.where(obstacles, col_index + 1, np.int32(0)), axis=1
-    )
-    # Counting columns from the right turns the right edge into a maximum too.
-    mirrored_last_free = np.maximum.accumulate(
-        np.where(obstacles, cols - col_index, np.int32(0))[:, ::-1], axis=1
-    )[:, ::-1]
-    height = np.empty((rows, cols), dtype=np.int32)
-    left = np.empty((rows, cols), dtype=np.int32)
-    mirrored_right = np.empty((rows, cols), dtype=np.int32)
-    height[0] = free[0]
-    left[0] = first_free[0] * free[0]
-    mirrored_right[0] = mirrored_last_free[0] * free[0]
+    dtype = np.int16 if max(rows, cols) < np.iinfo(np.int16).max else np.int32
+    col_number = np.arange(1, cols + 1, dtype=dtype)
+    # (rows, 1): minus the top row of a run that starts on the next row.
+    below = -np.arange(1, rows + 1, dtype=dtype)[:, None]
+    edges = np.empty((rows, 3, cols), dtype=dtype)
+    # A run carries its top row down unchanged.
+    edges[:, 0] = np.iinfo(dtype).min
+    # First free column of the row segment of every pixel.
+    np.multiply(obstacles, col_number, out=edges[:, 1])
+    np.maximum.accumulate(edges[:, 1], axis=1, out=edges[:, 1])
+    # Columns right of the row segment, counted on the mirrored image.
+    mirrored = edges[:, 2, ::-1]
+    np.multiply(obstacles[:, ::-1], col_number, out=mirrored)
+    np.maximum.accumulate(mirrored, axis=1, out=mirrored)
+    # (rows, 1, cols): forces all three edges of an obstacle down to below.
+    ceiling = np.where(obstacles, below, np.iinfo(dtype).max)[:, None, :]
+    # Above the image is a run of height 0 that starts at row 0.
+    np.maximum(edges[0], 0, out=edges[0])
+    np.minimum(edges[0], ceiling[0], out=edges[0])
     for y in range(1, rows):
-        np.add(height[y - 1], free[y], out=height[y])
-        height[y] *= free[y]
-        np.maximum(left[y - 1], first_free[y], out=left[y])
-        left[y] *= free[y]
-        np.maximum(mirrored_right[y - 1], mirrored_last_free[y], out=mirrored_right[y])
-        mirrored_right[y] *= free[y]
-    return height, left, cols - 1 - mirrored_right
+        np.maximum(edges[y - 1], edges[y], out=edges[y])
+        np.minimum(edges[y], ceiling[y], out=edges[y])
+    return edges
 
 
 def _maximal_rectangles(obstacles: NDArray[np.bool_]) -> NDArray[np.int32]:
@@ -94,18 +96,20 @@ def _maximal_rectangles(obstacles: NDArray[np.bool_]) -> NDArray[np.int32]:
         NDArray[np.int32]: Rectangle table, one column of top, left, bottom
             and right per rectangle.
     """
-    height, left, right = _pixel_rectangles(obstacles)
-    named_here = height > 0
-    named_here[:, 1:] &= height[:, 1:] != height[:, :-1]
+    cols = obstacles.shape[1]
+    edges = _rectangle_edges(obstacles)
+    minus_top, left, after_right = edges[:, 0], edges[:, 1], edges[:, 2]
+    named_here = ~obstacles
+    named_here[:, 1:] &= minus_top[:, 1:] != minus_top[:, :-1]
     named_here[:-1] &= (
-        obstacles[1:] | (left[1:] != left[:-1]) | (right[1:] != right[:-1])
+        obstacles[1:] | (left[1:] != left[:-1]) | (after_right[1:] != after_right[:-1])
     )
-    rows, cols = np.nonzero(named_here)
-    table = np.empty((4, rows.size), dtype=np.int32)
-    table[_TOP] = rows - height[rows, cols] + 1
-    table[_LEFT] = left[rows, cols]
-    table[_BOTTOM] = rows + 1
-    table[_RIGHT] = right[rows, cols] + 1
+    row, col = np.divmod(np.flatnonzero(named_here), cols)
+    table = np.empty((4, row.size), dtype=np.int32)
+    table[_TOP] = -minus_top[row, col]
+    table[_LEFT] = left[row, col]
+    table[_BOTTOM] = row + 1
+    table[_RIGHT] = cols - after_right[row, col]
     return table
 
 
@@ -172,7 +176,28 @@ class WhitespaceSearch:
             found = np.zeros((4, 0), dtype=np.int32)
         else:
             found = _maximal_rectangles(np.asarray(obstacles, dtype=bool))
+        self._maximal = found
         self._store(*self._rate(found))
+
+    def with_powers(self, width_power: int, height_power: int) -> WhitespaceSearch:
+        """Start a second search of the same image with other quality exponents.
+
+        The new search sees the image as it was given to the constructor,
+        without the blocks made on this one since, and keeps the minimum size.
+        It reuses the scan, so it costs much less than a new instance.
+
+        Args:
+            width_power (int): Exponent of the width in the quality, at least 1.
+            height_power (int): Exponent of the height in the quality, at least 1.
+
+        Returns:
+            WhitespaceSearch: An independent search; blocks on either one do not
+                reach the other.
+        """
+        search = copy.copy(self)
+        search._powers = (width_power, height_power)
+        search._store(*search._rate(self._maximal))
+        return search
 
     def _rate(
         self, rectangles: NDArray[np.int32]
@@ -205,10 +230,11 @@ class WhitespaceSearch:
         which a monotone stack of column heights, run along each row from the
         top, meets them.
         """
-        best = self._quality.max(initial=_GONE)
+        quality = self._quality[: self._used]
+        best = quality.max(initial=_GONE)
         if best == _GONE:
             return None
-        tied = self._found[:, self._quality == best]
+        tied = self._found[:, np.flatnonzero(quality == best)]
         top, left, bottom, right = (
             int(edge)
             for edge in tied[
@@ -229,7 +255,7 @@ class WhitespaceSearch:
         rows, cols = self._shape
         top, left = max(top, 0), max(left, 0)
         bottom, right = min(bottom, rows), min(right, cols)
-        found = self._found
+        found = self._found[:, : self._used]
         hit = np.flatnonzero((found[_TOP] < bottom) & (found[_BOTTOM] > top))
         hit = hit[
             (found[_LEFT, hit] < right)
