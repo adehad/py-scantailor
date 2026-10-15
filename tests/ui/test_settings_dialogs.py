@@ -132,6 +132,7 @@ UNWIRED = (
 WIRED = (
     ("languageBox", QtWidgets.QComboBox),
     ("colorSchemeBox", QtWidgets.QComboBox),
+    ("hoverHighlightBox", QtWidgets.QComboBox),
     ("unitsBox", QtWidgets.QComboBox),
     ("autoSaveProjectCB", QtWidgets.QCheckBox),
     ("thumbnailQualitySB", QtWidgets.QSpinBox),
@@ -327,6 +328,33 @@ class TestSettingsDialog:
 
         assert window_lightness(qapp) < light
         assert QtCore.QSettings().value(theme.SETTINGS_KEY) == "dark"
+        theme.apply_theme(qapp, theme.AUTO)
+
+    def test_hover_highlight_is_neutral_until_the_accent_is_chosen(
+        self,
+        qtbot: QtBot,
+        qapp: QtWidgets.QApplication,
+        config: pathlib.Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
+        theme.apply_theme(qapp, "light")
+        neutral = "QToolButton#groupHeader:pressed { background: rgba(42, 38, 32"
+        assert neutral in qapp.styleSheet()
+        dialog = SettingsDialog(ApplicationSettings())
+        qtbot.addWidget(dialog)
+
+        def drive(dlg: QtWidgets.QDialog) -> None:
+            box = find(dlg, QtWidgets.QComboBox, "hoverHighlightBox")
+            assert box.currentData() == theme.NEUTRAL
+            box.setCurrentIndex(box.findData(theme.ACCENT))
+            accept(dlg)
+
+        exec_while(dialog, drive)
+
+        assert QtCore.QSettings().value(theme.HOVER_KEY) == theme.ACCENT
+        accent = "QToolButton#groupHeader:pressed { background: rgba(47, 111, 237"
+        assert accent in qapp.styleSheet()
         theme.apply_theme(qapp, theme.AUTO)
 
     def test_cancel_leaves_settings_untouched(
