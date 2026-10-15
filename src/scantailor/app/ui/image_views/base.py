@@ -14,7 +14,7 @@ subclasses draw overlays and handle their own handles.
 
 import math
 from enum import IntFlag, auto
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -552,6 +552,20 @@ class ImageViewBase(QtWidgets.QAbstractScrollArea):
     def widget_to_image(self) -> QTransform:
         """Return the composite widget-to-image transformation."""
         return self._widget_to_virtual * self._virtual_to_image
+
+    def update(self, *args: Any) -> None:
+        """Schedule a repaint of the image and its overlay.
+
+        The view draws on its viewport, a child widget that the scroll area's
+        own ``update()`` does not repaint, so every overload goes to the viewport.
+
+        Args:
+            *args (Any): Nothing, or the rectangle or region to repaint, in
+                viewport coordinates, as for ``QWidget.update``.
+        """
+        viewport = self.viewport()
+        assert viewport is not None
+        viewport.update(*args)
 
     def paintEvent(self, event: QtGui.QPaintEvent) -> None:
         """Draw the image, then the overlay of the subclass.
