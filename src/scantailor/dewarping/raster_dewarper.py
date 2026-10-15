@@ -288,6 +288,13 @@ def _compute_dewarp_maps(
         top + (np.arange(dst_height) + 0.5) * y_scale, dtype=np.float64
     )
 
+    # The denominator is monotonic down a column, so a column whose first and
+    # last rows are clear of zero on the same side is clear in every row.
+    ends = columns.h10 * model_ys[[0, -1], None] + columns.h11
+    clear = (ends > _DEGENERATE_DENOMINATOR).all(axis=0) | (
+        ends < -_DEGENERATE_DENOMINATOR
+    ).all(axis=0)
+
     map_x = np.empty((dst_height, dst_width), dtype=np.float32)
     map_y = np.empty((dst_height, dst_width), dtype=np.float32)
     buffers = tuple(np.empty((_MAP_BAND_ROWS, dst_width)) for _ in range(3))
@@ -300,6 +307,7 @@ def _compute_dewarp_maps(
             map_x[band],
             map_y[band],
             buffers,
+            may_be_degenerate=not clear.all(),
         )
     return map_x, map_y
 
@@ -335,6 +343,7 @@ def _fill_map_band(
     map_x: NDArray[np.float32],
     map_y: NDArray[np.float32],
     buffers: tuple[NDArray[np.float64], ...],
+    may_be_degenerate: bool,
 ) -> None:
     """Fill a band of rows of both maps in place.
 
@@ -352,6 +361,8 @@ def _fill_map_band(
         map_y (numpy.ndarray of numpy.float32): Band of the y map, written.
         buffers (tuple[numpy.ndarray of numpy.float64, ...]): Three scratch
             arrays of at least the band's shape, so no band allocates.
+        may_be_degenerate (bool): Whether any denominator may be near zero;
+            when False the band skips looking for them.
     """
     rows = map_x.shape[0]
     along, denominator, scratch = (buffer[:rows] for buffer in buffers)
@@ -359,13 +370,9 @@ def _fill_map_band(
     along += columns.h01
     np.multiply(columns.h10, model_y, out=denominator)
     denominator += columns.h11
-    # The denominator is monotonic down a column, so when the first and last
-    # rows of the band are clear of zero on the same side, every row is.
-    ends = denominator[[0, -1]]
-    clear = (ends > _DEGENERATE_DENOMINATOR).all(axis=0) | (
-        ends < -_DEGENERATE_DENOMINATOR
-    ).all(axis=0)
-    degenerate = None if clear.all() else np.abs(denominator) < _DEGENERATE_DENOMINATOR
+    degenerate = (
+        np.abs(denominator) < _DEGENERATE_DENOMINATOR if may_be_degenerate else None
+    )
     with np.errstate(divide="ignore", invalid="ignore"):
         np.divide(along, denominator, out=along)
     if degenerate is not None:
