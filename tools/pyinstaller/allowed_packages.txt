@@ -1,0 +1,99 @@
+# Packages the frozen build may contain, checked by tools/bundle_report.py.
+# A bare name must be bundled on every platform; names after it limit the entry
+# to those platforms (win32, linux, darwin). Pure-Python stdlib modules live in
+# the executables and need no entry; stdlib extension modules are files and do.
+
+# scantailor and its runtime dependencies
+scantailor
+PIL
+PySide6
+shiboken6
+annotated_types
+cv2
+jbig2_numba
+lazy_loader
+llvmlite
+loguru
+numba
+numpy
+packaging  # pikepdf.jbig2 and lazy_loader compare versions
+pikepdf
+pydantic
+pydantic_core
+pypdfium2
+pypdfium2_cfg
+pypdfium2_raw
+scipy
+skimage
+typing_extensions
+typing_inspection
+colorama win32  # loguru's coloured console on Windows
+win32_setctime win32  # loguru's file timestamps on Windows
+
+# PyInstaller's own pieces
+base_library.zip
+_pyi_rth_utils
+
+# stdlib extension modules. Windows builds most of them into python314.dll, so
+# most are files on Linux and macOS only.
+_asyncio  # loguru's async sinks
+_bisect
+_blake2
+_bz2  # zipfile
+_codecs_cn  # the CJK codecs come with the encodings package
+_codecs_hk
+_codecs_iso2022
+_codecs_jp
+_codecs_kr
+_codecs_tw
+_csv  # importlib.metadata
+_ctypes  # numpy, llvmlite
+_decimal  # multiprocessing's xmlrpc
+_elementtree  # Pillow reads XMP
+_heapq
+_hmac  # multiprocessing authenticates its workers
+_interpqueues  # concurrent.futures
+_interpreters
+_json
+_lsprof  # cProfile, through numba.testing
+_lzma  # zipfile
+_md5
+_multibytecodec
+_multiprocessing
+_pickle
+_posixshmem
+_posixsubprocess
+_queue
+_random
+_sha1
+_sha2
+_sha3
+_socket  # multiprocessing connections
+_statistics
+_struct
+_uuid  # pydantic
+_zoneinfo  # pydantic
+_zstd  # zipfile
+array
+binascii
+cmath  # numba's complex math
+fcntl
+grp
+math
+mmap
+pyexpat  # xml
+readline  # pdb, through numpy.testing
+resource
+select
+termios  # pydoc's pager, through numpy
+unicodedata
+xxsubtype linux darwin  # shiboken6; a test module, so not in sys.stdlib_module_names
+zlib
+_overlapped win32  # asyncio on Windows
+_wmi win32  # platform on Windows
+_scproxy darwin  # urllib's proxy lookup on macOS
+_sysconfigdata__darwin_darwin darwin
+_sysconfigdata__linux_x86_64-linux-gnu linux
+
+# The Python runtime itself on macOS
+Python.framework darwin

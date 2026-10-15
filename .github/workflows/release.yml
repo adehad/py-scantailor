@@ -3,8 +3,8 @@
 # A manual run (workflow_dispatch) builds and checks without publishing.
 #
 # Each build adds scantailor-checks (SCANTAILOR_BUILD_CHECKS=1, see app.spec),
-# runs it with the CLI smoke test against the folder that ships and deletes it
-# before archiving.
+# runs it with the CLI smoke test against the folder that ships, reports what the
+# folder bundles and deletes scantailor-checks before archiving.
 name: Release
 
 on:
@@ -53,7 +53,7 @@ jobs:
           # cache from an older commit is still safe to restore.
           restore-keys: numba-${{ runner.os }}-
 
-      # The smoke test needs only the runtime packages; pdm run exe
+      # The smoke test and the report need only the runtime packages; pdm run exe
       # freezes from its own environment (tools/build_exe.py).
       - name: Install dependencies
         run: pdm install --frozen-lockfile --prod
@@ -71,6 +71,18 @@ jobs:
         run: >-
           pdm run python tools/smoke_frozen.py dist/ScanTailor/scantailor-cli.exe
           --checks dist/ScanTailor/scantailor-checks.exe
+
+      - name: Report the bundle
+        if: ${{ !cancelled() }}
+        run: >-
+          pdm run python tools/bundle_report.py --json bundle-report-windows-x64.json 2>&1
+          | tee bundle-report-windows-x64.txt
+
+      - uses: actions/upload-artifact@v5
+        if: ${{ !cancelled() }}
+        with:
+          name: bundle-report-windows-x64
+          path: bundle-report-windows-x64.*
 
       - name: Remove the checks
         run: rm dist/ScanTailor/scantailor-checks.exe
@@ -129,6 +141,20 @@ jobs:
           pdm run python tools/smoke_frozen.py dist/ScanTailor/scantailor-cli
           --checks dist/ScanTailor/scantailor-checks
 
+      - name: Report the bundle
+        if: ${{ !cancelled() }}
+        # An explicit bash adds pipefail, so tee keeps the report's exit code.
+        shell: bash
+        run: >-
+          pdm run python tools/bundle_report.py --json bundle-report-linux-x64.json 2>&1
+          | tee bundle-report-linux-x64.txt
+
+      - uses: actions/upload-artifact@v5
+        if: ${{ !cancelled() }}
+        with:
+          name: bundle-report-linux-x64
+          path: bundle-report-linux-x64.*
+
       - name: Remove the checks
         run: rm dist/ScanTailor/scantailor-checks
 
@@ -175,6 +201,20 @@ jobs:
         run: >-
           pdm run python tools/smoke_frozen.py dist/ScanTailor.app/Contents/MacOS/scantailor-cli
           --checks dist/ScanTailor.app/Contents/MacOS/scantailor-checks
+
+      - name: Report the bundle
+        if: ${{ !cancelled() }}
+        # An explicit bash adds pipefail, so tee keeps the report's exit code.
+        shell: bash
+        run: >-
+          pdm run python tools/bundle_report.py --json bundle-report-macos-arm64.json 2>&1
+          | tee bundle-report-macos-arm64.txt
+
+      - uses: actions/upload-artifact@v5
+        if: ${{ !cancelled() }}
+        with:
+          name: bundle-report-macos-arm64
+          path: bundle-report-macos-arm64.*
 
       # Deleting a file from the signed bundle invalidates its ad-hoc signature,
       # so the bundle is signed again.

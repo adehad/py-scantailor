@@ -13,6 +13,7 @@ sees exactly the files that ship.
 """
 
 import os
+import shutil
 import sys
 import typing
 from importlib import metadata
@@ -27,6 +28,8 @@ if typing.TYPE_CHECKING:
     from PyInstaller.building.osx import BUNDLE
 
     SPECPATH: str
+    specnm: str
+    workpath: str
 
 ROOT = Path(SPECPATH)
 SRC = ROOT / "src"
@@ -84,8 +87,8 @@ if sys.platform == "win32":
     exe_icon = str(RESOURCES / "win32" / "scantailor.ico")
 
 
-def _analyse(script: str) -> "Analysis":
-    return Analysis(
+def _analyse(script: str, name: str) -> "Analysis":
+    analysis = Analysis(
         [str(ENTRY_POINTS / script)],
         pathex=[str(SRC)],
         datas=datas,
@@ -93,6 +96,14 @@ def _analyse(script: str) -> "Analysis":
         hookspath=[str(HOOKS)],
         hooksconfig=hooksconfig,
     )
+    # Every Analysis overwrites the same xref and warn files; keep a copy per
+    # executable for tools/bundle_report.py.
+    work = Path(workpath)
+    for kind, suffix in (("xref", "html"), ("warn", "txt")):
+        shutil.copyfile(
+            work / f"{kind}-{specnm}.{suffix}", work / f"{kind}-{name}.{suffix}"
+        )
+    return analysis
 
 
 def _executable(analysis: "Analysis", name: str, *, console: bool) -> "EXE":
@@ -107,8 +118,8 @@ def _executable(analysis: "Analysis", name: str, *, console: bool) -> "EXE":
     )
 
 
-gui = _analyse("scantailor_gui.py")
-cli = _analyse("scantailor_cli.py")
+gui = _analyse("scantailor_gui.py", "ScanTailor")
+cli = _analyse("scantailor_cli.py", "scantailor-cli")
 contents = [
     _executable(gui, "ScanTailor", console=False),
     gui.binaries,
@@ -120,7 +131,7 @@ contents = [
 if BUILD_CHECKS:
     # The checks import whatever either executable can, so they follow both.
     hiddenimports += ["scantailor.main", "scantailor.cli.main"]
-    checks = _analyse("frozen_checks.py")
+    checks = _analyse("frozen_checks.py", "scantailor-checks")
     contents.append(_executable(checks, "scantailor-checks", console=True))
 
 # UPX stays off everywhere: it corrupts some Qt and Control Flow Guard DLLs.
