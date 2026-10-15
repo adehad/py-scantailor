@@ -30,6 +30,12 @@ _FLOAT_GLYPH = (
 )
 _CLOSE_GLYPH = _SVG_HEAD + '<path d="M18 6 6 18M6 6l12 12"/></svg>'
 _CHECK_GLYPH = _SVG_HEAD + '<path d="M20 6 9 17l-5-5"/></svg>'
+# Three dots at their own size, so the narrow dock gutter does not scale them down.
+_GRIP_GLYPH = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="20" viewBox="0 0 4 20" '
+    'fill="currentColor"><circle cx="2" cy="3" r="1.5"/><circle cx="2" cy="10" '
+    'r="1.5"/><circle cx="2" cy="17" r="1.5"/></svg>'
+)
 _DIM_GLYPHS = {
     "chevron_down": "chevron-down",
     "chevron_up": "chevron-up",
@@ -60,6 +66,7 @@ def write_assets(t: Tokens, name: str) -> dict[str, str]:
     files = {key: tinted_svg(glyph, dim) for key, glyph in _DIM_GLYPHS.items()}
     files["close"] = _CLOSE_GLYPH.replace("currentColor", dim.name()).encode()
     files["float"] = _FLOAT_GLYPH.replace("currentColor", dim.name()).encode()
+    files["grip"] = _GRIP_GLYPH.replace("currentColor", dim.name()).encode()
     files["check"] = _CHECK_GLYPH.replace(
         "currentColor", QtGui.QColor(t.accent_text).name()
     ).encode()

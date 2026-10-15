@@ -19,7 +19,7 @@ def build_palette(t: Tokens) -> QtGui.QPalette:
     group = QtGui.QPalette.ColorGroup
     palette = QtGui.QPalette()
     window = QtGui.QColor(t.bg_top)
-    base = QtGui.QColor("#232838" if t.dark else "#ffffff")
+    base = QtGui.QColor(t.base)
     text = QtGui.QColor(t.text)
     dim = QtGui.QColor(t.text_dim)
     # Item delegates that paint selection with palette.highlight() (the

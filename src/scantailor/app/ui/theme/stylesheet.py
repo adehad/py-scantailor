@@ -115,18 +115,23 @@ QDockWidget {{
     titlebar-normal-icon: url({glyphs["float"]});
 }}
 QDockWidget::close-button, QDockWidget::float-button {{
-    width: 20px; height: 20px; border: none; border-radius: 6px;
+    width: 24px; height: 24px; border: none; border-radius: 6px;
     background: transparent;
 }}
 QDockWidget::close-button:hover, QDockWidget::float-button:hover {{
     background: {t.field_hover};
 }}
 QDockWidget::title {{
-    background: transparent; padding: 8px 12px; text-align: left;
+    background: transparent; text-align: left;
+    padding: {SPACE_M}px {SPACE_S}px {SPACE_XS}px {SPACE_M + SPACE_S}px;
 }}
 QWidget#dockWidgetContents_5, QWidget#dockWidgetContents_2,
 QScrollArea > QWidget > QWidget {{ background: transparent; }}
-QMainWindow::separator {{ background: transparent; width: 8px; height: 8px; }}
+QMainWindow::separator {{
+    background: transparent; width: {SPACE_S}px; height: {SPACE_S}px;
+    image: url({glyphs["grip"]});
+}}
+QMainWindow::separator:hover {{ background: {hover}; border-radius: {SPACE_XS}px; }}
 
 QGroupBox {{
     background: {t.panel};
@@ -377,13 +382,13 @@ QProgressBar {{
 QProgressBar::chunk {{ background: {t.accent}; border-radius: 4px; }}
 
 QScrollArea {{ background: transparent; border: none; }}
-QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px 4px 2px 2px; }}
-QScrollBar:horizontal {{ background: transparent; height: 10px; margin: 2px; }}
+QScrollBar:vertical {{ background: transparent; width: 12px; margin: 2px; }}
+QScrollBar:horizontal {{ background: transparent; height: 12px; margin: 2px; }}
 QScrollBar::handle:vertical {{
-    background: {t.scroll_handle}; border-radius: 3px; min-height: 32px; margin: 0 2px;
+    background: {t.scroll_handle}; border-radius: 3px; min-height: 32px; margin: 0 1px;
 }}
 QScrollBar::handle:horizontal {{
-    background: {t.scroll_handle}; border-radius: 3px; min-width: 32px; margin: 2px 0;
+    background: {t.scroll_handle}; border-radius: 3px; min-width: 32px; margin: 1px 0;
 }}
 QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {{
     margin: 0; border-radius: 5px; background: {t.accent};

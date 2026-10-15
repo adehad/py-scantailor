@@ -402,3 +402,54 @@ def test_an_untitled_group_reserves_no_title_band(app, qtbot):
         group.ensurePolished()
     assert untitled.contentsRect().top() == stylesheet.SPACE_M + 1
     assert titled.contentsRect().top() > untitled.contentsRect().top() + 24
+
+
+@pytest.mark.parametrize("scheme", theme.SCHEMES)
+def test_dock_splitters_always_show_a_grip(app, qtbot, scheme):
+    theme.apply_theme(app, scheme)
+    window = QtWidgets.QMainWindow()
+    qtbot.addWidget(window)
+    window.setCentralWidget(QtWidgets.QWidget())
+    dock = QtWidgets.QDockWidget("Filters")
+    dock.setWidget(QtWidgets.QWidget())
+    window.addDockWidget(QtCore.Qt.DockWidgetArea.LeftDockWidgetArea, dock)
+    window.resize(600, 400)
+    window.show()
+    qtbot.waitExposed(window)
+    qtbot.wait(50)
+
+    gutter = QtCore.QRect(
+        dock.geometry().right() + 1, 0, stylesheet.SPACE_S, window.height()
+    )
+    image = window.grab(gutter).toImage()
+    background = image.pixelColor(0, 0).lightness()
+    grip = [
+        (x, y)
+        for y in range(image.height())
+        for x in range(image.width())
+        if abs(image.pixelColor(x, y).lightness() - background) > 60
+    ]
+    assert grip
+    assert all(abs(y - image.height() / 2) < 20 for _x, y in grip)
+
+
+def test_scroll_bar_handles_are_visible_without_hovering(app, qtbot):
+    theme.apply_theme(app, "light")
+    area = QtWidgets.QScrollArea()
+    qtbot.addWidget(area)
+    content = QtWidgets.QWidget()
+    content.setMinimumSize(100, 2000)
+    area.setWidget(content)
+    area.resize(200, 300)
+    area.show()
+    qtbot.waitExposed(area)
+    bar = area.verticalScrollBar()
+    image = bar.grab().toImage()
+    background = image.pixelColor(0, 0)
+    handle_columns = {
+        x
+        for y in range(image.height())
+        for x in range(image.width())
+        if image.pixelColor(x, y) != background
+    }
+    assert len(handle_columns) >= 6
