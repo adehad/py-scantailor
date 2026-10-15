@@ -194,9 +194,7 @@ interrupt the opening:
 First start
 -----------
 
-The first start of a packaged build compiles the image processing kernels once
-and keeps them in a cache folder: ``%LOCALAPPDATA%/numba`` on Windows and
-``~/.cache/numba`` elsewhere. The application compiles them in the background
-after its window opens, so the first pages can take longer to process. From a
-source checkout, ``python -m scantailor.imageproc.numba_warmup`` compiles them
-ahead of time.
+The first PDF export with JBIG2 compression compiles the JBIG2 encoder once and
+keeps it in a cache folder: ``%LOCALAPPDATA%/numba`` on Windows and
+``~/.cache/numba`` elsewhere, so that export takes a few seconds longer. Page
+processing needs no compile step.

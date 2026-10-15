@@ -51,16 +51,10 @@ datas = [
 ]
 
 # QtSvg gives PyInstaller's hook the qsvg image-format plugin that draws the glyphs.
-#
-# The numba kernels cannot ship precompiled: numba keys its cache by the source
-# path and, in a frozen build, by a hash of the executable, and writes it to the
-# user's cache directory (%LOCALAPPDATA%\numba, ~/.cache/numba). numba_warmup
-# compiles every kernel once on tiny input, so the first run pays the compile in
-# the background and every later run loads the cache.
-hiddenimports = ["PySide6.QtSvg", "scantailor.imageproc.numba_warmup"]
+hiddenimports = ["PySide6.QtSvg"]
 
-# The dev environment also holds the docs and test tools; PyInstaller's hooks for
-# numba and scikit-image would otherwise sweep them in (about 30 MB).
+# The dev environment also holds the docs and test tools, which PyInstaller's
+# hooks would otherwise sweep in.
 excludes = ["_pytest", "alabaster", "babel", "docutils", "pytest", "pytz", "sphinx"]
 
 exe_icon = None
