@@ -1,4 +1,8 @@
-"""The bundled UI typeface, applied identically on every platform."""
+"""The bundled UI typeface, sized from the platform UI font so user text scaling counts.
+
+Every size is a ratio of the application font, so raising it in the operating
+system or on the application grows the whole interface together.
+"""
 
 import pathlib
 
@@ -10,10 +14,14 @@ from scantailor.app._ui import resources_rc
 assert resources_rc, "The import ensures the Inter files are registered with Qt."
 
 FAMILIES = ["Inter", "Noto Sans KR"]
-BASE_PX = 13
-CAPTION_PX = 11
-HEADING_PX = 15
 SEMIBOLD = 600
+# Inter sets visibly smaller than Segoe UI or San Francisco at the same nominal
+# size, so the body text is a step above the platform size. The small size is
+# body / BODY_RATIO, which puts it back at the platform size.
+BODY_RATIO = 13 / 12
+SMALL_RATIO = 1 / BODY_RATIO
+PANEL_HEADING_RATIO = 1.25
+DISPLAY_RATIO = 1.4
 
 _INTER_FILES = (
     ":/fonts/inter/Inter-Regular.ttf",
@@ -49,19 +57,80 @@ def load_fonts() -> list[str]:
     return loaded
 
 
+def scaled(font: QtGui.QFont, ratio: float) -> QtGui.QFont:
+    """Return a copy of a font at a multiple of its size, in the unit it was set in.
+
+    Args:
+        font (QtGui.QFont): Font to copy; usually the widget or application font.
+        ratio (float): Size multiplier, for example SMALL_RATIO.
+
+    Returns:
+        QtGui.QFont: The resized copy.
+    """
+    copy = QtGui.QFont(font)
+    if font.pointSizeF() > 0:
+        copy.setPointSizeF(font.pointSizeF() * ratio)
+    else:
+        copy.setPixelSize(max(1, round(font.pixelSize() * ratio)))
+    return copy
+
+
+def small(font: QtGui.QFont) -> QtGui.QFont:
+    """Return the small text size for captions, hints and overlay labels.
+
+    Args:
+        font (QtGui.QFont): Body font to derive from, usually ``widget.font()``.
+
+    Returns:
+        QtGui.QFont: A copy at the small size.
+    """
+    return scaled(font, SMALL_RATIO)
+
+
+def tabular(font: QtGui.QFont) -> QtGui.QFont:
+    """Return a copy of a font with fixed-width digits, for numbers that line up.
+
+    Args:
+        font (QtGui.QFont): Font to copy.
+
+    Returns:
+        QtGui.QFont: The copy with the OpenType tnum feature on.
+    """
+    copy = QtGui.QFont(font)
+    copy.setFeature(QtGui.QFont.Tag(_TABULAR_FIGURES), 1)
+    return copy
+
+
+def pixel_size(font: QtGui.QFont) -> float:
+    """Return a font's size in logical pixels, whichever unit it was set in.
+
+    Args:
+        font (QtGui.QFont): Font to measure.
+
+    Returns:
+        float: Size in logical pixels.
+    """
+    if font.pixelSize() > 0:
+        return float(font.pixelSize())
+    screen = QtGui.QGuiApplication.primaryScreen()
+    dpi = screen.logicalDotsPerInchY() if screen is not None else 96.0
+    return font.pointSizeF() * dpi / 72
+
+
 def apply_fonts(app: QtWidgets.QApplication) -> None:
     """Load the bundled fonts and make them the application font.
 
-    Sizes are pixels because point sizes scale differently per platform.
+    The size follows the platform UI font, so the operating system text size
+    setting carries over.
 
     Args:
         app (QtWidgets.QApplication): The running application.
     """
     load_fonts()
-    font = app.font()
+    system = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.SystemFont.GeneralFont)
+    font = scaled(system, BODY_RATIO)
     font.setFamilies(FAMILIES)
     font.setStyleHint(QtGui.QFont.StyleHint.SansSerif)
-    font.setPixelSize(BASE_PX)
     app.setFont(font)
 
 
