@@ -1,21 +1,26 @@
 """Collapsible group box widget.
 
-A QGroupBox that can be collapsed to hide its contents, saving screen space.
-The collapsed state is persisted across sessions using QSettings.
+A QGroupBox whose whole header row folds its contents away. The collapsed state
+is persisted across sessions using QSettings.
 """
 
-from PySide6.QtCore import QEvent, QSettings, Signal
+from PySide6.QtCore import QEvent, QSettings, Qt, Signal
 from PySide6.QtGui import QResizeEvent, QShowEvent
 from PySide6.QtWidgets import QGroupBox, QToolButton, QWidget
 
 from scantailor.app.ui.icons import icon
+from scantailor.app.ui.theme.stylesheet import SPACE_XS, header_height
+
+# QWIDGETSIZE_MAX, which PySide6 does not export.
+_UNBOUNDED = 16777215
 
 
 class CollapsibleGroupBox(QGroupBox):
-    """A group box that can be collapsed to hide its contents.
+    """A group box that folds to its header row when the header is clicked.
 
-    The collapsed state is persisted using QSettings based on the widget's
-    object name and parent hierarchy.
+    The title is the text of a tool button that spans the header row, with the
+    chevron on its left. The button takes Tab focus and toggles with Space, so
+    the group folds from the keyboard as well as the mouse.
 
     Signals:
         collapsed_state_changed: Emitted when the collapsed state changes.
@@ -23,50 +28,55 @@ class CollapsibleGroupBox(QGroupBox):
 
     collapsed_state_changed = Signal(bool)
 
-    def __init__(
-        self,
-        title: str = "",
-        parent: QWidget | None = None,
-    ) -> None:
+    def __init__(self, title: str = "", parent: QWidget | None = None) -> None:
         """Initialize the collapsible group box.
 
         Args:
-            title: The group box title.
-            parent: The parent widget.
+            title (str): The group title, shown in the header row.
+            parent (QWidget | None): The parent widget.
         """
-        super().__init__(title, parent)
-
+        super().__init__(parent)
         self._collapsed = False
         self._shown = False
-        self._collapse_button: QToolButton | None = None
         self._collapsed_widgets: set[QWidget] = set()
 
-        self._collapse_icon = icon("chevron-down")
-        self._expand_icon = icon("chevron-right")
-
-        self._initialize()
-
-    def _initialize(self) -> None:
-        """Set up the collapse button and connections."""
-        # Create collapse button
-        self._collapse_button = QToolButton(self)
-        self._collapse_button.setObjectName("collapseButton")
-        self._collapse_button.setAutoRaise(True)
-        self._collapse_button.setIcon(self._collapse_icon)
-        self._collapse_button.clicked.connect(self.toggle_collapsed)
-
-        # Connect checkbox if checkable
-        if self.isCheckable():
-            self.toggled.connect(self._on_check_toggled)
-            self.clicked.connect(self._on_check_clicked)
-
+        self._header = QToolButton(self)
+        self._header.setObjectName("groupHeader")
+        self._header.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self._header.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._header.clicked.connect(self.toggle_collapsed)
+        self.setTitle(title)
         self._update_widgets()
+
+    def title(self) -> str:
+        """Return the group title.
+
+        Returns:
+            str: The text of the header row.
+        """
+        return self._header.text()
+
+    def setTitle(self, title: str) -> None:
+        """Show a title in the header row instead of the group box frame.
+
+        Args:
+            title (str): The group title.
+        """
+        self._header.setText(title)
+
+    def header(self) -> QToolButton:
+        """Return the button that spans the header row and toggles the group.
+
+        Returns:
+            QToolButton: The header button.
+        """
+        return self._header
 
     def is_collapsed(self) -> bool:
         """Return the current collapsed state.
 
         Returns:
-            True if collapsed, False if expanded.
+            bool: True if collapsed, False if expanded.
         """
         return self._collapsed
 
@@ -74,11 +84,10 @@ class CollapsibleGroupBox(QGroupBox):
         """Set the collapsed state.
 
         Args:
-            collapse: True to collapse, False to expand.
+            collapse (bool): True to collapse, False to expand.
         """
         if self._collapsed == collapse:
             return
-
         self._collapsed = collapse
         self._update_widgets()
         self._save_state()
@@ -88,144 +97,95 @@ class CollapsibleGroupBox(QGroupBox):
         """Toggle between collapsed and expanded states."""
         self.set_collapsed(not self._collapsed)
 
+    def _nested(self) -> bool:
+        return isinstance(self.parentWidget(), QGroupBox)
+
+    def _place_header(self) -> None:
+        nested = self._nested()
+        height = header_height(self.font(), nested=nested)
+        inset = 0 if nested else SPACE_XS
+        self._header.setGeometry(inset, inset, self.width() - 2 * inset, height)
+        if self._collapsed:
+            self.setMaximumHeight(self._header.geometry().bottom() + 1 + inset)
+
     def _update_widgets(self) -> None:
-        """Update visibility of child widgets based on collapsed state."""
-        if self._collapse_button is None:
-            return
-
-        # Update button icon
+        self._header.setIcon(
+            icon("chevron-right" if self._collapsed else "chevron-down")
+        )
+        self._header.setAccessibleDescription(
+            self.tr("Collapsed") if self._collapsed else self.tr("Expanded")
+        )
         if self._collapsed:
-            self._collapse_button.setIcon(self._expand_icon)
-        else:
-            self._collapse_button.setIcon(self._collapse_icon)
-
-        # Position the button in the title area
-        self._position_collapse_button()
-
-        if self._collapsed:
-            # Hide all visible children and remember them
             self._collapsed_widgets.clear()
             for child in self.findChildren(QWidget):
-                if child is self._collapse_button:
-                    continue
-                if child.parent() is not self:
+                if child is self._header or child.parent() is not self:
                     continue
                 if child.isVisible():
                     self._collapsed_widgets.add(child)
                     child.hide()
         else:
-            # Restore previously hidden children
             for child in self._collapsed_widgets:
                 child.show()
             self._collapsed_widgets.clear()
+            self.setMaximumHeight(_UNBOUNDED)
+        self._place_header()
 
-    def _position_collapse_button(self) -> None:
-        """Position the collapse button in the title bar area."""
-        if self._collapse_button is None:
-            return
-
-        # Get the title bar height
-        fm = self.fontMetrics()
-        title_height = fm.height() + 4  # Add some padding
-
-        # Position button at right side of title
-        button_size = title_height - 4
-        self._collapse_button.setFixedSize(button_size, button_size)
-
-        # Position at right edge, vertically centered in title
-        x = self.width() - button_size - 4
-        y = 2
-        self._collapse_button.move(x, y)
-
-    def _on_check_toggled(self, checked: bool) -> None:
-        """Handle checkbox toggle.
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        """Stretch the header row across the new width.
 
         Args:
-            checked: Whether the checkbox is checked.
+            event (QResizeEvent): The resize event.
         """
-        # If unchecked, collapse; if checked, expand
-        if not checked and not self._collapsed:
-            self.set_collapsed(True)
+        super().resizeEvent(event)
+        self._place_header()
 
-    def _on_check_clicked(self, checked: bool) -> None:
-        """Handle checkbox click.
+    def changeEvent(self, event: QEvent) -> None:
+        """Resize the header row when the font or style changes.
 
         Args:
-            checked: Whether the checkbox is checked.
+            event (QEvent): The change event.
         """
-        if checked and self._collapsed:
-            self.set_collapsed(False)
+        super().changeEvent(event)
+        if event.type() in (QEvent.Type.FontChange, QEvent.Type.StyleChange):
+            self._place_header()
 
     def showEvent(self, event: QShowEvent) -> None:
-        """Handle show event.
+        """Restore the saved state the first time the group shows.
 
         Args:
-            event: The show event.
+            event (QShowEvent): The show event.
         """
         super().showEvent(event)
-
         if not self._shown:
             self._shown = True
             self._load_state()
             self._update_widgets()
             self.collapsed_state_changed.emit(self._collapsed)
 
-    def resizeEvent(self, event: QResizeEvent) -> None:
-        """Handle resize event.
-
-        Args:
-            event: The resize event.
-        """
-        super().resizeEvent(event)
-        self._position_collapse_button()
-
-    def changeEvent(self, event: QEvent) -> None:
-        """Handle change event.
-
-        Args:
-            event: The change event.
-        """
-        super().changeEvent(event)
-
-        if event.type() == QEvent.Type.EnabledChange:
-            if self._collapse_button is not None:
-                self._collapse_button.setEnabled(self.isEnabled())
-
     def _get_settings_key(self) -> str:
         """Get the settings key for persisting collapsed state.
 
         Returns:
-            A unique key based on the widget hierarchy.
+            str: A unique key based on the widget hierarchy.
         """
         parts = []
         widget: QWidget | None = self
-
         while widget is not None:
             name = widget.objectName()
             if name:
                 parts.insert(0, name)
             widget = widget.parentWidget()
-
         if not parts:
             parts = ["CollapsibleGroupBox"]
-
         return "/".join(["CollapsibleGroupBox", *parts, "collapsed"])
 
     def _load_state(self) -> None:
-        """Load the collapsed state from settings."""
-        settings = QSettings()
-        key = self._get_settings_key()
-        value = settings.value(key)
-
-        if value is not None:
-            # QSettings returns string "true"/"false" on some platforms
-            if isinstance(value, bool):
-                self._collapsed = value
-            elif isinstance(value, str):
-                self._collapsed = value.lower() == "true"
+        # QSettings returns the strings "true" and "false" on some platforms.
+        value = QSettings().value(self._get_settings_key())
+        if isinstance(value, bool):
+            self._collapsed = value
+        elif isinstance(value, str):
+            self._collapsed = value.lower() == "true"
 
     def _save_state(self) -> None:
-        """Save the collapsed state to settings."""
-        settings = QSettings()
-        key = self._get_settings_key()
-        settings.setValue(key, self._collapsed)
+        QSettings().setValue(self._get_settings_key(), self._collapsed)
