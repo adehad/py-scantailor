@@ -33,7 +33,6 @@ from PySide6.QtWidgets import (
 )
 
 from scantailor.app.ui.icons import icon
-from scantailor.app.ui.theme.fonts import CAPTION_PX
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 from scantailor.app.ui.widgets.ticked_slider import TickedSlider
 from scantailor.core.models import Dpi, PageId
@@ -212,9 +211,7 @@ class _StopLabels(QWidget):
         for text, name in labels:
             label = QLabel(text, self)
             label.setObjectName(name)
-            font = label.font()
-            font.setPixelSize(CAPTION_PX)
-            label.setFont(font)
+            label.setProperty("textRole", "small")
             label.adjustSize()
             self._labels.append(label)
         self.setFixedHeight(max(label.height() for label in self._labels))

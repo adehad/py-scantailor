@@ -58,11 +58,6 @@
         </item>
         <item>
          <widget class="QLabel" name="newProjectLabel">
-          <property name="font">
-           <font>
-            <pointsize>16</pointsize>
-           </font>
-          </property>
           <property name="text">
            <string>New Project ...</string>
           </property>
@@ -89,11 +84,6 @@
         </item>
         <item>
          <widget class="QLabel" name="openProjectLabel">
-          <property name="font">
-           <font>
-            <pointsize>16</pointsize>
-           </font>
-          </property>
           <property name="text">
            <string>Open Project ...</string>
           </property>
@@ -135,12 +125,6 @@
       </item>
       <item>
        <widget class="QGroupBox" name="recentProjectsGroup">
-        <property name="font">
-         <font>
-          <pointsize>16</pointsize>
-          <kerning>true</kerning>
-         </font>
-        </property>
         <property name="styleSheet">
          <string notr="true"/>
         </property>

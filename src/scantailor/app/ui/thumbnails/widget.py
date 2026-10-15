@@ -18,9 +18,17 @@ from PySide6.QtCore import (
     Qt,
     Signal,
 )
-from PySide6.QtGui import QMouseEvent, QPainter, QPainterPath, QPalette, QPen
+from PySide6.QtGui import (
+    QFontMetrics,
+    QMouseEvent,
+    QPainter,
+    QPainterPath,
+    QPalette,
+    QPen,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QComboBox,
     QListView,
     QMenu,
@@ -33,6 +41,7 @@ from PySide6.QtWidgets import (
 )
 
 from scantailor.app.ui.icons import icon
+from scantailor.app.ui.theme.fonts import small
 from scantailor.app.ui.theme.tokens import view_color
 from scantailor.app.ui.thumbnails.cache import ThumbnailCache
 from scantailor.app.ui.thumbnails.model import (
@@ -57,11 +66,10 @@ from scantailor.core.settings import ApplicationSettings
 from scantailor.core.stage_sequence import StageSequence
 
 _PADDING = 6
-_CAPTION_HEIGHT = 18
 _CURRENT_BORDER = 2
 _FRAME_MARGIN = 3
 _FRAME_RADIUS = 4
-_CAPTION_PX = 11
+_CAPTION_LEADING = 4
 # Fraction of the picture the question mark of an incomplete page fills.
 _QUESTION_MARK_FILL = 0.9
 _QUESTION_MARK_ALPHA = 160
@@ -101,6 +109,10 @@ def _question_mark() -> QPainterPath:
 _QUESTION_MARK = _question_mark()
 
 
+def _caption_height() -> int:
+    return QFontMetrics(small(QApplication.font())).height() + _CAPTION_LEADING
+
+
 class ThumbnailDelegate(QStyledItemDelegate):
     """Paints a thumbnail, its caption and the current-page highlight."""
 
@@ -126,7 +138,7 @@ class ThumbnailDelegate(QStyledItemDelegate):
         """Return the size of one cell: the thumbnail, its caption and padding."""
         return QSize(
             self._thumbnail_size.width() + 2 * _PADDING,
-            self._thumbnail_size.height() + _CAPTION_HEIGHT + 2 * _PADDING,
+            self._thumbnail_size.height() + _caption_height() + 2 * _PADDING,
         )
 
     def sizeHint(
@@ -181,14 +193,12 @@ class ThumbnailDelegate(QStyledItemDelegate):
 
         # The caption lies below the inset selection fill, on the plain background.
         painter.setPen(palette.text().color())
-        caption_font = painter.font()
-        caption_font.setPixelSize(_CAPTION_PX)
-        painter.setFont(caption_font)
+        painter.setFont(small(QApplication.font()))
         caption_area = QRect(
             option.rect.left() + _PADDING,
             picture_area.bottom() + 1 + _FRAME_MARGIN,
             self._thumbnail_size.width(),
-            _CAPTION_HEIGHT,
+            _caption_height(),
         )
         painter.drawText(
             caption_area,

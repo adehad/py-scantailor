@@ -211,13 +211,67 @@ def test_bundled_fonts_load_and_provide_both_families(app):
     assert {"Regular", "Medium", "SemiBold"} <= set(database_styles)
 
 
-def test_app_font_is_inter_with_noto_for_hangul_and_pixel_sizes(app):
+def test_app_font_is_inter_with_noto_for_hangul_sized_from_the_system_font(app):
     theme.apply_theme(app, "light")
     font = app.font()
+    system = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.SystemFont.GeneralFont)
     assert font.families() == ["Inter", "Noto Sans KR"]
     assert QtGui.QFontInfo(font).family() == "Inter"
-    assert font.pixelSize() == fonts.BASE_PX == 13
-    assert (fonts.CAPTION_PX, fonts.HEADING_PX) == (11, 15)
+    assert font.pointSizeF() == pytest.approx(system.pointSizeF() * fonts.BODY_RATIO)
+
+
+def test_small_text_is_never_below_the_system_font_size(app):
+    theme.apply_theme(app, "light")
+    system = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.SystemFont.GeneralFont)
+    assert fonts.small(app.font()).pointSizeF() >= system.pointSizeF() - 1e-6
+
+
+def test_stylesheet_sets_no_body_font_size_and_scales_the_rest_from_the_app_font(app):
+    theme.apply_theme(app, "light")
+    body = fonts.pixel_size(app.font())
+    sizes = {int(px) for px in re.findall(r"font-size: (\d+)px", app.styleSheet())}
+    assert round(body) not in sizes
+    assert sizes == {
+        round(body * fonts.SMALL_RATIO),
+        round(body * fonts.PANEL_HEADING_RATIO),
+        round(body * fonts.DISPLAY_RATIO),
+    }
+
+
+def raise_app_font(app: QtWidgets.QApplication, points: float) -> None:
+    font = app.font()
+    font.setPointSizeF(font.pointSizeF() + points)
+    app.setFont(font)
+    app.processEvents()
+
+
+def test_raising_the_app_font_grows_headings_body_and_small_text(app, qtbot):
+    theme.apply_theme(app, "light")
+    window = QtWidgets.QWidget()
+    qtbot.addWidget(window)
+    layout = QtWidgets.QVBoxLayout(window)
+    body = QtWidgets.QLabel("Body")
+    hint = QtWidgets.QLabel("Hint")
+    hint.setProperty("textRole", "small")
+    spin = QtWidgets.QSpinBox()
+    dock = QtWidgets.QDockWidget("Filters")
+    for widget in (body, hint, spin, dock):
+        layout.addWidget(widget)
+    window.show()
+    qtbot.waitExposed(window)
+
+    def sizes() -> list[int]:
+        return [QtGui.QFontInfo(w.font()).pixelSize() for w in (body, hint, spin, dock)]
+
+    before = sizes()
+    raise_app_font(app, 4)
+    after = sizes()
+
+    assert all(new > old for old, new in zip(before, after, strict=True)), (
+        before,
+        after,
+    )
+    assert after[3] > after[0] > after[1]
 
 
 def test_spin_boxes_use_tabular_figures(app, qtbot):
