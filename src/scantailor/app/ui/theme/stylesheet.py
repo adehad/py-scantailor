@@ -15,10 +15,29 @@ SPACE_XL = 24
 CHEVRON = 16
 # Alpha of the text colour behind a hovered header row.
 HOVER_ALPHA = 18
+# Alpha of the text colour behind the selected stage. The stylesheet style paints a
+# selected table cell's background twice, so it shows at about double this.
+SELECTED_ALPHA = 16
+# Width of the accent bar that marks the selected stage.
+SELECTED_BAR = 3
 RADIUS_PANEL = 12
 RADIUS_CONTROL = 8
 FIELD_BORDER = 1
 FIELD_PADDING_X = 8
+
+
+def text_tint(t: Tokens, alpha: int) -> str:
+    """Return the text colour at an alpha, a neutral fill that follows the theme.
+
+    Args:
+        t (Tokens): Colours for the look.
+        alpha (int): Alpha from 0 to 255.
+
+    Returns:
+        str: An rgba() colour for QSS.
+    """
+    text = QtGui.QColor(t.text)
+    return f"rgba({text.red()}, {text.green()}, {text.blue()}, {alpha})"
 
 
 def header_height(font: QtGui.QFont, nested: bool = False) -> int:
@@ -286,6 +305,22 @@ QTableView QPushButton, QTableView QToolButton {{
 }}
 QTableView QHeaderView, QTableCornerButton::section {{
     background: transparent; border: none;
+}}
+QTableView#filterList {{
+    background: {t.panel}; border: 1px solid {t.panel_border};
+    border-top: 1px solid {t.panel_highlight}; border-radius: {RADIUS_PANEL}px;
+    padding: {SPACE_XS}px;
+    selection-background-color: transparent;
+}}
+QTableView#filterList:focus {{ border: 1px solid {t.accent}; }}
+QTableView#filterList::item:selected {{
+    background: {text_tint(t, SELECTED_ALPHA)}; color: {t.text};
+}}
+QTableView#filterList::item:first {{
+    border-left: {SELECTED_BAR}px solid transparent;
+}}
+QTableView#filterList::item:selected:first {{
+    border-left: {SELECTED_BAR}px solid {t.accent};
 }}
 QHeaderView::section {{
     background: transparent; border: none; padding: 6px 8px; color: {t.text_dim};
