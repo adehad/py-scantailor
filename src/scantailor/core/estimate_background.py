@@ -180,17 +180,14 @@ def estimate_background(
     )
 
 
-_LEVELS = np.arange(256, dtype=np.float32).reshape(1, 256)
-_SCALED_LEVEL = _LEVELS * 255
-_HALF_LEVEL = np.floor(_LEVELS / 2)
-_RECIPROCAL = 1 / np.maximum(_LEVELS, 1)
-# A whole number divided by a level of at most 255 is either whole or at least
-# 1/255 away from the next whole number, far more than float32 error. Rounding
-# after this shift therefore gives the exact floor of the quotient.
-_FLOOR_SHIFT = -0.498
+# cv2.divide rounds exact halves to even; the normalised level rounds them up.
+# Scaling by a little over 255 lifts every exact half just above it. Any other
+# quotient gray * 255 / background is at least 1 / (2 * 255) away from a half,
+# far more than the at most 255 * 1e-6 this adds, so no other result changes.
+_SCALE_ROUNDING_HALVES_UP = 255 * (1 + 1e-6)
 
 
-def _apply_table(
+def _divide_by_background(
     gray: NDArray[np.uint8],
     background: NDArray[np.uint8],
     out: NDArray[np.uint8],
@@ -201,10 +198,8 @@ def _apply_table(
     where ``gray`` is not below ``background``. All three arrays have one shape
     and rows OpenCV can address.
     """
-    quotient = cv2.LUT(gray, _SCALED_LEVEL)
-    quotient += cv2.LUT(background, _HALF_LEVEL)
-    quotient *= cv2.LUT(background, _RECIPROCAL)
-    cv2.convertScaleAbs(quotient, out, alpha=1.0, beta=_FLOOR_SHIFT)
+    cv2.divide(gray, background, out, scale=_SCALE_ROUNDING_HALVES_UP)
+    # cv2.divide gives 0 where the background is 0, and every level is at or above that.
     cv2.max(out, cv2.compare(gray, background, cv2.CMP_GE), dst=out)
 
 
@@ -224,12 +219,10 @@ def raise_above_background(
     Returns:
         NDArray[np.uint8]: Normalised image.
     """
-    gray = np.ascontiguousarray(gray)
-    background = np.ascontiguousarray(background)
     out = np.empty(gray.shape, dtype=np.uint8)
-    for start in range(0, gray.shape[0], _BAND_ROWS):
-        band = slice(start, start + _BAND_ROWS)
-        _apply_table(gray[band], background[band], out[band])
+    _divide_by_background(
+        np.ascontiguousarray(gray), np.ascontiguousarray(background), out
+    )
     return out
 
 
@@ -273,7 +266,7 @@ def normalize_illumination_gray(
     out = np.empty(gray.shape, dtype=np.uint8)
     for start in range(0, height, _BAND_ROWS):
         stop = min(start + _BAND_ROWS, height)
-        _apply_table(
+        _divide_by_background(
             gray[start:stop],
             _render_band(left_factor, hor_basis_t, start, stop),
             out[start:stop],

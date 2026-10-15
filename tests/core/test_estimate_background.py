@@ -1,5 +1,6 @@
 """Tests for page background estimation and illumination normalisation."""
 
+import math
 import time
 
 import numpy as np
@@ -243,7 +244,7 @@ def _noisy_page(height: int, width: int, seed: int) -> np.ndarray:
 
 
 class TestMatchesTheDirectEvaluation:
-    """Table lookup and banded rendering change no pixel."""
+    """Division and banded rendering change no pixel."""
 
     def test_every_gray_and_background_pair_gives_the_same_level(self):
         gray = np.tile(np.arange(256, dtype=np.uint8), (256, 1))
@@ -253,6 +254,26 @@ class TestMatchesTheDirectEvaluation:
             raise_above_background(gray, background),
             _raised_by_division(gray, background),
         )
+
+    @pytest.mark.parametrize("width", [1, 3, 16, 33, 256, 4096])
+    def test_every_pair_gives_the_same_level_in_rows_of_any_width(self, width):
+        # Shuffled so that every pair also lands in the unaligned tail of a row.
+        shuffled = np.random.default_rng(width).permutation(256 * 256)
+        pairs = np.resize(shuffled, math.ceil(shuffled.size / width) * width)
+        gray = (pairs % 256).astype(np.uint8).reshape(-1, width)
+        background = (pairs // 256).astype(np.uint8).reshape(-1, width)
+
+        assert np.array_equal(
+            raise_above_background(gray, background),
+            _raised_by_division(gray, background),
+        )
+
+    def test_an_exact_half_rounds_up_rather_than_to_even(self):
+        # 1 * 255 / 6 is exactly 42.5.
+        gray = np.array([[1]], dtype=np.uint8)
+        background = np.array([[6]], dtype=np.uint8)
+
+        assert raise_above_background(gray, background)[0, 0] == 43
 
     @pytest.mark.parametrize(
         "shape", [(333, 257), (31, 1000), (1, 50), (70, 1), (65, 65), (500, 40)]
