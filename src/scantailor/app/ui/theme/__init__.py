@@ -1,6 +1,7 @@
 """One cross-platform glass look, light or dark, with a bundled typeface and icons.
 
 The look follows the operating system colour scheme and updates when it changes.
+Type sizes follow the application font and update when it changes.
 The QSettings key ``appearance/theme`` (``auto``, ``light`` or ``dark``) forces a
 scheme, and the ``SCANTAILOR_THEME`` environment variable overrides both.
 """
@@ -100,6 +101,7 @@ class _ThemeController(QtCore.QObject):
         app.installEventFilter(SpinBoxTextInset(self))
         app.installEventFilter(DockSizer(self))
         app.styleHints().colorSchemeChanged.connect(self._on_scheme_changed)
+        app.installEventFilter(self)
 
     def apply(self, mode: str | None) -> str:
         """Draw the look for a mode; None re-reads the environment and settings."""
@@ -114,8 +116,27 @@ class _ThemeController(QtCore.QObject):
         set_active_tokens(tokens)
         set_semantic_colors(QtGui.QColor(tokens.positive), QtGui.QColor(tokens.danger))
         self._app.setPalette(build_palette(tokens))
-        self._app.setStyleSheet(build_stylesheet(tokens, write_assets(tokens, scheme)))
+        self._app.setStyleSheet(
+            build_stylesheet(tokens, write_assets(tokens, scheme), self._app.font())
+        )
         return scheme
+
+    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        """Rebuild the stylesheet sizes when the application font changes.
+
+        Args:
+            watched (QtCore.QObject): Object receiving the event.
+            event (QtCore.QEvent): The event.
+
+        Returns:
+            bool: Always False; the event is never consumed.
+        """
+        if (
+            watched is self._app
+            and event.type() == QtCore.QEvent.Type.ApplicationFontChange
+        ):
+            self._draw()
+        return False
 
     def _on_scheme_changed(self, _scheme: QtCore.Qt.ColorScheme) -> None:
         mode = self._requested if self._requested is not None else resolve_mode()

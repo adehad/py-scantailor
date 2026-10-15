@@ -5,6 +5,7 @@ from pathlib import PurePath
 
 from PySide6 import QtCore, QtWidgets
 
+from scantailor.app.ui.theme.fonts import tabular
 from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.core.models import PageId, SubPage
 from scantailor.core.settings import Units
@@ -86,6 +87,8 @@ class StatusBarPanel(QtWidgets.QWidget):
         separator = QtWidgets.QFrame(self)
         separator.setFrameShape(QtWidgets.QFrame.Shape.VLine)
         label = QtWidgets.QLabel(self)
+        label.setProperty("textRole", "small")
+        label.setFont(tabular(label.font()))
         label.setToolTip(tooltip)
         label.setStatusTip(status_tip)
         layout.addWidget(separator)

@@ -1,6 +1,8 @@
 """QSS generation for the light and dark looks."""
 
-from .fonts import BASE_PX, CAPTION_PX, HEADING_PX, SEMIBOLD
+from PySide6 import QtGui
+
+from .fonts import DISPLAY_RATIO, PANEL_HEADING_RATIO, SEMIBOLD, SMALL_RATIO, pixel_size
 from .tokens import Tokens
 
 CONTROL_HEIGHT = 32
@@ -10,16 +12,24 @@ FIELD_BORDER = 1
 FIELD_PADDING_X = 8
 
 
-def build_stylesheet(t: Tokens, glyphs: dict[str, str]) -> str:
+def build_stylesheet(t: Tokens, glyphs: dict[str, str], font: QtGui.QFont) -> str:
     """Build the application stylesheet for a token set.
+
+    Body text takes the application font and is never sized here; the other
+    sizes are ratios of it, so the stylesheet is rebuilt when that font changes.
 
     Args:
         t (Tokens): Colours for the look.
         glyphs (dict[str, str]): Glyph name to SVG path, from write_assets.
+        font (QtGui.QFont): The application font, the body size.
 
     Returns:
         str: QSS text. The page image viewports are left untinted.
     """
+    body = pixel_size(font)
+    small_px = round(body * SMALL_RATIO)
+    panel_heading_px = round(body * PANEL_HEADING_RATIO)
+    display_px = round(body * DISPLAY_RATIO)
     handle_fill = t.accent_text if t.dark else "#ffffff"
     control = CONTROL_HEIGHT - 2
     window_gradient = (
@@ -41,7 +51,7 @@ QToolTip {{
 }}
 
 QDockWidget {{
-    font-size: {CAPTION_PX}px; font-weight: {SEMIBOLD}; color: {t.text_dim};
+    font-size: {panel_heading_px}px; font-weight: {SEMIBOLD}; color: {t.text};
     titlebar-close-icon: url({glyphs["close"]});
     titlebar-normal-icon: url({glyphs["float"]});
 }}
@@ -65,7 +75,7 @@ QGroupBox {{
     border-top: 1px solid {t.panel_highlight};
     border-radius: {RADIUS_PANEL}px;
     margin-top: 0; padding: 36px 8px 8px 8px;
-    font-size: {BASE_PX}px; font-weight: {SEMIBOLD};
+    font-weight: {SEMIBOLD};
 }}
 QGroupBox::title {{
     subcontrol-origin: padding; subcontrol-position: top left;
@@ -236,9 +246,10 @@ QFrame#imageViewFrame {{
     background: {t.viewport}; border: 1px solid {t.panel_border};
     border-radius: 10px; padding: 2px;
 }}
-QLabel#newProjectLabel, QLabel#openProjectLabel {{
-    font-size: {HEADING_PX}px; font-weight: {SEMIBOLD};
+QLabel#newProjectLabel, QLabel#openProjectLabel, QLabel[textRole="display"] {{
+    font-size: {display_px}px; font-weight: {SEMIBOLD};
 }}
+QLabel[textRole="small"] {{ font-size: {small_px}px; color: {t.text_dim}; }}
 
 QMenuBar {{ background: transparent; padding: 2px 8px; }}
 QMenuBar::item {{ padding: 6px 10px; border-radius: 6px; background: transparent; }}
@@ -254,7 +265,7 @@ QMenu::separator {{ height: 1px; background: {t.field_border}; margin: 6px 8px; 
 
 QToolBar {{ background: transparent; border: none; spacing: 4px; padding: 4px; }}
 QStatusBar {{
-    background: transparent; color: {t.text_dim}; font-size: {CAPTION_PX}px;
+    background: transparent; color: {t.text_dim}; font-size: {small_px}px;
 }}
 QStatusBar::item {{ border: none; }}
 

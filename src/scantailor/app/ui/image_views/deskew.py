@@ -27,6 +27,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QColor, QImage, QPainter, QPalette, QPen
 
 from scantailor.app.ui.image_views.base import ImageViewBase
+from scantailor.app.ui.theme.fonts import small
 from scantailor.app.ui.theme.tokens import view_color
 from scantailor.core.transformation import ImageTransformation
 from scantailor.filters.deskew.params import MAX_OBLIQUE_DEG
@@ -378,9 +379,7 @@ class DeskewImageView(ImageViewBase):
             self._paint_handle(painter, handle, index, accent)
 
         painter.setPen(self.palette().color(QPalette.ColorRole.Text))
-        font = painter.font()
-        font.setPointSize(10)
-        painter.setFont(font)
+        painter.setFont(small(self.font()))
         painter.drawText(
             QRectF(square.center().x() - 30, square.bottom() + 5, 60, 20),
             Qt.AlignmentFlag.AlignCenter,

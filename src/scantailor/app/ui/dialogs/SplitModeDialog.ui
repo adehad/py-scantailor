@@ -187,11 +187,9 @@
         </item>
         <item>
          <widget class="QLabel" name="selectedPagesHint">
-          <property name="font">
-           <font>
-            <pointsize>7</pointsize>
-           </font>
-          </property>
+          <property name="textRole" stdset="0">
+          <string notr="true">small</string>
+         </property>
           <property name="text">
            <string>Use Ctrl+Click / Shift+Click to select multiple pages.</string>
           </property>
@@ -226,11 +224,9 @@
         </item>
         <item>
          <widget class="QLabel" name="everyOtherSelectedHint">
-          <property name="font">
-           <font>
-            <pointsize>7</pointsize>
-           </font>
-          </property>
+          <property name="textRole" stdset="0">
+          <string notr="true">small</string>
+         </property>
           <property name="text">
            <string>The current page will be included.</string>
           </property>
