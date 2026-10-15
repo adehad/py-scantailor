@@ -67,7 +67,9 @@ def neutral_hover(t: Tokens) -> str:
     return f"rgba({text.red()}, {text.green()}, {text.blue()}, {HOVER_ALPHA})"
 
 
-def build_stylesheet(t: Tokens, glyphs: dict[str, str], font: QtGui.QFont) -> str:
+def build_stylesheet(
+    t: Tokens, glyphs: dict[str, str], font: QtGui.QFont, accent_hover: bool = False
+) -> str:
     """Build the application stylesheet for a token set.
 
     Body text takes the application font and is never sized here; the other
@@ -77,6 +79,8 @@ def build_stylesheet(t: Tokens, glyphs: dict[str, str], font: QtGui.QFont) -> st
         t (Tokens): Colours for the look.
         glyphs (dict[str, str]): Glyph name to SVG path, from write_assets.
         font (QtGui.QFont): The application font, the body size.
+        accent_hover (bool): Fill hovered group headers and splitters with the
+            accent tint instead of the neutral text tint.
 
     Returns:
         str: QSS text. The page image viewports are left untinted.
@@ -88,7 +92,7 @@ def build_stylesheet(t: Tokens, glyphs: dict[str, str], font: QtGui.QFont) -> st
     line = QtGui.QFontMetrics(font).height()
     header = header_height(font)
     nested_header = header_height(font, nested=True)
-    hover = neutral_hover(t)
+    hover = t.accent_tint if accent_hover else neutral_hover(t)
     handle_fill = t.accent_text if t.dark else "#ffffff"
     control = CONTROL_HEIGHT - 2
     window_gradient = (
