@@ -367,3 +367,38 @@ def test_deskew_arc_and_handles_are_drawn_in_the_theme_accent(app, qtbot, scheme
     }
     assert view.palette().color(QtGui.QPalette.ColorRole.Accent) == accent
     assert accent.rgb() in opaque
+
+
+def test_default_layouts_take_margins_and_gaps_from_the_spacing_scale(app, qtbot):
+    theme.apply_theme(app, "light")
+    dialog = QtWidgets.QDialog()
+    qtbot.addWidget(dialog)
+    dialog_layout = QtWidgets.QVBoxLayout(dialog)
+    panel = QtWidgets.QWidget()
+    panel_layout = QtWidgets.QVBoxLayout(panel)
+    group = QtWidgets.QGroupBox("Group")
+    group_layout = QtWidgets.QVBoxLayout(group)
+    dialog_layout.addWidget(panel)
+    panel_layout.addWidget(group)
+
+    def margins(layout: QtWidgets.QLayout) -> set[int]:
+        m = layout.contentsMargins()
+        return {m.left(), m.top(), m.right(), m.bottom()}
+
+    assert margins(dialog_layout) == {stylesheet.SPACE_L}
+    assert margins(panel_layout) == {stylesheet.SPACE_S}
+    assert margins(group_layout) == {0}
+    assert dialog_layout.spacing() == stylesheet.SPACE_S
+
+
+def test_an_untitled_group_reserves_no_title_band(app, qtbot):
+    theme.apply_theme(app, "light")
+    titled = QtWidgets.QGroupBox("Title")
+    untitled = QtWidgets.QGroupBox()
+    untitled.setProperty("untitled", True)
+    for group in (titled, untitled):
+        qtbot.addWidget(group)
+        QtWidgets.QVBoxLayout(group).addWidget(QtWidgets.QLabel("Body"))
+        group.ensurePolished()
+    assert untitled.contentsRect().top() == stylesheet.SPACE_M + 1
+    assert titled.contentsRect().top() > untitled.contentsRect().top() + 24
