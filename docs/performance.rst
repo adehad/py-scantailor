@@ -1,7 +1,8 @@
 Performance notes
 #################
 
-These notes record how the port's image code is written and why there is no GPU build.
+These notes cover which libraries the image code uses, how fast it is against the
+compiled kernels it replaced, and why there is no GPU build.
 
 How pixel code is written
 =========================
@@ -23,7 +24,7 @@ Linux and macOS. Page code uses these tools, in this order of preference:
        same work in a Python loop.
    * - Vectorised NumPy
      - When no single OpenCV routine fits, but the work is whole-array
-       arithmetic. Scans whose result depends on the previous pixel are done a
+       arithmetic. A scan whose result depends on the previous pixel steps a
        whole row or band at a time.
    * - Plain Python
      - For short loops whose steps depend on each other, such as a snake moving
@@ -31,12 +32,66 @@ Linux and macOS. Page code uses these tools, in this order of preference:
        arrays of a few hundred values, so the per-step overhead stays small
        against the page.
 
-A few kernels are slower this way than a compiled loop would be. On generated
-300 dpi pages, the dewarping auto model takes 0.8 to 1.2 s per page, about 1.5
-times a compiled version; picture detection up to 2.6 times and the content box
-search up to 1.45 times. Other stages got faster where OpenCV replaced a Python
-or SciPy step, so a whole batch of the ten sample pages takes about as long as
-with compiled kernels.
+How it compares with compiled kernels
+=====================================
+
+Earlier versions compiled the hottest loops with numba and called SciPy and
+scikit-image for a few filters. Issue `#231
+<https://github.com/adehad/py-scantailor/issues/231>`_ has the full timings of
+the switch, measured on twelve real book scans of about 2100 x 3000 pixels, one
+thread, auto detection in every stage. Every replacement gives the same output
+as the code it replaced.
+
+Whole page, as a share of the compiled version's time:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Output mode
+     - 300 dpi
+     - 600 dpi
+     - 1200 dpi
+   * - Black and white
+     - about 0.9
+     - 0.8 to 0.9
+     - about 0.8
+   * - Black and white, auto dewarping
+     - about 1.0
+     - 0.8 to 0.9
+     - about 0.8
+   * - Mixed
+     - about 1.1
+     - 0.8 to 0.9
+     - about 0.8
+
+These are rough. The machine was busier during the compiled run, so the
+figures discount the speed-up that unchanged stages also showed.
+
+Single kernels differ more. These are faster than the compiled loops were:
+
+* despeckling, where OpenCV's distance transform now finds where components
+  meet (about half the time)
+* illumination normalisation, one ``cv2.divide`` per page (0.6 to 0.7 times)
+* the limited flood fill and the largest whitespace search in Select Content
+* every SciPy call that OpenCV replaced, such as the distance transforms
+  (a quarter to half the time) and Savitzky-Golay smoothing (0.6 to 0.75 times)
+
+These are still slower, because each step is a NumPy call of a few
+microseconds over one row or one snake node:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Kernel
+     - Times the compiled version
+   * - Greyscale reconstruction (picture detection in Mixed mode)
+     - about 2.4
+   * - Text line snakes (dewarping)
+     - 2.5 to 3.5
+   * - Page edge snakes and dewarp maps
+     - about 2
+   * - Text line tracing (dewarping)
+     - about 20, but under 0.05 s per page
 
 The JBIG2 encoder used by PDF export lives in ``packages/jbig2``. One OpenCV
 correlation gives every pixel its coding context, and the arithmetic coder is a
@@ -50,9 +105,9 @@ Why there is no GPU build
 =========================
 
 numba can compile CUDA kernels for NVIDIA cards, but only for code written as
-separate GPU kernels. One hot loop was ported to ``numba-cuda`` and timed on 2100
-x 3000 pixel pages, against the same loop compiled for the CPU, on a machine
-with 16 CPU threads and an NVIDIA RTX A2000:
+separate GPU kernels. Before the switch to NumPy, one hot loop was ported to
+``numba-cuda`` and timed on 2100 x 3000 pixel pages against the same loop
+compiled for the CPU, on a machine with 16 CPU threads and an NVIDIA RTX A2000:
 
 .. list-table::
    :header-rows: 1
