@@ -202,6 +202,41 @@ class TestMatchesWholeImageEvaluation:
         )
 
 
+class TestSourcesByLabel:
+    """The border search reads each cell's source pixel off its label number."""
+
+    def test_opencv_numbers_zero_pixels_in_row_major_order(self) -> None:
+        rng = np.random.default_rng(0)
+        image = np.where(rng.random((97, 131)) < 0.3, 0, 255).astype(np.uint8)
+
+        _, labels = cv2.distanceTransformWithLabels(
+            image, cv2.DIST_L2, 3, labelType=cv2.DIST_LABEL_PIXEL
+        )
+
+        zeros = image == 0
+        assert np.array_equal(labels[zeros], np.arange(1, zeros.sum() + 1))
+
+    def test_every_label_leads_back_to_its_pixel_and_node(self) -> None:
+        rng = np.random.default_rng(1)
+        nodes = rng.integers(0, 40, (61, 83)).astype(np.int32)
+        nodes[rng.random(nodes.shape) < 0.7] = -1
+        nodes[:, 0] = -1  # a column and a row without any source
+        nodes[5] = -1
+        sources = nodes >= 0
+        stretched = np.repeat(np.where(sources, 0, 255).astype(np.uint8), _SCALE, 0)
+        _, labels = cv2.distanceTransformWithLabels(
+            stretched, cv2.DIST_L2, 3, labelType=cv2.DIST_LABEL_PIXEL
+        )
+
+        flat, node = module._sources_by_label(nodes, sources, _SCALE)
+
+        rows, cols = np.nonzero(stretched == 0)
+        source_labels = labels[rows, cols]
+        assert np.array_equal(flat[source_labels], (rows // _SCALE) * 83 + cols)
+        assert np.array_equal(node[source_labels], nodes[rows // _SCALE, cols])
+        assert flat.size == node.size == source_labels.size + 1
+
+
 @pytest.mark.slow
 class TestSpeed:
     def test_banded_evaluation_is_faster_than_the_whole_image(self) -> None:
