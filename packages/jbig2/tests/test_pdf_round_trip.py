@@ -12,7 +12,7 @@ import pytest
 from pdf_decoders import EmbeddedImage, build_pdf, decode_with_both, decode_with_pymupdf
 from sample_images import checkerboard, fuzz_images, noise, scanned_page, text_page
 
-from jbig2_numba import encode_file, encode_pdf_stream
+from jbig2 import encode_file, encode_pdf_stream
 
 
 def _blank_rows_page() -> np.ndarray:

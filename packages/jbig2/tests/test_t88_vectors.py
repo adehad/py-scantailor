@@ -4,8 +4,8 @@ import struct
 
 import numpy as np
 
-from jbig2_numba import encode_file, encode_pdf_stream
-from jbig2_numba.mq_coder import NLPS, NMPS, QE, SWITCH, encode_decisions
+from jbig2 import encode_file, encode_pdf_stream
+from jbig2.mq_coder import NLPS, NMPS, QE, SWITCH, encode_decisions
 
 # T.88 Annex H.2 test sequence for the arithmetic coder (single context).
 _H2_INPUT = bytes.fromhex("00020051000000C00352872AAAAAAAAA82C02000FCD79EF6BF7FED904F46A3BF")

@@ -1,8 +1,7 @@
-# jbig2-numba
+# jbig2
 
 Lossless JBIG2 (ITU-T T.88) encoder for bilevel images, written in Python
-with the hot loops compiled by numba. No native extension, so it installs
-anywhere numba does.
+on NumPy and OpenCV. No native extension of its own and no compile step.
 
 ## What it produces
 
@@ -21,7 +20,7 @@ Input is a 2-D `bool` or `uint8` array. `True` or any nonzero value is black,
 which matches JBIG2 where 1 is black. Inputs are never modified.
 
 ```python
-from jbig2_numba import encode_file, encode_generic, encode_pdf_stream
+from jbig2 import encode_file, encode_generic, encode_pdf_stream
 
 stream = encode_pdf_stream(image, dpi=(300, 300))  # body of a PDF image XObject
 jb2 = encode_file(image, dpi=(300, 300))  # standalone .jb2 file

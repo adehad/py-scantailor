@@ -10,7 +10,7 @@ from enum import IntEnum
 
 import numpy as np
 
-from jbig2_numba.generic_region import TEMPLATE0_AT_PIXELS, as_bilevel, encode_generic
+from jbig2.generic_region import TEMPLATE0_AT_PIXELS, as_bilevel, encode_generic
 
 # T.88 D.4.1 file header ID string.
 FILE_ID = bytes((0x97, 0x4A, 0x42, 0x32, 0x0D, 0x0A, 0x1A, 0x0A))

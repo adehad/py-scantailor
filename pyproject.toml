@@ -13,7 +13,7 @@ dependencies = [
     "pillow>=12.3",
     "pikepdf>=10.17",
     "pypdfium2>=5.14",
-    "jbig2-numba @ file:///${PROJECT_ROOT}/packages/jbig2-numba",
+    "jbig2 @ file:///${PROJECT_ROOT}/packages/jbig2",
 ]
 requires-python = ">=3.14,<3.15"
 readme = "README.md"
