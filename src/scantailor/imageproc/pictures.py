@@ -3,7 +3,6 @@
 import cv2
 import numpy as np
 from numpy.typing import NDArray
-from scipy import ndimage
 
 from .filters import stretch_gray_range
 from .reconstruction import reconstruction
@@ -151,18 +150,47 @@ def find_picture_rectangles(
         return []
     size = 2 * _JOIN_DISTANCE + 1
     joined = cv2.dilate(picture.astype(np.uint8), np.ones((size, size), dtype=np.uint8))
-    _, clusters = cv2.connectedComponents(joined, connectivity=8)
+    count, cluster_map, stats, _ = cv2.connectedComponentsWithStats(
+        joined, connectivity=8, ltype=cv2.CV_32S
+    )
+    clusters = np.asarray(cluster_map, dtype=np.int32)
 
     rectangles: list[tuple[int, int, int, int]] = []
-    found = ndimage.find_objects(np.where(picture, clusters, 0))
-    for rows, cols in (slices for slices in found if slices is not None):
-        rect = (cols.start, rows.start, cols.stop - 1, rows.stop - 1)
+    for label in range(1, count):
+        rect = _picture_box(picture, clusters, label, stats[label])
         rectangles.append(
             _trim_rectangle(picture, rect, sensitivity / 100.0)
             if sensitivity < 100
             else rect
         )
     return rectangles
+
+
+def _picture_box(
+    picture: NDArray[np.bool_],
+    clusters: NDArray[np.int32],
+    label: int,
+    cluster_stats: NDArray[np.int32],
+) -> tuple[int, int, int, int]:
+    """Bounding box (left, top, right, bottom) of the picture pixels of one cluster.
+
+    The cluster grew out of its picture pixels, so they lie inside its box and
+    only that box is searched.
+    """
+    left = int(cluster_stats[cv2.CC_STAT_LEFT])
+    top = int(cluster_stats[cv2.CC_STAT_TOP])
+    width = int(cluster_stats[cv2.CC_STAT_WIDTH])
+    height = int(cluster_stats[cv2.CC_STAT_HEIGHT])
+    box = (slice(top, top + height), slice(left, left + width))
+    own = picture[box] & (clusters[box] == label)
+    rows = np.flatnonzero(own.any(axis=1))
+    cols = np.flatnonzero(own.any(axis=0))
+    return (
+        left + int(cols[0]),
+        top + int(rows[0]),
+        left + int(cols[-1]),
+        top + int(rows[-1]),
+    )
 
 
 def _trim_rectangle(

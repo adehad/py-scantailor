@@ -4,12 +4,9 @@ Provides common image filters including blur, edge detection,
 and noise reduction.
 """
 
-from concurrent.futures import ThreadPoolExecutor
-
 import cv2
 import numpy as np
 from numpy.typing import NDArray
-from scipy import ndimage
 
 _VARIANCE_EPSILON = 1e-6
 # Added before truncating to 8 bits so that a value that is an integer up to
@@ -271,37 +268,27 @@ def gray_histogram(image: NDArray[np.uint8]) -> NDArray[np.int64]:
     return counts
 
 
-# Fewest lines of work that are worth handing to a thread of their own.
-_MIN_LINES_PER_BAND = 256
-
-
-def _correlate1d_in_bands(
+def _correlate_along(
     data: NDArray[np.float32],
     weights: NDArray[np.float32],
     axis: int,
 ) -> NDArray[np.float32]:
-    """``ndimage.correlate1d`` with the lines split between threads.
+    """Correlate every line along ``axis`` with ``weights``, mirroring at the ends.
 
-    Every output sample depends on one line only, so splitting across the other
-    axis gives the same values as one call; scipy releases the GIL.
+    Sums run in float64 and are rounded once to float32; float32 sums move the
+    last bits and flip the final rounding of a few pixels per page.
     """
-    result = np.empty_like(data)
-    across = 1 - axis
-    count = data.shape[across]
-    bands = max(1, min(cv2.getNumThreads(), count // _MIN_LINES_PER_BAND))
-    edges = np.linspace(0, count, bands + 1).astype(int)
-
-    def run(index: int) -> None:
-        part = slice(edges[index], edges[index + 1])
-        key = (part, slice(None)) if axis == 1 else (slice(None), part)
-        ndimage.correlate1d(data[key], weights, axis=axis, output=result[key])
-
-    if bands == 1:
-        run(0)
-    else:
-        with ThreadPoolExecutor(max_workers=bands) as pool:
-            list(pool.map(run, range(bands)))
-    return result
+    taps = weights.astype(np.float64)
+    one_tap = np.ones(1, dtype=np.float64)
+    along_x, along_y = (taps, one_tap) if axis == 1 else (one_tap, taps)
+    result = cv2.sepFilter2D(
+        data.astype(np.float64),
+        cv2.CV_64F,
+        along_x,
+        along_y,
+        borderType=cv2.BORDER_REFLECT,
+    )
+    return np.asarray(result, dtype=np.float32)
 
 
 def _savgol_axis(
@@ -320,7 +307,7 @@ def _savgol_axis(
     left = window // 2
     right = window - left - 1
 
-    result = _correlate1d_in_bands(data, hat[left].astype(np.float32), axis)
+    result = _correlate_along(data, hat[left].astype(np.float32), axis)
     source = np.moveaxis(data, axis, 0)
     target = np.moveaxis(result, axis, 0)
     target[:left] = np.tensordot(hat[:left], source[:window], axes=(1, 0))

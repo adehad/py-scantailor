@@ -10,13 +10,11 @@ from dataclasses import dataclass
 
 import cv2
 import numpy as np
-from numba import njit
 from numpy.typing import NDArray
-from scipy import ndimage
 
 _DEG2RAD = math.pi / 180.0
 _PEAK_WINDOW = 5
-_EIGHT_CONNECTED = np.ones((3, 3), dtype=np.bool_)
+_VOTE_CHUNK_ELEMENTS = 1 << 19
 
 
 @dataclass(frozen=True)
@@ -97,16 +95,39 @@ class HoughLineDetector:
             ys (NDArray[np.int64]): Y coordinates, inside the input plane.
             weights (NDArray[np.uint32]): Vote weight of each point.
         """
-        _vote(
-            self._histogram,
-            self._cos,
-            self._sin,
-            self._bias,
-            self._reciprocal_resolution,
-            xs,
-            ys,
-            weights,
-        )
+        if xs.size == 0:
+            return
+        angles, bins = self._histogram.shape
+        x = xs.astype(np.float64)
+        y = ys.astype(np.float64)
+        # Angles go in chunks whose (angles, points) buffers are allocated once
+        # and reused; fresh multi-megabyte arrays cost more than the arithmetic.
+        chunk = min(angles, max(1, _VOTE_CHUNK_ELEMENTS // xs.size))
+        distance = np.empty((chunk, xs.size), dtype=np.float64)
+        term = np.empty_like(distance)
+        index = np.empty(distance.shape, dtype=np.int64)
+        row_offsets = np.arange(chunk, dtype=np.int64)[:, None] * bins
+        votes_per_row = np.tile(weights.astype(np.float64), chunk)
+        for first in range(0, angles, chunk):
+            rows = min(chunk, angles - first)
+            d, t, i = distance[:rows], term[:rows], index[:rows]
+            np.multiply(self._cos[first : first + rows, None], x, out=d)
+            np.multiply(self._sin[first : first + rows, None], y, out=t)
+            d += t
+            d += self._bias
+            d *= self._reciprocal_resolution
+            d += 0.5
+            i[...] = d
+            i += row_offsets[:rows]
+            # bincount sums in float64, exact while a bin stays below 2**53.
+            votes = np.bincount(
+                i.ravel(),
+                weights=votes_per_row[: i.size],
+                minlength=rows * bins,
+            )
+            self._histogram[first : first + rows] += votes.reshape(rows, bins).astype(
+                np.uint32
+            )
 
     def find_lines(self, quality_lower_bound: int) -> list[HoughLine]:
         """Return the lines whose vote sum reaches the bound, best first.
@@ -119,16 +140,25 @@ class HoughLineDetector:
             keep the raster order of their peaks.
         """
         peaks = _find_histogram_peaks(self._histogram, quality_lower_bound)
-        labels, _count = ndimage.label(peaks, structure=_EIGHT_CONNECTED)
+        _, labels, stats, _ = cv2.connectedComponentsWithStats(
+            peaks.view(np.uint8), connectivity=8, ltype=cv2.CV_32S
+        )
+        # The first pixel of each peak in raster order seeds it and fixes its
+        # place among peaks of equal quality.
+        found, first_pixels = np.unique(labels.ravel(), return_index=True)
+        in_raster_order = np.argsort(first_pixels)
         lines: list[HoughLine] = []
-        for index, box in enumerate(ndimage.find_objects(labels), start=1):
-            if box is None:
+        for label, first_pixel in zip(
+            found[in_raster_order].tolist(),
+            first_pixels[in_raster_order].tolist(),
+            strict=True,
+        ):
+            if label == 0:
                 continue
-            rows, cols = box
-            centre_row = (rows.start + rows.stop - 1) // 2
-            centre_col = (cols.start + cols.stop - 1) // 2
-            seed_row, seed_col = np.argwhere(labels[box] == index)[0]
-            level = int(self._histogram[rows.start + seed_row, cols.start + seed_col])
+            left, top, width, height = stats[label, : cv2.CC_STAT_AREA].tolist()
+            centre_row = (2 * top + height - 1) // 2
+            centre_col = (2 * left + width - 1) // 2
+            level = int(self._histogram.flat[first_pixel])
             distance = (centre_col + 0.5) * self._resolution - self._bias
             lines.append(
                 HoughLine(
@@ -142,27 +172,16 @@ class HoughLineDetector:
         return lines
 
 
-@njit(cache=True)
-def _vote(histogram, cos, sin, bias, reciprocal_resolution, xs, ys, weights):
-    """Add each point's weight to the bin it falls in for every angle.
-
-    Compiled by numba: a point votes once per angle, which is too many tiny
-    steps for NumPy.
-    """
-    for i in range(xs.shape[0]):
-        x = xs[i]
-        y = ys[i]
-        weight = weights[i]
-        for a in range(cos.shape[0]):
-            distance = cos[a] * x + sin[a] * y
-            histogram[a, int((distance + bias) * reciprocal_resolution + 0.5)] += weight
-
-
 def _peak_candidates(
     histogram: NDArray[np.uint32], lower_bound: int
 ) -> NDArray[np.bool_]:
     """Bins at or above the bound that no bin within 2 steps exceeds."""
-    window_max = ndimage.maximum_filter(histogram, size=_PEAK_WINDOW, mode="nearest")
+    # float64 holds every uint32 count exactly; cv2.dilate does not take uint32.
+    window_max = cv2.dilate(
+        histogram.astype(np.float64),
+        np.ones((_PEAK_WINDOW, _PEAK_WINDOW), np.uint8),
+        borderType=cv2.BORDER_REPLICATE,
+    )
     return (histogram >= lower_bound) & (histogram == window_max)
 
 
@@ -183,8 +202,10 @@ def _find_histogram_peaks(
     raised = histogram + neighbourhood.astype(np.uint32)
     changed = _peak_candidates(raised, lower_bound) ^ candidates
 
-    labels, count = ndimage.label(candidates, structure=_EIGHT_CONNECTED)
-    spoiled = np.zeros(count + 1, dtype=np.bool_)
+    count, labels = cv2.connectedComponents(
+        candidates.view(np.uint8), connectivity=8, ltype=cv2.CV_32S
+    )
+    spoiled = np.zeros(count, dtype=np.bool_)
     spoiled[labels[changed & candidates]] = True
     spoiled[0] = False
     return candidates & ~spoiled[labels]

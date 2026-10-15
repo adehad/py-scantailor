@@ -13,7 +13,6 @@ Each zone has:
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -97,21 +96,64 @@ class ZoneSpline:
         """
         if not self.is_smooth or len(self.points) < 4:
             return self.points.copy()
-
-        # For smooth splines, use cubic interpolation
-        from scipy.interpolate import splev, splprep
-
-        try:
-            # Close the spline by appending start point
-            pts = np.vstack([self.points, self.points[0]])
-            tck_list, _ = splprep([pts[:, 0], pts[:, 1]], s=0, per=True)
-            tck: Any = tck_list
-            u = np.linspace(0, 1, num_samples)
-            x, y = splev(u, tck)
-            return np.column_stack([x, y])
-        except ValueError, TypeError:
-            # splprep rejects repeated or too few points; draw the polygon instead.
+        closed = np.vstack([self.points, self.points[:1]])
+        chords = np.hypot(*np.diff(closed, axis=0).T)
+        if not np.all(chords > 0):
+            # A repeated point leaves no curve through it; draw the polygon.
             return self.points.copy()
+        knots = np.concatenate([[0.0], np.cumsum(chords)]) / chords.sum()
+        return _periodic_cubic_spline(knots, closed, np.linspace(0, 1, num_samples))
+
+
+def _periodic_cubic_spline(
+    knots: NDArray[np.float64],
+    values: NDArray[np.float64],
+    samples: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Evaluate the closed interpolating cubic spline through ``values``.
+
+    The spline passes through every value at its knot and has continuous first
+    and second derivatives everywhere, including where the last segment meets
+    the first. This is the spline ``scipy.interpolate.splprep(..., s=0,
+    per=True)`` fits, with the knots at the chord-length parameters.
+
+    Args:
+        knots (NDArray[np.float64]): Increasing parameters, from 0 to 1, one per
+            value; the last value repeats the first.
+        values (NDArray[np.float64]): (n + 1, 2) points to pass through.
+        samples (NDArray[np.float64]): Parameters in [0, 1] to evaluate at.
+
+    Returns:
+        NDArray[np.float64]: (len(samples), 2) points on the spline.
+    """
+    spans = np.diff(knots)
+    slopes = np.diff(values, axis=0) / spans[:, None]
+    count = spans.size
+    # Second derivative at each knot from the cyclic tridiagonal system that
+    # makes the first derivative continuous across every knot.
+    before = np.roll(spans, 1)
+    system = np.zeros((count, count))
+    index = np.arange(count)
+    system[index, index] = 2 * (before + spans)
+    system[index, (index - 1) % count] = before
+    system[index, (index + 1) % count] = spans
+    bends = np.linalg.solve(system, 6 * (slopes - np.roll(slopes, 1, axis=0)))
+    bends = np.vstack([bends, bends[:1]])
+
+    segment = np.clip(np.searchsorted(knots, samples, side="right") - 1, 0, count - 1)
+    span = spans[segment][:, None]
+    weight_end = (samples - knots[segment])[:, None] / span
+    weight_start = 1 - weight_end
+    return (
+        weight_start * values[segment]
+        + weight_end * values[segment + 1]
+        + (
+            (weight_start**3 - weight_start) * bends[segment]
+            + (weight_end**3 - weight_end) * bends[segment + 1]
+        )
+        * span**2
+        / 6
+    )
 
 
 class PictureZoneProperties(BaseModel):

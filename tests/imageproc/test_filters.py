@@ -257,3 +257,28 @@ class TestStretchGrayRange:
         stretch_gray_range(image, 0.01, 0.01)
 
         assert np.array_equal(image, before)
+
+
+@pytest.mark.parametrize("axis", [0, 1])
+@pytest.mark.parametrize("taps", [5, 8, 31])
+def test_correlation_along_an_axis_matches_a_float64_sum_of_shifts(axis, taps):
+    from scantailor.imageproc.filters import _correlate_along
+
+    rng = np.random.default_rng(taps + axis)
+    data = rng.integers(0, 256, (70, 90)).astype(np.float32)
+    weights = rng.normal(size=taps).astype(np.float32)
+    anchor = taps // 2
+    padding = [(0, 0), (0, 0)]
+    padding[axis] = (anchor, taps - 1 - anchor)
+    padded = np.pad(data.astype(np.float64), padding, mode="symmetric")
+    length = data.shape[axis]
+    expected = sum(
+        float(weight) * np.take(padded, range(tap, tap + length), axis=axis)
+        for tap, weight in enumerate(weights)
+    )
+
+    # Both sum in float64; summing order differs, so the float32 results may
+    # differ by one unit in the last place.
+    np.testing.assert_allclose(
+        _correlate_along(data, weights, axis), expected, rtol=2e-7, atol=1e-4
+    )

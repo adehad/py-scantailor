@@ -21,7 +21,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 import cv2
 import numpy as np
-from numba import njit
 from numpy.typing import NDArray
 
 # Vertical offsets count double so that marks beside a word are preferred over
@@ -31,9 +30,6 @@ _VERTICAL_SCALE = 2
 # Background kept around the ink when cells are assigned, in attach radii. Cells
 # of marks near the page edge extend into it.
 _BORDER_RADII = 2
-
-# Initial capacity of the border pair buffers, in pairs.
-_INITIAL_PAIR_CAPACITY = 1 << 16
 
 # Most threads that share the cell assignment of one image.
 _MAX_BAND_THREADS = 8
@@ -313,7 +309,6 @@ def _band_pairs(
     return _min_per_pair(lo, hi, sq_dist, claims.size)
 
 
-@njit(cache=True, nogil=True)
 def _border_pairs(
     cells: NDArray[np.int32],
     scale: int,
@@ -335,71 +330,69 @@ def _border_pairs(
 
     Returns:
         tuple: Parallel arrays of the lower node, the higher node and the squared
-            distance, one entry per border pixel pair between components.
+            distance, one entry per border pixel pair between components, in no
+            particular order.
     """
-    width = nodes.shape[1]
-    capacity = _INITIAL_PAIR_CAPACITY
-    lows = np.empty(capacity, dtype=np.int64)
-    highs = np.empty(capacity, dtype=np.int64)
-    dists = np.empty(capacity, dtype=np.int64)
-    count = 0
-    above_node = np.full(width, -1, dtype=np.int32)
-    if row_start > 0:
-        for col in range(width):
-            if own[row_start - 1, col]:
-                above_node[col] = nodes[row_start - 1, col]
-            else:
-                above_node[col] = table_node[cells[(row_start - 1) * scale, col]]
-    for row in range(row_start, row_stop):
-        stretched_row = row * scale
-        left_node = np.int32(-1)
-        for col in range(width):
-            if own[row, col]:
-                node = nodes[row, col]
-            else:
-                node = table_node[cells[stretched_row, col]]
-            for neighbour in range(2):
-                if neighbour == 0:
-                    if col == 0:
-                        continue
-                    other = left_node
-                    other_row, other_col = row, col - 1
-                else:
-                    if row == 0:
-                        continue
-                    other = above_node[col]
-                    other_row, other_col = row - 1, col
-                if node == other or node < 0 or other < 0:
-                    continue
-                if own[row, col]:
-                    x_a, y_a = col, row
-                else:
-                    cell = cells[stretched_row, col]
-                    x_a, y_a = table_x[cell], table_y[cell]
-                if own[other_row, other_col]:
-                    x_b, y_b = other_col, other_row
-                else:
-                    cell = cells[other_row * scale, other_col]
-                    x_b, y_b = table_x[cell], table_y[cell]
-                if count == capacity:
-                    capacity *= 2
-                    lows = _grown(lows, capacity)
-                    highs = _grown(highs, capacity)
-                    dists = _grown(dists, capacity)
-                lows[count] = min(node, other)
-                highs[count] = max(node, other)
-                dists[count] = np.int64(x_a - x_b) ** 2 + np.int64(y_a - y_b) ** 2
-                count += 1
-            left_node = node
-            above_node[col] = node
-    return lows[:count], highs[:count], dists[:count]
+    first = max(row_start - 1, 0)
+    rows = slice(first, row_stop)
+    cell = cells[first * scale : row_stop * scale : scale]
+    own_rows = own[rows]
+    node = np.where(own_rows, nodes[rows], table_node[cell])
+    source_x = np.where(
+        own_rows, np.arange(cell.shape[1], dtype=np.int32), table_x[cell]
+    )
+    source_y = np.where(
+        own_rows,
+        np.arange(first, row_stop, dtype=np.int32)[:, None],
+        table_y[cell],
+    )
+    # The upper row is context only when the band does not start at the top.
+    own_first = row_start - first
+    pairs = [
+        _pairs_between(
+            (node[own_first:, 1:], node[own_first:, :-1]),
+            (source_x[own_first:, 1:], source_x[own_first:, :-1]),
+            (source_y[own_first:, 1:], source_y[own_first:, :-1]),
+        ),
+        _pairs_between(
+            (node[1:], node[:-1]),
+            (source_x[1:], source_x[:-1]),
+            (source_y[1:], source_y[:-1]),
+        ),
+    ]
+    return (
+        np.concatenate([pair[0] for pair in pairs]),
+        np.concatenate([pair[1] for pair in pairs]),
+        np.concatenate([pair[2] for pair in pairs]),
+    )
 
 
-@njit(cache=True, nogil=True)
-def _grown(array: NDArray[np.int64], capacity: int) -> NDArray[np.int64]:
-    bigger = np.empty(capacity, dtype=np.int64)
-    bigger[: array.size] = array
-    return bigger
+def _pairs_between(
+    node: tuple[NDArray[np.int32], NDArray[np.int32]],
+    source_x: tuple[NDArray[np.int32], NDArray[np.int32]],
+    source_y: tuple[NDArray[np.int32], NDArray[np.int32]],
+) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
+    """Border pairs between two aligned pixel grids, such as a grid and its shift.
+
+    Args:
+        node (tuple[NDArray[np.int32], NDArray[np.int32]]): Node of every pixel
+            of the two grids, -1 for none.
+        source_x (tuple[NDArray[np.int32], NDArray[np.int32]]): Column of the
+            source pixel of every pixel of the two grids.
+        source_y (tuple[NDArray[np.int32], NDArray[np.int32]]): Row of the
+            source pixel of every pixel of the two grids.
+
+    Returns:
+        tuple: Lower node, higher node and squared source distance of every
+            pixel pair whose two nodes differ and are both components.
+    """
+    a, b = node
+    border = (a != b) & (a >= 0) & (b >= 0)
+    node_a = a[border].astype(np.int64)
+    node_b = b[border].astype(np.int64)
+    dx = source_x[0][border].astype(np.int64) - source_x[1][border]
+    dy = source_y[0][border].astype(np.int64) - source_y[1][border]
+    return np.minimum(node_a, node_b), np.maximum(node_a, node_b), dx * dx + dy * dy
 
 
 def _min_per_pair(

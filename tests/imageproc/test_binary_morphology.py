@@ -92,3 +92,9 @@ class TestSeedFill:
         seeds[2, 2] = True
 
         assert not seed_fill(seeds, mask).any()
+
+
+def test_seed_fill_of_an_empty_image_is_empty():
+    empty = np.zeros((0, 4), dtype=bool)
+
+    assert seed_fill(empty, empty).shape == (0, 4)
