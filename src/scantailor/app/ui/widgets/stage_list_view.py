@@ -1,18 +1,20 @@
 """Custom table view for displaying filter stages in the main window.
 
 This view displays the 6 filter stages as a table with stage names and
-a batch processing launch button.
+a batch processing launch button. Each name carries its stage number in the
+same cell, so the number shares the font, colour and selection of the name.
 """
 
 from PySide6.QtCore import (
     QAbstractTableModel,
     QCoreApplication,
+    QEvent,
     QModelIndex,
     QPersistentModelIndex,
     Qt,
     Signal,
 )
-from PySide6.QtGui import QPainter
+from PySide6.QtGui import QFontMetrics, QPainter
 from PySide6.QtWidgets import (
     QHeaderView,
     QSizePolicy,
@@ -25,7 +27,14 @@ from PySide6.QtWidgets import (
 )
 
 from scantailor.app.ui.icons import icon
+from scantailor.app.ui.theme.fonts import tabular
+from scantailor.app.ui.theme.stylesheet import SPACE_S
 from scantailor.core.stage_sequence import StageSequence
+
+# Vertical space around the stage name: 36 px rows at 13 px Inter.
+_ROW_LEADING = 20
+# Figure space: as wide as a digit, so the names line up behind the numbers.
+_NUMBER_GAP = "\u2007\u2007"
 
 
 class StageListModel(QAbstractTableModel):
@@ -140,6 +149,26 @@ class StageListDelegate(QStyledItemDelegate):
         """
         super().__init__(parent)
 
+    def initStyleOption(
+        self,
+        option: QStyleOptionViewItem,
+        index: QModelIndex | QPersistentModelIndex,
+    ) -> None:
+        """Prefix the stage name with its number, in tabular figures.
+
+        Args:
+            option: Style options to fill.
+            index: Model index.
+        """
+        super().initStyleOption(option, index)
+        if index.column() == 0 and option.text:
+            # QStyleOptionViewItem fields are typed as `...` in the PySide6 stubs
+            # (PYSIDE-3034).
+            # pyrefly: ignore[bad-assignment]
+            option.text = f"{index.row() + 1}{_NUMBER_GAP}{option.text}"
+            # pyrefly: ignore[bad-assignment, bad-argument-type]
+            option.font = tabular(option.font)
+
     def paint(
         self,
         painter: QPainter,
@@ -201,13 +230,13 @@ class StageListView(QTableView):
         h_header.hide()
 
         v_header = self.verticalHeader()
-        v_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        v_header.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         v_header.setSectionsMovable(False)
+        v_header.hide()
 
         # Create launch button (initially hidden)
         self._launch_btn = QToolButton(self.viewport())
         self._launch_btn.setIcon(icon("play"))
-        self._launch_btn.setMinimumSize(18, 18)
         self._launch_btn.setToolTip(self.tr("Launch batch processing"))
         self._launch_btn.hide()
         self._launch_btn.clicked.connect(self.launch_batch_processing.emit)
@@ -218,6 +247,37 @@ class StageListView(QTableView):
         )
         size_policy.setVerticalStretch(1)
         self.setSizePolicy(size_policy)
+        self._apply_row_height()
+
+    def row_height(self) -> int:
+        """Return the height of one stage row, which grows with the font.
+
+        Returns:
+            int: Height in logical pixels.
+        """
+        return QFontMetrics(self.font()).height() + _ROW_LEADING
+
+    def _apply_row_height(self) -> None:
+        row = self.row_height()
+        self.verticalHeader().setDefaultSectionSize(row)
+        if self._launch_btn is not None:
+            self._launch_btn.setFixedSize(row - SPACE_S, row - SPACE_S)
+        if self._model is not None:
+            self.horizontalHeader().resizeSection(1, row)
+            height = self.verticalHeader().length()
+            height += self.height() - self.viewport().height()
+            self.setFixedHeight(height)
+        self._update_launch_button()
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Resize the rows when the font changes.
+
+        Args:
+            event: The change event.
+        """
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.FontChange:
+            self._apply_row_height()
 
     def set_stages(self, stages: StageSequence) -> None:
         """Set the stage sequence to display.
@@ -238,17 +298,7 @@ class StageListView(QTableView):
         h_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         h_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
 
-        # Make second column square
-        if self.verticalHeader().count() > 0:
-            square_side = self.verticalHeader().sectionSize(0)
-            h_header.resizeSection(1, square_side)
-
-        # Update size hint
-        height = self.verticalHeader().length()
-        height += self.height() - self.viewport().height()
-        self.setMinimumHeight(height)
-        self.setMaximumHeight(height)
-
+        self._apply_row_height()
         self.updateGeometry()
 
     def set_batch_processing_possible(self, possible: bool) -> None:
