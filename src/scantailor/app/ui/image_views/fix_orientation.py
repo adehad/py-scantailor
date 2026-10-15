@@ -12,7 +12,7 @@ import numpy as np
 from numpy.typing import NDArray
 from PySide6 import QtGui, QtWidgets
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import QImage, QPainter, QPen
+from PySide6.QtGui import QFontMetricsF, QImage, QPainter, QPen
 
 from scantailor.app.ui.image_views.base import ImageViewBase
 from scantailor.app.ui.theme.tokens import view_color
@@ -36,6 +36,7 @@ class FixOrientationImageView(ImageViewBase):
 
     INDICATOR_SIZE = 60
     INDICATOR_MARGIN = 10
+    INDICATOR_LABEL_GAP = 2
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         """Initialize the view.
@@ -124,13 +125,48 @@ class FixOrientationImageView(ImageViewBase):
             )
         self.update()
 
-    def _paint_overlay(self, painter: QPainter) -> None:
+    def indicator_rects(self) -> tuple[QRectF, QRectF]:
+        """Return where the rotation indicator and its degrees label are drawn.
+
+        The label sits in the bottom-right corner and the indicator above it.
+        Both are measured with the viewport's font, so a larger font or display
+        scale moves the indicator up instead of pushing the label off the edge.
+
+        Returns:
+            tuple[QRectF, QRectF]: The indicator's bounding square and the
+            label's rectangle, in viewport coordinates.
+        """
         viewport = self.viewport()
         assert viewport is not None
+        metrics = QFontMetricsF(viewport.font())
         size = self.INDICATOR_SIZE
-        left = viewport.width() - size - self.INDICATOR_MARGIN
-        top = viewport.height() - size - self.INDICATOR_MARGIN
-        center = QPointF(left + size / 2, top + size / 2)
+        margin = self.INDICATOR_MARGIN
+        label_width = max(
+            float(size), metrics.horizontalAdvance(str(self._rotation.degrees))
+        )
+        label_height = metrics.height()
+        label_top = viewport.height() - margin - label_height
+        indicator = QRectF(
+            viewport.width() - margin - size,
+            label_top - self.INDICATOR_LABEL_GAP - size,
+            size,
+            size,
+        )
+        label = QRectF(
+            min(
+                indicator.center().x() - label_width / 2,
+                viewport.width() - margin - label_width,
+            ),
+            label_top,
+            label_width,
+            label_height,
+        )
+        return indicator, label
+
+    def _paint_overlay(self, painter: QPainter) -> None:
+        indicator, label = self.indicator_rects()
+        size = self.INDICATOR_SIZE
+        center = indicator.center()
 
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -160,7 +196,7 @@ class FixOrientationImageView(ImageViewBase):
         painter.resetTransform()
         painter.setPen(view_color("indicator_label"))
         painter.drawText(
-            QRectF(left, top + size + 2, size, 16),
+            label,
             Qt.AlignmentFlag.AlignCenter,
             str(self._rotation.degrees),
         )
