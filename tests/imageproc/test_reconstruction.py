@@ -103,7 +103,9 @@ class TestMatchesRepeatedGeodesicDilation:
             _expected(seed, mask, method, connectivity),
         )
 
-    @pytest.mark.parametrize("dtype", [np.uint16, np.int16, np.float32])
+    @pytest.mark.parametrize(
+        "dtype", [np.uint16, np.int16, np.float32, np.int8, np.uint32, np.int64]
+    )
     def test_other_dtypes(self, method, connectivity, dtype):
         rng = np.random.default_rng(4)
         if dtype is np.float32:
@@ -205,8 +207,11 @@ def _serpentine_corridor(side: int) -> np.ndarray:
 
 
 @pytest.mark.parametrize("connectivity", [4, 8])
-def test_winding_corridor_is_followed_to_its_end(connectivity):
+@pytest.mark.parametrize("transposed", [False, True])
+def test_winding_corridor_is_followed_to_its_end(connectivity, transposed):
     corridor = _serpentine_corridor(41)
+    if transposed:
+        corridor = np.ascontiguousarray(corridor.T)
     mask = np.where(corridor, 200, 0).astype(np.uint8)
     seed = np.zeros_like(mask)
     seed[0, 0] = 200
@@ -215,3 +220,36 @@ def test_winding_corridor_is_followed_to_its_end(connectivity):
         result, _geodesic_dilation_until_stable(seed, mask, connectivity)
     )
     np.testing.assert_array_equal(result == 200, corridor)
+
+
+def _blocky_pair(rng, shape, block):
+    """Mask of random plateaus and a seed with a few raised pixels."""
+    coarse = rng.integers(0, 256, (shape[0] // block + 1, shape[1] // block + 1))
+    mask = np.kron(coarse, np.ones((block, block), dtype=np.int64))
+    mask = mask[: shape[0], : shape[1]].astype(np.uint8)
+    seed = np.where(rng.random(shape) < 0.002, mask, 0).astype(np.uint8)
+    return seed, mask
+
+
+@pytest.mark.parametrize("connectivity", [4, 8])
+def test_plateau_images_wider_or_taller_than_square_match_the_reference(connectivity):
+    rng = np.random.default_rng(7)
+    for shape in [(90, 230), (230, 90)]:
+        seed, mask = _blocky_pair(rng, shape, 5)
+        np.testing.assert_array_equal(
+            reconstruction(seed, mask, "dilation", connectivity),
+            _geodesic_dilation_until_stable(seed, mask, connectivity),
+        )
+
+
+def test_frame_seed_fills_dark_holes_as_in_picture_detection():
+    rng = np.random.default_rng(8)
+    rough = rng.integers(0, 256, (70, 110)).astype(np.uint8)
+    picture_like = np.asarray(np.maximum(rough, np.roll(rough, 1, axis=1)))
+    frame = np.full_like(picture_like, 255)
+    frame[0, :] = frame[-1, :] = frame[:, 0] = frame[:, -1] = 0
+    seed = np.maximum(frame, picture_like)
+    np.testing.assert_array_equal(
+        reconstruction(seed, picture_like, "erosion", 8),
+        _expected(seed, picture_like, "erosion", 8),
+    )

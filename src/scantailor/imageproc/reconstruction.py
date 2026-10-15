@@ -1,11 +1,14 @@
 """Greyscale morphological reconstruction.
 
-The marker is raised by directional sweeps: each line of pixels takes the
-maximum of itself and its neighbours in the line before it, capped by the mask,
-first down the image and back up, then across it and back. Sweeps repeat until
-two in a row change nothing. Every sweep moves values arbitrarily far in its
-direction, so natural images settle in a few rounds; only paths that wind back
-and forth need more. The result is the unique reconstruction, so it equals
+The marker is raised by directional sweeps: each row takes the maximum of
+itself and its neighbours in the row before it, capped by the mask, first down
+the image and back up, then across it and back on a transposed copy. A row is
+only visited again once the row before it has risen since it was last passed
+on, so after the first sweeps the work shrinks to the rows where values are
+still moving. Every sweep moves values arbitrarily far in its direction, so
+natural images settle in a few rounds; only paths that wind back and forth need
+more. The marker is final when no row is left to pass on in either orientation.
+The result is the unique reconstruction, so it equals
 ``skimage.morphology.reconstruction`` with a 4 or 8-connected footprint.
 """
 
@@ -88,51 +91,124 @@ def _lowest_value(dtype: np.dtype) -> float | int:
     return -np.inf if dtype.kind == "f" else int(np.iinfo(dtype).min)
 
 
-def _transposed(image: NDArray) -> NDArray:
-    """Return a C-contiguous transposed copy."""
-    if image.dtype in _CV2_TRANSPOSE_DTYPES:
-        return np.asarray(cv2.transpose(image), dtype=image.dtype)
-    return np.ascontiguousarray(image.T)
+def _copy_transposed(source: NDArray, target: NDArray) -> None:
+    """Write the transpose of ``source`` into ``target``, which may be a view."""
+    if source.dtype in _CV2_TRANSPOSE_DTYPES:
+        cv2.transpose(source, target)
+    else:
+        target[...] = source.T
 
 
-def _with_side_columns(image: NDArray, fill: float | int) -> NDArray:
-    """Copy ``image`` with one column of ``fill`` added on the left and right."""
-    framed = np.empty((image.shape[0], image.shape[1] + 2), dtype=image.dtype)
-    framed[:, 0] = fill
-    framed[:, -1] = fill
-    framed[:, 1:-1] = image
-    return framed
+class _Rows:
+    """The marker in one orientation, and which rows still have to pass on a rise.
 
-
-def _sweep_down_and_up(framed: NDArray, mask: NDArray, eight_connected: bool) -> bool:
-    """Raise each row to its neighbours in the row before, top down then bottom up.
-
-    Args:
-        framed (NDArray): Marker with a side column of the lowest value on each
+    Attributes:
+        mask (NDArray): C-contiguous upper limit, shape (rows, columns).
+        framed (NDArray): Marker with a column of the lowest value on each
             side, so the diagonal neighbours of the edge pixels need no special
-            case. Raised in place.
-        mask (NDArray): Upper limit, without side columns.
-        eight_connected (bool): Also take the diagonal neighbours.
-
-    Returns:
-        bool: Whether any pixel changed.
+            case. Shape (rows, columns + 2).
+        marker (NDArray): View of ``framed`` without the side columns.
+        unspread_down (list[bool]): Per row, whether it has risen since the
+            row below was last raised from it.
+        unspread_up (list[bool]): Per row, whether it has risen since the row
+            above was last raised from it.
     """
-    before = framed[:, 1:-1].copy()
-    centre = framed[:, 1:-1]
-    left = framed[:, :-2]
-    right = framed[:, 2:]
-    rows = framed.shape[0]
-    # A Python loop over rows; every step is a vectorised operation on a whole row.
-    for order, step in ((range(1, rows), -1), (range(rows - 2, -1, -1), 1)):
+
+    def __init__(self, mask: NDArray, fill: float | int) -> None:
+        """Set up an orientation in which every row still has to be passed on.
+
+        Args:
+            mask (NDArray): C-contiguous upper limit in this orientation.
+            fill (float | int): The lowest value of the dtype.
+        """
+        rows, columns = mask.shape
+        self.mask = mask
+        self.framed = np.empty((rows, columns + 2), dtype=mask.dtype)
+        self.framed[:, 0] = fill
+        self.framed[:, -1] = fill
+        self.marker = self.framed[:, 1:-1]
+        self.unspread_down = [True] * rows
+        self.unspread_up = [True] * rows
+
+    def has_unspread_rows(self) -> bool:
+        """Whether any row may still raise its neighbour row."""
+        # The last row has no row below it and the first none above.
+        return any(self.unspread_down[:-1]) or any(self.unspread_up[1:])
+
+    def mark_unspread(self, rows: NDArray) -> None:
+        """Record that ``rows`` rose while the other orientation was swept.
+
+        Args:
+            rows (NDArray): Indices of rows of this orientation.
+        """
+        for row in rows.tolist():
+            self.unspread_down[row] = True
+            self.unspread_up[row] = True
+
+    def sweep_down_and_up(self, eight_connected: bool) -> NDArray:
+        """Raise each row from the row above, top down, then from the row below.
+
+        Args:
+            eight_connected (bool): Also take the diagonal neighbours.
+
+        Returns:
+            NDArray: Bool per column, whether any pixel in it rose.
+        """
+        risen_columns = np.zeros(self.marker.shape[1], dtype=bool)
+        rows = self.marker.shape[0]
+        self._sweep(range(1, rows), -1, eight_connected, risen_columns)
+        self._sweep(range(rows - 2, -1, -1), 1, eight_connected, risen_columns)
+        return risen_columns
+
+    def _sweep(
+        self,
+        order: range,
+        step: int,
+        eight_connected: bool,
+        risen_columns: NDArray,
+    ) -> None:
+        """Raise the rows in ``order`` from their neighbour row ``step`` away.
+
+        Args:
+            order (range): Rows to raise, in sweep order.
+            step (int): -1 to raise each row from the row above, 1 from below.
+            eight_connected (bool): Also take the diagonal neighbours.
+            risen_columns (NDArray): Bool per column; set where a pixel rose.
+        """
+        unspread, unspread_back = (
+            (self.unspread_down, self.unspread_up)
+            if step == -1
+            else (self.unspread_up, self.unspread_down)
+        )
+        lefts = self.framed[:, :-2]
+        rights = self.framed[:, 2:]
+        marker = self.marker
+        mask = self.mask
+        raised = np.empty(marker.shape[1], dtype=marker.dtype)
+        rose = np.empty(marker.shape[1], dtype=bool)
+        # A Python loop over rows; every step is a vectorised operation on a whole row.
         for row in order:
-            line = centre[row]
-            previous = row + step
-            np.maximum(line, centre[previous], out=line)
+            source = row + step
+            if not unspread[source]:
+                continue
+            unspread[source] = False
             if eight_connected:
-                np.maximum(line, left[previous], out=line)
-                np.maximum(line, right[previous], out=line)
-            np.minimum(line, mask[row], out=line)
-    return not np.array_equal(before, centre)
+                np.maximum(lefts[source], rights[source], out=raised)
+                np.maximum(raised, marker[source], out=raised)
+                np.minimum(raised, mask[row], out=raised)
+            else:
+                np.minimum(marker[source], mask[row], out=raised)
+            line = marker[row]
+            np.maximum(raised, line, out=raised)
+            # Most visited rows do not change, and comparing their bytes is
+            # several times cheaper than np.array_equal on one row.
+            if raised.tobytes() == line.tobytes():
+                continue
+            np.not_equal(raised, line, out=rose)
+            np.logical_or(risen_columns, rose, out=risen_columns)
+            line[...] = raised
+            unspread[row] = True
+            unspread_back[row] = True
 
 
 def _dilate(seed: NDArray, mask: NDArray, eight_connected: bool) -> NDArray:
@@ -141,16 +217,21 @@ def _dilate(seed: NDArray, mask: NDArray, eight_connected: bool) -> NDArray:
         return seed.copy()
     fill = _lowest_value(seed.dtype)
     upright_mask = np.ascontiguousarray(mask)
-    masks = (upright_mask, _transposed(upright_mask))
-    framed = _with_side_columns(seed, fill)
-    transposed = 0
-    quiet_sweeps = 0
-    # Every neighbour direction is looked at by one of the two orientations, so
-    # two quiet sweeps in a row mean no pixel can rise any further.
-    while quiet_sweeps < 2:
-        changed = _sweep_down_and_up(framed, masks[transposed], eight_connected)
-        quiet_sweeps = 0 if changed else quiet_sweeps + 1
-        framed = _with_side_columns(_transposed(framed[:, 1:-1]), fill)
-        transposed ^= 1
-    result = framed[:, 1:-1]
-    return np.ascontiguousarray(result.T if transposed else result)
+    lying_mask = np.empty(upright_mask.shape[::-1], dtype=mask.dtype)
+    _copy_transposed(upright_mask, lying_mask)
+    current = _Rows(upright_mask, fill)
+    current.marker[...] = seed
+    other = _Rows(lying_mask, fill)
+    while True:
+        # The columns of one orientation are the rows of the other.
+        risen_columns = current.sweep_down_and_up(eight_connected)
+        other.mark_unspread(np.flatnonzero(risen_columns))
+        if not (current.has_unspread_rows() or other.has_unspread_rows()):
+            break
+        _copy_transposed(current.marker, other.marker)
+        current, other = other, current
+    if current.mask is upright_mask:
+        return current.marker.copy()
+    result = np.empty_like(upright_mask)
+    _copy_transposed(current.marker, result)
+    return result
