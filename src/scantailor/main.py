@@ -8,7 +8,6 @@ from .app._ui import resources_rc
 from .app.ui.MainWindow import MainWindowManager
 from .app.ui.theme import apply_theme
 from .core.settings import ApplicationSettings
-from .imageproc.numba_warmup import start_warmup
 from .translations import TRANSLATIONS_DIR, load_translation, locale_for_language
 
 assert resources_rc, "The import ensures we load in the resources for the rest of Qt."
@@ -45,7 +44,6 @@ def main() -> int:
     install_saved_language(app)
     main_window = MainWindowManager()
     main_window.show()
-    start_warmup()
     return app.exec()
 
 

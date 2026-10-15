@@ -329,13 +329,11 @@ def pool_size(max_workers: int | None) -> int:
 
 
 def configure_worker_threads() -> None:
-    """Limit OpenCV and Numba to one thread in this process.
+    """Limit OpenCV to one thread in this process.
 
     The pool already runs one page per core, so per-process threading only
-    oversubscribes the CPU. Numba reads its variable on first import, so this
-    must run before anything in the process imports Numba.
+    oversubscribes the CPU.
     """
-    os.environ["NUMBA_NUM_THREADS"] = "1"
     cv2.setNumThreads(1)
 
 

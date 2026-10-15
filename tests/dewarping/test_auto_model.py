@@ -4,17 +4,10 @@ import cv2
 import numpy as np
 import pytest
 
-from scantailor.dewarping import (
-    spline_fit,
-    text_line_refiner,
-    text_line_tracer,
-    top_bottom_edge_tracer,
-)
 from scantailor.dewarping.auto_model import (
     build_auto_distortion_model,
     straighten_outer_border,
     trivial_distortion_model,
-    warm_up_kernels,
 )
 from scantailor.dewarping.distortion_model import Curve, DistortionModel
 from scantailor.dewarping.page_dewarper import dewarper_from_model
@@ -275,20 +268,6 @@ class TestStraighteningTheOuterBorder:
 
         assert fixed.bottom_curve is not None
         assert fixed.bottom_curve.polyline[0, 0] == float(np.float32(100.123456789012))
-
-
-class TestWarmUp:
-    def test_warming_up_compiles_the_kernels_of_every_stage(self) -> None:
-        warm_up_kernels()
-
-        kernels = (
-            spline_fit._fit_extended_spline,
-            text_line_tracer._trace_towards_line,
-            text_line_refiner._evolve_snake,
-            top_bottom_edge_tracer._shortest_paths,
-            top_bottom_edge_tracer._snake_search,
-        )
-        assert all(kernel.signatures for kernel in kernels)
 
 
 class TestTrivialModel:
