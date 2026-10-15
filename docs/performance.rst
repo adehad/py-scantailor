@@ -6,7 +6,10 @@ These notes record how the port's image code is written and why there is no GPU 
 How pixel code is written
 =========================
 
-The page image code uses these tools, in this order of preference:
+The application depends on NumPy, OpenCV, Pillow and the standard library for
+its image work, and on nothing that needs a compiler at build time. NumPy is then
+the only package that ships an OpenBLAS, and the same wheels run on Windows,
+Linux and macOS. Page code uses these tools, in this order of preference:
 
 .. list-table::
    :header-rows: 1
@@ -14,35 +17,44 @@ The page image code uses these tools, in this order of preference:
 
    * - Tool
      - When it is used
-   * - OpenCV or SciPy
+   * - OpenCV
      - First choice. A compiled C routine such as morphology, blur, threshold,
-       remap or connected components runs faster than the same work in a Python
-       loop.
+       remap, distance transform or connected components runs faster than the
+       same work in a Python loop.
    * - Vectorised NumPy
-     - When no single C routine fits, but the work is whole-array arithmetic.
-   * - numba ``njit``
-     - Only where NumPy still leaves a clear gap, such as a loop over connected
-       components or a scan whose result depends on the previous pixel. numba
-       compiles these kernels for the CPU and caches them on disk, so later runs
-       start fast.
+     - When no single OpenCV routine fits, but the work is whole-array
+       arithmetic. Scans whose result depends on the previous pixel are done a
+       whole row or band at a time.
+   * - Plain Python
+     - For short loops whose steps depend on each other, such as a snake moving
+       one node at a time or a spline fit's small linear solve. These run on
+       arrays of a few hundred values, so the per-step overhead stays small
+       against the page.
 
-numba's parallel loops, ``prange``, gave no gain in these kernels, because batch
-processing already runs one page per worker process.
+A few kernels are slower this way than a compiled loop would be. On generated
+300 dpi pages, the dewarping auto model takes 0.8 to 1.2 s per page, about 1.5
+times a compiled version; picture detection up to 2.6 times and the content box
+search up to 1.45 times. Other stages got faster where OpenCV replaced a Python
+or SciPy step, so a whole batch of the ten sample pages takes about as long as
+with compiled kernels.
+
+The JBIG2 encoder used by PDF export lives in ``packages/jbig2-numba`` and is
+compiled by numba on its first use, then cached in the user cache folder.
 
 Why there is no GPU build
 =========================
 
 numba can compile CUDA kernels for NVIDIA cards, but only for code written as
-separate GPU kernels. It does not move ``njit`` code to the GPU. One hot loop was
-ported to ``numba-cuda`` and timed on 2100 x 3000 pixel pages, on a machine with
-16 CPU threads and an NVIDIA RTX A2000:
+separate GPU kernels. One hot loop was ported to ``numba-cuda`` and timed on 2100
+x 3000 pixel pages, against the same loop compiled for the CPU, on a machine
+with 16 CPU threads and an NVIDIA RTX A2000:
 
 .. list-table::
    :header-rows: 1
 
    * - Version
      - Time per page
-   * - CPU, with OpenCV, NumPy and numba
+   * - CPU, compiled with numba
      - 29 to 35 ms
    * - GPU, with ``numba-cuda`` and the copies to and from the card
      - 42 to 49 ms
