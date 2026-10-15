@@ -22,6 +22,8 @@ jobs:
     # To add a platform or Python version, copy this job.
     name: Python 3.14 on Linux
     runs-on: ubuntu-latest
+    # A clean run takes about 5 minutes; a hung Qt test would hold the runner for hours.
+    timeout-minutes: 10
     env:
       NUMBA_CACHE_DIR: ${{ github.workspace }}/.numba-cache
 
