@@ -48,8 +48,10 @@ jobs:
           # cache from an older commit is still safe to restore.
           restore-keys: numba-${{ runner.os }}-
 
+      # The smoke test needs only the runtime packages; pdm run exe
+      # freezes from its own environment (tools/build_exe.py).
       - name: Install dependencies
-        run: pdm install --frozen-lockfile -G installer
+        run: pdm install --frozen-lockfile --prod
 
       - name: Compile translations
         run: pdm run translations
@@ -104,7 +106,7 @@ jobs:
             libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1
 
       - name: Install dependencies
-        run: pdm install --frozen-lockfile -G installer
+        run: pdm install --frozen-lockfile --prod
 
       - name: Compile translations
         run: pdm run translations
@@ -146,7 +148,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: pdm install --frozen-lockfile -G installer
+        run: pdm install --frozen-lockfile --prod
 
       - name: Compile translations
         run: pdm run translations

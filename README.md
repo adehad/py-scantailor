@@ -453,7 +453,7 @@ pdm install
 pdm run exe
 ```
 
-`pdm run exe` compiles the translations, then runs PyInstaller on [`app.spec`](app.spec). The result is one folder, `dist/ScanTailor/`, holding the windowed `ScanTailor` and the console `scantailor-cli` (`.exe` on Windows), which share the bundled libraries. On macOS the same folder is also wrapped as `dist/ScanTailor.app`, with both executables in `Contents/MacOS`. The entry scripts in [`tools/pyinstaller/`](tools/pyinstaller/) call `multiprocessing.freeze_support()` so the batch worker processes start correctly from a frozen executable. PyInstaller only builds for the platform it runs on.
+`pdm run exe` compiles the translations, then runs PyInstaller on [`app.spec`](app.spec) from `build/venv`, a separate environment that [`tools/build_exe.py`](tools/build_exe.py) syncs from `pdm.lock` with the runtime dependencies and PyInstaller only, so test and docs tools installed for development never end up in the bundle. The result is one folder, `dist/ScanTailor/`, holding the windowed `ScanTailor` and the console `scantailor-cli` (`.exe` on Windows), which share the bundled libraries. On macOS the same folder is also wrapped as `dist/ScanTailor.app`, with both executables in `Contents/MacOS`. The entry scripts in [`tools/pyinstaller/`](tools/pyinstaller/) call `multiprocessing.freeze_support()` so the batch worker processes start correctly from a frozen executable. PyInstaller only builds for the platform it runs on.
 
 #### Releasing
 

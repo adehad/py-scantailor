@@ -3,7 +3,8 @@
 
 On macOS the folder is also wrapped in ScanTailor.app.
 
-Run ``pdm run exe``, which compiles the translations first.
+Run ``pdm run exe``, which compiles the translations and freezes from a virtual
+environment holding only the runtime dependencies (tools/build_exe.py).
 """
 
 import sys
@@ -59,10 +60,6 @@ datas = [
 # the background and every later run loads the cache.
 hiddenimports = ["PySide6.QtSvg", "scantailor.imageproc.numba_warmup"]
 
-# The dev environment also holds the docs and test tools; PyInstaller's hooks for
-# numba and scikit-image would otherwise sweep them in (about 30 MB).
-excludes = ["_pytest", "alabaster", "babel", "docutils", "pytest", "pytz", "sphinx"]
-
 exe_icon = None
 if sys.platform == "win32":
     exe_icon = str(RESOURCES / "win32" / "scantailor.ico")
@@ -74,7 +71,6 @@ def _analyse(script: str) -> "Analysis":
         pathex=[str(SRC)],
         datas=datas,
         hiddenimports=hiddenimports,
-        excludes=excludes,
     )
 
 
