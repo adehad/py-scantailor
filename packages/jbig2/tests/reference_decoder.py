@@ -7,7 +7,7 @@ misreading of the spec is less likely to cancel out.
 
 import numpy as np
 
-from jbig2_numba.mq_coder import NLPS, NMPS, QE, SWITCH
+from jbig2.mq_coder import NLPS, NMPS, QE, SWITCH
 
 
 class MQDecoder:

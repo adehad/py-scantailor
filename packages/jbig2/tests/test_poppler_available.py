@@ -12,7 +12,7 @@ from pdf_decoders import (
     decode_with_poppler,
 )
 
-from jbig2_numba import encode_pdf_stream
+from jbig2 import encode_pdf_stream
 
 
 def test_poppler_decodes_the_encoder_output(tmp_path) -> None:

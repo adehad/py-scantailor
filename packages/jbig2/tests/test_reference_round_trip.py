@@ -5,8 +5,8 @@ import pytest
 from reference_decoder import MQDecoder, decode_generic
 from sample_images import checkerboard, fuzz_images, noise
 
-from jbig2_numba import encode_generic
-from jbig2_numba.mq_coder import encode_decisions
+from jbig2 import encode_generic
+from jbig2.mq_coder import encode_decisions
 
 
 @pytest.mark.parametrize("seed", range(5))

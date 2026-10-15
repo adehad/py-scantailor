@@ -55,7 +55,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.NUMBA_CACHE_DIR }}
-          key: numba-${{ runner.os }}-${{ hashFiles('pdm.lock', 'packages/**/*.py', 'tests/filters/page_split/cpp_reference.py') }}
+          key: numba-${{ runner.os }}-${{ hashFiles('pdm.lock', 'tests/filters/page_split/cpp_reference.py') }}
           # numba checks each entry against its source file's hash, so a
           # cache from an older commit is still safe to restore.
           restore-keys: numba-${{ runner.os }}-

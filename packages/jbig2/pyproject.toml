@@ -1,14 +1,14 @@
 [project]
-name = "jbig2-numba"
+name = "jbig2"
 version = "0.1.0"
-description = "Lossless JBIG2 generic-region encoder for bilevel images, in pure Python accelerated by numba"
+description = "Lossless JBIG2 generic-region encoder for bilevel images, in Python with NumPy and OpenCV"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 dependencies = [
     "numpy>=2",
-    "numba>=0.60",
+    "opencv-python>=4.8",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -27,7 +27,7 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/jbig2_numba"]
+packages = ["src/jbig2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -47,4 +47,4 @@ convention = "google"
 "tests/**" = ["D100", "D101", "D102", "D103"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["jbig2_numba"]
+known-first-party = ["jbig2"]
