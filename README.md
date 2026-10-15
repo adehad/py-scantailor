@@ -457,6 +457,8 @@ pdm run exe
 
 The project hooks in [`tools/pyinstaller/hooks/`](tools/pyinstaller/hooks/) keep the bundle to what the app uses: Qt without OpenGL, QML, networking or unused image formats and with Qt's own translations for the shipped languages only, OpenCV without its FFmpeg video library, numba without its test, coverage and pretty-printing helpers, and Python without OpenSSL, which only network code needs. Each rule carries its reason in the hook.
 
+Building with `SCANTAILOR_BUILD_CHECKS=1` adds a third executable, `scantailor-checks` ([`tools/pyinstaller/frozen_checks.py`](tools/pyinstaller/frozen_checks.py)), that uses the same bundled libraries. It imports every module in `used_modules.txt`, and drives the window offscreen through a project: every stage, the batch, the main dialogs, a language switch and a PDF export. `python tools/smoke_frozen.py <scantailor-cli> --checks <scantailor-checks>` runs it after the CLI smoke test. It is for testing only; delete it before handing the folder out.
+
 #### Releasing
 
 Push a tag that starts with `v`:
@@ -468,4 +470,4 @@ git push origin v1.0.0-rc1
 
 [`.github/workflows/release.yml`](.github/workflows/release.yml) then compiles the translations, builds the executables on each platform, smoke-tests them and creates a GitHub Release for the tag with the archives attached and generated release notes. Tags containing `-rc`, `-alpha` or `-beta` are published as pre-releases.
 
-Linux (Ubuntu 22.04) and macOS (Apple Silicon, macOS 15) are built alongside Windows. The full test suite runs on every push to `main` in the test workflow, so a release does not repeat it; every build runs [`tools/smoke_frozen.py`](tools/smoke_frozen.py), which drives the frozen `scantailor-cli` through `create`, `run` and `export pdf` on a few sample pages. Running the workflow by hand from the Actions tab (or `gh workflow run release.yml --ref <branch>`) builds and smoke-tests all three without publishing; those archives are named with the short commit hash instead of a tag.
+Linux (Ubuntu 22.04) and macOS (Apple Silicon, macOS 15) are built alongside Windows. The full test suite runs on every push to `main` in the test workflow, so a release does not repeat it; every build runs [`tools/smoke_frozen.py`](tools/smoke_frozen.py), which drives the frozen `scantailor-cli` through `create`, `run` and `export pdf` on a few sample pages, then runs `scantailor-checks` and deletes it before archiving. Running the workflow by hand from the Actions tab (or `gh workflow run release.yml --ref <branch>`) builds and smoke-tests all three without publishing; those archives are named with the short commit hash instead of a tag.

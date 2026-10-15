@@ -4,8 +4,14 @@ Renders a few sample pages, then drives the frozen executable through
 ``create``, ``run`` and ``export pdf`` and checks each JSON result and the page
 count of the PDF. Exits non-zero with a message on the first failure.
 
+With ``--checks``, it then runs the frozen-checks executable that a build with
+SCANTAILOR_BUILD_CHECKS=1 adds (tools/pyinstaller/frozen_checks.py): the import
+check against used_modules.txt and the offscreen GUI run on every sample page.
+
 Usage:
     python tools/smoke_frozen.py dist/ScanTailor/scantailor-cli
+    python tools/smoke_frozen.py dist/ScanTailor/scantailor-cli \
+        --checks dist/ScanTailor/scantailor-checks
 """
 
 import argparse
@@ -18,12 +24,13 @@ from typing import Any, Final
 
 import pikepdf
 from PIL import Image
-from sample_book import SAMPLE_DPI, render_sample_page
+from sample_book import SAMPLE_DPI, SAMPLE_PAGE_NAMES, render_sample_page
 
 # Single pages only, so page split leaves the count unchanged.
 SMOKE_PAGES: Final = ("01_single_page", "05_skewed", "08_pictures")
 # The first run of a fresh frozen build compiles every numba kernel.
 _COMMAND_TIMEOUT_SECONDS: Final = 1800
+USED_MODULES: Final = Path(__file__).with_name("pyinstaller") / "used_modules.txt"
 
 
 class SmokeFailure(Exception):
@@ -45,21 +52,31 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--workers", type=int, default=2, help="worker processes for run (default 2)"
     )
+    parser.add_argument(
+        "--checks", type=Path, help="also run this frozen scantailor-checks"
+    )
+    parser.add_argument(
+        "--modules",
+        type=Path,
+        default=USED_MODULES,
+        help="module list for the import check (default used_modules.txt)",
+    )
     return parser.parse_args(argv)
 
 
-def write_pages(directory: Path) -> list[Path]:
-    """Render the smoke pages as PNG files.
+def write_pages(directory: Path, names: tuple[str, ...] = SMOKE_PAGES) -> list[Path]:
+    """Render sample pages as PNG files.
 
     Args:
         directory (Path): Folder to write the images into; created when missing.
+        names (tuple[str, ...]): Sample pages to render; the smoke pages by default.
 
     Returns:
         list[Path]: The written images, in project order.
     """
     directory.mkdir(parents=True, exist_ok=True)
     paths = []
-    for name in SMOKE_PAGES:
+    for name in names:
         path = directory / f"{name}.png"
         Image.fromarray(render_sample_page(name).image).save(
             path, dpi=(SAMPLE_DPI, SAMPLE_DPI)
@@ -160,6 +177,34 @@ def smoke(cli: Path, workers: int, work_dir: Path) -> None:
     expect(pdf_pages == len(pages), f"{pdf} has {pdf_pages} pages, not {len(pages)}")
 
 
+def run_checks(checks: Path, modules: Path, work_dir: Path) -> None:
+    """Run the frozen import check, then the GUI check on the whole sample book.
+
+    Args:
+        checks (Path): The frozen scantailor-checks executable.
+        modules (Path): Module list for the import check.
+        work_dir (Path): Empty scratch folder.
+
+    Raises:
+        SmokeFailure: A check exited non-zero; its output says why.
+    """
+    pages = write_pages(work_dir / "book", SAMPLE_PAGE_NAMES)
+    for args in (
+        ("imports", modules),
+        ("gui", pages[0].parent, work_dir / "gui"),
+    ):
+        command = [str(checks), *map(str, args)]
+        sys.stderr.write(f"$ {' '.join(command)}\n")
+        sys.stderr.flush()
+        completed = subprocess.run(
+            command, timeout=_COMMAND_TIMEOUT_SECONDS, check=False
+        )
+        expect(
+            completed.returncode == 0,
+            f"scantailor-checks {args[0]} exited with {completed.returncode}",
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the smoke test from the command line.
 
@@ -170,12 +215,17 @@ def main(argv: list[str] | None = None) -> int:
         int: 0 when every check passed, 1 otherwise.
     """
     args = parse_args(argv)
-    if not args.cli.is_file():
-        sys.stderr.write(f"smoke test FAILED: no executable at {args.cli}\n")
-        return 1
+    for executable in (args.cli, args.checks):
+        if executable is not None and not executable.is_file():
+            sys.stderr.write(f"smoke test FAILED: no executable at {executable}\n")
+            return 1
     with tempfile.TemporaryDirectory(prefix="scantailor-smoke-") as scratch:
         try:
-            smoke(args.cli.resolve(), args.workers, Path(scratch))
+            smoke(args.cli.resolve(), args.workers, Path(scratch) / "cli")
+            if args.checks is not None:
+                run_checks(
+                    args.checks.resolve(), args.modules, Path(scratch) / "checks"
+                )
         except (SmokeFailure, subprocess.TimeoutExpired) as error:
             sys.stderr.write(f"smoke test FAILED: {error}\n")
             return 1

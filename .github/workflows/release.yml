@@ -1,6 +1,10 @@
 # Release: on a pushed v* tag, freeze with PyInstaller on Windows, Linux and
-# macOS, smoke-test each build and attach the archives to a GitHub Release.
-# A manual run (workflow_dispatch) builds and smoke-tests without publishing.
+# macOS, check each build and attach the archives to a GitHub Release.
+# A manual run (workflow_dispatch) builds and checks without publishing.
+#
+# Each build adds scantailor-checks (SCANTAILOR_BUILD_CHECKS=1, see app.spec),
+# runs it with the CLI smoke test against the folder that ships and deletes it
+# before archiving.
 name: Release
 
 on:
@@ -16,6 +20,7 @@ env:
   PYTHONUNBUFFERED: "1"
   FORCE_COLOR: "1"
   QT_QPA_PLATFORM: "offscreen"
+  SCANTAILOR_BUILD_CHECKS: "1"
 
 jobs:
   windows:
@@ -62,8 +67,13 @@ jobs:
       - name: Smoke test the CLI
         run: dist/ScanTailor/scantailor-cli.exe --help
 
-      - name: Smoke test a frozen batch run
-        run: pdm run python tools/smoke_frozen.py dist/ScanTailor/scantailor-cli.exe
+      - name: Smoke test a frozen batch run and the frozen checks
+        run: >-
+          pdm run python tools/smoke_frozen.py dist/ScanTailor/scantailor-cli.exe
+          --checks dist/ScanTailor/scantailor-checks.exe
+
+      - name: Remove the checks
+        run: rm dist/ScanTailor/scantailor-checks.exe
 
       - name: Archive
         id: archive
@@ -114,8 +124,13 @@ jobs:
       - name: Build executables
         run: pdm run exe
 
-      - name: Smoke test a frozen batch run
-        run: pdm run python tools/smoke_frozen.py dist/ScanTailor/scantailor-cli
+      - name: Smoke test a frozen batch run and the frozen checks
+        run: >-
+          pdm run python tools/smoke_frozen.py dist/ScanTailor/scantailor-cli
+          --checks dist/ScanTailor/scantailor-checks
+
+      - name: Remove the checks
+        run: rm dist/ScanTailor/scantailor-checks
 
       - name: Archive
         id: archive
@@ -156,8 +171,18 @@ jobs:
       - name: Build executables
         run: pdm run exe
 
-      - name: Smoke test a frozen batch run
-        run: pdm run python tools/smoke_frozen.py dist/ScanTailor.app/Contents/MacOS/scantailor-cli
+      - name: Smoke test a frozen batch run and the frozen checks
+        run: >-
+          pdm run python tools/smoke_frozen.py dist/ScanTailor.app/Contents/MacOS/scantailor-cli
+          --checks dist/ScanTailor.app/Contents/MacOS/scantailor-checks
+
+      # Deleting a file from the signed bundle invalidates its ad-hoc signature,
+      # so the bundle is signed again.
+      - name: Remove the checks
+        run: |
+          rm -f dist/ScanTailor/scantailor-checks dist/ScanTailor.app/Contents/MacOS/scantailor-checks
+          codesign --force --sign - dist/ScanTailor.app
+          codesign --verify --deep --strict dist/ScanTailor.app
 
       - name: Archive
         id: archive

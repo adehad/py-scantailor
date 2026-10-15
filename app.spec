@@ -5,8 +5,14 @@ On macOS the folder is also wrapped in ScanTailor.app.
 
 Run ``pdm run exe``, which compiles the translations and freezes from a virtual
 environment holding only the runtime dependencies (tools/build_exe.py).
+
+With ``SCANTAILOR_BUILD_CHECKS=1`` the folder also gets scantailor-checks
+(tools/pyinstaller/frozen_checks.py), which the release workflow runs against the
+folder and deletes before archiving. It brings none of its own libraries, so it
+sees exactly the files that ship.
 """
 
+import os
 import sys
 import typing
 from importlib import metadata
@@ -28,6 +34,7 @@ PACKAGE = SRC / "scantailor"
 ENTRY_POINTS = ROOT / "tools" / "pyinstaller"
 HOOKS = ENTRY_POINTS / "hooks"
 RESOURCES = PACKAGE / "resources"
+BUILD_CHECKS = os.environ.get("SCANTAILOR_BUILD_CHECKS") == "1"
 
 # The project hooks import their shared rules (_trim.py, _qt.py) from here.
 sys.path.insert(0, str(HOOKS))
@@ -88,39 +95,36 @@ def _analyse(script: str) -> "Analysis":
     )
 
 
+def _executable(analysis: "Analysis", name: str, *, console: bool) -> "EXE":
+    return EXE(
+        PYZ(analysis.pure),
+        analysis.scripts,
+        exclude_binaries=True,
+        name=name,
+        upx=False,
+        console=console,
+        icon=exe_icon,
+    )
+
+
 gui = _analyse("scantailor_gui.py")
 cli = _analyse("scantailor_cli.py")
-
-gui_exe = EXE(
-    PYZ(gui.pure),
-    gui.scripts,
-    exclude_binaries=True,
-    name="ScanTailor",
-    upx=False,
-    console=False,
-    icon=exe_icon,
-)
-cli_exe = EXE(
-    PYZ(cli.pure),
-    cli.scripts,
-    exclude_binaries=True,
-    name="scantailor-cli",
-    upx=False,
-    console=True,
-    icon=exe_icon,
-)
-
-# UPX stays off everywhere: it corrupts some Qt and Control Flow Guard DLLs.
-coll = COLLECT(
-    gui_exe,
+contents = [
+    _executable(gui, "ScanTailor", console=False),
     gui.binaries,
     gui.datas,
-    cli_exe,
+    _executable(cli, "scantailor-cli", console=True),
     cli.binaries,
     cli.datas,
-    upx=False,
-    name="ScanTailor",
-)
+]
+if BUILD_CHECKS:
+    # The checks import whatever either executable can, so they follow both.
+    hiddenimports += ["scantailor.main", "scantailor.cli.main"]
+    checks = _analyse("frozen_checks.py")
+    contents.append(_executable(checks, "scantailor-checks", console=True))
+
+# UPX stays off everywhere: it corrupts some Qt and Control Flow Guard DLLs.
+coll = COLLECT(*contents, upx=False, name="ScanTailor")
 
 # The bundle copies the whole folder into Contents/MacOS, so the CLI ships at
 # ScanTailor.app/Contents/MacOS/scantailor-cli beside the libraries it shares.
