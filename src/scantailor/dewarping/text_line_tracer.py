@@ -12,9 +12,7 @@ from dataclasses import dataclass, field
 
 import cv2
 import numpy as np
-from numba import njit
 from numpy.typing import NDArray
-from scipy import ndimage
 
 from scantailor.core.models import Dpi
 from scantailor.dewarping.grid_filters import (
@@ -60,6 +58,17 @@ _MAX_END_GAP_FRACTION = 0.3
 _CURVATURE_ANGLE_DEG = 6.0
 _FLOAT_EPS = 1.1920929e-07
 _FLOAT_MAX = 3.4028235e38
+# Neighbour steps of a ridge walk, clockwise from the top left.
+_TRACE_DIRECTIONS = (
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+    (1, 0),
+    (1, 1),
+    (0, 1),
+    (-1, 1),
+    (-1, 0),
+)
 
 
 @dataclass(frozen=True)
@@ -317,9 +326,12 @@ def _squared_distance_map(ink: NDArray[np.bool_]) -> NDArray[np.int64]:
     Returns:
         numpy.ndarray of numpy.int64: Squared distances, zero on the background.
     """
-    padded = np.pad(ink, 1, constant_values=False)
-    distances = ndimage.distance_transform_edt(padded)
-    return np.rint(distances[1:-1, 1:-1] ** 2).astype(np.int64)
+    padded = np.pad(ink, 1, constant_values=False).astype(np.uint8)
+    # The precise mask gives exact Euclidean distances; squaring them in double
+    # precision keeps the float32 rounding well below the 0.5 that rint absorbs.
+    distances = cv2.distanceTransform(padded, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)
+    squared = np.square(distances[1:-1, 1:-1], dtype=np.float64)
+    return np.rint(squared).astype(np.int64)
 
 
 def _find_mid_line_seeds(
@@ -347,7 +359,6 @@ def _find_mid_line_seeds(
     return seeds
 
 
-@njit(cache=True)
 def _trace_towards_line(
     sedm: NDArray[np.int64],
     ridge: NDArray[np.float32],
@@ -373,56 +384,23 @@ def _trace_towards_line(
             from the last reported point.
 
     Returns:
-        Cells ``(x, y)`` that were reported, in path order, shape ``(k, 2)``.
+        numpy.ndarray of numpy.int64: Cells ``(x, y)`` that were reported, in path
+            order, shape ``(k, 2)``.
     """
     height, width = sedm.shape
-    p1x = line[0, 0]
-    p1y = line[0, 1]
-    dx = line[1, 0] - p1x
-    dy = line[1, 1] - p1y
-    # The line's normal, turned to point from the seed towards the line.
-    nx = dy
-    ny = -dx
-    start_side = nx * (seed_x - p1x) + ny * (seed_y - p1y)
-    tip_side = nx * nx + ny * ny
-    if start_side * tip_side > 0:
-        nx = -nx
-        ny = -ny
-
-    directions = np.array(
-        [[-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0]]
-    )
-    step_x = np.zeros(8, dtype=np.int64)
-    step_y = np.zeros(8, dtype=np.int64)
-    alignment = np.zeros(8)
-    count = 0
-    for i in range(8):
-        vx = directions[i, 0]
-        vy = directions[i, 1]
-        if nx * vx + ny * vy > 0.0:
-            norm = math.sqrt(float(vx * vx + vy * vy))
-            step_x[count] = vx
-            step_y[count] = vy
-            alignment[count] = nx * (vx / norm) + ny * (vy / norm)
-            count += 1
-    # Insertion sort by decreasing alignment; equal alignments keep their order.
-    for i in range(1, count):
-        key_x = step_x[i]
-        key_y = step_y[i]
-        key_a = alignment[i]
-        j = i - 1
-        while j >= 0 and alignment[j] < key_a:
-            step_x[j + 1] = step_x[j]
-            step_y[j + 1] = step_y[j]
-            alignment[j + 1] = alignment[j]
-            j -= 1
-        step_x[j + 1] = key_x
-        step_y[j + 1] = key_y
-        alignment[j + 1] = key_a
+    # The walk reads single cells; flat memoryviews hand them back as Python
+    # numbers several times faster than NumPy scalar indexing.
+    distance_at = memoryview(np.ascontiguousarray(sedm, dtype=np.int64)).cast("B")
+    distance_at = distance_at.cast("q")
+    ridge_at = memoryview(np.ascontiguousarray(ridge, dtype=np.float32)).cast("B")
+    ridge_at = ridge_at.cast("f")
+    p1x = float(line[0, 0])
+    p1y = float(line[0, 1])
+    nx, ny = _normal_towards_line(line, seed_x, seed_y)
+    steps = _steps_towards(nx, ny)
 
     max_sqdist = math.floor(max_dist * max_dist + 0.5)
-    out = np.empty((64, 2), dtype=np.int64)
-    out_count = 0
+    cells: list[tuple[int, int]] = []
     last_x = seed_x
     last_y = seed_y
     finished = False
@@ -431,34 +409,33 @@ def _trace_towards_line(
         cur_y = last_y
         reported = False
         while True:
-            best_dm = -1
-            best_pm = -1
+            best_dm = None
+            best_pm = None
             best_sqd = 0
             best_prob = -_FLOAT_MAX
-            for i in range(count):
-                x = cur_x + step_x[i]
-                y = cur_y + step_y[i]
+            for step in steps:
+                x = cur_x + step[0]
+                y = cur_y + step[1]
                 if x < 0 or y < 0 or x >= width or y >= height:
                     continue
-                sqd = sedm[y, x]
+                index = y * width + x
+                sqd = distance_at[index]
                 if sqd > best_sqd:
                     best_sqd = sqd
-                    best_dm = i
-                probability = ridge[y, x]
+                    best_dm = step
+                probability = ridge_at[index]
                 if probability > best_prob:
                     best_prob = probability
-                    best_pm = i
-            if best_dm == -1:
+                    best_pm = step
+            if best_dm is None or best_pm is None:
                 finished = True
                 break
             best = best_pm
-            dm_x = cur_x + step_x[best_dm]
-            dm_y = cur_y + step_y[best_dm]
             # A neighbour deeper in the mask than this cell wins over the ridge.
-            if sedm[dm_y, dm_x] > sedm[cur_y, cur_x]:
+            if best_sqd > distance_at[cur_y * width + cur_x]:
                 best = best_dm
-            new_x = cur_x + step_x[best]
-            new_y = cur_y + step_y[best]
+            new_x = cur_x + best[0]
+            new_y = cur_y + best[1]
             side1 = nx * (new_x - p1x) + ny * (new_y - p1y)
             side2 = nx * (last_x - p1x) + ny * (last_y - p1y)
             if side1 * side2 < 0:
@@ -475,12 +452,40 @@ def _trace_towards_line(
             break
         last_x = cur_x
         last_y = cur_y
-        if out_count >= out.shape[0]:
-            out = np.concatenate((out, np.empty_like(out)))
-        out[out_count, 0] = last_x
-        out[out_count, 1] = last_y
-        out_count += 1
-    return out[:out_count]
+        cells.append((last_x, last_y))
+    return np.array(cells, dtype=np.int64).reshape(-1, 2)
+
+
+def _normal_towards_line(
+    line: NDArray[np.float64], seed_x: int, seed_y: int
+) -> tuple[float, float]:
+    """The line's normal, turned to point from the seed towards the line."""
+    p1x = float(line[0, 0])
+    p1y = float(line[0, 1])
+    dx = float(line[1, 0]) - p1x
+    dy = float(line[1, 1]) - p1y
+    nx = dy
+    ny = -dx
+    start_side = nx * (seed_x - p1x) + ny * (seed_y - p1y)
+    tip_side = nx * nx + ny * ny
+    if start_side * tip_side > 0:
+        return -nx, -ny
+    return nx, ny
+
+
+def _steps_towards(nx: float, ny: float) -> list[tuple[int, int]]:
+    """Neighbour steps facing ``(nx, ny)``, best aligned first.
+
+    The sort is stable, so equally aligned steps keep the order of
+    ``_TRACE_DIRECTIONS``.
+    """
+    facing = []
+    for vx, vy in _TRACE_DIRECTIONS:
+        if nx * vx + ny * vy > 0.0:
+            norm = math.sqrt(float(vx * vx + vy * vy))
+            facing.append(((vx, vy), nx * (vx / norm) + ny * (vy / norm)))
+    facing.sort(key=lambda entry: -entry[1])
+    return [step for step, _ in facing]
 
 
 def _extract_text_lines(

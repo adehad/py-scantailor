@@ -12,10 +12,10 @@ often prefers it to the last text line, which flattens the bottom of the model.
 """
 
 import math
+from typing import NamedTuple
 
 import cv2
 import numpy as np
-from numba import njit
 from numpy.typing import NDArray
 
 from scantailor.dewarping.grid_filters import (
@@ -61,6 +61,14 @@ _FLAT_ENERGY_LEVEL = 0.01
 _BORDER_BAND_FRACTION = 0.015
 _MIN_BORDER_BAND = 3.0
 _MAX_BORDER_BEND = 2.0
+
+_FLOAT32_MAX = 3.4028235e38
+# Which step a path is taken to have arrived by when several offer the same
+# cost, as (forward, across) in the sweep frame of ``_SweepFrame``.
+_STEP_PREFERENCE = ((1, 0), (1, 1), (1, -1), (0, 1))
+_RELAXATION_ROUNDS = 4
+FloatArray = NDArray[np.float64]
+IntArray = NDArray[np.int64]
 
 _NEIGHBOUR_VECTORS = np.array(
     [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]],
@@ -128,16 +136,19 @@ def trace_top_bottom_edges(
 
     absolute = np.abs(deriv)
     blurred = gauss_blur(absolute, _BLUR_SIGMA, _BLUR_SIGMA)
-    snakes = []
-    for endpoint in endpoints:
-        snake = _path_to_snake(previous, endpoint)
-        down = _down_the_hill_direction(scaled_width, scaled_height, snake, avg_dir)
-        snakes.append(_run_snake(snake, blurred, down, uphill=False))
+    snakes = [_path_to_snake(previous, endpoint) for endpoint in endpoints]
+    downs = [
+        _down_the_hill_direction(scaled_width, scaled_height, snake, avg_dir)
+        for snake in snakes
+    ]
+    snakes = _run_snakes(snakes, blurred, downs, uphill=False)
 
-    result = []
+    ups = []
     for snake in snakes:
         down = _down_the_hill_direction(scaled_width, scaled_height, snake, avg_dir)
-        refined = _run_snake(snake, absolute, (-down[0], -down[1]), uphill=True)
+        ups.append((-down[0], -down[1]))
+    result = []
+    for refined in _run_snakes(snakes, absolute, ups, uphill=True):
         if is_image_border(refined, scaled_height):
             continue
         result.append(refined * np.array([1.0 / factor_x, 1.0 / factor_y]))
@@ -242,153 +253,208 @@ def _propagate_shortest_paths(
     """Minimax path costs from the start cells, towards ``direction``.
 
     The cost of a path is the largest value of ``1 - |derivative|`` on it, so a
-    path is cheap when it keeps to strong edges. Padding of one cell surrounds
-    the returned arrays.
+    path is cheap when it keeps to strong edges. A path only steps to the
+    neighbours that lie ``direction``'s way.
+
+    Every such step moves forward along ``direction``, so no path comes back to
+    a cell and the costs can be swept in one pass: line by line across the
+    dominant axis of ``direction``, and within a line along its other axis.
+    The costs are those of a shortest path search. Where two neighbours offer
+    a path of the same cost, the one whose own cost is lower is taken as the
+    one the path came from, as a search that settles cheaper cells first
+    would. Remaining ties go to the straight step forward, then the diagonal
+    ones, then the step down the line; upstream's search breaks them in the
+    order of its heap, so on flat stretches of cost the paths, though equally
+    cheap, can run differently.
 
     Returns:
         tuple: Path cost, shape ``(h + 2, w + 2)``, and for every cell the index
             (0 to 7) of the neighbour the path came from, -1 at a path start or
-            on unreached cells.
+            on unreached cells. Padding of one cell surrounds both arrays, with
+            cost -1.
     """
     height, width = deriv.shape
-    padded = np.zeros((height + 2, width + 2), dtype=np.float32)
-    padded[1:-1, 1:-1] = deriv
-    start_array = np.array(
-        [(y + 1) * (width + 2) + (x + 1) for x, y in starts], dtype=np.int64
+    direction32 = (float(np.float32(direction[0])), float(np.float32(direction[1])))
+    cost = np.full((height + 2, width + 2), -1.0, dtype=np.float32)
+    previous = np.full((height + 2, width + 2), -1, dtype=np.int8)
+    frame = _SweepFrame(direction32)
+    step = np.float32(1.0) - np.abs(deriv)
+    start_mask = np.zeros((height, width), dtype=bool)
+    for x, y in starts:
+        start_mask[y, x] = True
+    interior = (slice(1, -1), slice(1, -1))
+    sweep_cost, sweep_previous = _sweep(
+        frame.to_sweep(step), frame.to_sweep(start_mask), frame.moves
     )
-    direction32 = (np.float32(direction[0]), np.float32(direction[1]))
-    return _shortest_paths(
-        padded, start_array, float(direction32[0]), float(direction32[1])
-    )
+    cost[interior] = frame.from_sweep(sweep_cost)
+    previous[interior] = frame.from_sweep(frame.neighbour_index[sweep_previous])
+    return cost, previous
 
 
-@njit(cache=True)
-def _shortest_paths(
-    padded: NDArray[np.float32],
-    starts: NDArray[np.int64],
-    direction_x: float,
-    direction_y: float,
-) -> tuple[NDArray[np.float32], NDArray[np.int8]]:
-    stride = padded.shape[1]
-    total = padded.shape[0] * stride
-    values = padded.reshape(total)
-    cost = np.full(total, np.float32(3.4028235e38), dtype=np.float32)
-    prev_nbh = np.full(total, -1, dtype=np.int8)
-    heap_pos = np.full(total, -1, dtype=np.int64)
-    heap = np.empty(total, dtype=np.int64)
-    heap_size = 0
+class _SweepFrame:
+    """The grid turned so that every allowed step goes forward or down.
 
-    # Padding cells are never entered: nothing is cheaper than their cost.
-    for x in range(stride):
-        cost[x] = -1.0
-        cost[total - stride + x] = -1.0
-    for y in range(padded.shape[0]):
-        cost[y * stride] = -1.0
-        cost[y * stride + stride - 1] = -1.0
+    In the sweep frame, axis 0 runs along the dominant axis of the direction
+    and points the direction's way; axis 1 runs along the other axis, pointing
+    the direction's way too. Allowed steps are then a subset of one line
+    forward (and one cell either way across) or one cell down the line.
 
-    offsets = np.array(
-        [-stride - 1, -stride, -stride + 1, -1, 1, stride - 1, stride, stride + 1]
-    )
-    vectors = np.array(
-        [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]]
-    )
-    opposite = np.array([7, 6, 5, 4, 3, 2, 1, 0])
-    num_nb = 0
-    nb_offset = np.zeros(8, dtype=np.int64)
-    nb_prev = np.zeros(8, dtype=np.int64)
-    for i in range(8):
-        if vectors[i, 0] * direction_x + vectors[i, 1] * direction_y > 0:
-            nb_offset[num_nb] = offsets[i]
-            nb_prev[num_nb] = opposite[i]
-            num_nb += 1
+    Attributes:
+        moves (list[tuple[int, int]]): Allowed steps as (forward, across), in
+            the order of ``_STEP_PREFERENCE``.
+        neighbour_index (numpy.ndarray of numpy.int8): For each allowed step,
+            in ``moves`` order, the index in ``_NEIGHBOUR_VECTORS`` of the
+            neighbour the step comes from, with -1 appended for "none".
+    """
 
-    for s in range(starts.shape[0]):
-        node = starts[s]
-        cost[node] = 0.0
-        heap[heap_size] = node
-        heap_pos[node] = heap_size
-        heap_size += 1
-        _bubble_up(heap, heap_pos, cost, heap_size - 1)
+    def __init__(self, direction: tuple[float, float]) -> None:
+        dx, dy = direction
+        self._transposed = abs(dx) >= abs(dy)
+        along, across = (dx, dy) if self._transposed else (dy, dx)
+        self._flip_along = along < 0
+        self._flip_across = across < 0
+        allowed = []
+        for index, (vx, vy) in enumerate(_NEIGHBOUR_VECTORS.tolist()):
+            if vx * dx + vy * dy > 0:
+                forward, side = (vx, vy) if self._transposed else (vy, vx)
+                forward = -forward if self._flip_along else forward
+                side = -side if self._flip_across else side
+                allowed.append(((forward, side), 7 - index))
+        allowed.sort(key=lambda entry: _STEP_PREFERENCE.index(entry[0]))
+        self.moves = [move for move, _ in allowed]
+        self.neighbour_index = np.array(
+            [source for _, source in allowed] + [-1], dtype=np.int8
+        )
 
-    while heap_size > 0:
-        node = heap[0]
-        # Pop: the last element takes the front and sinks.
-        heap[0] = heap[heap_size - 1]
-        heap_pos[heap[0]] = 0
-        heap_size -= 1
-        heap_pos[node] = -1
-        if heap_size > 0:
-            _bubble_down(heap, heap_pos, cost, heap_size, 0)
+    def to_sweep(self, grid: NDArray) -> NDArray:
+        """The grid in the sweep frame, as a contiguous copy."""
+        view = grid.T if self._transposed else grid
+        if self._flip_along:
+            view = view[::-1]
+        if self._flip_across:
+            view = view[:, ::-1]
+        return np.ascontiguousarray(view)
 
-        step_cost = np.float32(1.0) - abs(values[node])
-        new_cost = cost[node] if cost[node] > step_cost else step_cost
-        for i in range(num_nb):
-            nb = node + nb_offset[i]
-            if new_cost < cost[nb]:
-                cost[nb] = new_cost
-                prev_nbh[nb] = nb_prev[i]
-                if heap_pos[nb] == -1:
-                    heap[heap_size] = nb
-                    heap_pos[nb] = heap_size
-                    heap_size += 1
-                    _bubble_up(heap, heap_pos, cost, heap_size - 1)
-                else:
-                    position = _bubble_down(
-                        heap, heap_pos, cost, heap_size, heap_pos[nb]
-                    )
-                    _bubble_up(heap, heap_pos, cost, position)
-    return cost.reshape(padded.shape), prev_nbh.reshape(padded.shape)
+    def from_sweep(self, grid: NDArray) -> NDArray:
+        """A sweep frame grid back in the image frame."""
+        view = grid
+        if self._flip_across:
+            view = view[:, ::-1]
+        if self._flip_along:
+            view = view[::-1]
+        return view.T if self._transposed else view
 
 
-@njit(cache=True)
-def _bubble_up(
-    heap: NDArray[np.int64],
-    heap_pos: NDArray[np.int64],
+def _sweep(
+    step: NDArray[np.float32],
+    starts: NDArray[np.bool_],
+    moves: list[tuple[int, int]],
+) -> tuple[NDArray[np.float32], NDArray[np.int64]]:
+    """Minimax path costs in the sweep frame, line by line.
+
+    Args:
+        step (numpy.ndarray of numpy.float32): Cost of stepping off each cell.
+        starts (numpy.ndarray of numpy.bool): Cells paths start from, at cost 0.
+        moves (list[tuple[int, int]]): Allowed steps as (forward, across), each
+            either ``(1, -1)``, ``(1, 0)``, ``(1, 1)`` or ``(0, 1)``.
+
+    Returns:
+        tuple: Costs, unreached cells at the float32 maximum, and for each
+            cell the index in ``moves`` of the step that reached it, or
+            ``len(moves)`` at starts and unreached cells.
+    """
+    lines, length = step.shape
+    unreached = np.float32(_FLOAT32_MAX)
+    forward = [side for along, side in moves if along == 1]
+    down_the_line = (0, 1) in moves
+    cost = np.empty((lines, length), dtype=np.float32)
+    # Cost of a path leaving each cell of the previous line, one cell of
+    # padding at each end.
+    leaving = np.full(length + 2, unreached, dtype=np.float32)
+    arriving = np.empty(length, dtype=np.float32)
+    for line in range(lines):
+        arriving.fill(unreached)
+        for side in forward:
+            np.minimum(arriving, leaving[1 - side : 1 - side + length], out=arriving)
+        arriving[starts[line]] = 0.0
+        if down_the_line:
+            arriving = _down_the_line(arriving, step[line])
+        cost[line] = arriving
+        # Unreached cells stay unreached: no step costs more than the maximum.
+        np.maximum(arriving, step[line], out=leaving[1:-1])
+    return cost, _came_from(cost, step, starts, moves)
+
+
+def _down_the_line(
+    arriving: NDArray[np.float32], step: NDArray[np.float32]
+) -> NDArray[np.float32]:
+    """Costs within a line where a path may also step down the line.
+
+    ``cost[i] = min(arriving[i], max(cost[i - 1], step[i - 1]))``. A few rounds
+    of relaxing every cell from the one before it settle almost every line;
+    the rare line with a long run of such steps is finished by a prefix scan.
+    """
+    cost = arriving.copy()
+    for _ in range(_RELAXATION_ROUNDS):
+        through = np.maximum(cost[:-1], step[:-1])
+        if not (through < cost[1:]).any():
+            return cost
+        np.minimum(cost[1:], through, out=cost[1:])
+    return _down_the_line_scan(cost, step)
+
+
+def _down_the_line_scan(
+    arriving: NDArray[np.float32], step: NDArray[np.float32]
+) -> NDArray[np.float32]:
+    """``_down_the_line`` in a logarithmic number of whole-line operations.
+
+    Each cell applies ``x -> min(high, max(x, low))`` to the cost of the one
+    before it, and such clamps compose into clamps, so a prefix scan composes
+    them for all cells at once.
+    """
+    high = arriving.copy()
+    low = np.empty_like(arriving)
+    low[0] = _FLOAT32_MAX
+    low[1:] = step[:-1]
+    span = 1
+    while span < high.shape[0]:
+        high[span:] = np.minimum(high[span:], np.maximum(high[:-span], low[span:]))
+        low[span:] = np.maximum(low[:-span], low[span:])
+        span *= 2
+    return high
+
+
+def _came_from(
     cost: NDArray[np.float32],
-    index: int,
-) -> int:
-    """Move an element towards the root while it costs less than its parent."""
-    while index > 0:
-        parent = (index - 1) // 2
-        if not cost[heap[index]] < cost[heap[parent]]:
-            break
-        swapped = heap[index]
-        heap[index] = heap[parent]
-        heap[parent] = swapped
-        heap_pos[heap[index]] = index
-        heap_pos[heap[parent]] = parent
-        index = parent
-    return index
+    step: NDArray[np.float32],
+    starts: NDArray[np.bool_],
+    moves: list[tuple[int, int]],
+) -> NDArray[np.int64]:
+    """For each cell, the step in ``moves`` its cheapest path arrived by.
 
-
-@njit(cache=True)
-def _bubble_down(
-    heap: NDArray[np.int64],
-    heap_pos: NDArray[np.int64],
-    cost: NDArray[np.float32],
-    size: int,
-    index: int,
-) -> int:
-    """Move an element away from the root while a child costs less."""
-    while True:
-        left = index * 2 + 1
-        right = index * 2 + 2
-        if right < size:
-            best = left if cost[heap[left]] < cost[heap[right]] else right
-        elif left < size:
-            best = left
-        else:
-            break
-        if cost[heap[best]] < cost[heap[index]]:
-            swapped = heap[index]
-            heap[index] = heap[best]
-            heap[best] = swapped
-            heap_pos[heap[index]] = index
-            heap_pos[heap[best]] = best
-            index = best
-        else:
-            break
-    return index
+    Of the neighbours that offer the cell's cost, the one with the lowest cost
+    of its own wins; remaining ties go to the first in ``moves``.
+    """
+    lines, length = cost.shape
+    unreached = np.float32(_FLOAT32_MAX)
+    leaving = np.maximum(cost, step)
+    padded_leaving = np.full((lines + 2, length + 2), unreached, dtype=np.float32)
+    padded_leaving[1:-1, 1:-1] = leaving
+    padded_cost = np.full((lines + 2, length + 2), unreached, dtype=np.float32)
+    padded_cost[1:-1, 1:-1] = cost
+    best_source = np.full((lines, length), np.inf, dtype=np.float32)
+    came_from = np.full((lines, length), len(moves), dtype=np.int64)
+    for index, (along, side) in enumerate(moves):
+        source = (
+            slice(1 - along, 1 - along + lines),
+            slice(1 - side, 1 - side + length),
+        )
+        offers = padded_leaving[source] == cost
+        better = offers & (padded_cost[source] < best_source)
+        best_source[better] = padded_cost[source][better]
+        came_from[better] = index
+    came_from[starts | (cost == unreached)] = len(moves)
+    return came_from
 
 
 def _locate_best_path_endpoints(
@@ -477,53 +543,60 @@ def _down_the_hill_direction(
 
 
 def _run_snake(
-    snake: NDArray[np.float64],
+    snake: FloatArray,
     grid: NDArray[np.float32],
     direction: tuple[float, float],
     uphill: bool,
-) -> NDArray[np.float64]:
-    """Move a snake into the gradient valley, or onto the gradient ridge.
+) -> FloatArray:
+    """Move one snake; see ``_run_snakes``."""
+    return _run_snakes([snake], grid, [direction], uphill)[0]
+
+
+def _run_snakes(
+    snakes: list[FloatArray],
+    grid: NDArray[np.float32],
+    directions: list[tuple[float, float]],
+    uphill: bool,
+) -> list[FloatArray]:
+    """Move snakes into the gradient valley, or onto the gradient ridge.
 
     Args:
-        snake (numpy.ndarray of numpy.float64): Knots, shape ``(n, 2)``.
+        snakes (list[numpy.ndarray of numpy.float64]): Knots of each snake, shape
+            ``(n, 2)``.
         grid (numpy.ndarray of numpy.float32):
             Blurred gradient magnitude for the downhill
             pass, the gradient magnitude for the uphill one.
-        direction (tuple[float, float]): Knots only move to neighbours that lie
-            this way.
+        directions (list[tuple[float, float]]): For each snake, the way its
+            knots may move to neighbours.
         uphill (bool): True for the uphill pass.
 
     Returns:
-        numpy.ndarray of numpy.float64: The moved knots in the same order.
+        list[numpy.ndarray of numpy.float64]: The moved knots of each snake, in
+            the same order.
     """
-    if len(snake) <= 1:
-        return snake
-    displacements = _displacement_vectors(direction)
+    result = list(snakes)
+    moving = [index for index, snake in enumerate(snakes) if len(snake) > 1]
+    if not moving:
+        return result
+    displacements = [_displacement_vectors(directions[index]) for index in moving]
     if uphill:
-        displacements = displacements * 0.5
-        elasticity, bending, external = (
-            _UPHILL_ELASTICITY,
-            _UPHILL_BENDING,
-            _UPHILL_EXTERNAL,
-        )
+        displacements = [steps * 0.5 for steps in displacements]
+        weights = (_UPHILL_ELASTICITY, _UPHILL_BENDING, _UPHILL_EXTERNAL)
     else:
-        elasticity, bending, external = (
-            _DOWNHILL_ELASTICITY,
-            _DOWNHILL_BENDING,
-            _DOWNHILL_EXTERNAL,
-        )
-    return _snake_search(
-        np.ascontiguousarray(snake),
+        weights = (_DOWNHILL_ELASTICITY, _DOWNHILL_BENDING, _DOWNHILL_EXTERNAL)
+    moved = _snake_search(
+        [np.asarray(snakes[index], dtype=np.float64) for index in moving],
         np.ascontiguousarray(grid, dtype=np.float32),
         displacements,
         uphill,
-        elasticity,
-        bending,
-        external,
+        weights,
     )
+    for index, knots in zip(moving, moved, strict=True):
+        result[index] = knots
+    return result
 
 
-def _displacement_vectors(direction: tuple[float, float]) -> NDArray[np.float64]:
+def _displacement_vectors(direction: tuple[float, float]) -> FloatArray:
     """Standing still plus every neighbour step that points the given way."""
     steps = [(0.0, 0.0)]
     for dx, dy in _NEIGHBOUR_VECTORS:
@@ -532,136 +605,264 @@ def _displacement_vectors(direction: tuple[float, float]) -> NDArray[np.float64]
     return np.array(steps, dtype=np.float64)
 
 
-@njit(cache=True)
-def _energy_at(grid: NDArray[np.float32], px: float, py: float, uphill: bool) -> float:
-    """Energy of a position: the bilinear grid value, negated going uphill.
+def _energy_at(
+    grid: NDArray[np.float32], px: FloatArray, py: FloatArray, uphill: bool
+) -> FloatArray:
+    """Energy of positions: the bilinear grid value, negated going uphill.
 
-    Positions outside the grid cost a large positive energy, whichever way the
-    snake is moving.
+    Positions whose 2x2 cell leaves the grid cost a large positive energy,
+    whichever way the snake is moving. The float32 grid values are weighted in
+    double precision.
     """
-    x_base = math.floor(px)
-    y_base = math.floor(py)
-    xi = int(x_base)
-    yi = int(y_base)
-    if xi < 0 or yi < 0 or xi + 1 >= grid.shape[1] or yi + 1 >= grid.shape[0]:
-        return _OUTSIDE_ENERGY
+    height, width = grid.shape
+    flat = grid.ravel()
+    x_base = np.floor(px)
+    y_base = np.floor(py)
+    xi = x_base.astype(np.int64)
+    yi = y_base.astype(np.int64)
+    # Negative indexes wrap round to huge unsigned ones, so one comparison per
+    # axis tells whether the 2x2 cell lies inside the grid.
+    inside = (xi.view(np.uint64) < width - 1) & (yi.view(np.uint64) < height - 1)
+    index = np.where(inside, yi * width + xi, 0)
     x = px - x_base
     y = py - y_base
     x1 = 1.0 - x
     y1 = 1.0 - y
     value = (
-        grid[yi, xi] * x1 * y1
-        + grid[yi, xi + 1] * x * y1
-        + grid[yi + 1, xi] * x1 * y
-        + grid[yi + 1, xi + 1] * x * y
+        flat[index] * x1 * y1
+        + flat[index + 1] * x * y1
+        + flat[index + width] * x1 * y
+        + flat[index + width + 1] * x * y
     )
-    return -value if uphill else value
+    return np.where(inside, -value if uphill else value, _OUTSIDE_ENERGY)
 
 
-@njit(cache=True)
+class _SnakeBatch(NamedTuple):
+    """Snakes padded to common knot and displacement counts.
+
+    Padding knots repeat a snake's last knot and padding displacements stand
+    still; neither is ever used: padded displacements are ruled out, and each
+    snake's path is read back from its own last knot.
+
+    Attributes:
+        knots (numpy.ndarray of numpy.float64): Shape ``(s, n, 2)``.
+        counts (numpy.ndarray of numpy.int64): Knots of each snake.
+        displacements (numpy.ndarray of numpy.float64): Shape ``(s, d, 2)``.
+        real_displacement (numpy.ndarray of numpy.bool): Shape ``(s, d)``.
+        avg_dist (numpy.ndarray of numpy.float64): Mean knot spacing of each
+            snake as it started.
+    """
+
+    knots: FloatArray
+    counts: IntArray
+    displacements: FloatArray
+    real_displacement: NDArray[np.bool_]
+    avg_dist: FloatArray
+
+
+def _snake_batch(
+    snakes: list[FloatArray], displacements: list[FloatArray]
+) -> _SnakeBatch:
+    counts = np.array([len(snake) for snake in snakes], dtype=np.int64)
+    num_disp = max(len(steps) for steps in displacements)
+    knots = np.empty((len(snakes), int(counts.max()), 2))
+    padded_steps = np.zeros((len(snakes), num_disp, 2))
+    real = np.zeros((len(snakes), num_disp), dtype=bool)
+    avg_dist = np.empty(len(snakes))
+    for row, (snake, steps) in enumerate(zip(snakes, displacements, strict=True)):
+        knots[row, : len(snake)] = snake
+        knots[row, len(snake) :] = snake[-1]
+        padded_steps[row, : len(steps)] = steps
+        real[row, : len(steps)] = True
+        lengths = np.sqrt(np.diff(snake[:, 0]) ** 2 + np.diff(snake[:, 1]) ** 2)
+        # Added one at a time, as upstream does.
+        avg_dist[row] = float(np.add.accumulate(lengths)[-1]) / (len(snake) - 1)
+    return _SnakeBatch(knots, counts, padded_steps, real, avg_dist)
+
+
 def _snake_search(
-    snake: NDArray[np.float64],
+    snakes: list[FloatArray],
     grid: NDArray[np.float32],
-    displacements: NDArray[np.float64],
+    displacements: list[FloatArray],
     uphill: bool,
-    elasticity_weight: float,
-    bending_weight: float,
-    external_weight: float,
-) -> NDArray[np.float64]:
+    weights: tuple[float, float, float],
+) -> list[FloatArray]:
     """Forty rounds of dynamic programming over the knots' displacements.
 
     Each round returns the knots in reverse order, as the best path is read off
     from its last knot. With an even number of rounds the order comes out as it
-    went in.
+    went in. A knot whose every move is ruled out cuts the path: the knots
+    after it start afresh, and only they are rewritten that round.
+
+    Args:
+        snakes (list[numpy.ndarray of numpy.float64]): Knots of each snake, shape
+            ``(n, 2)``, n >= 2.
+        grid (numpy.ndarray of numpy.float32): Energy grid.
+        displacements (list[numpy.ndarray of numpy.float64]): Moves each snake's
+            knots may make, shape ``(d, 2)``, standing still first.
+        uphill (bool): True for the uphill pass.
+        weights (tuple[float, float, float]): Elasticity, bending and external
+            weights.
+
+    Returns:
+        list[numpy.ndarray of numpy.float64]: The moved knots of each snake.
     """
-    num_nodes = snake.shape[0]
-    num_disp = displacements.shape[0]
-    avg_dist = 0.0
-    for i in range(1, num_nodes):
-        avg_dist += math.sqrt(
-            (snake[i, 0] - snake[i - 1, 0]) ** 2 + (snake[i, 1] - snake[i - 1, 1]) ** 2
-        )
-    avg_dist /= num_nodes - 1
-
-    capacity = num_nodes * num_disp
-    step_x = np.zeros(capacity)
-    step_y = np.zeros(capacity)
-    step_prev = np.zeros(capacity, dtype=np.int64)
-    step_cost = np.zeros(capacity)
-    paths = np.zeros(num_disp, dtype=np.int64)
-    new_paths = np.zeros(num_disp, dtype=np.int64)
-    current = snake.copy()
-
+    batch = _snake_batch(snakes, displacements)
+    current = batch.knots.copy()
     for _ in range(_SNAKE_ITERATIONS):
-        count = 0
-        num_paths = 0
-        for node in range(num_nodes):
-            px = current[node, 0]
-            py = current[node, 1]
-            cur_energy = _energy_at(grid, px, py, uphill)
-            num_new = 0
-            for d in range(num_disp):
-                sx = px + displacements[d, 0]
-                sy = py + displacements[d, 1]
-                path_cost = 0.0
-                adjusted = _energy_at(grid, sx, sy, uphill)
-                if uphill:
-                    # Standing still is discouraged where the gradient is weak.
-                    if d == 0 and adjusted > _UPHILL_STAY_PENALTY_LEVEL:
-                        path_cost += _STAY_PENALTY
-                elif d == 0:
-                    path_cost += _STAY_PENALTY
-                elif cur_energy < _FLAT_ENERGY_LEVEL:
-                    if cur_energy - adjusted < _FLAT_ENERGY_LEVEL:
-                        continue
-                path_cost += external_weight * adjusted
+        _snake_round(current, grid, batch, uphill, weights)
+    return [current[row, :count].copy() for row, count in enumerate(batch.counts)]
 
-                best_cost = 3.4028235e38
-                best_prev = -1
-                for p in range(num_paths):
-                    prev = paths[p]
-                    cost = path_cost + step_cost[prev]
-                    vx = sx - step_x[prev]
-                    vy = sy - step_y[prev]
-                    vec_len = math.sqrt(vx * vx + vy * vy)
-                    if vec_len < _MIN_SEGMENT_DIST:
-                        cost += _TOO_CLOSE_PENALTY
-                    cost += elasticity_weight * (abs(avg_dist - vec_len) / avg_dist)
-                    before = step_prev[prev]
-                    if before != -1 and vec_len >= _MIN_SEGMENT_DIST:
-                        nx = -(step_y[prev] - step_y[before])
-                        ny = step_x[prev] - step_x[before]
-                        normal_len = math.sqrt(nx * nx + ny * ny)
-                        if normal_len < _MIN_SEGMENT_DIST:
-                            cost += _TOO_CLOSE_PENALTY
-                        else:
-                            cos = (vx * nx + vy * ny) / (vec_len * normal_len)
-                            cost += bending_weight * cos * cos
-                    if cost < best_cost:
-                        best_cost = cost
-                        best_prev = prev
-                step_x[count] = sx
-                step_y[count] = sy
-                step_prev[count] = best_prev
-                step_cost[count] = best_cost if best_prev != -1 else path_cost
-                new_paths[num_new] = count
-                num_new += 1
-                count += 1
-            for p in range(num_new):
-                paths[p] = new_paths[p]
-            num_paths = num_new
 
-        best_path = -1
-        best_cost = 3.4028235e38
-        for p in range(num_paths):
-            if step_cost[paths[p]] < best_cost:
-                best_cost = step_cost[paths[p]]
-                best_path = paths[p]
-        out = 0
-        step = best_path
-        while step != -1:
-            current[out, 0] = step_x[step]
-            current[out, 1] = step_y[step]
-            out += 1
-            step = step_prev[step]
-    return current
+def _snake_round(
+    current: FloatArray,
+    grid: NDArray[np.float32],
+    batch: _SnakeBatch,
+    uphill: bool,
+    weights: tuple[float, float, float],
+) -> None:
+    """One round of the snake search, rewriting ``current`` in place.
+
+    Args:
+        current (numpy.ndarray of numpy.float64): Knots, shape ``(s, n, 2)``.
+        grid (numpy.ndarray of numpy.float32): Energy grid.
+        batch (_SnakeBatch): The snakes' counts, moves and spacing.
+        uphill (bool): True for the uphill pass.
+        weights (tuple[float, float, float]): Elasticity, bending and external
+            weights.
+    """
+    elasticity_weight, bending_weight, external_weight = weights
+    num_snakes, num_knots, _ = current.shape
+    num_disp = batch.displacements.shape[1]
+    sx = current[:, :, 0, None] + batch.displacements[:, None, :, 0]
+    sy = current[:, :, 1, None] + batch.displacements[:, None, :, 1]
+    cur_energy = _energy_at(grid, current[:, :, 0], current[:, :, 1], uphill)[
+        :, :, None
+    ]
+    adjusted = _energy_at(grid, sx, sy, uphill)
+    stay = np.zeros(sx.shape, dtype=bool)
+    usable = np.broadcast_to(batch.real_displacement[:, None, :], sx.shape).copy()
+    if uphill:
+        # Standing still is discouraged where the gradient is weak.
+        stay[:, :, 0] = adjusted[:, :, 0] > _UPHILL_STAY_PENALTY_LEVEL
+    else:
+        stay[:, :, 0] = True
+        # On flat ground a knot moves only where the energy drops enough.
+        usable[:, :, 1:] &= ~(
+            (cur_energy < _FLAT_ENERGY_LEVEL)
+            & (cur_energy - adjusted[:, :, 1:] < _FLAT_ENERGY_LEVEL)
+        )
+    path_cost = np.where(stay, _STAY_PENALTY, 0.0) + external_weight * adjusted
+
+    # Terms of a move to candidate d of knot k after candidate p of knot k - 1,
+    # at [:, k - 1, d, p].
+    vx = sx[:, 1:, :, None] - sx[:, :-1, None, :]
+    vy = sy[:, 1:, :, None] - sy[:, :-1, None, :]
+    vec_len = np.sqrt(vx * vx + vy * vy)
+    close = vec_len < _MIN_SEGMENT_DIST
+    too_close = np.where(close, _TOO_CLOSE_PENALTY, 0.0)
+    avg = batch.avg_dist[:, None, None, None]
+    elastic = elasticity_weight * (np.abs(avg - vec_len) / avg)
+    bending = _snake_bending(sx, sy, vx, vy, vec_len, close, bending_weight)
+
+    fresh = num_disp
+    fallback = np.where(usable, path_cost, np.inf)
+    # bending[s, k - 1, d, p, b] sits at index[k - 1, s, d, p] + b of the flat array.
+    index = (
+        np.arange(num_snakes)[None, :, None, None] * bending[0].size
+        + np.arange(num_knots - 1)[:, None, None, None] * bending[0, 0].size
+        + np.arange(num_disp)[:, None] * bending[0, 0, 0].size
+        + np.arange(num_disp) * (num_disp + 1)
+    )
+    flat_bending = bending.ravel()
+    step_costs = np.empty(sx.shape)
+    step_costs[:, 0] = fallback[:, 0]
+    came_from = np.full(sx.shape, fresh, dtype=np.int64)
+    for k in range(1, num_knots):
+        cost = path_cost[:, k, :, None] + step_costs[:, k - 1, None, :]
+        cost += too_close[:, k - 1]
+        cost += elastic[:, k - 1]
+        cost += flat_bending[index[k - 1] + came_from[:, k - 1, None, :]]
+        best = np.argmin(cost, axis=2)
+        best_cost = cost.min(axis=2)
+        joined = best_cost < _FLOAT32_MAX
+        came_from[:, k] = np.where(joined, best, fresh)
+        step_costs[:, k] = np.where(joined & usable[:, k], best_cost, fallback[:, k])
+    final_cost = step_costs[np.arange(num_snakes), batch.counts - 1]
+    for row in range(num_snakes):
+        _read_back(
+            current[row],
+            sx[row],
+            sy[row],
+            came_from[row],
+            final_cost[row],
+            int(batch.counts[row]),
+        )
+
+
+def _read_back(
+    current: FloatArray,
+    sx: FloatArray,
+    sy: FloatArray,
+    came_from: IntArray,
+    final_cost: FloatArray,
+    count: int,
+) -> None:
+    """Write one snake's best path into its knots, last knot first.
+
+    The path is read back until it reaches a knot that started it afresh, which
+    ``came_from`` marks with the displacement count; the knots beyond that keep
+    their positions. Nothing changes when no candidate of the last knot is
+    usable.
+    """
+    if not (final_cost < _FLOAT32_MAX).any():
+        return
+    fresh = came_from.shape[1]
+    pick = int(np.argmin(final_cost))
+    picks = came_from.tolist()
+    out = 0
+    for k in range(count - 1, -1, -1):
+        current[out] = (sx[k, pick], sy[k, pick])
+        out += 1
+        pick = picks[k][pick]
+        if pick == fresh:
+            break
+
+
+def _snake_bending(
+    sx: FloatArray,
+    sy: FloatArray,
+    vx: FloatArray,
+    vy: FloatArray,
+    vec_len: FloatArray,
+    close: NDArray[np.bool_],
+    bending_weight: float,
+) -> FloatArray:
+    """Bending of every move against the segment before it.
+
+    Returns:
+        numpy.ndarray of numpy.float64: At ``[:, k - 1, d, p, b]``, the bending of
+            a move to candidate d of knot k after candidate p of knot k - 1,
+            which followed candidate b of knot k - 2; the extra last slot of
+            ``b`` is a path that starts afresh at knot k - 1 and does not bend.
+            Zero for moves whose segment is too short.
+    """
+    num_snakes, num_knots, num_disp = sx.shape
+    bending = np.zeros((num_snakes, num_knots - 1, num_disp, num_disp, num_disp + 1))
+    # Normal of the segment from candidate b of knot k - 2 to candidate p of
+    # knot k - 1, at [:, k - 2, p, b].
+    nx = -(sy[:, 1:-1, :, None] - sy[:, :-2, None, :])
+    ny = sx[:, 1:-1, :, None] - sx[:, :-2, None, :]
+    normal_len = np.sqrt(nx * nx + ny * ny)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        cos = (
+            vx[:, 1:, :, :, None] * nx[:, :, None]
+            + vy[:, 1:, :, :, None] * ny[:, :, None]
+        ) / (vec_len[:, 1:, :, :, None] * normal_len[:, :, None])
+    terms = np.where(
+        normal_len[:, :, None] < _MIN_SEGMENT_DIST,
+        _TOO_CLOSE_PENALTY,
+        bending_weight * cos * cos,
+    )
+    bending[:, 1:, :, :, :num_disp] = np.where(close[:, 1:, :, :, None], 0.0, terms)
+    return bending

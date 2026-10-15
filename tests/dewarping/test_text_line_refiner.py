@@ -6,12 +6,15 @@ The C++ code works in single precision, so positions agree to a few thousandths.
 """
 
 import numpy as np
+import pytest
 
 from scantailor.dewarping.text_line_refiner import (
     _evolve_snake,
+    _evolve_snakes,
     _make_snake,
     refine_text_lines,
 )
+from tests.dewarping.kernel_reference import formula_grid, recorded
 
 
 def _band_page(
@@ -148,3 +151,38 @@ class TestAgainstCpp:
 
         assert _evolve_snake(cx, cy, rib, coarse, 0.0, 1.0, 0, True) == 0
         np.testing.assert_array_equal(cy, before)
+
+
+class TestRecordedOutputs:
+    """Snakes evolve on formula gradients exactly as recorded."""
+
+    @pytest.mark.parametrize(
+        ("snake", "stage"), [(snake, stage) for snake in range(5) for stage in (0, 1)]
+    )
+    def test_a_snake_evolves_as_recorded(self, snake: int, stage: int) -> None:
+        remaining, stop = [(100, True), (37, False)][stage]
+        cx, cy, rib = recorded(f"evolve{snake}_{stage}_in")
+
+        left = _evolve_snake(
+            cx, cy, rib, formula_grid(140, 300, 23, 17), 0.0, 1.0, remaining, stop
+        )
+
+        assert left == recorded(f"evolve{snake}_{stage}_left")
+        np.testing.assert_array_equal(
+            np.stack([cx, cy, rib]), recorded(f"evolve{snake}_{stage}_out")
+        )
+
+    def test_snakes_of_different_lengths_evolve_together_as_they_do_alone(
+        self,
+    ) -> None:
+        snakes = [tuple(recorded(f"batch{n}_in")) for n in range(6)]
+
+        left = _evolve_snakes(
+            snakes, formula_grid(140, 300, 23, 17), (0.0, 1.0), [100] * 6, True
+        )
+        _evolve_snakes(snakes, formula_grid(140, 300, 13, 11), (0.0, 1.0), left, False)
+
+        for n, (cx, cy, rib) in enumerate(snakes):
+            np.testing.assert_array_equal(
+                np.stack([cx, cy, rib]), recorded(f"batch{n}_out")
+            )

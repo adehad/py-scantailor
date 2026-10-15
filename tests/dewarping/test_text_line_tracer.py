@@ -13,6 +13,7 @@ from scantailor.dewarping.text_line_tracer import (
     trace_text_lines,
 )
 from tests.dewarping.book_pages import BentPage, bent_book_page
+from tests.dewarping.kernel_reference import recorded
 
 DPI = 200
 CONTENT = (160, 200, 890, 1090)
@@ -363,3 +364,67 @@ class TestTowardsLineTracer:
         cells = tracer._trace_towards_line(sedm, ridge, line, 100, 31, 10.0)
 
         assert len(cells) > 0
+
+
+def _brute_force_squared_distances(mask: np.ndarray) -> np.ndarray:
+    """Squared distance of each ink pixel to the nearest background or border."""
+    padded = np.pad(mask, 1, constant_values=False)
+    background = np.argwhere(~padded)
+    expected = np.zeros(mask.shape, dtype=np.int64)
+    for y, x in np.argwhere(mask):
+        offsets = background - (y + 1, x + 1)
+        expected[y, x] = (offsets**2).sum(axis=1).min()
+    return expected
+
+
+class TestSquaredDistanceMapExactness:
+    @pytest.mark.parametrize("seed", range(4))
+    def test_it_matches_a_search_over_every_background_pixel(self, seed: int) -> None:
+        mask = np.random.default_rng(seed).random((23, 31)) < 0.85
+
+        sedm = tracer._squared_distance_map(mask)
+
+        np.testing.assert_array_equal(sedm, _brute_force_squared_distances(mask))
+        assert sedm.dtype == np.int64
+
+    def test_distances_deep_inside_a_large_blob_are_exact(self) -> None:
+        mask = np.zeros((420, 640), dtype=bool)
+        mask[10:410, 20:620] = True
+        yy, xx = np.mgrid[0:420, 0:640]
+        nearest_edge = np.minimum.reduce([yy - 9, 410 - yy, xx - 19, 620 - xx])
+
+        sedm = tracer._squared_distance_map(mask)
+
+        np.testing.assert_array_equal(sedm, np.where(mask, nearest_edge**2, 0))
+
+
+class TestRecordedWalks:
+    """Ridge walks on formula maps follow the recorded cells."""
+
+    @staticmethod
+    def _ridge() -> np.ndarray:
+        yy, xx = np.mgrid[0:90, 0:240]
+        return (((xx * 5 + yy * 3) % 29) - 14).astype(np.float32) / np.float32(8.0)
+
+    def test_the_distance_map_of_the_walk_mask_is_as_recorded(self) -> None:
+        np.testing.assert_array_equal(
+            tracer._squared_distance_map(recorded("walk_mask")),
+            recorded("walk_sedm"),
+        )
+
+    @pytest.mark.parametrize("case", range(5))
+    def test_a_walk_reports_the_recorded_cells(self, case: int) -> None:
+        seed_x, seed_y = recorded(f"walk{case}_seed").tolist()
+
+        cells = tracer._trace_towards_line(
+            recorded("walk_sedm"),
+            self._ridge(),
+            recorded(f"walk{case}_line"),
+            seed_x,
+            seed_y,
+            10.0,
+        )
+
+        np.testing.assert_array_equal(cells, recorded(f"walk{case}_cells"))
+        assert cells.dtype == np.int64
+        assert cells.shape[1] == 2
