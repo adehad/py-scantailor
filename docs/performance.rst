@@ -38,8 +38,13 @@ search up to 1.45 times. Other stages got faster where OpenCV replaced a Python
 or SciPy step, so a whole batch of the ten sample pages takes about as long as
 with compiled kernels.
 
-The JBIG2 encoder used by PDF export lives in ``packages/jbig2-numba`` and is
-compiled by numba on its first use, then cached in the user cache folder.
+The JBIG2 encoder used by PDF export lives in ``packages/jbig2``. One OpenCV
+correlation gives every pixel its coding context, and the arithmetic coder is a
+plain Python loop over runs of pixels that share a context and a colour, so a
+long white stretch costs one step instead of one per pixel. A scanned black and
+white page takes about 0.35 s to encode at 300 dpi and 1.1 s at 600 dpi, 1.5 and
+1.1 times a compiled coder. Pages with fine dither patterns have few runs and
+take up to five times as long as with a compiled coder.
 
 Why there is no GPU build
 =========================

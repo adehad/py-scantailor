@@ -17,7 +17,7 @@ from typing import Any, Literal
 import cv2
 import numpy as np
 import pikepdf
-from jbig2_numba import encode_pdf_stream
+from jbig2 import encode_pdf_stream
 from numpy.typing import NDArray
 from PIL import Image
 

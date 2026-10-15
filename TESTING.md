@@ -22,4 +22,4 @@ Qt tests need no display: CI sets `QT_QPA_PLATFORM=offscreen`, and the same work
 
 `tests/` mirrors `src/scantailor/`: `tests/filters/deskew/` tests `scantailor.filters.deskew`, and so on. `tests/ui/` covers the windows and dialogs, `tests/cli/` the command line and `tests/docs/` the manual's screenshots. Shared test data lives in `tests/fixtures/`.
 
-`packages/jbig2-numba/` has its own suite under `packages/jbig2-numba/tests/`.
+`packages/jbig2/` has its own suite under `packages/jbig2/tests/`.

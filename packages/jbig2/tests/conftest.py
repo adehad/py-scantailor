@@ -22,6 +22,6 @@ def pytest_terminal_summary(terminalreporter: pytest.TerminalReporter) -> None:
         terminalreporter (pytest.TerminalReporter): pytest's reporter.
     """
     if _MEASUREMENTS:
-        terminalreporter.section("jbig2-numba measurements")
+        terminalreporter.section("jbig2 measurements")
         for line in _MEASUREMENTS:
             terminalreporter.write_line(line)

@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from sample_images import noise
 
-from jbig2_numba import encode_file, encode_generic, encode_pdf_stream
+from jbig2 import encode_file, encode_generic, encode_pdf_stream
 
 ENCODERS = [encode_generic, encode_pdf_stream, encode_file]
 
@@ -140,7 +140,7 @@ def test_masked_array_is_rejected_instead_of_encoding_its_raw_data() -> None:
 
 
 def test_segment_longer_than_a_32_bit_length_field_is_refused() -> None:
-    from jbig2_numba.segments import SegmentType, segment_header
+    from jbig2.segments import SegmentType, segment_header
 
     with pytest.raises(ValueError, match="32-bit"):
         segment_header(0, SegmentType.PAGE_INFORMATION, 1, 2**32)
@@ -149,7 +149,7 @@ def test_segment_longer_than_a_32_bit_length_field_is_refused() -> None:
 
 
 def test_segment_header_accepts_the_largest_known_length() -> None:
-    from jbig2_numba.segments import SegmentType, segment_header
+    from jbig2.segments import SegmentType, segment_header
 
     header = segment_header(0, SegmentType.PAGE_INFORMATION, 1, 0xFFFFFFFE)
 

@@ -34,7 +34,7 @@ src/scantailor/math/         - Splines and numeric helpers
 src/scantailor/cli/          - Headless command line
 src/scantailor/resources/    - Qt resources (icons, fonts)
 src/scantailor/translations/ - .ts catalogues
-packages/jbig2-numba/        - JBIG2 encoder used by PDF export
+packages/jbig2/              - JBIG2 encoder used by PDF export
 tools/                       - Translation, screenshot and PyInstaller helpers
 tests/                       - pytest suite, mirroring the package layout
 docs/                        - Sphinx user guide and API reference

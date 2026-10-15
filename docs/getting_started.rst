@@ -190,11 +190,3 @@ interrupt the opening:
    * - An image has no usable resolution
      - Fix DPI
      - The project does not open.
-
-First start
------------
-
-The first PDF export with JBIG2 compression compiles the JBIG2 encoder once and
-keeps it in a cache folder: ``%LOCALAPPDATA%/numba`` on Windows and
-``~/.cache/numba`` elsewhere, so that export takes a few seconds longer. Page
-processing needs no compile step.

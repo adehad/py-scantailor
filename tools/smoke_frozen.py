@@ -22,8 +22,7 @@ from sample_book import SAMPLE_DPI, render_sample_page
 
 # Single pages only, so page split leaves the count unchanged.
 SMOKE_PAGES: Final = ("01_single_page", "05_skewed", "08_pictures")
-# The first PDF export of a fresh frozen build compiles the numba JBIG2 encoder.
-_COMMAND_TIMEOUT_SECONDS: Final = 1800
+_COMMAND_TIMEOUT_SECONDS: Final = 600
 
 
 class SmokeFailure(Exception):

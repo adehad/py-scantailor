@@ -9,12 +9,13 @@ import pytest
 from PIL import Image
 from sample_images import scanned_page, text_page
 
-from jbig2_numba import encode_pdf_stream
+from jbig2 import encode_pdf_stream
 
-# libtiff's G4 coder is a tight C loop over run lengths while MQ coding
-# visits every pixel of every non-typical row, so parity is not expected. The
-# factor guards against regressions such as losing numba compilation, which
-# costs two orders of magnitude.
+# libtiff's G4 coder is a tight C loop over run lengths while the MQ coder
+# here is a Python loop over runs of equal decisions in every non-typical row,
+# so parity is not expected. The page measures about 25 times G4; the factor
+# guards against regressions such as coding each decision on its own, which
+# about doubles the time.
 _MAX_SLOWDOWN_VS_G4 = 40.0
 
 

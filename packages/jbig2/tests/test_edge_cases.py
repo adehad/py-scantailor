@@ -1,10 +1,5 @@
-"""Adversarial inputs: extreme shapes, memory layouts, dtypes, byte stuffing, threads, cache."""
+"""Adversarial inputs: extreme shapes, memory layouts, dtypes, byte stuffing, threads."""
 
-import json
-import os
-import subprocess
-import sys
-import textwrap
 from concurrent.futures import ThreadPoolExecutor
 from itertools import pairwise
 from pathlib import Path
@@ -15,10 +10,8 @@ from pdf_decoders import EmbeddedImage, decode_with_both
 from reference_decoder import MQDecoder, decode_generic
 from sample_images import noise
 
-from jbig2_numba import encode_file, encode_generic, encode_pdf_stream
-from jbig2_numba.mq_coder import encode_decisions
-
-PACKAGE_SRC = Path(__file__).resolve().parents[1] / "src"
+from jbig2 import encode_file, encode_generic, encode_pdf_stream
+from jbig2.mq_coder import encode_decisions
 
 
 def _assert_both_decoders(images: list[np.ndarray], workdir: Path, *, tpgdon: bool = True) -> None:
@@ -244,43 +237,3 @@ def test_repeated_calls_are_stateless() -> None:
     first_a = encode_generic(a)
     encode_generic(b)
     assert encode_generic(a) == first_a
-
-
-_CACHE_PROBE = textwrap.dedent(
-    """
-    import json, sys
-    import numpy as np
-    sys.path.insert(0, sys.argv[1])
-    from jbig2_numba import encode_generic, generic_region
-    data = encode_generic(np.random.default_rng(0).random((50, 60)) < 0.3)
-    stats = generic_region._encode_template0.stats
-    print(json.dumps({
-        "misses": sum(stats.cache_misses.values()),
-        "hits": sum(stats.cache_hits.values()),
-        "digest": data.hex(),
-    }))
-    """
-)
-
-
-def test_numba_cache_is_reused_from_a_fresh_process(tmp_path: Path) -> None:
-    cache_dir = tmp_path / "numba_cache"
-    env = {**os.environ, "NUMBA_CACHE_DIR": str(cache_dir)}
-    env.pop("NUMBA_DISABLE_JIT", None)
-    runs = []
-    for _ in range(2):
-        result = subprocess.run(
-            [sys.executable, "-I", "-c", _CACHE_PROBE, str(PACKAGE_SRC)],
-            capture_output=True,
-            text=True,
-            env=env,
-            check=False,
-            timeout=300,
-        )
-        assert result.returncode == 0, result.stderr
-        runs.append(json.loads(result.stdout.strip().splitlines()[-1]))
-    assert runs[0]["misses"] >= 1
-    assert runs[1]["misses"] == 0, "second process recompiled instead of loading the cache"
-    assert runs[1]["hits"] >= 1
-    assert runs[0]["digest"] == runs[1]["digest"]
-    assert any(cache_dir.rglob("*.nbi"))
