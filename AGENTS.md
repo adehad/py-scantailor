@@ -71,6 +71,7 @@ docs/                        - Sphinx user guide and API reference
 - Mutable default arguments
 - `from x import *`
 - Keep deprecated/dead code (rely on git for rollback)
+- Add numba, SciPy or scikit-image to the application: it ships NumPy, OpenCV, Pillow and the stdlib only, so there is one OpenBLAS and no compiler in the build
 
 ## Library Choices
 
@@ -81,7 +82,7 @@ docs/                        - Sphinx user guide and API reference
 | LinearSolver  | `np.linalg.solve()`                          |
 | Morphology    | `cv2.morphologyEx()`                         |
 | GaussBlur     | `cv2.GaussianBlur()`                         |
-| Binarize      | `cv2.threshold()` / `skimage.filters`        |
+| Binarize      | `cv2.threshold()`                            |
 | Transform     | `cv2.warpAffine()` / `cv2.warpPerspective()` |
 | XmlMarshaller | Pydantic + JSON                              |
 

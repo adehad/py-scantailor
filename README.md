@@ -78,7 +78,7 @@ and assembling multi-page documents are out of scope of this project.
 - **Linux:** unpack with `tar -xzf ScanTailor-<tag>-linux-x64.tar.gz` and run `ScanTailor/ScanTailor`. It is built on Ubuntu 22.04 and needs glibc 2.35 or newer. Qt's X11 plugin uses the system's xcb libraries; if the window does not open, install them (on Debian and Ubuntu: `sudo apt install libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libegl1`). The command line runs without a display when `QT_QPA_PLATFORM=offscreen` is set.
 - **macOS:** needs macOS 15 or later. Unzip and move `ScanTailor.app` to Applications. The app is not signed with an Apple Developer ID or notarised, so the first launch is blocked: right-click the app and choose **Open**; if macOS only offers to move it to the Bin, open it once, then allow it under **System Settings > Privacy & Security > Open Anyway**. The command line lives inside the bundle because it shares the bundle's libraries; link it onto your `PATH` with `ln -s /Applications/ScanTailor.app/Contents/MacOS/scantailor-cli /usr/local/bin/`. Intel Macs are not built; run from source there.
 
-The first launch of a new build compiles the image-processing kernels in the background and caches them in the user cache folder (`%LOCALAPPDATA%\numba`, `~/.cache/numba` or `~/Library/Caches/numba`); later launches load that cache.
+The first JBIG2 PDF export of a new build compiles the JBIG2 encoder and caches it in the user cache folder (`%LOCALAPPDATA%\numba`, `~/.cache/numba` or `~/Library/Caches/numba`); later exports load that cache.
 
 **From source** (Windows, Linux or macOS) needs Python 3.14 and [PDM](https://pdm-project.org):
 
