@@ -130,6 +130,7 @@ class Tokens:
         danger (str): Semantic red for destructive glyphs.
         viewport (str): Neutral colour behind page images.
         scroll_handle (str): Scroll bar handle.
+        base (str): Opaque fill of item views and text entry, the palette Base role.
         view (ViewColors): Overlay colours of the image views.
     """
 
@@ -156,33 +157,35 @@ class Tokens:
     danger: str
     viewport: str
     scroll_handle: str
+    base: str
     view: ViewColors
 
 
 LIGHT = Tokens(
     dark=False,
-    bg_top="#e9eef7",
-    bg_bottom="#dce3ef",
-    panel="rgba(255, 255, 255, 184)",
-    panel_border="rgba(15, 23, 42, 20)",
-    panel_highlight="rgba(255, 255, 255, 230)",
+    bg_top="#f6f3ec",
+    bg_bottom="#ece7dc",
+    panel="rgba(253, 251, 246, 210)",
+    panel_border="rgba(60, 45, 20, 34)",
+    panel_highlight="rgba(255, 254, 250, 230)",
     link="#0b3fa8",
-    field="rgba(255, 255, 255, 190)",
-    field_hover="rgba(255, 255, 255, 235)",
-    field_border="rgba(20, 30, 60, 38)",
-    indicator_border="rgba(20, 30, 60, 130)",
-    text="#1c2330",
-    text_dim="#5b6472",
-    text_disabled="#a4abb7",
-    field_disabled="rgba(120, 130, 150, 28)",
+    field="rgba(255, 254, 250, 200)",
+    field_hover="rgba(255, 254, 250, 240)",
+    field_border="rgba(70, 55, 32, 72)",
+    indicator_border="rgba(70, 55, 32, 130)",
+    text="#2a2620",
+    text_dim="#655d51",
+    text_disabled="#aca598",
+    field_disabled="rgba(140, 125, 100, 28)",
     accent="#2f6fed",
     accent_hover="#4a82f2",
-    accent_tint="rgba(47, 111, 237, 40)",
+    accent_tint="rgba(47, 111, 237, 28)",
     accent_text="#ffffff",
     positive="#008a1a",
     danger="#d92d20",
-    viewport="#c9ccd1",
-    scroll_handle="rgba(28, 35, 48, 90)",
+    viewport="#cfcac0",
+    scroll_handle="rgba(42, 38, 32, 90)",
+    base="#fffefa",
     view=ViewColors(
         split_line="rgba(0, 70, 200, 220)",
         split_line_active="#0a84ff",
@@ -216,7 +219,7 @@ LIGHT = Tokens(
         deskew_axis="#0000d1",
         indicator_scrim="rgba(0, 0, 0, 140)",
         indicator_glyph="#ffffff",
-        indicator_label="rgba(28, 35, 48, 220)",
+        indicator_label="rgba(42, 38, 32, 220)",
     ),
 )
 
@@ -225,12 +228,12 @@ DARK = Tokens(
     bg_top="#1b2030",
     bg_bottom="#11141d",
     panel="rgba(255, 255, 255, 18)",
-    panel_border="rgba(255, 255, 255, 26)",
+    panel_border="rgba(255, 255, 255, 40)",
     panel_highlight="rgba(255, 255, 255, 46)",
     link="#8ab8ff",
     field="rgba(255, 255, 255, 22)",
     field_hover="rgba(255, 255, 255, 38)",
-    field_border="rgba(255, 255, 255, 40)",
+    field_border="rgba(255, 255, 255, 60)",
     indicator_border="rgba(255, 255, 255, 120)",
     text="#e8ecf4",
     text_dim="#9aa3b5",
@@ -244,6 +247,7 @@ DARK = Tokens(
     danger="#ff7b72",
     viewport="#2b2d31",
     scroll_handle="rgba(232, 236, 244, 90)",
+    base="#232838",
     view=ViewColors(
         split_line="rgba(70, 140, 250, 230)",
         split_line_active="#4a9bff",
