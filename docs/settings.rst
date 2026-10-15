@@ -11,9 +11,9 @@ Settings
 .. screenshot:: settings
    :alt: The Settings dialog
 
-Changes take effect when you press OK. Cancel restores the colour scheme that was
-in use before the dialog opened. Some options are greyed out. This build does not
-act on them, so they keep their stored values.
+Changes take effect when you press OK. Cancel restores the colour scheme and
+hover highlight that were in use before the dialog opened. Some options are
+greyed out. This build does not act on them, so they keep their stored values.
 
 .. list-table::
    :header-rows: 1
@@ -35,6 +35,10 @@ act on them, so they keep their stored values.
      - Auto follows the operating system. Light and Dark fix the scheme. The
        change shows at once.
      - Light or Dark to fix one scheme. Auto to follow the system.
+   * - Hover highlight
+     - The fill behind an options group title or a panel divider under the
+       pointer. Neutral is a light grey. Accent colour uses the selection blue.
+     - Accent colour if the grey is hard to see on your screen.
    * - Units
      - The unit for every length on screen: pixels, millimetres, centimetres or
        inches. Same as **Tools > Units**.
