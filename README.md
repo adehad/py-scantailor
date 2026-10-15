@@ -455,6 +455,8 @@ pdm run exe
 
 `pdm run exe` compiles the translations, then runs PyInstaller on [`app.spec`](app.spec) from `build/venv`, a separate environment that [`tools/build_exe.py`](tools/build_exe.py) syncs from `pdm.lock` with the runtime dependencies and PyInstaller only, so test and docs tools installed for development never end up in the bundle. The result is one folder, `dist/ScanTailor/`, holding the windowed `ScanTailor` and the console `scantailor-cli` (`.exe` on Windows), which share the bundled libraries. On macOS the same folder is also wrapped as `dist/ScanTailor.app`, with both executables in `Contents/MacOS`. The entry scripts in [`tools/pyinstaller/`](tools/pyinstaller/) call `multiprocessing.freeze_support()` so the batch worker processes start correctly from a frozen executable. PyInstaller only builds for the platform it runs on.
 
+The project hooks in [`tools/pyinstaller/hooks/`](tools/pyinstaller/hooks/) keep the bundle to what the app uses: Qt without OpenGL, QML, networking or unused image formats and with Qt's own translations for the shipped languages only, OpenCV without its FFmpeg video library, numba without its test, coverage and pretty-printing helpers, and Python without OpenSSL, which only network code needs. Each rule carries its reason in the hook.
+
 #### Releasing
 
 Push a tag that starts with `v`:

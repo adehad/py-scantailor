@@ -26,7 +26,11 @@ ROOT = Path(SPECPATH)
 SRC = ROOT / "src"
 PACKAGE = SRC / "scantailor"
 ENTRY_POINTS = ROOT / "tools" / "pyinstaller"
+HOOKS = ENTRY_POINTS / "hooks"
 RESOURCES = PACKAGE / "resources"
+
+# The project hooks import their shared rules (_trim.py, _qt.py) from here.
+sys.path.insert(0, str(HOOKS))
 
 
 def _beside_package(files: list[Path]) -> list[tuple[str, str]]:
@@ -40,6 +44,11 @@ if not translations:
         "No compiled translations; run tools/build_translations.py (pdm run exe "
         "does this) before PyInstaller."
     )
+languages = sorted(
+    path.stem.removeprefix("scantailor_")
+    for path in translations
+    if path.stem != "scantailor_untranslated"
+)
 
 # The dialogs load their .ui files and the translation loader its .qm files from
 # beside the modules; fonts.py reads the Korean fallback from disk. Inter and the
@@ -60,6 +69,9 @@ datas = [
 # the background and every later run loads the cache.
 hiddenimports = ["PySide6.QtSvg", "scantailor.imageproc.numba_warmup"]
 
+# The Qt hooks keep Qt's own translations for these languages only.
+hooksconfig = {"scantailor": {"qt_languages": languages}}
+
 exe_icon = None
 if sys.platform == "win32":
     exe_icon = str(RESOURCES / "win32" / "scantailor.ico")
@@ -71,6 +83,8 @@ def _analyse(script: str) -> "Analysis":
         pathex=[str(SRC)],
         datas=datas,
         hiddenimports=hiddenimports,
+        hookspath=[str(HOOKS)],
+        hooksconfig=hooksconfig,
     )
 
 
