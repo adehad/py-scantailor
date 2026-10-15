@@ -7,10 +7,10 @@ from scantailor.app.ui.theme.palette import build_palette
 from scantailor.app.ui.theme.tokens import DARK, LIGHT, Tokens
 from scantailor.app.ui.thumbnails.model import IsCurrentRole
 from scantailor.app.ui.thumbnails.widget import (
-    _CAPTION_HEIGHT,
     _FRAME_MARGIN,
     _PADDING,
     ThumbnailDelegate,
+    _caption_height,
 )
 
 THUMBNAIL = QtCore.QSize(60, 80)
@@ -169,7 +169,7 @@ def test_caption_is_drawn_in_the_text_colour_below_the_frame(
     top = _PADDING + THUMBNAIL.height() + _FRAME_MARGIN
     pixels = [
         image.pixelColor(x, y)
-        for y in range(top, top + _CAPTION_HEIGHT)
+        for y in range(top, top + _caption_height())
         for x in range(_PADDING, _PADDING + THUMBNAIL.width())
     ]
     inked = [c for c in pixels if _distance(c, window) > TOLERANCE]

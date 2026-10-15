@@ -53,6 +53,7 @@ from scantailor.app.ui.image_views.picture_mask_overlay import (
     MaskZone,
     PictureMaskOverlay,
 )
+from scantailor.app.ui.theme.fonts import small
 from scantailor.app.ui.theme.tokens import view_color
 from scantailor.app.ui.widgets.color_pickup import ColorPickupInteraction
 from scantailor.app.ui.widgets.picture_zone_dialog import (
@@ -1223,9 +1224,7 @@ class OutputImageView(ImageViewBase):
         text = layer_label(layer)
         if not text:
             return
-        font = painter.font()
-        font.setPixelSize(11)
-        painter.setFont(font)
+        painter.setFont(small(QtWidgets.QApplication.font()))
         bounds = polygon.boundingRect()
         if painter.fontMetrics().horizontalAdvance(text) + 8 > bounds.width():
             return

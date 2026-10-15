@@ -38,9 +38,8 @@
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
         <widget class="QLabel" name="label">
-         <property name="styleSheet">
-          <string notr="true">font-size: 17px;
-font-weight: bold;</string>
+         <property name="textRole" stdset="0">
+          <string notr="true">display</string>
          </property>
          <property name="text">
           <string>Out of Memory Situation in Scan Tailor</string>
@@ -449,9 +448,8 @@ font-weight: bold;</string>
       <layout class="QVBoxLayout" name="verticalLayout_9">
        <item>
         <widget class="QLabel" name="label_2">
-         <property name="styleSheet">
-          <string notr="true">font-size: 17px;
-font-weight: bold;</string>
+         <property name="textRole" stdset="0">
+          <string notr="true">display</string>
          </property>
          <property name="text">
           <string>Project Saved Successfully</string>

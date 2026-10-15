@@ -217,9 +217,7 @@ class ApplyToDialog(QtWidgets.QDialog):
     def _hint(text: str) -> QtWidgets.QLabel:
         label = QtWidgets.QLabel(text)
         label.setContentsMargins(24, 0, 0, 0)
-        font = label.font()
-        font.setPointSize(max(font.pointSize() - 2, 6))
-        label.setFont(font)
+        label.setProperty("textRole", "small")
         return label
 
     @property
