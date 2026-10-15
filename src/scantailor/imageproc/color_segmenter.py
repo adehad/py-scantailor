@@ -5,9 +5,10 @@ page, and every connected piece of ink is painted with the average colour of
 the original under it. The paper stays white.
 """
 
+from dataclasses import dataclass
+
 import cv2
 import numpy as np
-from numba import njit
 from numpy.typing import NDArray
 
 from .background_color import otsu_threshold
@@ -24,11 +25,11 @@ _MAX_THRESHOLD = 255
 _REFERENCE_DPI = 300.0
 _MIN_AVERAGE_WIDTH_AT_REFERENCE = 1.5
 _UNREACHED = np.iinfo(np.int32).max
-# Neighbour offsets (dy, dx) in the order ties between equidistant labels are resolved.
-_NEIGHBOURS = np.array(
-    [(-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1)],
-    dtype=np.int64,
-)
+# Queue entries offered together in one vectorised step of the label spread.
+_BATCH_ENTRIES = 1024
+# Neighbour offsets in the order ties between equidistant labels are resolved.
+_NEIGHBOUR_DY = np.array([-1, -1, -1, 0, 1, 1, 1, 0], dtype=np.int32)
+_NEIGHBOUR_DX = np.array([-1, 0, 1, 1, 1, 0, -1, -1], dtype=np.int32)
 
 
 def segment_colors(
@@ -178,56 +179,16 @@ def _is_noise(
     return (areas <= big_piece) | (average_width <= min_average_width)
 
 
-@njit(cache=True)
-def _propagate(labels, reach, vector_x, vector_y, frontier, neighbours):
-    """Spread labels breadth first through unreached cells, nearest source wins.
-
-    ``reach`` holds the squared distance to the source and is ``_UNREACHED`` in
-    cells that may still be taken; cells holding 0 and no label never change.
-    Distances come from per-cell vectors to the source, so they are exact
-    Euclidean distances to the closest source pixel found along the way.
-    """
-    height, width = labels.shape
-    queue = frontier
-    count = frontier.shape[0]
-    head = 0
-    while head < count:
-        flat = queue[head]
-        head += 1
-        y = flat // width
-        x = flat - y * width
-        vx = vector_x[y, x]
-        vy = vector_y[y, x]
-        label = labels[y, x]
-        for k in range(neighbours.shape[0]):
-            dy = neighbours[k, 0]
-            dx = neighbours[k, 1]
-            ny = y + dy
-            nx = x + dx
-            if ny < 0 or ny >= height or nx < 0 or nx >= width:
-                continue
-            new_x = vx - dx
-            new_y = vy - dy
-            distance = new_x * new_x + new_y * new_y
-            if distance < reach[ny, nx]:
-                labels[ny, nx] = label
-                reach[ny, nx] = distance
-                vector_x[ny, nx] = new_x
-                vector_y[ny, nx] = new_y
-                if count == queue.shape[0]:
-                    grown = np.empty(queue.shape[0] * 2, dtype=queue.dtype)
-                    grown[:count] = queue[:count]
-                    queue = grown
-                queue[count] = ny * width + nx
-                count += 1
-
-
 def _extend_into_ink(
     labels: NDArray[np.int32], ink: NDArray[np.bool_]
 ) -> NDArray[np.int32]:
     """Give unlabelled ink the label of the nearest labelled pixel it connects to.
 
-    Labels spread only through ink, so ink that no piece reaches stays 0.
+    Labels spread breadth first through ink, so ink that no piece reaches stays
+    0. Each pixel carries the vector to its source, so distances are exact
+    Euclidean distances to the closest source found along the way, and a pixel
+    is taken over again whenever a strictly nearer source arrives. Of equally
+    near offers the first one wins, so the queue order decides ties.
 
     Args:
         labels (NDArray[np.int32]): Piece labels, 0 for none. Not modified.
@@ -237,19 +198,165 @@ def _extend_into_ink(
         NDArray[np.int32]: New label array.
     """
     sources = labels != 0
-    if not sources.any():
+    open_ink = ink & ~sources
+    if not sources.any() or not open_ink.any():
         return labels.copy()
-    extended = labels.copy()
-    reach = np.where(ink & ~sources, _UNREACHED, 0).astype(np.int32)
-    _propagate(
-        extended,
-        reach,
-        np.zeros(labels.shape, dtype=np.int32),
-        np.zeros(labels.shape, dtype=np.int32),
-        np.flatnonzero(sources).astype(np.int32),
-        _NEIGHBOURS,
+
+    # A frame of closed pixels keeps every neighbour index inside the arrays.
+    height, width = labels.shape[0] + 2, labels.shape[1] + 2
+    spread = _Spread(
+        label=np.pad(labels, 1).ravel(),
+        reach=np.where(np.pad(open_ink, 1), np.int32(_UNREACHED), np.int32(0)).ravel(),
+        vector_x=np.zeros(height * width, dtype=np.int32),
+        vector_y=np.zeros(height * width, dtype=np.int32),
+        offsets=_NEIGHBOUR_DY.astype(np.int64) * width + _NEIGHBOUR_DX,
     )
-    return extended
+    # Sources with no open neighbour cannot take anything, so they are left out.
+    next_to_open = cv2.dilate(open_ink.view(np.uint8), np.ones((3, 3), np.uint8))
+    queue = np.flatnonzero(np.pad(sources & next_to_open.view(np.bool_), 1))
+    while queue.size:
+        queue = _spread_generation(queue, spread)
+    return spread.label.reshape(height, width)[1:-1, 1:-1].copy()
+
+
+@dataclass(frozen=True)
+class _Spread:
+    """Per-pixel state of the label spread over the framed, flattened page.
+
+    Attributes:
+        label (NDArray[np.int32]): Current label, 0 for none.
+        reach (NDArray[np.int32]): Squared distance to the source of the label;
+            ``_UNREACHED`` where still open, 0 where the pixel never changes.
+        vector_x (NDArray[np.int32]): Column offset from the pixel to its source.
+        vector_y (NDArray[np.int32]): Row offset from the pixel to its source.
+        offsets (NDArray[np.int64]): Flat index step to each neighbour, in the
+            order of ``_NEIGHBOUR_DY`` and ``_NEIGHBOUR_DX``.
+    """
+
+    label: NDArray[np.int32]
+    reach: NDArray[np.int32]
+    vector_x: NDArray[np.int32]
+    vector_y: NDArray[np.int32]
+    offsets: NDArray[np.int64]
+
+
+def _spread_generation(queue: NDArray[np.int64], spread: _Spread) -> NDArray[np.int64]:
+    """Take every queue entry in order and let it offer its label to its neighbours.
+
+    Entries are handled a batch at a time with whole-array operations, which
+    gives the same result as one at a time as long as no entry of the batch is
+    changed by an earlier one, because that entry has to offer its new label.
+    A batch therefore ends just before the first such entry.
+
+    Args:
+        queue (NDArray[np.int64]): Flat pixel indices of one generation, in
+            queue order; a pixel may appear more than once.
+        spread (_Spread): State updated in place.
+
+    Returns:
+        NDArray[np.int64]: The pixels taken over, in the order they were taken
+            over, which is the next generation.
+    """
+    taken: list[NDArray[np.int64]] = []
+    start = 0
+    while start < queue.size:
+        batch = queue[start : start + _BATCH_ENTRIES]
+        target = (batch[:, None] + spread.offsets).ravel()
+        offer_x = (spread.vector_x[batch][:, None] - _NEIGHBOUR_DX).ravel()
+        offer_y = (spread.vector_y[batch][:, None] - _NEIGHBOUR_DY).ravel()
+        distance = offer_x * offer_x + offer_y * offer_y
+        accepted = _accepted_offers(target, distance, spread.reach)
+        entry = accepted // _NEIGHBOUR_DX.size
+        stop = _first_entry_changed_earlier(batch, entry, target[accepted])
+        accepted = accepted[entry < stop]
+
+        nearest = _last_offer_per_target(target[accepted], accepted)
+        cells = target[nearest]
+        spread.label[cells] = spread.label[batch[nearest // _NEIGHBOUR_DX.size]]
+        spread.reach[cells] = distance[nearest]
+        spread.vector_x[cells] = offer_x[nearest]
+        spread.vector_y[cells] = offer_y[nearest]
+        taken.append(target[accepted])
+        start += stop
+    return np.concatenate(taken) if taken else np.empty(0, dtype=np.int64)
+
+
+def _accepted_offers(
+    target: NDArray[np.int64],
+    distance: NDArray[np.int32],
+    reach: NDArray[np.int32],
+) -> NDArray[np.int64]:
+    """Offers nearer than what their target holds and than every earlier offer to it.
+
+    Args:
+        target (NDArray[np.int64]): Pixel each offer is for, in offer order.
+        distance (NDArray[np.int32]): Squared distance of each offer.
+        reach (NDArray[np.int32]): Squared distance each pixel holds.
+
+    Returns:
+        NDArray[np.int64]: Indices of the accepted offers, in offer order.
+    """
+    candidate = np.flatnonzero(distance < reach[target])
+    if candidate.size == 0:
+        return candidate
+    by_target = candidate[np.argsort(target[candidate], kind="stable")]
+    sorted_target = target[by_target]
+    new_target = np.ones(by_target.size, dtype=bool)
+    new_target[1:] = sorted_target[1:] != sorted_target[:-1]
+    group = np.cumsum(new_target)
+    # Lifting the distances of each target above those of every later target
+    # makes a single running minimum start afresh at each target.
+    lifted = distance[by_target] + (group[-1] - group) * (np.int64(1) << 32)
+    earlier_best = np.empty_like(lifted)
+    earlier_best[1:] = np.minimum.accumulate(lifted)[:-1]
+    earlier_best[new_target] = np.iinfo(np.int64).max
+    return np.sort(by_target[lifted < earlier_best])
+
+
+def _first_entry_changed_earlier(
+    batch: NDArray[np.int64],
+    entry: NDArray[np.int64],
+    changed: NDArray[np.int64],
+) -> int:
+    """Position of the first batch entry whose pixel an earlier entry changes.
+
+    Args:
+        batch (NDArray[np.int64]): Pixels of the batch entries, in queue order.
+        entry (NDArray[np.int64]): Batch position of the entry behind each change.
+        changed (NDArray[np.int64]): Pixel each change is to.
+
+    Returns:
+        int: The position, or ``batch.size`` when no entry is changed earlier.
+    """
+    if changed.size == 0:
+        return batch.size
+    size = np.int64(batch.size)
+    # Keys sort by pixel, then by position; the next key after (pixel, entry)
+    # is the first later entry of the same pixel, if there is one.
+    keys = np.sort(batch * size + np.arange(batch.size))
+    following = np.searchsorted(keys, changed * size + entry, side="right")
+    inside = following < keys.size
+    later = keys[following[inside]]
+    same_pixel = later // size == changed[inside]
+    if not same_pixel.any():
+        return batch.size
+    return int((later[same_pixel] % size).min())
+
+
+def _last_offer_per_target(
+    target: NDArray[np.int64], offer: NDArray[np.int64]
+) -> NDArray[np.int64]:
+    """The last accepted offer to each target, which is also its nearest.
+
+    Args:
+        target (NDArray[np.int64]): Target of each accepted offer, in offer order.
+        offer (NDArray[np.int64]): Index of each accepted offer.
+
+    Returns:
+        NDArray[np.int64]: One offer index per target.
+    """
+    _, last_from_end = np.unique(target[::-1], return_index=True)
+    return offer[::-1][last_from_end]
 
 
 def _paint_pieces(

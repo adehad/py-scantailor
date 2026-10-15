@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from scantailor.imageproc import hough_line_detector
 from scantailor.imageproc.hough_line_detector import HoughLineDetector
 from tests.filters.page_split import cpp_reference as cpp
 
@@ -105,3 +106,85 @@ def test_lines_come_best_first() -> None:
         (line.quality for line in lines), reverse=True
     )
     assert lines[0].point_at_y(100.0)[0] == pytest.approx(100, abs=THICKNESS)
+
+
+def _votes_one_point_at_a_time(
+    detector: HoughLineDetector, xs: np.ndarray, ys: np.ndarray, weights: np.ndarray
+) -> np.ndarray:
+    """Reference: every point adds its weight to one bin per angle."""
+    histogram = np.zeros_like(detector._histogram)
+    for x, y, weight in zip(xs.tolist(), ys.tolist(), weights.tolist(), strict=True):
+        for angle, (cos, sin) in enumerate(
+            zip(detector._cos.tolist(), detector._sin.tolist(), strict=True)
+        ):
+            distance = cos * x + sin * y
+            index = int(
+                (distance + detector._bias) * detector._reciprocal_resolution + 0.5
+            )
+            histogram[angle, index] += weight
+    return histogram
+
+
+@pytest.mark.parametrize("resolution", [1.0, 2.5, 5.0])
+def test_votes_match_adding_one_point_at_a_time(resolution: float) -> None:
+    rng = np.random.default_rng(int(resolution * 10))
+    xs = rng.integers(0, 120, 400)
+    ys = rng.integers(0, 90, 400)
+    weights = rng.integers(1, 255, 400).astype(np.uint32)
+    detector = HoughLineDetector(120, 90, resolution, -7.0, 0.25, 57)
+
+    detector.process(xs, ys, weights)
+
+    np.testing.assert_array_equal(
+        detector._histogram, _votes_one_point_at_a_time(detector, xs, ys, weights)
+    )
+
+
+def test_votes_split_into_full_and_partial_angle_chunks_match_one_point_at_a_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rng = np.random.default_rng(11)
+    xs = rng.integers(0, 120, 400)
+    ys = rng.integers(0, 90, 400)
+    weights = rng.integers(1, 255, 400).astype(np.uint32)
+    # Five angles per chunk: 57 angles make eleven full chunks and one of two.
+    monkeypatch.setattr(hough_line_detector, "_VOTE_CHUNK_ELEMENTS", 5 * 400)
+    detector = HoughLineDetector(120, 90, 1.0, -7.0, 0.25, 57)
+
+    detector.process(xs, ys, weights)
+
+    np.testing.assert_array_equal(
+        detector._histogram, _votes_one_point_at_a_time(detector, xs, ys, weights)
+    )
+
+
+def test_votes_from_several_calls_add_up() -> None:
+    rng = np.random.default_rng(3)
+    xs = rng.integers(0, 50, 60)
+    ys = rng.integers(0, 50, 60)
+    weights = np.ones(60, dtype=np.uint32)
+    once = HoughLineDetector(50, 50, 1.0, -5.0, 1.0, 11)
+    twice = HoughLineDetector(50, 50, 1.0, -5.0, 1.0, 11)
+
+    once.process(xs, ys, weights)
+    twice.process(xs[:25], ys[:25], weights[:25])
+    twice.process(xs[25:], ys[25:], weights[25:])
+    twice.process(xs[:0], ys[:0], weights[:0])
+
+    np.testing.assert_array_equal(once._histogram, twice._histogram)
+
+
+def test_equal_peaks_come_in_raster_order_of_their_first_bin() -> None:
+    detector = HoughLineDetector(50, 50, 1.0, 0.0, 1.0, 12)
+    histogram = np.zeros_like(detector._histogram)
+    # Peak A starts first in raster order but reaches further down than peak B.
+    histogram[2:9, 30] = 7
+    histogram[4, 5] = 7
+    histogram[10, 15] = 9
+    detector._histogram = histogram
+
+    lines = detector.find_lines(1)
+
+    assert [line.quality for line in lines] == [9, 7, 7]
+    centre_columns = [round(line.distance + detector._bias - 0.5) for line in lines]
+    assert centre_columns == [15, 30, 5]

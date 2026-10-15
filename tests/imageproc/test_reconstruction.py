@@ -1,26 +1,38 @@
 """Tests for greyscale morphological reconstruction."""
 
-import time
-
 import numpy as np
 import pytest
-from skimage.morphology import reconstruction as skimage_reconstruction
 
 from scantailor.imageproc.reconstruction import reconstruction
 
-_FOOTPRINTS = {
-    4: np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype=bool),
-    8: np.ones((3, 3), dtype=bool),
+_NEIGHBOURS = {
+    4: [(-1, 0), (1, 0), (0, -1), (0, 1)],
+    8: [(dy, dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1) if (dy, dx) != (0, 0)],
 }
 
 
+def _geodesic_dilation_until_stable(seed, mask, connectivity):
+    """Reference: one-pixel geodesic dilations repeated until nothing changes."""
+    lowest = -np.inf if seed.dtype.kind == "f" else np.iinfo(seed.dtype).min
+    marker = seed.copy()
+    while True:
+        padded = np.pad(marker, 1, constant_values=lowest)
+        grown = marker.copy()
+        height, width = marker.shape
+        for dy, dx in _NEIGHBOURS[connectivity]:
+            shifted = padded[1 + dy : 1 + dy + height, 1 + dx : 1 + dx + width]
+            np.maximum(grown, shifted, out=grown)
+        grown = np.minimum(grown, mask)
+        if np.array_equal(grown, marker):
+            return marker
+        marker = grown
+
+
 def _expected(seed, mask, method, connectivity):
-    return np.asarray(
-        skimage_reconstruction(
-            seed, mask, method=method, footprint=_FOOTPRINTS[connectivity]
-        ),
-        dtype=seed.dtype,
-    )
+    if method == "dilation":
+        return _geodesic_dilation_until_stable(seed, mask, connectivity)
+    flip = (lambda image: -image) if seed.dtype.kind == "f" else np.invert
+    return flip(_geodesic_dilation_until_stable(flip(seed), flip(mask), connectivity))
 
 
 def _random_pair(rng, shape, method, dtype=np.uint8):
@@ -33,8 +45,10 @@ def _random_pair(rng, shape, method, dtype=np.uint8):
 
 @pytest.mark.parametrize("method", ["dilation", "erosion"])
 @pytest.mark.parametrize("connectivity", [4, 8])
-class TestMatchesSkimage:
-    def test_random_images_give_the_same_result_as_skimage(self, method, connectivity):
+class TestMatchesRepeatedGeodesicDilation:
+    def test_random_images_give_the_same_result_as_the_reference(
+        self, method, connectivity
+    ):
         rng = np.random.default_rng(1)
         for shape in [(1, 1), (1, 17), (13, 1), (2, 2), (31, 47), (64, 64)]:
             seed, mask = _random_pair(rng, shape, method)
@@ -181,32 +195,23 @@ class TestRejectsBadArguments:
             )  # type: ignore[arg-type]
 
 
-def _best_of_three(run) -> float:
-    timings = []
-    for _ in range(3):
-        start = time.perf_counter()
-        run()
-        timings.append(time.perf_counter() - start)
-    return min(timings)
+def _serpentine_corridor(side: int) -> np.ndarray:
+    """A one-pixel corridor that turns back at every other row end."""
+    corridor = np.zeros((side, side), dtype=bool)
+    corridor[::2, :] = True
+    for row in range(1, side, 2):
+        corridor[row, -1 if row % 4 == 1 else 0] = True
+    return corridor
 
 
-@pytest.mark.parametrize("method", ["dilation", "erosion"])
-def test_reconstruction_is_several_times_faster_than_skimage_after_warm_up(method):
-    # A ratio against skimage on the same input holds under parallel test load,
-    # where an absolute wall-clock bound does not. Measured ratio is 8 to 15.
-    rng = np.random.default_rng(7)
-    mask = np.asarray(
-        np.cumsum(rng.integers(-2, 3, (1200, 840)), axis=1) % 256, dtype=np.uint8
+@pytest.mark.parametrize("connectivity", [4, 8])
+def test_winding_corridor_is_followed_to_its_end(connectivity):
+    corridor = _serpentine_corridor(41)
+    mask = np.where(corridor, 200, 0).astype(np.uint8)
+    seed = np.zeros_like(mask)
+    seed[0, 0] = 200
+    result = reconstruction(seed, mask, "dilation", connectivity)
+    np.testing.assert_array_equal(
+        result, _geodesic_dilation_until_stable(seed, mask, connectivity)
     )
-    seed = np.where(
-        rng.random(mask.shape) < 0.001, mask, 0 if method == "dilation" else 255
-    )
-    seed = seed.astype(np.uint8)
-    reconstruction(seed[:64, :64].copy(), mask[:64, :64].copy(), method)
-
-    ours = _best_of_three(lambda: reconstruction(seed, mask, method))
-    reference = _best_of_three(
-        lambda: skimage_reconstruction(seed, mask, method=method)
-    )
-
-    assert reference / ours >= 3
+    np.testing.assert_array_equal(result == 200, corridor)

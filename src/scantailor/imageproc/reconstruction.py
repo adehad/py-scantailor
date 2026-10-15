@@ -1,19 +1,29 @@
 """Greyscale morphological reconstruction.
 
-Hybrid algorithm of Vincent (1993): one raster and one anti-raster scan, then a
-FIFO queue that propagates the remaining changes. The result is the unique
-reconstruction, so it equals ``skimage.morphology.reconstruction`` with a 4 or
-8-connected footprint.
+The marker is raised by directional sweeps: each line of pixels takes the
+maximum of itself and its neighbours in the line before it, capped by the mask,
+first down the image and back up, then across it and back. Sweeps repeat until
+two in a row change nothing. Every sweep moves values arbitrarily far in its
+direction, so natural images settle in a few rounds; only paths that wind back
+and forth need more. The result is the unique reconstruction, so it equals
+``skimage.morphology.reconstruction`` with a 4 or 8-connected footprint.
 """
 
 from typing import Literal
 
+import cv2
 import numpy as np
-from numba import njit
 from numpy.typing import NDArray
 
 Connectivity = Literal[4, 8]
 Method = Literal["dilation", "erosion"]
+
+# Element types cv2.transpose accepts; it is about three times faster than a
+# NumPy transposed copy at page size.
+_CV2_TRANSPOSE_DTYPES = frozenset(
+    np.dtype(kind)
+    for kind in (np.uint8, np.uint16, np.int16, np.int32, np.float32, np.float64)
+)
 
 
 def reconstruction(
@@ -73,110 +83,74 @@ def _reverse_order(image: NDArray) -> NDArray:
     return -image if image.dtype.kind == "f" else ~image
 
 
-def _dilate(seed: NDArray, mask: NDArray, eight_connected: bool) -> NDArray:
-    """Reconstruction by dilation on contiguous copies; returns the new marker."""
-    marker = np.array(seed, order="C")
-    _dilate_in_place(marker, np.ascontiguousarray(mask), eight_connected)
-    return marker
+def _lowest_value(dtype: np.dtype) -> float | int:
+    """The value no other value of ``dtype`` is below, so it never wins a maximum."""
+    return -np.inf if dtype.kind == "f" else int(np.iinfo(dtype).min)
 
 
-@njit(cache=True)
-def _dilate_in_place(marker, mask, eight_connected):
-    """Hybrid reconstruction by dilation; ``marker`` is raised to the result.
+def _transposed(image: NDArray) -> NDArray:
+    """Return a C-contiguous transposed copy."""
+    if image.dtype in _CV2_TRANSPOSE_DTYPES:
+        return np.asarray(cv2.transpose(image), dtype=image.dtype)
+    return np.ascontiguousarray(image.T)
 
-    Compiled by numba, so it is written with explicit index loops.
+
+def _with_side_columns(image: NDArray, fill: float | int) -> NDArray:
+    """Copy ``image`` with one column of ``fill`` added on the left and right."""
+    framed = np.empty((image.shape[0], image.shape[1] + 2), dtype=image.dtype)
+    framed[:, 0] = fill
+    framed[:, -1] = fill
+    framed[:, 1:-1] = image
+    return framed
+
+
+def _sweep_down_and_up(framed: NDArray, mask: NDArray, eight_connected: bool) -> bool:
+    """Raise each row to its neighbours in the row before, top down then bottom up.
+
+    Args:
+        framed (NDArray): Marker with a side column of the lowest value on each
+            side, so the diagonal neighbours of the edge pixels need no special
+            case. Raised in place.
+        mask (NDArray): Upper limit, without side columns.
+        eight_connected (bool): Also take the diagonal neighbours.
+
+    Returns:
+        bool: Whether any pixel changed.
     """
-    height, width = marker.shape
-    queued = np.zeros((height, width), dtype=np.uint8)
-    queue = np.empty(height * width, dtype=np.int32)
-    head = 0
-    count = 0
+    before = framed[:, 1:-1].copy()
+    centre = framed[:, 1:-1]
+    left = framed[:, :-2]
+    right = framed[:, 2:]
+    rows = framed.shape[0]
+    # A Python loop over rows; every step is a vectorised operation on a whole row.
+    for order, step in ((range(1, rows), -1), (range(rows - 2, -1, -1), 1)):
+        for row in order:
+            line = centre[row]
+            previous = row + step
+            np.maximum(line, centre[previous], out=line)
+            if eight_connected:
+                np.maximum(line, left[previous], out=line)
+                np.maximum(line, right[previous], out=line)
+            np.minimum(line, mask[row], out=line)
+    return not np.array_equal(before, centre)
 
-    # Raster scan: take the maximum over neighbours already visited.
-    for y in range(height):
-        for x in range(width):
-            value = marker[y, x]
-            if x > 0 and marker[y, x - 1] > value:
-                value = marker[y, x - 1]
-            if y > 0:
-                if marker[y - 1, x] > value:
-                    value = marker[y - 1, x]
-                if eight_connected:
-                    if x > 0 and marker[y - 1, x - 1] > value:
-                        value = marker[y - 1, x - 1]
-                    if x + 1 < width and marker[y - 1, x + 1] > value:
-                        value = marker[y - 1, x + 1]
-            marker[y, x] = min(value, mask[y, x])
 
-    # Anti-raster scan: same with the other half of the neighbours. A pixel
-    # that can still raise a not-yet-visited neighbour starts the queue.
-    for y in range(height - 1, -1, -1):
-        for x in range(width - 1, -1, -1):
-            value = marker[y, x]
-            if x + 1 < width and marker[y, x + 1] > value:
-                value = marker[y, x + 1]
-            if y + 1 < height:
-                if marker[y + 1, x] > value:
-                    value = marker[y + 1, x]
-                if eight_connected:
-                    if x > 0 and marker[y + 1, x - 1] > value:
-                        value = marker[y + 1, x - 1]
-                    if x + 1 < width and marker[y + 1, x + 1] > value:
-                        value = marker[y + 1, x + 1]
-            value = min(value, mask[y, x])
-            marker[y, x] = value
-
-            pending = False
-            if x + 1 < width:
-                q = marker[y, x + 1]
-                pending = q < value and q < mask[y, x + 1]
-            if not pending and y + 1 < height:
-                q = marker[y + 1, x]
-                pending = q < value and q < mask[y + 1, x]
-                if not pending and eight_connected:
-                    if x > 0:
-                        q = marker[y + 1, x - 1]
-                        pending = q < value and q < mask[y + 1, x - 1]
-                    if not pending and x + 1 < width:
-                        q = marker[y + 1, x + 1]
-                        pending = q < value and q < mask[y + 1, x + 1]
-            if pending:
-                queue[count] = y * width + x
-                queued[y, x] = 1
-                count += 1
-
-    # Propagate with a circular FIFO. A pixel is queued at most once at a time,
-    # so height * width slots always suffice.
-    capacity = height * width
-    while count > 0:
-        flat = queue[head]
-        head += 1
-        if head == capacity:
-            head = 0
-        count -= 1
-        y = flat // width
-        x = flat - y * width
-        queued[y, x] = 0
-        value = marker[y, x]
-
-        for dy in range(-1, 2):
-            ny = y + dy
-            if ny < 0 or ny >= height:
-                continue
-            for dx in range(-1, 2):
-                if dy == 0 and dx == 0:
-                    continue
-                if not eight_connected and dy != 0 and dx != 0:
-                    continue
-                nx = x + dx
-                if nx < 0 or nx >= width:
-                    continue
-                if marker[ny, nx] < value and marker[ny, nx] != mask[ny, nx]:
-                    marker[ny, nx] = min(value, mask[ny, nx])
-                    if queued[ny, nx] == 0:
-                        queued[ny, nx] = 1
-                        tail = head + count
-                        if tail >= capacity:
-                            tail -= capacity
-                        queue[tail] = ny * width + nx
-                        count += 1
+def _dilate(seed: NDArray, mask: NDArray, eight_connected: bool) -> NDArray:
+    """Reconstruction by dilation; returns a new array."""
+    if seed.size == 0:
+        return seed.copy()
+    fill = _lowest_value(seed.dtype)
+    upright_mask = np.ascontiguousarray(mask)
+    masks = (upright_mask, _transposed(upright_mask))
+    framed = _with_side_columns(seed, fill)
+    transposed = 0
+    quiet_sweeps = 0
+    # Every neighbour direction is looked at by one of the two orientations, so
+    # two quiet sweeps in a row mean no pixel can rise any further.
+    while quiet_sweeps < 2:
+        changed = _sweep_down_and_up(framed, masks[transposed], eight_connected)
+        quiet_sweeps = 0 if changed else quiet_sweeps + 1
+        framed = _with_side_columns(_transposed(framed[:, 1:-1]), fill)
+        transposed ^= 1
+    result = framed[:, 1:-1]
+    return np.ascontiguousarray(result.T if transposed else result)

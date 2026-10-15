@@ -2,7 +2,6 @@
 
 import cv2
 import numpy as np
-from skimage.morphology import reconstruction as skimage_reconstruction
 
 from scantailor.imageproc.pictures import (
     PICTURE_THRESHOLD,
@@ -159,21 +158,28 @@ class TestFindPictureRectangles:
         assert find_picture_rectangles(mask, 100) == [(20, 20, 79, 79)]
 
 
-class TestReconstructionBackend:
-    """The numba reconstruction must give what scikit-image gave."""
+def _erode_geodesically_until_stable(seed: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """Reference: 3x3 erosions kept above the mask, repeated until nothing changes."""
+    marker = seed
+    while True:
+        eroded = np.maximum(cv2.erode(marker, np.ones((3, 3), np.uint8)), mask)
+        if np.array_equal(eroded, marker):
+            return marker
+        marker = eroded
 
-    def test_erosion_step_matches_skimage_on_a_photo_page(self):
+
+class TestReconstructionBackend:
+    """The reconstruction gives the fixed point of repeated geodesic erosion."""
+
+    def test_erosion_step_matches_repeated_geodesic_erosion_on_a_photo_page(self):
         page = _text_page()
         _add_photo(page, slice(250, 370), slice(60, 240))
         window = np.ones((3, 3), np.uint8)
         gradient = np.asarray(cv2.dilate(page, window) - cv2.erode(page, window))
         marker = np.asarray(cv2.dilate(gradient, np.ones((35, 35), np.uint8)))
 
-        expected = skimage_reconstruction(
-            np.maximum(marker, gradient),
-            gradient,
-            method="erosion",
-            footprint=np.ones((3, 3), dtype=bool),
+        expected = _erode_geodesically_until_stable(
+            np.maximum(marker, gradient), gradient
         )
 
         np.testing.assert_array_equal(
@@ -197,3 +203,21 @@ class TestDetectionResolution:
         monkeypatch.setattr(pictures, "detect_pictures", spy)
         pictures.estimate_picture_mask(np.zeros((5, 5), np.uint8), (600, 600))
         assert seen == [(3, 3)]
+
+
+def test_rectangles_of_many_clusters_match_a_direct_search():
+    rng = np.random.default_rng(4)
+    mask = np.zeros((600, 500), dtype=bool)
+    for _ in range(40):
+        top, left = rng.integers(0, 580), rng.integers(0, 480)
+        mask[top : top + rng.integers(1, 30), left : left + rng.integers(1, 30)] = True
+    mask[0, 0] = mask[-1, -1] = True
+    joined = cv2.dilate(mask.astype(np.uint8), np.ones((33, 33), np.uint8))
+    count, clusters = cv2.connectedComponents(joined, connectivity=8)
+
+    expected = []
+    for label in range(1, count):
+        ys, xs = np.nonzero(mask & (clusters == label))
+        expected.append((int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())))
+
+    assert find_picture_rectangles(mask, 100) == expected
