@@ -60,6 +60,28 @@ class TestLimitedFlood:
 
         assert np.array_equal(limited_flood(mask, -1), limited_flood(mask, 0))
 
+    @pytest.mark.parametrize("max_steps", [0, 7, 40, 200])
+    def test_a_winding_corridor_is_flooded_along_its_path(self, max_steps: int) -> None:
+        """Steps count along the corridor, not across the walls between its turns."""
+        mask = np.zeros((21, 21), dtype=bool)
+        mask[1:20:2, 1:20] = True
+        mask[2:19:4, 19] = True
+        mask[4:19:4, 1] = True
+        mask[1, 0] = True
+
+        reached = limited_flood(mask, max_steps)
+
+        assert np.array_equal(reached, _dilation_flood(mask, max_steps))
+        assert reached.sum() == min(max_steps + 1, mask.sum())
+
+    def test_strided_input_gives_the_same_flood_as_a_copy(self) -> None:
+        mask = np.random.default_rng(2).random((40, 60)) < 0.6
+        strided = mask[:, ::2]
+
+        assert np.array_equal(
+            limited_flood(strided, 9), limited_flood(np.ascontiguousarray(strided), 9)
+        )
+
 
 def _dilation_flood(mask: np.ndarray, max_steps: int) -> np.ndarray:
     """Reference: grow the border pixels by one cross-shaped step at a time."""
@@ -77,7 +99,14 @@ def _dilation_flood(mask: np.ndarray, max_steps: int) -> np.ndarray:
 
 @pytest.mark.parametrize(
     ("shape", "density", "max_steps"),
-    [((300, 200), 0.55, 40), ((300, 200), 0.7, 25), ((1, 9), 0.7, 3), ((9, 1), 0.7, 3)],
+    [
+        ((300, 200), 0.55, 40),
+        ((300, 200), 0.7, 25),
+        ((1, 9), 0.7, 3),
+        ((9, 1), 0.7, 3),
+        ((1, 1), 1.0, 2),
+        ((2, 6), 0.7, 3),
+    ],
 )
 def test_matches_step_by_step_dilation_on_random_masks(
     shape: tuple[int, int], density: float, max_steps: int
