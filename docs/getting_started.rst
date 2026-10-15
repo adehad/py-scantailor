@@ -168,6 +168,10 @@ Orientation, Split Pages, Deskew, Select Content, Margins and Output. Each stage
 has its own options under the list and starts from the result of the stage
 before it. See :doc:`stages/index`.
 
+Click the title row of an options group, or press Space when it has keyboard
+focus, to fold the group down to its title. Each group stays folded or open
+the next time you start the program.
+
 Opening a project
 -----------------
 

@@ -6,10 +6,46 @@ from .fonts import DISPLAY_RATIO, PANEL_HEADING_RATIO, SEMIBOLD, SMALL_RATIO, pi
 from .tokens import Tokens
 
 CONTROL_HEIGHT = 32
+# Spacing scale: every margin, padding and gap is one of these.
+SPACE_XS = 4
+SPACE_S = 8
+SPACE_M = 12
+SPACE_L = 16
+SPACE_XL = 24
+CHEVRON = 16
+# Alpha of the text colour behind a hovered header row.
+HOVER_ALPHA = 18
 RADIUS_PANEL = 12
 RADIUS_CONTROL = 8
 FIELD_BORDER = 1
 FIELD_PADDING_X = 8
+
+
+def header_height(font: QtGui.QFont, nested: bool = False) -> int:
+    """Return the height of a group header row, which grows with the font.
+
+    Args:
+        font (QtGui.QFont): Font of the group title.
+        nested (bool): True for a group inside another group, which is tighter.
+
+    Returns:
+        int: Height in logical pixels; 32 for a card and 28 nested at 13 px Inter.
+    """
+    line = QtGui.QFontMetrics(font).height()
+    return line + (3 * SPACE_XS if nested else 2 * SPACE_S)
+
+
+def neutral_hover(t: Tokens) -> str:
+    """Return the text colour at a low alpha, a hover fill that reads as no selection.
+
+    Args:
+        t (Tokens): Colours for the look.
+
+    Returns:
+        str: An rgba() colour for QSS.
+    """
+    text = QtGui.QColor(t.text)
+    return f"rgba({text.red()}, {text.green()}, {text.blue()}, {HOVER_ALPHA})"
 
 
 def build_stylesheet(t: Tokens, glyphs: dict[str, str], font: QtGui.QFont) -> str:
@@ -30,6 +66,10 @@ def build_stylesheet(t: Tokens, glyphs: dict[str, str], font: QtGui.QFont) -> st
     small_px = round(body * SMALL_RATIO)
     panel_heading_px = round(body * PANEL_HEADING_RATIO)
     display_px = round(body * DISPLAY_RATIO)
+    line = QtGui.QFontMetrics(font).height()
+    header = header_height(font)
+    nested_header = header_height(font, nested=True)
+    hover = neutral_hover(t)
     handle_fill = t.accent_text if t.dark else "#ffffff"
     control = CONTROL_HEIGHT - 2
     window_gradient = (
@@ -74,12 +114,14 @@ QGroupBox {{
     border: 1px solid {t.panel_border};
     border-top: 1px solid {t.panel_highlight};
     border-radius: {RADIUS_PANEL}px;
-    margin-top: 0; padding: 36px 8px 8px 8px;
+    margin-top: 0;
+    padding: {SPACE_XS + header + SPACE_S}px {SPACE_M}px {SPACE_M}px {SPACE_M}px;
     font-weight: {SEMIBOLD};
 }}
 QGroupBox::title {{
     subcontrol-origin: padding; subcontrol-position: top left;
-    left: 12px; top: 10px; padding: 0; color: {t.text};
+    left: {SPACE_M}px; top: {SPACE_XS + (header - line) // 2}px; padding: 0;
+    color: {t.text};
 }}
 QGroupBox::indicator {{
     width: 16px; height: 16px; background: transparent; border: none;
@@ -88,14 +130,12 @@ QGroupBox::indicator {{
 QGroupBox::indicator:unchecked {{ image: url({chevron_right}); }}
 QGroupBox::indicator:checked {{ image: url({chevron_down}); }}
 QGroupBox QGroupBox {{
-    background: transparent; border: none; margin: 0; padding: 20px 0 0 0;
+    background: transparent; border: none; margin: 0;
+    padding: {nested_header + SPACE_XS}px 0 0 0;
 }}
-QGroupBox QGroupBox::title {{ left: 0; top: 0; color: {t.text_dim}; }}
-QToolButton#collapseButton {{
-    min-width: 0; min-height: 0; padding: 0; border: none; border-radius: 6px;
-    background: transparent; icon-size: 14px;
+QGroupBox QGroupBox::title {{
+    left: 0; top: {(nested_header - line) // 2}px; color: {t.text_dim};
 }}
-QToolButton#collapseButton:hover {{ background: {t.accent_tint}; }}
 QLabel {{ background: transparent; }}
 QFrame[frameShape="4"] {{
     background: {t.field_border}; border: none; max-height: 1px;
@@ -122,6 +162,20 @@ QPushButton:default:hover {{ background: {t.accent_hover}; }}
 QPushButton:disabled, QToolButton:disabled {{
     color: {t.text_disabled}; background: {t.field_disabled};
     border-color: transparent;
+}}
+QGroupBox > QToolButton#groupHeader {{
+    min-width: 0; min-height: 0; padding: 0 {SPACE_S}px; border: none;
+    border-radius: {RADIUS_CONTROL}px; background: transparent;
+    icon-size: {CHEVRON}px; font-weight: {SEMIBOLD}; color: {t.text};
+}}
+QGroupBox QGroupBox > QToolButton#groupHeader {{
+    padding: 0 {SPACE_XS}px; border-radius: 6px; color: {t.text_dim};
+}}
+QGroupBox > QToolButton#groupHeader:hover,
+QGroupBox > QToolButton#groupHeader:pressed {{ background: {hover}; }}
+QGroupBox > QToolButton#groupHeader:focus {{ border: 2px solid {t.accent}; }}
+QGroupBox > QToolButton#groupHeader:disabled {{
+    background: transparent; color: {t.text_disabled};
 }}
 
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QPlainTextEdit, QTextEdit {{
