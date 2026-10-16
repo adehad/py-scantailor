@@ -178,7 +178,8 @@ class OptionsWidget(QWidget):
         self._apply_to_btn.setObjectName("applyToBtn")
         self._apply_to_btn.setToolTip(
             QtCore.QCoreApplication.translate(
-                "fix_orientation::OptionsWidget", "Apply this rotation to other pages"
+                "fix_orientation::OptionsWidget",
+                "Copy this image's rotation and trim to other pages you choose.",
             )
         )
         apply_layout.addWidget(self._apply_to_btn)
@@ -211,6 +212,14 @@ class OptionsWidget(QWidget):
             )
         )
         self._trim_enabled_check.setObjectName("trimEnabledCheck")
+        self._trim_enabled_check.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "fix_orientation::OptionsWidget",
+                "Cut strips off the edges of the scan before any other stage sees "
+                "it. Use it to drop scanner bed, fingers or a neighbouring page "
+                "that would confuse page and content detection.",
+            )
+        )
         enable_layout.addWidget(self._trim_enabled_check)
         enable_layout.addWidget(IconLabel("crop", _TRIM_ICON_SIZE))
         enable_layout.addStretch(1)
@@ -241,7 +250,19 @@ class OptionsWidget(QWidget):
             self._trim_corner_labels
         )
 
-        grid = QGridLayout()
+        # One help text covers all four sides, so the cross of spin boxes is
+        # not broken up by an icon in every cell.
+        trim_sides = QWidget()
+        trim_sides.setObjectName("trimSides")
+        trim_sides.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "fix_orientation::OptionsWidget",
+                "Pixels to cut from the top, left, right and bottom of the scan, "
+                "counted on the image as stored, before rotation.",
+            )
+        )
+        grid = QGridLayout(trim_sides)
+        grid.setContentsMargins(0, 0, 0, 0)
         grid.addWidget(top_left, 0, 0)
         grid.addWidget(self._trim_top_spin, 0, 1)
         grid.addWidget(top_right, 0, 2)
@@ -251,7 +272,7 @@ class OptionsWidget(QWidget):
         grid.addWidget(bottom_left, 2, 0)
         grid.addWidget(self._trim_bottom_spin, 2, 1)
         grid.addWidget(bottom_right, 2, 2)
-        group_layout.addLayout(grid)
+        group_layout.addWidget(trim_sides)
 
         self._reset_trim_btn = QPushButton(
             QtCore.QCoreApplication.translate(
@@ -259,6 +280,12 @@ class OptionsWidget(QWidget):
             )
         )
         self._reset_trim_btn.setObjectName("resetTrimBtn")
+        self._reset_trim_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "fix_orientation::OptionsWidget",
+                "Set all four trim amounts back to zero, keeping the whole scan.",
+            )
+        )
         self._reset_trim_btn.setIcon(icon("undo-2"))
         group_layout.addWidget(self._reset_trim_btn)
 

@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
 
 from scantailor.app.ui.icons import icon
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
+from scantailor.app.ui.widgets.help_icon import HELP_GROUP_PROPERTY
 from scantailor.app.ui.widgets.ticked_slider import TickedSlider
 from scantailor.core.models import Dpi, PageId
 from scantailor.dewarping.auto_model import DewarpMetrics
@@ -116,6 +117,88 @@ _FILLING_LABELS = {
     FillingColor.WHITE: QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "White"),
     FillingColor.BLACK: QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Black"),
 }
+_METHOD_TOOLTIPS = {
+    BinarizationMethod.OTSU: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "Uses one threshold for the whole page, picked from its brightness "
+        "histogram. Fast and clean on evenly lit scans, but loses text in shadows.",
+    ),
+    BinarizationMethod.SAUVOLA: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "Sets a threshold for every area from its local brightness and contrast. "
+        "Copes with shadows and yellowed paper, but can thin out faint strokes.",
+    ),
+    BinarizationMethod.WOLF: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "Works like Sauvola but also weighs the contrast of the whole page. Often "
+        "gives a cleaner background on stained or low-contrast pages.",
+    ),
+    BinarizationMethod.FOX: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "A Wolf variant that measures local contrast another way. Try it when "
+        "Wolf leaves gray blotches in the background.",
+    ),
+    BinarizationMethod.WINDOW: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "A Wolf variant whose window adapts to the contrast around each pixel. "
+        "Try it on pages that mix very large and very small print.",
+    ),
+    BinarizationMethod.BRADLEY: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "Compares each pixel with the average of the area around it. Simple and "
+        "fast, and handles gradual changes in lighting well.",
+    ),
+    BinarizationMethod.GRAD: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "Mixes the local average with a page level measured along the edges of "
+        "the text. Try it on faded or unevenly inked print.",
+    ),
+    BinarizationMethod.EDGEPLUS: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "Sharpens edges before deciding black or white, so thin and faint "
+        "strokes survive. Can bring out paper texture as noise.",
+    ),
+    BinarizationMethod.BLURDIV: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "Divides the page by a blurred copy of itself to cancel uneven lighting "
+        "first. Good for shadows near the binding and lighting gradients.",
+    ),
+    BinarizationMethod.EDGEDIV: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "Combines EdgePlus and BlurDiv: sharpens edges and evens out lighting. "
+        "Set the share of each with the two weights below.",
+    ),
+}
+_PICTURE_SHAPE_TOOLTIPS = {
+    PictureShape.OFF: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "Finds no pictures by itself. Only the picture zones you draw stay in color.",
+    ),
+    PictureShape.FREE: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "Keeps each picture found with its own outline. Follows irregular "
+        "pictures closely, but the edges can look ragged.",
+    ),
+    PictureShape.RECTANGULAR: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "Turns each picture found into a rectangle around it. Suits photos and "
+        "figures with straight edges.",
+    ),
+}
+_FILLING_TOOLTIPS = {
+    FillingColor.BACKGROUND: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "Paints with the paper color measured from the page, so filled areas blend in.",
+    ),
+    FillingColor.WHITE: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "Paints with white, or black when the page is light text on a dark background.",
+    ),
+    FillingColor.BLACK: QtCore.QT_TRANSLATE_NOOP(
+        "output::OptionsWidget",
+        "Paints with black, or white when the page is light text on a dark background.",
+    ),
+}
 
 
 def _spacer() -> QSpacerItem:
@@ -168,10 +251,28 @@ def _despeckle_step(level: DespeckleLevel) -> int:
 
 
 def _despeckle_tooltip(strength: float) -> str:
-    """Name the strength when it lies between the steps the slider offers."""
+    """Explain despeckling, and name the strength when it lies between the steps.
+
+    Args:
+        strength (float): The page's despeckle strength.
+
+    Returns:
+        str: The help text, with a second line for a strength the slider cannot
+            show exactly.
+    """
+    help_text = QtCore.QCoreApplication.translate(
+        "output::OptionsWidget",
+        "Removes small specks of dirt and noise from the black and white result. "
+        "Cautious removes only tiny dots; Aggressive also removes larger specks "
+        "but can erase periods, accents and thin lines.",
+    )
     if strength in {level.to_factor() for level, _label in _DESPECKLE_LEVELS}:
-        return ""
-    return f"Strength {strength:g}, from a project that stores values between the steps"
+        return help_text
+    note = QtCore.QCoreApplication.translate(
+        "output::OptionsWidget",
+        "Strength %1, from a project that stores values between the steps",
+    ).replace("%1", f"{strength:g}")
+    return f"{help_text}\n{note}"
 
 
 def _exclusive_button(
@@ -310,6 +411,7 @@ class OptionsWidget(QWidget):
         self._build_despeckle_group(layout)
         self._build_dewarping_group(layout)
         self._build_depth_group(layout)
+        self._set_tooltips()
 
         layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
@@ -370,11 +472,6 @@ class OptionsWidget(QWidget):
             QtCore.QCoreApplication.translate("output::OptionsWidget", "Mixed"),
             2,
         )
-        self._mixed_btn.setToolTip(
-            QtCore.QCoreApplication.translate(
-                "output::OptionsWidget", "Black and white with colorful pictures"
-            )
-        )
         self._bw_btn.setIcon(icon("contrast"))
         self._gray_btn.setIcon(icon("palette"))
         self._mixed_btn.setIcon(icon("colour-mode-mixed"))
@@ -386,11 +483,6 @@ class OptionsWidget(QWidget):
         self._black_on_white_check = _check_box(
             "blackOnWhiteCB",
             QtCore.QCoreApplication.translate("output::OptionsWidget", "White margins"),
-            QtCore.QCoreApplication.translate(
-                "output::OptionsWidget",
-                "Checked: black text on white background\n"
-                "Unchecked: white text on black background",
-            ),
         )
         self._black_on_white_check.setChecked(True)
         bow_layout.addWidget(self._black_on_white_check)
@@ -421,11 +513,6 @@ class OptionsWidget(QWidget):
             "fillOutsidePageBoxCB",
             QtCore.QCoreApplication.translate(
                 "output::OptionsWidget", "Fill outside page box"
-            ),
-            QtCore.QCoreApplication.translate(
-                "output::OptionsWidget",
-                "Fill the full output page rectangle with the background color outside "
-                "the page content, instead of following offcut geometry.",
             ),
         )
         self._fill_outside_page_box_check.setIcon(icon("squares-exclude"))
@@ -515,6 +602,15 @@ class OptionsWidget(QWidget):
                 ),
                 color,
             )
+        for index in range(self._filling_color_combo.count()):
+            color = self._filling_color_combo.itemData(index)
+            self._filling_color_combo.setItemData(
+                index,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget", cast(str, _FILLING_TOOLTIPS[color])
+                ),
+                Qt.ItemDataRole.ToolTipRole,
+            )
         filling_layout.addWidget(self._filling_color_combo)
         filling_layout.addItem(_spacer())
         layout.addWidget(self._filling_group)
@@ -583,6 +679,15 @@ class OptionsWidget(QWidget):
                 ),
                 method,
             )
+        for index in range(self._method_combo.count()):
+            method = self._method_combo.itemData(index)
+            self._method_combo.setItemData(
+                index,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget", cast(str, _METHOD_TOOLTIPS[method])
+                ),
+                Qt.ItemDataRole.ToolTipRole,
+            )
         method_layout.addWidget(self._method_combo)
         method_layout.addItem(_spacer())
         bin_layout.addLayout(method_layout)
@@ -593,14 +698,19 @@ class OptionsWidget(QWidget):
                 QtCore.QCoreApplication.translate("output::OptionsWidget", "Threshold:")
             )
         )
+        self._threshold_control = QWidget()
+        self._threshold_control.setObjectName("thresholdControl")
+        threshold_control_layout = QHBoxLayout(self._threshold_control)
+        threshold_control_layout.setContentsMargins(0, 0, 0, 0)
         self._threshold_slider = QSlider()
         self._threshold_slider.setObjectName("thresholdSlider")
         self._threshold_slider.setOrientation(Qt.Orientation.Horizontal)
         self._threshold_slider.setRange(-100, 100)
-        thresh_layout.addWidget(self._threshold_slider)
+        threshold_control_layout.addWidget(self._threshold_slider)
         self._threshold_label = QLabel("0")
         self._threshold_label.setMinimumWidth(30)
-        thresh_layout.addWidget(self._threshold_label)
+        threshold_control_layout.addWidget(self._threshold_label)
+        thresh_layout.addWidget(self._threshold_control)
         bin_layout.addLayout(thresh_layout)
 
         self._window_size_row = QWidget()
@@ -878,6 +988,15 @@ class OptionsWidget(QWidget):
                 ),
                 shape,
             )
+        for index in range(self._picture_shape_combo.count()):
+            shape = self._picture_shape_combo.itemData(index)
+            self._picture_shape_combo.setItemData(
+                index,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget", cast(str, _PICTURE_SHAPE_TOOLTIPS[shape])
+                ),
+                Qt.ItemDataRole.ToolTipRole,
+            )
         selector_layout.addWidget(self._picture_shape_combo)
         selector_layout.addItem(_spacer())
         shape_layout.addLayout(selector_layout)
@@ -917,6 +1036,14 @@ class OptionsWidget(QWidget):
         self._despeckle_group.setObjectName("despeckleGroup")
         despeckle_layout = QVBoxLayout(self._despeckle_group)
 
+        # The slider and its stop labels share one width, so the help icon goes
+        # beside the pair rather than beside the slider alone.
+        self._despeckle_control = QWidget()
+        self._despeckle_control.setObjectName("despeckleControl")
+        despeckle_control_layout = QVBoxLayout(self._despeckle_control)
+        despeckle_control_layout.setContentsMargins(0, 0, 0, 0)
+        despeckle_layout.addWidget(self._despeckle_control)
+
         self._despeckle_slider = TickedSlider(Qt.Orientation.Horizontal)
         self._despeckle_slider.setObjectName("despeckleSlider")
         self._despeckle_slider.setRange(0, len(_DESPECKLE_LEVELS) - 1)
@@ -924,9 +1051,9 @@ class OptionsWidget(QWidget):
         self._despeckle_slider.setTickInterval(1)
         self._despeckle_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self._despeckle_slider.setValue(_despeckle_step(DespeckleLevel.CAUTIOUS))
-        despeckle_layout.addWidget(self._despeckle_slider)
+        despeckle_control_layout.addWidget(self._despeckle_slider)
 
-        despeckle_layout.addWidget(
+        despeckle_control_layout.addWidget(
             _StopLabels(
                 self._despeckle_slider,
                 [
@@ -954,7 +1081,11 @@ class OptionsWidget(QWidget):
         self._dewarping_group.setObjectName("dewarpingGroup")
         dewarp_layout = QVBoxLayout(self._dewarping_group)
 
-        btn_layout = QHBoxLayout()
+        self._dewarp_modes = QWidget()
+        self._dewarp_modes.setObjectName("dewarpModes")
+        self._dewarp_modes.setProperty(HELP_GROUP_PROPERTY, True)
+        btn_layout = QHBoxLayout(self._dewarp_modes)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
         self._dewarp_button_group = QButtonGroup(self)
         self._dewarp_buttons = {
             mode: _exclusive_button(
@@ -972,13 +1103,8 @@ class OptionsWidget(QWidget):
         self._dewarp_auto_btn = self._dewarp_buttons[DewarpingMode.AUTO]
         self._dewarp_manual_btn = self._dewarp_buttons[DewarpingMode.MANUAL]
         self._dewarp_marginal_btn = self._dewarp_buttons[DewarpingMode.MARGINAL]
-        self._dewarp_marginal_btn.setToolTip(
-            QtCore.QCoreApplication.translate(
-                "output::OptionsWidget", "Apply dewarping only to page margins"
-            )
-        )
         self._dewarp_off_btn.setChecked(True)
-        dewarp_layout.addLayout(btn_layout)
+        dewarp_layout.addWidget(self._dewarp_modes)
 
         self._min_span_row = QWidget()
         self._min_span_row.setObjectName("dewarpMinSpanRow")
@@ -992,13 +1118,6 @@ class OptionsWidget(QWidget):
             )
         )
         self._min_span_spinbox = _spin_box("dewarpMinSpanSB", 0, 100)
-        self._min_span_spinbox.setToolTip(
-            QtCore.QCoreApplication.translate(
-                "output::OptionsWidget",
-                "Leave the page as it is when the curves found lie closer together "
-                "than this share of the content height",
-            )
-        )
         span_layout.addWidget(self._min_span_spinbox)
         span_layout.addItem(_spacer())
         dewarp_layout.addWidget(self._min_span_row)
@@ -1012,9 +1131,6 @@ class OptionsWidget(QWidget):
         self._post_deskew_check = _check_box(
             "postDeskewCB",
             QtCore.QCoreApplication.translate("output::OptionsWidget", "Post-deskew"),
-            QtCore.QCoreApplication.translate(
-                "output::OptionsWidget", "Apply additional deskewing after dewarping"
-            ),
         )
         self._post_deskew_check.setChecked(True)
         dewarp_layout.addWidget(self._post_deskew_check)
@@ -1033,6 +1149,11 @@ class OptionsWidget(QWidget):
         )
         self._depth_group.setObjectName("depthPerceptionGroup")
         depth_layout = QHBoxLayout(self._depth_group)
+        self._depth_control = QWidget()
+        self._depth_control.setObjectName("depthPerceptionControl")
+        depth_control_layout = QHBoxLayout(self._depth_control)
+        depth_control_layout.setContentsMargins(0, 0, 0, 0)
+        depth_layout.addWidget(self._depth_control)
         self._depth_slider = QSlider()
         self._depth_slider.setObjectName("depthPerceptionSlider")
         self._depth_slider.setOrientation(Qt.Orientation.Horizontal)
@@ -1040,15 +1161,456 @@ class OptionsWidget(QWidget):
             _DEPTH_PERCEPTION_SCALE, 3 * _DEPTH_PERCEPTION_SCALE
         )
         self._depth_slider.setValue(2 * _DEPTH_PERCEPTION_SCALE)
-        depth_layout.addWidget(self._depth_slider)
+        depth_control_layout.addWidget(self._depth_slider)
         self._depth_label = QLabel("2.0")
         self._depth_label.setMinimumWidth(30)
-        depth_layout.addWidget(self._depth_label)
+        depth_control_layout.addWidget(self._depth_label)
         self._depth_group.setVisible(False)
         self._apply_buttons[ApplyGroup.DEPTH_PERCEPTION] = _apply_button(
             depth_layout, ApplyGroup.DEPTH_PERCEPTION
         )
         layout.addWidget(self._depth_group)
+
+    def _set_tooltips(self) -> None:
+        """Explain every option in its tooltip, which the help icons repeat."""
+        tooltips: list[tuple[QWidget, str]] = [
+            (
+                self._dewarp_modes,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Dewarping straightens text lines that curve near the book's "
+                    "spine. Auto finds the curves itself, Manual lets you drag them "
+                    "on the Dewarping tab, Marginal fixes only the strip near the "
+                    "binding. Hover over a button for details.",
+                ),
+            ),
+            (
+                self._dpi_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Resolution of the output files in dots per inch. Higher values "
+                    "keep finer detail but make larger files and slower processing; "
+                    "300 suits most text, 600 suits small print.",
+                ),
+            ),
+            (
+                self._bw_btn,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Turns every pixel pure black or white. Gives the smallest "
+                    "files and the crispest text, but photos and shading are lost.",
+                ),
+            ),
+            (
+                self._gray_btn,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Keeps the colors or shades of gray of the scan. Use it for "
+                    "photos, drawings and colored pages; files are larger.",
+                ),
+            ),
+            (
+                self._mixed_btn,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Makes the text black and white but keeps pictures in color or "
+                    "gray. Pictures are found automatically or marked with picture "
+                    "zones.",
+                ),
+            ),
+            (
+                self._black_on_white_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "This option should be enabled when the page has dark content "
+                    "on light background and disabled if vice versa in order to "
+                    "correct processing algorithms.",
+                ),
+            ),
+            (
+                self._fill_margins_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Paints everything outside the content box with the filling "
+                    "color. Removes shadows, dirt and finger marks around the text.",
+                ),
+            ),
+            (
+                self._fill_offcut_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Paints everything outside the page outline with the filling "
+                    "color, such as the edge of the facing page or the scanner lid.",
+                ),
+            ),
+            (
+                self._fill_outside_page_box_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Fill the full output page rectangle with the background color "
+                    "outside the page content, instead of following offcut "
+                    "geometry.",
+                ),
+            ),
+            (
+                self._equalize_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Evens out uneven lighting, such as a shadow near the binding, "
+                    "before the page is turned black and white. Turn it off if it "
+                    "washes out large dark areas.",
+                ),
+            ),
+            (
+                self._equalize_color_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Evens out uneven lighting in color and grayscale output, and "
+                    "in the pictures of a mixed page. Can dull the colors of large "
+                    "dark areas.",
+                ),
+            ),
+            (
+                self._savitzky_golay_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Smooths the grayscale image slightly before it is turned black "
+                    "and white, so letter edges come out less ragged. Turn it off "
+                    "to keep very fine lines sharp.",
+                ),
+            ),
+            (
+                self._morphological_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Cleans up the black and white result by removing one-pixel "
+                    "bumps and filling one-pixel holes along letter edges. Turn it "
+                    "off to keep very thin strokes and dots.",
+                ),
+            ),
+            (
+                self._wiener_coef_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Strength of a noise filter that smooths grain while keeping "
+                    "edges, from 0.0 (off) to 1.0. Higher values remove more grain "
+                    "but soften fine detail.",
+                ),
+            ),
+            (
+                self._wiener_window_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Size in pixels of the area the noise filter looks at around "
+                    "each pixel. Larger windows smooth more and take longer.",
+                ),
+            ),
+            (
+                self._filling_color_combo,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Color used to paint the margins and the area outside the page "
+                    "when filling is on.",
+                ),
+            ),
+            (
+                self._split_output_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Also saves the page as two extra images: a foreground with the "
+                    "text and a background with the pictures. Useful for compact "
+                    "PDFs or further editing.",
+                ),
+            ),
+            (
+                self._bw_foreground_radio,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Saves the foreground layer as pure black and white text.",
+                ),
+            ),
+            (
+                self._color_foreground_radio,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Saves the foreground layer with the colors of the scan instead "
+                    "of black and white.",
+                ),
+            ),
+            (
+                self._original_background_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Save the original background of the foreground layer.",
+                ),
+            ),
+            (
+                self._method_combo,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "How the page is turned into black and white. Otsu uses one "
+                    "threshold for the whole page; the other methods decide area by "
+                    "area and cope better with shadows and stains.",
+                ),
+            ),
+            (
+                self._threshold_control,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Shifts the point where gray becomes black. Move right for a "
+                    "darker, bolder result; move left for a lighter one that drops "
+                    "faint marks and noise.",
+                ),
+            ),
+            (
+                self._window_size_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Side in pixels of the area each local method looks at to "
+                    "decide black or white. Keep it larger than the letters: too "
+                    "small hollows out bold text, too large acts like a single "
+                    "threshold.",
+                ),
+            ),
+            (
+                self._sauvola_coef_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "How much local contrast it takes to make a pixel black. Higher "
+                    "values give a lighter, cleaner result; lower values keep faint "
+                    "text. The default is 0.34.",
+                ),
+            ),
+            (
+                self._wolf_coef_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "How much local contrast it takes to make a pixel black. Higher "
+                    "values give a lighter, cleaner result; lower values keep faint "
+                    "text. The default is 0.3.",
+                ),
+            ),
+            (
+                self._wolf_lower_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Gray level from 0 to 255 below which a pixel always stays "
+                    "black, whatever the local threshold says.",
+                ),
+            ),
+            (
+                self._wolf_upper_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Gray level from 0 to 255 above which a pixel always turns "
+                    "white. Lower it to clean a grayish background.",
+                ),
+            ),
+            (
+                self._bradley_coef_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "How much darker than its surroundings a pixel must be to turn "
+                    "black. Higher values make more pixels black.",
+                ),
+            ),
+            (
+                self._edge_plus_coef_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Strength of the edge sharpening, from 0 to 1. Higher values "
+                    "keep thin strokes but also bring out paper texture.",
+                ),
+            ),
+            (
+                self._blur_div_coef_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Strength of the lighting correction, from 0 to 1. Higher "
+                    "values flatten shadows more but can fade large dark areas.",
+                ),
+            ),
+            (
+                self._edge_div_kep_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Strength of the edge sharpening, from 0 to 1. Higher values "
+                    "keep thin strokes but also bring out paper texture.",
+                ),
+            ),
+            (
+                self._edge_div_kbd_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Strength of the lighting correction, from 0 to 1. Higher "
+                    "values flatten shadows more but can fade large dark areas.",
+                ),
+            ),
+            (
+                self._color_segmentation_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Colors the black text with a few flat colors taken from the "
+                    "scan, so red or blue ink stays red or blue. Makes small files "
+                    "that keep colored text.",
+                ),
+            ),
+            (
+                self._reduce_noise_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Size below which a colored speck counts as noise and takes the "
+                    "color of its neighbor. Higher values give fewer, cleaner color "
+                    "areas but can recolor small letters.",
+                ),
+            ),
+            (
+                self._red_adjustment_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Red component adjustment. A negative value means the segmenter "
+                    "will be more sensitive to red and vice versa for a positive "
+                    "one.",
+                ),
+            ),
+            (
+                self._green_adjustment_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Green component adjustment. A negative value means the "
+                    "segmenter will be more sensitive to green and vice versa for a "
+                    "positive one.",
+                ),
+            ),
+            (
+                self._blue_adjustment_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Blue component adjustment. A negative value means the "
+                    "segmenter will be more sensitive to blue and vice versa for a "
+                    "positive one.",
+                ),
+            ),
+            (
+                self._posterize_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Reduce the number of colors of the output image by grouping "
+                    "similar colors.",
+                ),
+            ),
+            (
+                self._posterize_level_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Lower value means lower count of colors in the output image, "
+                    "values between 2 and 6 inclusive guarantee an indexed image.",
+                ),
+            ),
+            (
+                self._posterize_normalize_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Stretches the colors to the full range from black to white "
+                    "before reducing them. Brightens dull or gray scans.",
+                ),
+            ),
+            (
+                self._posterize_force_bw_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Make dark and light gray gradients black and white respectively.",
+                ),
+            ),
+            (
+                self._picture_shape_combo,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "How pictures on a mixed page are found and outlined. Pictures "
+                    "stay in color while the rest becomes black and white.",
+                ),
+            ),
+            (
+                self._picture_sensitivity_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "For rectangular pictures, how much of an edge row must be "
+                    "picture to stay inside the rectangle. 100 keeps the whole "
+                    "bounding box; lower values trim sparse edges.",
+                ),
+            ),
+            (
+                self._higher_search_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Also finds faint or low-contrast pictures. Can mistake stains "
+                    "or large headings for pictures.",
+                ),
+            ),
+            (
+                self._dewarp_off_btn,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Leaves the page flat as scanned. Use it for loose sheets and "
+                    "pages that lay flat on the glass.",
+                ),
+            ),
+            (
+                self._dewarp_auto_btn,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Finds the curve of the text lines and straightens the page. "
+                    "Works best on pages with many full lines of text.",
+                ),
+            ),
+            (
+                self._dewarp_manual_btn,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Straightens the page along the curves you set on the Dewarping "
+                    "tab. Use it when Auto gets a page wrong.",
+                ),
+            ),
+            (
+                self._dewarp_marginal_btn,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Straightens only the strip next to the binding, using the "
+                    "curve of the top and bottom page edges. Use it for pages with "
+                    "little text but a visible curved edge.",
+                ),
+            ),
+            (
+                self._min_span_spinbox,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "Leave the page as it is when the curves found lie closer "
+                    "together than this share of the content height",
+                ),
+            ),
+            (
+                self._post_deskew_check,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "After Manual or Marginal dewarping, measures the tilt left in "
+                    "the text and rotates the page to remove it.",
+                ),
+            ),
+            (
+                self._depth_control,
+                QtCore.QCoreApplication.translate(
+                    "output::OptionsWidget",
+                    "How far the page curves toward the camera, from 1 to 3, used "
+                    "when straightening. Change it when straightened text looks "
+                    "squeezed or stretched near the binding.",
+                ),
+            ),
+        ]
+        for widget, text in tooltips:
+            widget.setToolTip(text)
+        self._despeckle_control.setToolTip(
+            _despeckle_tooltip(DespeckleLevel.CAUTIOUS.to_factor())
+        )
 
     def _connect_signals(self) -> None:
         """Connect widget signals to slots."""
@@ -1481,7 +2043,9 @@ class OptionsWidget(QWidget):
         self._despeckle_slider.setValue(
             _despeckle_step(DespeckleLevel.nearest(params.despeckle_strength))
         )
-        self._despeckle_slider.setToolTip(_despeckle_tooltip(params.despeckle_strength))
+        self._despeckle_control.setToolTip(
+            _despeckle_tooltip(params.despeckle_strength)
+        )
 
         dewarping = params.dewarping
         self._dewarp_buttons[dewarping.mode].setChecked(True)

@@ -104,7 +104,9 @@ class OptionsWidget(QWidget):
         self._page_disable_btn.setAutoExclusive(True)
         self._page_disable_btn.setToolTip(
             QtCore.QCoreApplication.translate(
-                "select_content::OptionsWidget", "Use full image as page"
+                "select_content::OptionsWidget",
+                "Use the whole image as the page. Pick this when the scan is "
+                "already cropped to the edges of the paper.",
             )
         )
         page_layout.addWidget(self._page_disable_btn, 0, 0, 1, 2)
@@ -118,7 +120,10 @@ class OptionsWidget(QWidget):
         self._page_auto_btn.setAutoExclusive(True)
         self._page_auto_btn.setToolTip(
             QtCore.QCoreApplication.translate(
-                "select_content::OptionsWidget", "Automatically detect page boundaries"
+                "select_content::OptionsWidget",
+                "Find the edges of the paper from long straight lines near the "
+                "image border. Use it when the scanner lid or background shows "
+                "around the page. If no edges are found, the whole image is used.",
             )
         )
         page_layout.addWidget(self._page_auto_btn, 1, 0)
@@ -131,7 +136,9 @@ class OptionsWidget(QWidget):
         self._page_manual_btn.setAutoExclusive(True)
         self._page_manual_btn.setToolTip(
             QtCore.QCoreApplication.translate(
-                "select_content::OptionsWidget", "Manually specify page boundaries"
+                "select_content::OptionsWidget",
+                "Keep the page box you draw on the image. Pick this when "
+                "automatic detection misses the edges of the paper.",
             )
         )
         page_layout.addWidget(self._page_manual_btn, 1, 1)
@@ -156,7 +163,9 @@ class OptionsWidget(QWidget):
         self._fine_tune_check.setToolTip(
             QtCore.QCoreApplication.translate(
                 "select_content::OptionsWidget",
-                "Shift with corners while they are in black.",
+                "Move the detected page corners inward while they sit on dark "
+                "scanner background. This helps when the paper lies slightly "
+                "crooked on the scanner glass.",
             )
         )
         options_layout.addWidget(self._fine_tune_check)
@@ -191,12 +200,28 @@ class OptionsWidget(QWidget):
         self._width_spinbox.setObjectName("widthSpinBox")
         self._width_spinbox.setDecimals(1)
         self._width_spinbox.setRange(0.1, 99999.0)
+        self._width_spinbox.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget",
+                "Width of the content box in millimetres, worked out from the "
+                "image resolution. Drag the box edges in the page view to "
+                "change it.",
+            )
+        )
         dims_grid.addWidget(self._width_spinbox, 0, 1)
 
         self._height_spinbox = QDoubleSpinBox()
         self._height_spinbox.setObjectName("heightSpinBox")
         self._height_spinbox.setDecimals(1)
         self._height_spinbox.setRange(0.1, 99999.0)
+        self._height_spinbox.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "select_content::OptionsWidget",
+                "Height of the content box in millimetres, worked out from the "
+                "image resolution. Drag the box edges in the page view to "
+                "change it.",
+            )
+        )
         dims_grid.addWidget(self._height_spinbox, 1, 1)
 
         dimensions_layout.addLayout(dims_grid)
@@ -229,7 +254,9 @@ class OptionsWidget(QWidget):
         self._content_disable_btn.setAutoExclusive(True)
         self._content_disable_btn.setToolTip(
             QtCore.QCoreApplication.translate(
-                "select_content::OptionsWidget", "Treat entire page as content"
+                "select_content::OptionsWidget",
+                "Treat the whole page as content, so nothing is trimmed. Pick "
+                "this for covers, photos or pages printed to the edge.",
             )
         )
         content_layout.addWidget(self._content_disable_btn, 0, 0, 1, 2)
@@ -245,7 +272,9 @@ class OptionsWidget(QWidget):
         self._content_auto_btn.setToolTip(
             QtCore.QCoreApplication.translate(
                 "select_content::OptionsWidget",
-                "Automatically detect content boundaries",
+                "Draw the box around the text and pictures found on the page, "
+                "leaving out dark shadows along the scan edges. Check the result, "
+                "since stray marks or page numbers can widen the box.",
             )
         )
         content_layout.addWidget(self._content_auto_btn, 1, 0)
@@ -258,7 +287,9 @@ class OptionsWidget(QWidget):
         self._content_manual_btn.setAutoExclusive(True)
         self._content_manual_btn.setToolTip(
             QtCore.QCoreApplication.translate(
-                "select_content::OptionsWidget", "Manually specify content boundaries"
+                "select_content::OptionsWidget",
+                "Keep the content box you draw on the image. Drag its edges in "
+                "the page view; batch processing leaves it where you put it.",
             )
         )
         content_layout.addWidget(self._content_manual_btn, 1, 1)
@@ -279,7 +310,9 @@ class OptionsWidget(QWidget):
         self._apply_btn.setObjectName("applyToBtn")
         self._apply_btn.setToolTip(
             QtCore.QCoreApplication.translate(
-                "select_content::OptionsWidget", "Apply settings to other pages"
+                "select_content::OptionsWidget",
+                "Copy the page box and content box settings of this page to "
+                "other pages you choose.",
             )
         )
         apply_layout.addWidget(self._apply_btn)

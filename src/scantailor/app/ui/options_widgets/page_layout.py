@@ -186,6 +186,14 @@ class OptionsWidget(QWidget):
             )
         )
         self._auto_margins_check.setObjectName("autoMargins")
+        self._auto_margins_check.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget",
+                "Take each margin from the space between the page box and the content "
+                "on the scan, so every page keeps its original margins. The margin "
+                "fields are locked while this is on.",
+            )
+        )
         auto_layout.addWidget(self._auto_margins_check)
         auto_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
@@ -212,6 +220,13 @@ class OptionsWidget(QWidget):
         self._top_spinbox.setObjectName("topMarginSpinBox")
         self._top_spinbox.setDecimals(1)
         self._top_spinbox.setRange(-9999.0, 9999.0)
+        self._top_spinbox.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget",
+                "Space added above the content, in the unit chosen in the settings. "
+                "A negative value cuts into the content.",
+            )
+        )
         margins_grid.addWidget(self._top_spinbox, 0, 1)
 
         self._top_bottom_link = QToolButton()
@@ -220,7 +235,9 @@ class OptionsWidget(QWidget):
         self._top_bottom_link.setCheckable(True)
         self._top_bottom_link.setToolTip(
             QtCore.QCoreApplication.translate(
-                "page_layout::OptionsWidget", "Link top and bottom margins"
+                "page_layout::OptionsWidget",
+                "Link the top and bottom margins, so changing one sets the other "
+                "to the same value.",
             )
         )
         self._top_bottom_link.setMinimumSize(20, 36)
@@ -240,6 +257,13 @@ class OptionsWidget(QWidget):
         self._bottom_spinbox.setObjectName("bottomMarginSpinBox")
         self._bottom_spinbox.setDecimals(1)
         self._bottom_spinbox.setRange(-9999.0, 9999.0)
+        self._bottom_spinbox.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget",
+                "Space added below the content, in the unit chosen in the settings. "
+                "A negative value cuts into the content.",
+            )
+        )
         margins_grid.addWidget(self._bottom_spinbox, 1, 1)
 
         # Left/Right spinboxes and link
@@ -254,6 +278,14 @@ class OptionsWidget(QWidget):
         self._left_spinbox.setObjectName("leftMarginSpinBox")
         self._left_spinbox.setDecimals(1)
         self._left_spinbox.setRange(-9999.0, 9999.0)
+        self._left_spinbox.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget",
+                "Space added to the left of the content, in the unit chosen in "
+                "the settings. "
+                "A negative value cuts into the content.",
+            )
+        )
         margins_grid.addWidget(self._left_spinbox, 2, 1)
 
         self._left_right_link = QToolButton()
@@ -262,7 +294,9 @@ class OptionsWidget(QWidget):
         self._left_right_link.setCheckable(True)
         self._left_right_link.setToolTip(
             QtCore.QCoreApplication.translate(
-                "page_layout::OptionsWidget", "Link left and right margins"
+                "page_layout::OptionsWidget",
+                "Link the left and right margins, so changing one sets the other "
+                "to the same value.",
             )
         )
         self._left_right_link.setMinimumSize(20, 36)
@@ -280,6 +314,14 @@ class OptionsWidget(QWidget):
         self._right_spinbox.setObjectName("rightMarginSpinBox")
         self._right_spinbox.setDecimals(1)
         self._right_spinbox.setRange(-9999.0, 9999.0)
+        self._right_spinbox.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget",
+                "Space added to the right of the content, in the unit chosen in "
+                "the settings. "
+                "A negative value cuts into the content.",
+            )
+        )
         margins_grid.addWidget(self._right_spinbox, 3, 1)
 
         spinbox_layout.addLayout(margins_grid)
@@ -301,9 +343,21 @@ class OptionsWidget(QWidget):
             )
         )
         self._apply_margins_btn.setObjectName("applyMarginsBtn")
+        self._apply_margins_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget",
+                "Copy these margins to other pages you choose.",
+            )
+        )
         apply_margins_layout.addWidget(self._apply_margins_btn)
         self._fix_dpi_btn = QPushButton(self.tr("Fix all..."))
         self._fix_dpi_btn.setObjectName("fixDpiBtn")
+        self._fix_dpi_btn.setToolTip(
+            self.tr(
+                "Open a list of every image whose resolution is missing or "
+                "doubtful, so you can set them in one go."
+            )
+        )
         apply_margins_layout.addWidget(self._fix_dpi_btn)
         apply_margins_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
@@ -334,6 +388,14 @@ class OptionsWidget(QWidget):
         )
         self._match_size_check.setObjectName("alignWithOthersCB")
         self._match_size_check.setChecked(True)
+        self._match_size_check.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget",
+                "Add margin to this page so it is as large as the largest page in the "
+                "project, giving every page of the book one size. Turn it off for a "
+                "page that should keep its own size, such as a fold-out.",
+            )
+        )
         match_layout.addWidget(self._match_size_check)
         match_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
@@ -370,6 +432,14 @@ class OptionsWidget(QWidget):
             ]
         )
         self._h_mode_combo.setCurrentIndex(1)  # Manual by default
+        self._h_mode_combo.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget",
+                "How the extra width is shared when the page grows to match others. "
+                "Auto puts the content left, right or centre by where it sat on the "
+                "scan, Manual uses the buttons below and Original keeps its position.",
+            )
+        )
         mode_grid.addWidget(self._h_mode_combo, 0, 1)
 
         mode_grid.addWidget(
@@ -395,6 +465,14 @@ class OptionsWidget(QWidget):
             ]
         )
         self._v_mode_combo.setCurrentIndex(1)  # Manual by default
+        self._v_mode_combo.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget",
+                "How the extra height is shared when the page grows to match others. "
+                "Auto puts the content top, bottom or centre by where it sat on the "
+                "scan, Manual uses the buttons below and Original keeps its position.",
+            )
+        )
         mode_grid.addWidget(self._v_mode_combo, 1, 1)
 
         mode_layout.addLayout(mode_grid)
@@ -409,7 +487,19 @@ class OptionsWidget(QWidget):
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
 
-        align_grid = QGridLayout()
+        # One help icon for the whole grid; nine would crowd it.
+        self._align_grid_widget = QWidget()
+        self._align_grid_widget.setObjectName("alignmentGrid")
+        self._align_grid_widget.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget",
+                "Where the content sits on a page that grows to match the others; the "
+                "extra space goes on the opposite side. Buttons for a direction whose "
+                "mode is Auto or Original are unavailable.",
+            )
+        )
+        align_grid = QGridLayout(self._align_grid_widget)
+        align_grid.setContentsMargins(0, 0, 0, 0)
         align_grid.setSpacing(16)
 
         self._align_button_group = QButtonGroup(self)
@@ -441,7 +531,7 @@ class OptionsWidget(QWidget):
             self._align_button_group.addButton(btn)
             self._align_buttons[name] = btn
 
-        align_grid_layout.addLayout(align_grid)
+        align_grid_layout.addWidget(self._align_grid_widget)
         align_grid_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
@@ -453,8 +543,9 @@ class OptionsWidget(QWidget):
         self._freeze_aggregate_check.setObjectName("freezeAggregateHardSizeCb")
         self._freeze_aggregate_check.setToolTip(
             self.tr(
-                "Keep the aggregate page size used for matching fixed while you "
-                "switch pages, so the reference dimensions do not jump."
+                "Hold the size that pages are matched to at its current value. "
+                "Use it while you adjust single pages, so the other pages do not "
+                "change size after each edit."
             )
         )
         alignment_layout.addWidget(self._freeze_aggregate_check)
@@ -470,6 +561,13 @@ class OptionsWidget(QWidget):
             )
         )
         self._apply_alignment_btn.setObjectName("applyAlignmentBtn")
+        self._apply_alignment_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_layout::OptionsWidget",
+                "Copy this alignment and the match size setting to other pages you "
+                "choose.",
+            )
+        )
         apply_align_layout.addWidget(self._apply_alignment_btn)
         self._match_size_to_all_btn = QPushButton(self.tr("Match size to all pages"))
         self._match_size_to_all_btn.setObjectName("matchSizeToAllBtn")
@@ -506,6 +604,13 @@ class OptionsWidget(QWidget):
 
         self._source_dpi_combo = QComboBox()
         self._source_dpi_combo.setObjectName("sourceDpiCombo")
+        self._source_dpi_combo.setToolTip(
+            self.tr(
+                "Resolution this page was scanned at, which turns pixels into "
+                "real sizes. Pick a common value, or type your own in the fields "
+                "below. A wrong value gives wrong margins and output sizes."
+            )
+        )
         self._source_dpi_combo.addItem(self.tr("Custom"), None)
         for dpi in _SOURCE_DPI_PRESETS:
             self._source_dpi_combo.addItem(f"{dpi} x {dpi}", QSize(dpi, dpi))
@@ -524,7 +629,18 @@ class OptionsWidget(QWidget):
         fields.addWidget(self._source_y_dpi)
         column.addLayout(fields)
 
+        self._source_dpi_help = {
+            self._source_x_dpi: self.tr(
+                "Horizontal resolution of this page's scan in dots per inch. "
+                "Correct it here when the image file reports a wrong value."
+            ),
+            self._source_y_dpi: self.tr(
+                "Vertical resolution of this page's scan in dots per inch. "
+                "Correct it here when the image file reports a wrong value."
+            ),
+        }
         for field in (self._source_x_dpi, self._source_y_dpi):
+            field.setToolTip(self._source_dpi_help[field])
             field.setMaxLength(_DPI_FIELD_MAX_LENGTH)
             field.setMaximumWidth(_DPI_FIELD_WIDTH)
             field.setValidator(QIntValidator(field))
@@ -664,7 +780,7 @@ class OptionsWidget(QWidget):
         )
 
     def _decorate_source_dpi_field(self, field: QLineEdit, status: DpiStatus) -> None:
-        """Colour a DPI field and explain why when its value is doubtful."""
+        """Colour a DPI field and add why its value is doubtful to its help."""
         warnings = {
             DpiStatus.TOO_LARGE: self.tr("DPI is too large and most likely wrong."),
             DpiStatus.TOO_SMALL: self.tr(
@@ -677,14 +793,15 @@ class OptionsWidget(QWidget):
             ),
         }
         warning = warnings.get(status)
+        help_text = self._source_dpi_help[field]
         if warning is None:
             field.setStyleSheet("")
-            field.setToolTip("")
+            field.setToolTip(help_text)
             return
         # The application style sheet ignores a palette set on the field.
         danger = icons.mode_color(QIcon.Mode.Normal, "danger").name()
         field.setStyleSheet(f"QLineEdit {{ color: {danger}; }}")
-        field.setToolTip(warning)
+        field.setToolTip(f"{help_text}\n{warning}")
 
     def _on_source_dpi_preset_chosen(self, index: int) -> None:
         """Copy a preset's values into the fields and commit them."""
