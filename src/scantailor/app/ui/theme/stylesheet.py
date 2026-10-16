@@ -56,19 +56,6 @@ def header_height(font: QtGui.QFont, nested: bool = False) -> int:
     return line + (3 * SPACE_XS if nested else 2 * SPACE_S)
 
 
-def neutral_hover(t: Tokens) -> str:
-    """Return the text colour at a low alpha, a hover fill that reads as no selection.
-
-    Args:
-        t (Tokens): Colours for the look.
-
-    Returns:
-        str: An rgba() colour for QSS.
-    """
-    text = QtGui.QColor(t.text)
-    return f"rgba({text.red()}, {text.green()}, {text.blue()}, {HOVER_ALPHA})"
-
-
 def build_stylesheet(
     t: Tokens, glyphs: dict[str, str], font: QtGui.QFont, accent_hover: bool = False
 ) -> str:
@@ -95,7 +82,7 @@ def build_stylesheet(
     help_glyph = help_icon_size(font)
     header = header_height(font)
     nested_header = header_height(font, nested=True)
-    hover = t.accent_tint if accent_hover else neutral_hover(t)
+    hover = t.accent_tint if accent_hover else text_tint(t, HOVER_ALPHA)
     handle_fill = t.accent_text if t.dark else "#ffffff"
     control = CONTROL_HEIGHT - 2
     window_gradient = (
