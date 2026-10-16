@@ -93,6 +93,8 @@ def _output_dir() -> Path:
 
 
 @pytest.mark.docs_screenshot
+# Each scheme drives the window through the whole manual, about 4 minutes.
+@pytest.mark.timeout(900)
 @pytest.mark.parametrize(
     "scheme",
     [

@@ -5,7 +5,7 @@
 groups = ["default", "dev", "docs", "installer", "test"]
 strategy = ["inherit_metadata"]
 lock_version = "4.5.0"
-content_hash = "sha256:f8fc10255e9fe43e15c8c0ca1f2065c664cfc778dcf23870459e2070953071cc"
+content_hash = "sha256:75a384323babbcbd251b16e420d3ae89521234ade30ceaa350105ba8ed7a0ce7"
 
 [[metadata.targets]]
 requires_python = ">=3.14,<3.15"
@@ -998,6 +998,20 @@ dependencies = [
 files = [
     {file = "pytest_qt-4.5.0-py3-none-any.whl", hash = "sha256:ed21ea9b861247f7d18090a26bfbda8fb51d7a8a7b6f776157426ff2ccf26eff"},
     {file = "pytest_qt-4.5.0.tar.gz", hash = "sha256:51620e01c488f065d2036425cbc1cbcf8a6972295105fd285321eb47e66a319f"},
+]
+
+[[package]]
+name = "pytest-timeout"
+version = "2.4.0"
+requires_python = ">=3.7"
+summary = "pytest plugin to abort hanging tests"
+groups = ["test"]
+dependencies = [
+    "pytest>=7.0.0",
+]
+files = [
+    {file = "pytest_timeout-2.4.0-py3-none-any.whl", hash = "sha256:c42667e5cdadb151aeb5b26d114aff6bdf5a907f176a007a30b940d3d865b5c2"},
+    {file = "pytest_timeout-2.4.0.tar.gz", hash = "sha256:7e68e90b01f9eff71332b25001f85c75495fc4e3a836701876183c4bcfd0540a"},
 ]
 
 [[package]]
