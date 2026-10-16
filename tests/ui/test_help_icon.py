@@ -1,9 +1,18 @@
-"""Help buttons beside controls that have a tooltip."""
+"""Help buttons beside controls that have a tooltip, and help on every option."""
 
 import pytest
 from PySide6 import QtCore, QtGui, QtWidgets
 from pytestqt.qtbot import QtBot
 
+from scantailor.app.ui.options_widgets import (
+    deskew,
+    fix_orientation,
+    output,
+    page_layout,
+    page_split,
+    select_content,
+)
+from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 from scantailor.app.ui.widgets.help_icon import (
     HELP_GROUP_PROPERTY,
     HELP_ICON_PROPERTY,
@@ -11,6 +20,15 @@ from scantailor.app.ui.widgets.help_icon import (
     help_button_for,
     help_icon_size,
     install_help_icons,
+)
+from scantailor.core.stage_sequence import StageSequence
+
+OPTION_CONTROLS = (
+    QtWidgets.QAbstractButton,
+    QtWidgets.QAbstractSpinBox,
+    QtWidgets.QComboBox,
+    QtWidgets.QAbstractSlider,
+    QtWidgets.QLineEdit,
 )
 
 
@@ -201,3 +219,61 @@ def test_a_help_group_gets_one_button_and_its_buttons_keep_their_own_tooltips(
 
     assert [button.control for button in root.findChildren(HelpButton)] == [row]
     assert modes[0].toolTip() == "Off, reworded."
+
+
+def _option_widgets() -> list[QtWidgets.QWidget]:
+    sequence = StageSequence()
+    return [
+        fix_orientation.OptionsWidget(sequence.fix_orientation_filter),
+        page_split.OptionsWidget(sequence.page_split_filter),
+        deskew.OptionsWidget(sequence.deskew_filter),
+        select_content.OptionsWidget(sequence.select_content_filter),
+        page_layout.OptionsWidget(sequence.page_layout_filter),
+        output.OptionsWidget(sequence.output_filter),
+    ]
+
+
+def _help_text(widget: QtWidgets.QWidget, root: QtWidgets.QWidget) -> str:
+    """The tooltip a user sees over a widget: its own or its nearest ancestor's."""
+    current: QtWidgets.QWidget | None = widget
+    while current is not None:
+        if current.toolTip():
+            return current.toolTip()
+        if current is root:
+            return ""
+        current = current.parentWidget()
+    return ""
+
+
+def _is_group_header(widget: QtWidgets.QWidget) -> bool:
+    return isinstance(widget.parentWidget(), CollapsibleGroupBox) and isinstance(
+        widget, QtWidgets.QToolButton
+    )
+
+
+def _is_part_of_another_control(widget: QtWidgets.QWidget) -> bool:
+    """The editor of a spin box or the scroll bars of a combo's list are no options."""
+    parent = widget.parentWidget()
+    return isinstance(widget, QtWidgets.QScrollBar) or isinstance(
+        parent, QtWidgets.QAbstractSpinBox | QtWidgets.QComboBox
+    )
+
+
+def test_every_option_in_the_six_stages_explains_itself(qtbot: QtBot):
+    missing: list[str] = []
+    for root in _option_widgets():
+        qtbot.addWidget(root)
+        for control in root.findChildren(QtWidgets.QWidget):
+            if (
+                not isinstance(control, OPTION_CONTROLS)
+                or isinstance(control, HelpButton)
+                or _is_group_header(control)
+                or _is_part_of_another_control(control)
+            ):
+                continue
+            if not _help_text(control, root).strip():
+                missing.append(
+                    f"{type(root).__module__}: {type(control).__name__} "
+                    f"{control.objectName() or '(unnamed)'}"
+                )
+    assert not missing, "Options without a tooltip:\n" + "\n".join(missing)

@@ -40,6 +40,12 @@ class _Panel:
         assert found is not None
         return found
 
+    @property
+    def help_text(self) -> str:
+        found = self.widget.findChild(QtWidgets.QWidget, "despeckleControl")
+        assert found is not None
+        return found.toolTip()
+
 
 def test_choosing_a_level_announces_it_and_renders_at_once_by_default(qtbot: QtBot):
     panel = _Panel(qtbot)
@@ -101,14 +107,15 @@ def test_a_stored_in_between_strength_shows_its_nearest_step_and_names_itself(
     panel.widget.set_current_page(PAGE)
 
     assert panel.slider.value() == 2
-    assert "2.3" in panel.slider.toolTip()
+    assert "2.3" in panel.help_text.splitlines()[-1]
     assert panel.filter.get_params(PAGE).despeckle_strength == 2.3
 
 
-def test_a_strength_on_a_step_has_no_tooltip_note(qtbot: QtBot):
+def test_a_strength_on_a_step_has_help_but_no_strength_note(qtbot: QtBot):
     panel = _Panel(qtbot)
 
-    assert panel.slider.toolTip() == ""
+    assert panel.help_text
+    assert "Strength" not in panel.help_text
 
 
 def test_picking_a_step_replaces_a_stored_in_between_strength(qtbot: QtBot):

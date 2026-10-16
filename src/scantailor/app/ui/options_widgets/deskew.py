@@ -87,7 +87,9 @@ class OptionsWidget(QWidget):
         self._auto_btn.setAutoExclusive(True)
         self._auto_btn.setToolTip(
             QtCore.QCoreApplication.translate(
-                "deskew::OptionsWidget", "Automatically detect skew angle"
+                "deskew::OptionsWidget",
+                "Measure how far the lines of text are tilted and rotate the page "
+                "to make them level. Works well on pages with plenty of text.",
             )
         )
         mode_layout.addWidget(self._auto_btn)
@@ -98,7 +100,10 @@ class OptionsWidget(QWidget):
         self._manual_btn.setAutoExclusive(True)
         self._manual_btn.setToolTip(
             QtCore.QCoreApplication.translate(
-                "deskew::OptionsWidget", "Manually specify skew angle"
+                "deskew::OptionsWidget",
+                "Keep the angle you type below or set by dragging on the image. "
+                "Pick this when Auto gets a page wrong, such as one that is "
+                "mostly pictures.",
             )
         )
         mode_layout.addWidget(self._manual_btn)
@@ -119,7 +124,9 @@ class OptionsWidget(QWidget):
         self._angle_spinbox.setSuffix("°")
         self._angle_spinbox.setToolTip(
             QtCore.QCoreApplication.translate(
-                "deskew::OptionsWidget", "Deskew angle in degrees"
+                "deskew::OptionsWidget",
+                "Rotation applied to straighten the page, in degrees. Changing it "
+                "switches the page to Manual.",
             )
         )
         angle_layout.addWidget(self._angle_spinbox)
@@ -160,6 +167,14 @@ class OptionsWidget(QWidget):
         self._oblique_spinbox.setRange(-MAX_OBLIQUE_DEG, MAX_OBLIQUE_DEG)
         self._oblique_spinbox.setSingleStep(0.1)
         self._oblique_spinbox.setDecimals(2)
+        self._oblique_spinbox.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "deskew::OptionsWidget",
+                "Slant correction in degrees. It shears the page sideways so "
+                "that columns which lean, as on a page that lay at an angle to "
+                "the camera, stand upright.",
+            )
+        )
         oblique_layout.addWidget(self._oblique_spinbox)
         group_layout.addLayout(oblique_layout)
 
@@ -201,7 +216,9 @@ class OptionsWidget(QWidget):
         self._apply_btn.setObjectName("applyDeskewBtn")
         self._apply_btn.setToolTip(
             QtCore.QCoreApplication.translate(
-                "deskew::OptionsWidget", "Apply this angle to other pages"
+                "deskew::OptionsWidget",
+                "Copy this page's deskew settings, including the mode and the "
+                "oblique correction, to other pages you choose.",
             )
         )
         apply_layout.addWidget(self._apply_btn)

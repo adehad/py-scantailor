@@ -324,11 +324,13 @@ class TestSourceDpi:
 
         y_field.editingFinished.emit()
 
-        assert y_field.toolTip() == (
+        help_text, warning = y_field.toolTip().split("\n")
+        assert help_text
+        assert warning == (
             "DPI is too small. Even if it's correct, you are not going to get "
             "acceptable results with it."
         )
-        assert child(shown, QLineEdit, "sourceXDpi").toolTip() == ""
+        assert "DPI is too" not in child(shown, QLineEdit, "sourceXDpi").toolTip()
         assert "color" in y_field.styleSheet()
         assert child(shown, QLineEdit, "sourceXDpi").styleSheet() == ""
 
@@ -336,13 +338,14 @@ class TestSourceDpi:
         self, shown: page_layout.OptionsWidget
     ) -> None:
         y_field = child(shown, QLineEdit, "sourceYDpi")
+        help_text = y_field.toolTip()
         y_field.setText("100")
         y_field.editingFinished.emit()
 
         y_field.setText("300")
         y_field.editingFinished.emit()
 
-        assert y_field.toolTip() == ""
+        assert y_field.toolTip() == help_text
         assert y_field.styleSheet() == ""
 
     def test_a_reported_resolution_is_used_for_pixel_units(
