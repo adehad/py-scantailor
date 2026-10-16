@@ -194,3 +194,23 @@ interrupt the opening:
    * - An image has no usable resolution
      - Fix DPI
      - The project does not open.
+
+Getting help in the program
+---------------------------
+
+Every option in the stage panels has a short explanation of what it does and
+when to change it.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Where
+     - What it does
+   * - Info icon beside an option
+     - Hover over the icon, or over the option itself, to read its explanation.
+       Click the icon, or reach it with Tab and press Space, to show the same
+       text without hovering. The icon only appears for options that have an
+       explanation, and grows with the interface font.
+   * - **Help > User guide** (F1)
+     - Opens this guide in your web browser.
