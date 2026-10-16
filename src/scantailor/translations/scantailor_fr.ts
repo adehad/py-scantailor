@@ -4152,9 +4152,8 @@ Vous devriez les retirer du projet.</translation>
         <translation type="vanished">Noir et blanc avec images en couleur</translation>
     </message>
     <message>
-        <location filename="../app/ui/options_widgets/output.py" line="485"/>
         <source>White margins</source>
-        <translation>Marges blanches</translation>
+        <translation type="vanished">Marges blanches</translation>
     </message>
     <message>
         <source>Checked: black text on white background
@@ -4510,8 +4509,9 @@ Non coché: texte blanc sur fond noir</translation>
         <translation>Cette option devrait être activée pour les pages avec un contenu foncé sur un arrière-plan pâle et désactivée sinon afin de corriger les algorithmes de traitement.</translation>
     </message>
     <message>
+        <location filename="../app/ui/options_widgets/output.py" line="485"/>
         <source>Black on white mode</source>
-        <translation type="vanished">Mode noir sur blanc</translation>
+        <translation>Mode noir sur blanc</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/output.py" line="1145"/>

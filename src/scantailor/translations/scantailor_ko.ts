@@ -5187,9 +5187,8 @@ You should remove them from the project.</source>
         <translation type="vanished">흑백 텍스트와 컬러 사진</translation>
     </message>
     <message>
-        <location filename="../app/ui/options_widgets/output.py" line="485"/>
         <source>White margins</source>
-        <translation>흰색 테두리</translation>
+        <translation type="vanished">흰색 테두리</translation>
     </message>
     <message>
         <source>Checked: black text on white background
@@ -5528,8 +5527,9 @@ Unchecked: white text on black background</source>
         <translation type="unfinished">이 옵션은 밝은 배경에서 검은 내용이 있을 때 활성화 해야 하고, 반대의 경우에는 비활성화 해야 합니다.</translation>
     </message>
     <message>
+        <location filename="../app/ui/options_widgets/output.py" line="485"/>
         <source>Black on white mode</source>
-        <translation type="obsolete">흰 종이 검은 글씨 모드</translation>
+        <translation>흰 종이 검은 글씨 모드</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/output.py" line="1145"/>

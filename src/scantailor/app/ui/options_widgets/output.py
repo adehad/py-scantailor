@@ -482,7 +482,9 @@ class OptionsWidget(QWidget):
         bow_layout.addItem(_spacer())
         self._black_on_white_check = _check_box(
             "blackOnWhiteCB",
-            QtCore.QCoreApplication.translate("output::OptionsWidget", "White margins"),
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Black on white mode"
+            ),
         )
         self._black_on_white_check.setChecked(True)
         bow_layout.addWidget(self._black_on_white_check)

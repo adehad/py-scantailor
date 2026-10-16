@@ -36,7 +36,7 @@ Mode
        tab shows the mask of what is kept as a picture.
      - Books with text and pictures on the same page, such as a textbook with plates.
 
-**White margins** sets the polarity of the black and white result. It is on by
+**Black on white mode** sets the polarity of the black and white result. It is on by
 default, which gives black text on a white background. Turn it off for white text on
 a black background.
 

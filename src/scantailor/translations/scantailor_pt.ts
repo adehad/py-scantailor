@@ -4197,9 +4197,8 @@ Deve removê-los do projeto.</translation>
         <translation type="vanished">Preto e branco com imagens coloridas</translation>
     </message>
     <message>
-        <location filename="../app/ui/options_widgets/output.py" line="485"/>
         <source>White margins</source>
-        <translation>Margens brancas</translation>
+        <translation type="vanished">Margens brancas</translation>
     </message>
     <message>
         <source>Checked: black text on white background
@@ -4555,8 +4554,9 @@ Desmarcado: texto branco em fundo preto</translation>
         <translation>Esta opção deve ser ativada quando a página tiver conteúdo escuro em fundo claro, caso contrário deve ser desativada, a fim de corrigir os algoritmos de processamento.</translation>
     </message>
     <message>
+        <location filename="../app/ui/options_widgets/output.py" line="485"/>
         <source>Black on white mode</source>
-        <translation type="vanished">Modo preto em branco</translation>
+        <translation>Modo preto em branco</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/output.py" line="1145"/>
