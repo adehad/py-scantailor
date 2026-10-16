@@ -3893,6 +3893,12 @@ Debería elimnarlos del proyecto.</translation>
         <translation>PPP:</translation>
     </message>
     <message>
+        <location filename="../app/ui/options_widgets/output.py" line="485"/>
+        <source>Black on white mode</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Modo negro sobre blanco</translation>
+    </message>
+    <message>
         <location filename="../app/ui/options_widgets/output.py" line="506"/>
         <source>Fill margins</source>
         <translation>Rellenar márgenes</translation>
@@ -4217,9 +4223,8 @@ Debería elimnarlos del proyecto.</translation>
         <translation type="vanished">Blanco y negro con imágenes en color</translation>
     </message>
     <message>
-        <location filename="../app/ui/options_widgets/output.py" line="485"/>
         <source>White margins</source>
-        <translation>Márgenes blancos</translation>
+        <translation type="vanished">Márgenes blancos</translation>
     </message>
     <message>
         <source>Checked: black text on white background

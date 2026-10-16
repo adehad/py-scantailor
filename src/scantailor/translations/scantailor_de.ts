@@ -4233,9 +4233,8 @@ Sie sollten sie aus dem Projekt entfernen.</translation>
         <translation type="vanished">Schwarzweiß mit farbigen Bildern</translation>
     </message>
     <message>
-        <location filename="../app/ui/options_widgets/output.py" line="485"/>
         <source>White margins</source>
-        <translation>Weiße Ränder</translation>
+        <translation type="vanished">Weiße Ränder</translation>
     </message>
     <message>
         <source>Checked: black text on white background
@@ -4591,8 +4590,9 @@ Deaktiviert: weißer Text auf schwarzem Hintergrund</translation>
         <translation>Diese Option sollte aktiviert werden, wenn die Seite dunklen Inhalt auf hellem Hintergrund hat, und deaktiviert werden, wenn es umgekehrt ist, um die Verarbeitungsalgorithmen zu korrigieren.</translation>
     </message>
     <message>
+        <location filename="../app/ui/options_widgets/output.py" line="485"/>
         <source>Black on white mode</source>
-        <translation type="vanished">Schwarz-auf-Weiß-Modus</translation>
+        <translation>Schwarz-auf-Weiß-Modus</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/output.py" line="1145"/>

@@ -4191,9 +4191,8 @@ You should remove them from the project.</source>
         <translation type="vanished">Черно-белое с цветными картинками</translation>
     </message>
     <message>
-        <location filename="../app/ui/options_widgets/output.py" line="485"/>
         <source>White margins</source>
-        <translation>Белые поля</translation>
+        <translation type="vanished">Белые поля</translation>
     </message>
     <message>
         <source>Checked: black text on white background
@@ -4537,8 +4536,9 @@ Unchecked: white text on black background</source>
         <translation>Эту опцию следует включить если страница имеет темный контент на светлом фоне и выключить при обратном для коррекции алгоритмов обработки.</translation>
     </message>
     <message>
+        <location filename="../app/ui/options_widgets/output.py" line="485"/>
         <source>Black on white mode</source>
-        <translation type="vanished">Режим черного на белом</translation>
+        <translation>Режим черного на белом</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/output.py" line="1145"/>
