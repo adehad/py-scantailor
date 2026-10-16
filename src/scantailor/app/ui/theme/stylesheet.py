@@ -2,6 +2,8 @@
 
 from PySide6 import QtGui
 
+from scantailor.app.ui.widgets.help_icon import help_icon_size
+
 from .fonts import DISPLAY_RATIO, PANEL_HEADING_RATIO, SEMIBOLD, SMALL_RATIO, pixel_size
 from .tokens import Tokens
 
@@ -90,6 +92,7 @@ def build_stylesheet(
     panel_heading_px = round(body * PANEL_HEADING_RATIO)
     display_px = round(body * DISPLAY_RATIO)
     line = QtGui.QFontMetrics(font).height()
+    help_glyph = help_icon_size(font)
     header = header_height(font)
     nested_header = header_height(font, nested=True)
     hover = t.accent_tint if accent_hover else neutral_hover(t)
@@ -189,10 +192,18 @@ QPushButton:default {{
     background: {t.accent}; color: {t.accent_text}; border-color: {t.accent};
 }}
 QPushButton:default:hover {{ background: {t.accent_hover}; }}
+QToolButton[helpIcon="true"] {{
+    min-width: 0; min-height: 0; padding: 0; icon-size: {help_glyph}px;
+    background: transparent; border: 1px solid transparent;
+    border-radius: {SPACE_XS}px;
+}}
+QToolButton[helpIcon="true"]:hover {{ background: {hover}; }}
 QPushButton:disabled, QToolButton:disabled {{
     color: {t.text_disabled}; background: {t.field_disabled};
     border-color: transparent;
 }}
+QToolButton[helpIcon="true"]:focus {{ border-color: {t.accent}; }}
+QToolButton[helpIcon="true"]:disabled {{ background: transparent; }}
 QGroupBox > QToolButton#groupHeader {{
     min-width: 0; min-height: 0; padding: 0 {SPACE_S}px; border: none;
     border-radius: {RADIUS_CONTROL}px; background: transparent;
