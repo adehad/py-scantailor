@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pypdfium2 as pdfium
+import shiboken6
 from loguru import logger
 from PySide6 import QtCore
 
@@ -444,10 +445,14 @@ class PdfJob(QtCore.QObject):
         thread, worker = self._thread, self._worker
         self._thread = self._worker = None
         outcome, self._outcome = self._outcome, None
-        if worker is not None:
-            worker.deleteLater()
         if thread is not None:
+            # finished is emitted before the thread runs its last deferred deletes
+            # and exits, so a deleteLater() on the worker would race this thread
+            # for the object. Once the thread has ended, delete it here instead.
+            thread.wait()
             thread.deleteLater()
+        if worker is not None:
+            shiboken6.delete(worker)
         kind, payload = outcome or ("failed", "The job stopped unexpectedly")
         if kind == "done":
             self.finished.emit(payload)

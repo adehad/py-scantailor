@@ -1,5 +1,6 @@
 """The options widget and image view that MainWindow shows for the current stage."""
 
+import gc
 import threading
 from collections.abc import Callable
 
@@ -302,7 +303,36 @@ def test_set_thumbnail_widget_can_be_called_again(main_window: MainWindowManager
     main_window.set_thumbnail_widget(second)
 
     assert second.isVisible()
-    assert first.parent() is None
+    assert first.isHidden()
+    assert first.parent() is second.parent()
+
+
+def test_a_replaced_thumbnail_widget_is_destroyed_with_the_window_on_its_thread(
+    qapp: QtWidgets.QApplication,
+):
+    """A widget the window stops showing must die with it, not in the collector.
+
+    The garbage collector runs on whichever thread happens to allocate, often a
+    render pool thread, and destroying a widget there crashes Qt.
+    """
+    window = MainWindowManager()
+    replaced = window.thumbnails
+    destroyed_on: list[threading.Thread] = []
+    replaced.destroyed.connect(
+        lambda: destroyed_on.append(threading.current_thread()),
+        QtCore.Qt.ConnectionType.DirectConnection,
+    )
+    window.set_thumbnail_widget(QtWidgets.QListWidget())
+
+    gc.disable()
+    try:
+        window.ui.deleteLater()
+        QtCore.QCoreApplication.sendPostedEvents(
+            None, QtCore.QEvent.Type.DeferredDelete
+        )
+        assert destroyed_on == [threading.main_thread()]
+    finally:
+        gc.enable()
 
 
 def test_page_selected_makes_that_page_current(project_window: MainWindowManager):
