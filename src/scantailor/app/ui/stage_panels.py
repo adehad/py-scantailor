@@ -41,6 +41,7 @@ from scantailor.app.ui.options_widgets import (
     select_content,
 )
 from scantailor.app.ui.source_cache import SourceCache
+from scantailor.app.ui.widgets.help_icon import install_help_icons
 from scantailor.core.content_mask import ContentMask, compute_content_mask
 from scantailor.core.image_io import ImageLoadError
 from scantailor.core.models import (
@@ -445,6 +446,7 @@ class StagePanels(QtCore.QObject):
             case FilterStage.OUTPUT:
                 widget = output.OptionsWidget(sequence.output_filter)
                 widget.params_changed.connect(forward)
+        install_help_icons(widget)
         return widget
 
     def _connect_view(self, stage: FilterStage) -> None:
