@@ -1429,7 +1429,7 @@ class MainWindowManager:
         """Show ``widget`` in the thumbnails dock instead of the placeholder view.
 
         Args:
-            widget (QWidget): The thumbnail list. Replacing it later unparents it.
+            widget (QWidget): The thumbnail list. Replacing it later hides it.
         """
         previous = self._thumbnail_widget or self.thumbView
         container = self.thumbView.parentWidget()
@@ -1437,10 +1437,12 @@ class MainWindowManager:
             container.findChild(QVBoxLayout, "verticalLayout") if container else None
         )
         assert layout is not None
+        # The replaced widget keeps its parent so it is destroyed with the window.
+        # Unparented, it would belong to Python and, being in a reference cycle
+        # with this window, be destroyed by whichever thread next runs the garbage
+        # collector, such as a render pool thread, which crashes Qt.
         layout.replaceWidget(previous, widget)
         previous.hide()
-        if previous is not self.thumbView:
-            previous.setParent(None)
         widget.show()
         self._thumbnail_widget = widget
 
