@@ -4160,9 +4160,8 @@ Należy je usunąć z projektu.</translation>
         <translation type="vanished">Czarno-biały z kolorowymi obrazami</translation>
     </message>
     <message>
-        <location filename="../app/ui/options_widgets/output.py" line="485"/>
         <source>White margins</source>
-        <translation>Białe marginesy</translation>
+        <translation type="vanished">Białe marginesy</translation>
     </message>
     <message>
         <source>Checked: black text on white background
@@ -4518,8 +4517,9 @@ Niezaznaczone: biały tekst na czarnym tle</translation>
         <translation>Opcję tę należy włączyć, gdy strona ma ciemną treść na jasnym tle i wyłączyć odwrotnie, aby poprawić algorytmy przetwarzania.</translation>
     </message>
     <message>
+        <location filename="../app/ui/options_widgets/output.py" line="485"/>
         <source>Black on white mode</source>
-        <translation type="vanished">Czarno na białym</translation>
+        <translation>Czarno na białym</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/output.py" line="1145"/>
