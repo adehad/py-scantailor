@@ -98,6 +98,26 @@ class OptionsWidget(QWidget):
             "pagePlusOffcutBtn", "split-right-page-plus-offcut", 1
         )
         self._two_pages_btn = self._layout_button("twoPagesBtn", "book-open", 2)
+        self._single_page_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_split::OptionsWidget",
+                "One page that fills the scan. Nothing is cut off.",
+            )
+        )
+        self._page_offcut_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_split::OptionsWidget",
+                "One page with unwanted material beside it, such as the edge of "
+                "the facing page. A cut line removes the extra part.",
+            )
+        )
+        self._two_pages_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_split::OptionsWidget",
+                "An open book with two pages on one scan. The scan is split at "
+                "the line between them and each half becomes its own page.",
+            )
+        )
         for button in self._layout_button_group.buttons():
             buttons_layout.addWidget(button)
 
@@ -118,6 +138,13 @@ class OptionsWidget(QWidget):
             QtCore.QCoreApplication.translate("page_split::OptionsWidget", "Change ...")
         )
         self._change_btn.setObjectName("changeBtn")
+        self._change_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_split::OptionsWidget",
+                "Choose whether the layout is detected automatically or fixed by "
+                "you, and which pages the choice applies to.",
+            )
+        )
         change_layout.addWidget(self._change_btn)
         change_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
@@ -142,6 +169,13 @@ class OptionsWidget(QWidget):
             QtCore.QCoreApplication.translate("page_split::OptionsWidget", "Auto")
         )
         self._auto_btn.setObjectName("autoBtn")
+        self._auto_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_split::OptionsWidget",
+                "Let the program find the gap between the pages and place the "
+                "split line there each time the page is processed.",
+            )
+        )
         self._auto_btn.setCheckable(True)
         self._mode_button_group.addButton(self._auto_btn)
         split_mode_layout.addWidget(self._auto_btn)
@@ -150,6 +184,13 @@ class OptionsWidget(QWidget):
             QtCore.QCoreApplication.translate("page_split::OptionsWidget", "Manual")
         )
         self._manual_btn.setObjectName("manualBtn")
+        self._manual_btn.setToolTip(
+            QtCore.QCoreApplication.translate(
+                "page_split::OptionsWidget",
+                "Keep the split line where you dragged it on the image. Pick this "
+                "when detection puts the line in the wrong place.",
+            )
+        )
         self._manual_btn.setCheckable(True)
         self._mode_button_group.addButton(self._manual_btn)
         split_mode_layout.addWidget(self._manual_btn)
