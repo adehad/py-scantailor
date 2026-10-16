@@ -35,6 +35,25 @@ def test_show_about(qtbot: QtBot):
     after_qdialog.close()
 
 
+def test_user_guide_action_opens_the_online_manual_in_the_browser(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+):
+    opened: list[QtCore.QUrl] = []
+
+    def fake_open_url(url: QtCore.QUrl) -> bool:
+        opened.append(url)
+        return True
+
+    monkeypatch.setattr(QtGui.QDesktopServices, "openUrl", fake_open_url)
+    manager = MainWindow.MainWindowManager()
+    qtbot.addWidget(manager.ui)
+    help_menu = manager.ui.findChild(QtWidgets.QMenu, "menuHelp")
+    assert manager.actionUserGuide in help_menu.actions()
+    manager.actionUserGuide.trigger()
+    assert opened == [QtCore.QUrl(MainWindow.USER_GUIDE_URL)]
+    assert opened[0].host() == "py-scantailor.readthedocs.io"
+
+
 def test_navigation_without_a_project_keeps_no_current_page(
     main_window: MainWindow.MainWindowManager,
 ):

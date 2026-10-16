@@ -124,6 +124,7 @@ from scantailor.filters.page_split.layout_type import LayoutType
 PROJECT_SUFFIX = ".ScanTailor"
 APP_TITLE = f"{APP_NAME} - {__version__}"
 _MAIN_WINDOW_UI = UI_FOLDER / "MainWindow.ui"
+USER_GUIDE_URL = "https://py-scantailor.readthedocs.io/"
 _LAST_DIR_KEY = "project/lastDir"
 _LAST_INPUT_DIR_KEY = "project/lastInputDir"
 _LAST_PDF_DIR_KEY = "project/lastPdfDir"
@@ -439,6 +440,7 @@ class MainWindowManager:
         )
         self.actionInches = get_cwidget(self.ui, QtGui.QAction, "actionInches")
         self.actionAbout = get_cwidget(self.ui, QtGui.QAction, "actionAbout")
+        self.actionUserGuide = get_cwidget(self.ui, QtGui.QAction, "actionUserGuide")
         self.actionReloadPage = get_cwidget(self.ui, QtGui.QAction, "actionReloadPage")
         self.actionSwitchFilter1 = get_cwidget(
             self.ui, QtGui.QAction, "actionSwitchFilter1"
@@ -546,6 +548,7 @@ class MainWindowManager:
         self.actionNextSelectedPageW.triggered.connect(self.goNextSelectedPage)
         self.actionGotoPage.triggered.connect(self.execGotoPageDialog)
         self.actionAbout.triggered.connect(self.showAboutDialog)
+        self.actionUserGuide.triggered.connect(self.openUserGuide)
         self.actionReloadPage.triggered.connect(self.reloadCurrentPage)
         self.actionSwitchFilter1.triggered.connect(self.switchFilter1)
         self.actionSwitchFilter2.triggered.connect(self.switchFilter2)
@@ -2348,6 +2351,11 @@ class MainWindowManager:
         )
         if accepted and pages[number - 1] != self._current_page:
             self._go_to_page(pages[number - 1])
+
+    def openUserGuide(self) -> None:
+        """Open the online user guide in the system web browser."""
+        if not QtGui.QDesktopServices.openUrl(QtCore.QUrl(USER_GUIDE_URL)):
+            _LOG.warning("Could not open the user guide at {}", USER_GUIDE_URL)
 
     def showAboutDialog(self) -> None:
         """Show about dialog."""
