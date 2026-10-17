@@ -133,9 +133,11 @@ class OptionsWidget(QWidget):
         self._page_auto_btn.setToolTip(
             QtCore.QCoreApplication.translate(
                 "select_content::OptionsWidget",
-                "Find the edges of the paper from long straight lines near the "
-                "image border. Use it when the scanner lid or background shows "
-                "around the page. If no edges are found, the whole image is used.",
+                "Find the edges of the paper where the dark scanner background "
+                "around it ends, or from long straight lines near the image border "
+                "when the background is light. Use it when the scanner lid or "
+                "background shows around the page. If no edges are found, the "
+                "whole image is used.",
             )
         )
         page_layout.addWidget(self._page_auto_btn, 1, 0)
@@ -177,7 +179,8 @@ class OptionsWidget(QWidget):
                 "select_content::OptionsWidget",
                 "Move the detected page corners inward while they sit on dark "
                 "scanner background. This helps when the paper lies slightly "
-                "crooked on the scanner glass.",
+                "crooked on the scanner glass. It has no effect on a light "
+                "background.",
             )
         )
         options_layout.addWidget(self._fine_tune_check)

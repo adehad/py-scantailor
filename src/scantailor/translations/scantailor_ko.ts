@@ -6273,9 +6273,9 @@ Unchecked: white text on black background</source>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="122"/>
-        <source>Find the edges of the paper from long straight lines near the image border. Use it when the scanner lid or background shows around the page. If no edges are found, the whole image is used.</source>
+        <source>Find the edges of the paper where the dark scanner background around it ends, or from long straight lines near the image border when the background is light. Use it when the scanner lid or background shows around the page. If no edges are found, the whole image is used.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>이미지 테두리 근처의 길고 곧은 선으로 종이 가장자리를 찾습니다. 페이지 주변에 스캐너 덮개나 배경이 보일 때 쓰세요. 가장자리를 찾지 못하면 이미지 전체를 씁니다.</translation>
+        <translation>주변의 어두운 스캐너 배경이 끝나는 곳에서 종이 가장자리를 찾고, 배경이 밝으면 이미지 테두리 근처의 긴 직선으로 찾습니다. 페이지 주위에 스캐너 덮개나 배경이 보일 때 사용하세요. 가장자리를 찾지 못하면 이미지 전체를 사용합니다.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="138"/>
@@ -6285,9 +6285,9 @@ Unchecked: white text on black background</source>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="164"/>
-        <source>Move the detected page corners inward while they sit on dark scanner background. This helps when the paper lies slightly crooked on the scanner glass.</source>
+        <source>Move the detected page corners inward while they sit on dark scanner background. This helps when the paper lies slightly crooked on the scanner glass. It has no effect on a light background.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>감지된 페이지 모서리가 어두운 스캐너 배경 위에 있는 동안 안쪽으로 옮깁니다. 종이가 스캐너 유리 위에 약간 비뚤게 놓였을 때 도움이 됩니다.</translation>
+        <translation>감지된 페이지 모서리가 어두운 스캐너 배경 위에 있는 동안 안쪽으로 옮깁니다. 종이가 스캐너 유리 위에 약간 비뚤게 놓였을 때 도움이 됩니다. 밝은 배경에서는 효과가 없습니다.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="182"/>

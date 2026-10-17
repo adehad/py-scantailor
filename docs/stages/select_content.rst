@@ -5,7 +5,9 @@
    :alt: Select Content with its Page Box and Content Box panels
 
 Finds the area of the page that holds text and pictures, and the area of the paper.
-The detection code is in :mod:`scantailor.filters.select_content.content_box_finder`.
+The detection code is in :mod:`scantailor.filters.select_content.content_box_finder`
+for the content box and :mod:`scantailor.filters.select_content.page_finder` for the
+page box.
 
 .. list-table::
    :header-rows: 1
@@ -72,7 +74,15 @@ When to enable the Page Box
      - The scan shows the page on a dark background, a scanner bed or a shadow along
        its edges. Content detection can take those edges for text or pictures, and
        the Page Box keeps the search inside the paper. The Margins stage then
-       measures the margins from the paper edge instead of the scan edge.
+       measures the margins from the paper edge instead of the scan edge. On a
+       dark background each side of the box stops where the background ends. A
+       side where the scanner cut the background off, so the paper runs to the
+       scan edge, keeps the scan edge as the page edge.
+       When the paper lies crooked, the corners of that box still show
+       background; tick **Fine Tune Page Corners** to move them inward until they
+       reach the paper. A light background, such as a closed scanner lid, cannot
+       be told from the paper that way, so the box is taken from long straight
+       edges near the image border instead, and fine tuning has no effect.
    * - **Manual**
      - **Auto** finds the paper edge in the wrong place. Drag the sides of the box in
        the image, as for the content box, or type its **Width** and **Height**,

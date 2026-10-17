@@ -37,6 +37,9 @@ _GRAD_ROUNDING = 0.5
 # Page-wide level of Grad when no pixel differs from its local mean.
 _GRAD_FLAT_PAGE_LEVEL = 127.5
 
+# Side of a square window, or (width, height) of a rectangular one.
+WindowSize = int | tuple[int, int]
+
 
 def peak_threshold(image: NDArray[np.uint8]) -> int:
     """Find a threshold value using peak detection in the histogram.
@@ -216,20 +219,20 @@ def _adjusted_otsu_threshold(
 
 def binarize_sauvola(
     image: NDArray[np.uint8],
-    window_size: int = 25,
+    window_size: WindowSize = 25,
     k: float = 0.2,
     delta: float = 0.0,
 ) -> NDArray[np.uint8]:
     """Binarize an image using Sauvola's adaptive thresholding.
 
     The local threshold is ``mean * (1 - k * (1 - (deviation / 128 + delta / 128)))``
-    over a square window. Good for uneven illumination.
+    over a local window. Good for uneven illumination.
 
     Args:
         image (NDArray[np.uint8]): 2-D gray image. Not modified.
-        window_size (int): Side of the local window, clipped at the image
-            border. An even size reaches one pixel further after the centre than
-            before.
+        window_size (int | tuple[int, int]): Side of a square local window, or
+            its ``(width, height)``, clipped at the image border. An even size
+            reaches one pixel further after the centre than before.
         k (float): Sensitivity, typically 0.1 to 0.5.
         delta (float): Threshold adjustment; positive means more ink.
 
@@ -243,7 +246,7 @@ def binarize_sauvola(
 
 def binarize_wolf(
     image: NDArray[np.uint8],
-    window_size: int = 25,
+    window_size: WindowSize = 25,
     k: float = 0.5,
     delta: float = 0.0,
     lower_bound: int = 1,
@@ -260,9 +263,9 @@ def binarize_wolf(
 
     Args:
         image (NDArray[np.uint8]): 2-D gray image. Not modified.
-        window_size (int): Side of the local window, clipped at the image
-            border. An even size reaches one pixel further after the centre than
-            before.
+        window_size (int | tuple[int, int]): Side of a square local window, or
+            its ``(width, height)``, clipped at the image border. An even size
+            reaches one pixel further after the centre than before.
         k (float): Sensitivity, typically 0.3 to 0.5.
         delta (float): Threshold adjustment; positive means more ink.
         lower_bound (int): Gray levels below this are ink whatever the threshold.
@@ -598,13 +601,14 @@ def run_in_row_bands(rows: int, band: Callable[[int, int], None]) -> None:
 
 def _window_statistics(
     image: NDArray[np.uint8],
-    window_size: int,
+    window_size: WindowSize,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Mean and standard deviation over a window clipped at the image border.
 
     Args:
         image (NDArray[np.uint8]): 2-D gray image.
-        window_size (int): Window side in pixels.
+        window_size (int | tuple[int, int]): Window side, or ``(width,
+            height)``, in pixels.
 
     Returns:
         tuple[NDArray[np.float64], NDArray[np.float64]]: Local mean and standard
@@ -613,14 +617,15 @@ def _window_statistics(
     rows, columns = image.shape
     mean = np.empty(image.shape, dtype=np.float64)
     deviation = np.empty(image.shape, dtype=np.float64)
-    row_extent = _window_extent(rows, window_size)
-    column_extent = _window_extent(columns, window_size)
+    window_width, window_height = _window_shape(window_size)
+    row_extent = _window_extent(rows, window_height)
+    column_extent = _window_extent(columns, window_width)
 
     def band(first: int, stop: int) -> None:
         # Sums of whole numbers are exact in any order, so a band that reads a
         # window's reach of rows beyond its own matches the whole image.
-        top = max(0, first - window_size)
-        bottom = min(rows, stop + window_size)
+        top = max(0, first - window_height)
+        bottom = min(rows, stop + window_height)
         gray = image[top:bottom].astype(np.float64)
         inside = slice(first - top, stop - top)
         reciprocal = 1.0 / np.multiply.outer(row_extent[first:stop], column_extent)
@@ -661,15 +666,24 @@ def _window_extent(length: int, window_size: int) -> NDArray[np.float64]:
     )
 
 
-def _window_sum(values: NDArray[np.float64], window_size: int) -> NDArray[np.float64]:
-    """Sum over a ``window_size`` square around each pixel, zero outside the image.
+def _window_shape(window_size: WindowSize) -> tuple[int, int]:
+    """Return ``(width, height)`` of a square or rectangular window."""
+    if isinstance(window_size, int):
+        return window_size, window_size
+    return window_size
+
+
+def _window_sum(
+    values: NDArray[np.float64], window_size: WindowSize
+) -> NDArray[np.float64]:
+    """Sum over a window around each pixel, zero outside the image.
 
     An even window reaches one pixel further after the centre than before.
     """
     summed = cv2.boxFilter(
         values,
         cv2.CV_64F,
-        (window_size, window_size),
+        _window_shape(window_size),
         normalize=False,
         borderType=cv2.BORDER_CONSTANT,
     )
