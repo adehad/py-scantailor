@@ -5,6 +5,7 @@ import pathlib
 import re
 
 import pytest
+import shiboken6
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from scantailor.app.ui import theme
@@ -18,11 +19,12 @@ SRC_ROOT = pathlib.Path(theme.__file__).resolve().parents[3]
 def app(original_look: QtWidgets.QApplication, monkeypatch):
     """Application restored to its original look; QSettings is isolated by conftest."""
     monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
-    # A collection while hiding could delete a window later in the list.
-    gc.collect()
     for widget in original_look.topLevelWidgets():
-        widget.hide()
-        widget.deleteLater()
+        # Menus and combo box popups are windows too, and go when the window
+        # that owns them is deleted while this loop runs.
+        if shiboken6.isValid(widget):
+            widget.hide()
+            widget.deleteLater()
     QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
     return original_look
 
