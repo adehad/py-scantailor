@@ -1,0 +1,8 @@
+#!/bin/sh
+# The AppImage runtime sets ARGV0 to the name it was started under, so a
+# symlink called scantailor-cli opens the command line instead of the window.
+here="$(dirname "$(readlink -f "$0")")"
+case "$(basename "${ARGV0:-$0}")" in
+scantailor-cli*) exec "$here/usr/lib/ScanTailor/scantailor-cli" "$@" ;;
+*) exec "$here/usr/lib/ScanTailor/ScanTailor" "$@" ;;
+esac

@@ -1,5 +1,6 @@
 # Release: on a pushed v* tag, freeze with PyInstaller on Windows, Linux and
-# macOS, smoke-test each build and attach the archives to a GitHub Release.
+# macOS, wrap the Linux build as an AppImage, smoke-test each build and attach
+# them all to a GitHub Release.
 # A manual run (workflow_dispatch) builds and smoke-tests without publishing.
 name: Release
 
@@ -111,11 +112,29 @@ jobs:
           name="ScanTailor-${label}-linux-x64.tar.gz"
           tar -C dist -czf "${name}" ScanTailor
           echo "name=${name}" >> "$GITHUB_OUTPUT"
+          echo "appimage=ScanTailor-${label}-linux-x64.AppImage" >> "$GITHUB_OUTPUT"
+
+      - name: Build AppImage
+        env:
+          APPIMAGE_NAME: ${{ steps.archive.outputs.appimage }}
+        run: tools/appimage/build_appimage.sh dist/ScanTailor "$APPIMAGE_NAME"
+
+      # Started through a symlink named scantailor-cli, the AppImage runs the
+      # command line. The runners have no FUSE, so the runtime extracts instead.
+      - name: Smoke test the AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          APPIMAGE_NAME: ${{ steps.archive.outputs.appimage }}
+        run: |
+          ln -s "$PWD/$APPIMAGE_NAME" "$RUNNER_TEMP/scantailor-cli"
+          pdm run python tools/smoke_frozen.py "$RUNNER_TEMP/scantailor-cli"
 
       - uses: actions/upload-artifact@v5
         with:
           name: release-linux-x64
-          path: ${{ steps.archive.outputs.name }}
+          path: |
+            ${{ steps.archive.outputs.name }}
+            ${{ steps.archive.outputs.appimage }}
           if-no-files-found: error
 
   macos:

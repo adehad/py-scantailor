@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.adehad.py-scantailor</id>
+  <name>pyScanTailor</name>
+  <summary>Interactive post-processing tool for scanned pages</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>
+      pyScanTailor splits, deskews, crops and cleans up scanned pages, then
+      exports them as TIFF images or a PDF. It is a Python port of ScanTailor
+      Advanced.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.adehad.py-scantailor.desktop</launchable>
+  <url type="homepage">https://github.com/adehad/py-scantailor</url>
+  <url type="bugtracker">https://github.com/adehad/py-scantailor/issues</url>
+  <categories>
+    <category>Graphics</category>
+    <category>Scanning</category>
+  </categories>
+  <provides>
+    <binary>ScanTailor</binary>
+    <binary>scantailor-cli</binary>
+  </provides>
+</component>

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=pyScanTailor
+Comment=Interactive post-processing tool for scanned pages
+Exec=ScanTailor %f
+Icon=scantailor
+Terminal=false
+Categories=Graphics;Scanning;
