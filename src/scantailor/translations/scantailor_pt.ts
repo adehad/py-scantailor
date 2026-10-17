@@ -1672,242 +1672,255 @@
         <translation>Ajuda</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="122"/>
+        <location filename="../app/ui/MainWindow.ui" line="125"/>
         <source>Thumbnails</source>
         <translation>Miniaturas</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="161"/>
+        <location filename="../app/ui/MainWindow.ui" line="164"/>
         <source>Keep current page in view.</source>
         <translation>Manter a página atual na vista.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="294"/>
+        <location filename="../app/ui/MainWindow.ui" line="297"/>
         <source>Navigate through selected pages only.</source>
         <translation>Navegar apenas pelas páginas selecionadas.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="344"/>
+        <location filename="../app/ui/MainWindow.ui" line="347"/>
         <source>Magnify thumbnails.  (Ctrl++)</source>
         <translation>Ampliar miniaturas.  (Ctrl++)</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="381"/>
+        <location filename="../app/ui/MainWindow.ui" line="384"/>
         <source>Diminish thumbnails.  (Ctrl+-)</source>
         <translation>Reduzir miniaturas.  (Ctrl+-)</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="428"/>
+        <location filename="../app/ui/MainWindow.ui" line="431"/>
         <source>Go To Page...  (Ctrl+G)</source>
         <translation>Ir para a página...  (Ctrl+G)</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="465"/>
+        <location filename="../app/ui/MainWindow.ui" line="468"/>
         <source>Enable multi page selection mode.</source>
         <translation>Ativar o modo de seleção de várias páginas.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="505"/>
+        <location filename="../app/ui/MainWindow.ui" line="508"/>
         <source>Single/multi column display.</source>
         <translation>Exibição em uma ou várias colunas.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="548"/>
+        <location filename="../app/ui/MainWindow.ui" line="551"/>
         <source>Pause automatic thumbnail reordering while thumbnails refresh.</source>
         <translation>Pausar a reordenação automática das miniaturas enquanto elas são atualizadas.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="585"/>
+        <location filename="../app/ui/MainWindow.ui" line="588"/>
         <source>Sorting order.</source>
         <translation>Ordem de classificação.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="628"/>
+        <location filename="../app/ui/MainWindow.ui" line="631"/>
         <source>Highlight deviation.</source>
         <translation>Destacar desvio.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="727"/>
+        <location filename="../app/ui/MainWindow.ui" line="730"/>
         <source>Filters</source>
         <translation>Filtros</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="843"/>
+        <location filename="../app/ui/MainWindow.ui" line="846"/>
         <source>Debug Mode</source>
         <translation>Modo de Depuração</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="854"/>
+        <location filename="../app/ui/MainWindow.ui" line="857"/>
         <source>Save Project</source>
         <translation>Guardar o Projecto</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="865"/>
+        <location filename="../app/ui/MainWindow.ui" line="868"/>
         <source>Save Project As ...</source>
         <translation>Guardar o Projecto Como...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="876"/>
-        <location filename="../app/ui/MainWindow.ui" line="931"/>
+        <location filename="../app/ui/MainWindow.ui" line="879"/>
+        <location filename="../app/ui/MainWindow.ui" line="934"/>
         <source>Next Page</source>
         <translation>Página Seguinte</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="887"/>
-        <location filename="../app/ui/MainWindow.ui" line="920"/>
+        <location filename="../app/ui/MainWindow.ui" line="890"/>
+        <location filename="../app/ui/MainWindow.ui" line="923"/>
         <source>Previous Page</source>
         <translation>Página Anterior</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="898"/>
+        <location filename="../app/ui/MainWindow.ui" line="901"/>
         <source>New Project ...</source>
         <translation>Criar um Projecto...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="909"/>
+        <location filename="../app/ui/MainWindow.ui" line="912"/>
         <source>Open Project ...</source>
         <translation>Abrir um Projecto...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="942"/>
+        <location filename="../app/ui/MainWindow.ui" line="945"/>
         <source>Close Project</source>
         <translation>Fechar o Projecto</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="953"/>
+        <location filename="../app/ui/MainWindow.ui" line="956"/>
         <source>Quit</source>
         <translation>Sair</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="964"/>
+        <location filename="../app/ui/MainWindow.ui" line="967"/>
         <source>Settings ...</source>
         <translation>Configurações...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="975"/>
+        <location filename="../app/ui/MainWindow.ui" line="978"/>
         <source>First Page</source>
         <translation>Primeira Página</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="986"/>
+        <location filename="../app/ui/MainWindow.ui" line="989"/>
         <source>Last Page</source>
         <translation>Última Página</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="997"/>
+        <location filename="../app/ui/MainWindow.ui" line="1000"/>
         <source>User guide</source>
         <extracomment>Machine draft, pending native review.</extracomment>
         <translation>Guia do utilizador</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1000"/>
+        <location filename="../app/ui/MainWindow.ui" line="1003"/>
         <source>Open the online manual in your web browser</source>
         <extracomment>Machine draft, pending native review.</extracomment>
         <translation>Abrir o manual online no navegador web</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1008"/>
+        <location filename="../app/ui/MainWindow.ui" line="1012"/>
+        <source>Open log folder</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Abrir pasta de registos</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.ui" line="1015"/>
+        <location filename="../app/ui/MainWindow.ui" line="1018"/>
+        <source>Show the folder of log files to attach to a bug report</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Mostrar a pasta dos ficheiros de registo a anexar a um relatório de erro</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.ui" line="1023"/>
         <source>About</source>
         <translation>Acerca de</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1019"/>
+        <location filename="../app/ui/MainWindow.ui" line="1034"/>
         <source>Fix DPI ...</source>
         <translation>Corrigir DPI...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1030"/>
+        <location filename="../app/ui/MainWindow.ui" line="1045"/>
         <source>Relinking ...</source>
         <translation>Re-conexão...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1041"/>
+        <location filename="../app/ui/MainWindow.ui" line="1056"/>
         <source>Reverse two-page spread order</source>
         <translation>Inverter a ordem das páginas duplas</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1044"/>
+        <location filename="../app/ui/MainWindow.ui" line="1059"/>
         <source>Swap left/right page order for two-page scans (e.g. Japanese book reading order).</source>
         <translation>Trocar a ordem esquerda/direita das páginas em digitalizações de duas páginas (por exemplo, a ordem de leitura de livros japoneses).</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1055"/>
-        <location filename="../app/ui/MainWindow.ui" line="1066"/>
-        <location filename="../app/ui/MainWindow.ui" line="1080"/>
-        <location filename="../app/ui/MainWindow.ui" line="1094"/>
-        <location filename="../app/ui/MainWindow.ui" line="1108"/>
-        <location filename="../app/ui/MainWindow.ui" line="1122"/>
+        <location filename="../app/ui/MainWindow.ui" line="1070"/>
+        <location filename="../app/ui/MainWindow.ui" line="1081"/>
+        <location filename="../app/ui/MainWindow.ui" line="1095"/>
+        <location filename="../app/ui/MainWindow.ui" line="1109"/>
+        <location filename="../app/ui/MainWindow.ui" line="1123"/>
+        <location filename="../app/ui/MainWindow.ui" line="1137"/>
         <source>Switch filter to orientation</source>
         <translation>Mudar filtro para orientação</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1069"/>
+        <location filename="../app/ui/MainWindow.ui" line="1084"/>
         <source>Switch filter to split pages</source>
         <translation>Mudar filtro para dividir as páginas</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1083"/>
+        <location filename="../app/ui/MainWindow.ui" line="1098"/>
         <source>Switch filter to deskew</source>
         <translation>Mudar filtro para desenviesar</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1097"/>
+        <location filename="../app/ui/MainWindow.ui" line="1112"/>
         <source>Switch filter to select content</source>
         <translation>Mudar filtro para seleccionar o conteúdo</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1111"/>
+        <location filename="../app/ui/MainWindow.ui" line="1126"/>
         <source>Switch filter to margins</source>
         <translation>Mudar filtro para  margens</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1125"/>
+        <location filename="../app/ui/MainWindow.ui" line="1140"/>
         <source>Switch filter to output</source>
         <translation>Mudar filtro para resultado final</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1139"/>
+        <location filename="../app/ui/MainWindow.ui" line="1154"/>
         <source>Pixels</source>
         <translation>Pixels</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1156"/>
+        <location filename="../app/ui/MainWindow.ui" line="1171"/>
         <source>Millimetres</source>
         <translation>Milímetros</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1170"/>
+        <location filename="../app/ui/MainWindow.ui" line="1185"/>
         <source>Inches</source>
         <translation>Polegadas</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1184"/>
+        <location filename="../app/ui/MainWindow.ui" line="1199"/>
         <source>Centimetres</source>
         <translation>Centímetros</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1195"/>
+        <location filename="../app/ui/MainWindow.ui" line="1210"/>
         <source>Default parameters ...</source>
         <translation>Parâmetros padrão ...</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1262"/>
+        <location filename="../app/ui/MainWindow.ui" line="1277"/>
         <source>Go To Page</source>
         <translation>Ir para a página</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1273"/>
+        <location filename="../app/ui/MainWindow.ui" line="1288"/>
         <source>Magnify thumbnails</source>
         <translation>Ampliar miniaturas</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1281"/>
+        <location filename="../app/ui/MainWindow.ui" line="1296"/>
         <source>Diminish thumbnails</source>
         <translation>Reduzir miniaturas</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1289"/>
-        <location filename="../app/ui/MainWindow.ui" line="1292"/>
+        <location filename="../app/ui/MainWindow.ui" line="1304"/>
+        <location filename="../app/ui/MainWindow.ui" line="1307"/>
         <source>Reload current page</source>
         <translation>Recarregar a página atual</translation>
     </message>
@@ -1999,33 +2012,33 @@ Para determinar o tamanho da páginas, execute o processamento em lote em &quot;
         <translation type="vanished">Eliminar</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="688"/>
+        <location filename="../app/ui/MainWindow.ui" line="691"/>
         <source>Use Home, End, PgUp/Q, PgDown/W to navigate between pages or Shift+PgUp/Q and Shift+PgDown/W to navigate between selected ones. Alt+Wheel - scale thumbnails.</source>
         <translation>Use as teclas Home, End, Page Up / Q, Page Down / W para navegar entre as páginas ou Shift + Page Up / Q e Shift + Page Down / W para navegar entre as páginas selecionadas. Use a tecla Alt e a  Roda do Rato  para modifica o tamanho das miniaturas.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1206"/>
-        <location filename="../app/ui/MainWindow.ui" line="1209"/>
-        <location filename="../app/ui/MainWindow.ui" line="1248"/>
-        <location filename="../app/ui/MainWindow.ui" line="1251"/>
+        <location filename="../app/ui/MainWindow.ui" line="1221"/>
+        <location filename="../app/ui/MainWindow.ui" line="1224"/>
+        <location filename="../app/ui/MainWindow.ui" line="1263"/>
+        <location filename="../app/ui/MainWindow.ui" line="1266"/>
         <source>Previous Selected Page</source>
         <translation>Página Anterior Selecionada</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1220"/>
-        <location filename="../app/ui/MainWindow.ui" line="1223"/>
-        <location filename="../app/ui/MainWindow.ui" line="1234"/>
-        <location filename="../app/ui/MainWindow.ui" line="1237"/>
+        <location filename="../app/ui/MainWindow.ui" line="1235"/>
+        <location filename="../app/ui/MainWindow.ui" line="1238"/>
+        <location filename="../app/ui/MainWindow.ui" line="1249"/>
+        <location filename="../app/ui/MainWindow.ui" line="1252"/>
         <source>Next Selected Page</source>
         <translation>Página Seguinte Seleccionada</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="220"/>
+        <location filename="../app/ui/MainWindow.ui" line="223"/>
         <source>Previous page.</source>
         <translation>Página anterior.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="257"/>
+        <location filename="../app/ui/MainWindow.ui" line="260"/>
         <source>Next page.</source>
         <translation>Página Seguinte.</translation>
     </message>

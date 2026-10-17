@@ -16,6 +16,7 @@ PDF.
    batch
    export_pdf
    settings
+   reporting_problems
 
 .. toctree::
    :maxdepth: 2

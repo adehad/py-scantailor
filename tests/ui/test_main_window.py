@@ -9,6 +9,7 @@ from pytestqt.qtbot import QtBot
 from scantailor.app.ui import MainWindow
 from scantailor.app.ui.dialogs.about import AboutDialog
 from scantailor.app.ui.units_provider import UnitsProvider
+from scantailor.core import diagnostics
 from scantailor.core.models import Dpi, Margins
 from scantailor.core.settings import ApplicationSettings, Units
 from scantailor.core.stage_sequence import FilterStage
@@ -61,6 +62,27 @@ def test_user_guide_action_opens_the_online_manual_in_the_browser(
     manager.actionUserGuide.trigger()
     assert opened == [QtCore.QUrl(MainWindow.USER_GUIDE_URL)]
     assert opened[0].host() == "py-scantailor.readthedocs.io"
+
+
+def test_open_log_folder_creates_and_shows_the_log_folder(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+):
+    folder = tmp_path / "ScanTailor" / "logs"
+    monkeypatch.setattr(diagnostics, "log_folder", lambda: folder)
+    opened: list[QtCore.QUrl] = []
+    monkeypatch.setattr(
+        QtGui.QDesktopServices, "openUrl", lambda url: opened.append(url) or True
+    )
+    manager = MainWindow.MainWindowManager()
+    qtbot.addWidget(manager.ui)
+    help_menu = manager.ui.findChild(QtWidgets.QMenu, "menuHelp")
+    assert manager.actionOpenLogFolder in help_menu.actions()
+    assert manager.actionOpenLogFolder.toolTip()
+
+    manager.actionOpenLogFolder.trigger()
+
+    assert folder.is_dir()
+    assert opened == [QtCore.QUrl.fromLocalFile(str(folder))]
 
 
 def test_navigation_without_a_project_keeps_no_current_page(
