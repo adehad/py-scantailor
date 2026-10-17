@@ -3,6 +3,9 @@
 # main. The release workflow publishes that draft when a v* tag is pushed.
 name-template: "v$RESOLVED_VERSION"
 tag-template: "v$RESOLVED_VERSION"
+# Every release so far is an rc pre-release; without this the draft finds no
+# earlier release and lists no changes.
+include-pre-releases: true
 change-template: "- $TITLE (#$NUMBER) by @$AUTHOR"
 change-title-escapes: '\<*_&'
 template: |
