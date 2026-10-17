@@ -1,5 +1,6 @@
 """The thumbnail of the page on screen reuses the render the view already shows."""
 
+import gc
 from pathlib import Path
 
 import numpy as np
@@ -81,6 +82,23 @@ def test_a_new_request_or_a_cancel_drops_the_kept_image(
     _render(qtbot, renderer, page, stages, FilterStage.DESKEW, tag="a")
     renderer.cancel()
     assert renderer.rendered(page, FilterStage.DESKEW, "a") is None
+
+
+def test_a_renderer_that_has_rendered_is_freed_without_the_cycle_collector(
+    qtbot: QtBot, page: PageId
+) -> None:
+    renderer = PageRenderer()
+    _render(qtbot, renderer, page, _stages(page), FilterStage.DESKEW, tag="a")
+    destroyed: list[bool] = []
+    renderer.destroyed.connect(lambda: destroyed.append(True))
+    was_enabled = gc.isenabled()
+    gc.disable()
+    try:
+        del renderer
+        assert destroyed
+    finally:
+        if was_enabled:
+            gc.enable()
 
 
 def test_a_shrunk_page_fits_the_box_and_keeps_its_shape() -> None:

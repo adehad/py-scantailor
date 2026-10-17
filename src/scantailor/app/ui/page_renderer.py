@@ -2,6 +2,7 @@
 
 import hashlib
 import threading
+import weakref
 from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 
@@ -467,7 +468,9 @@ class _RenderTask(QtCore.QRunnable):
         self._signals = signals
         self._sources = sources
         self._pixels = pixels
-        self._finished = finished
+        # Weak, so that a task finishing on a pool thread never holds the last
+        # reference to the renderer and destroys it there.
+        self._finished = weakref.WeakMethod(finished)
         self._extras = extras
         self.image: NDArray[np.uint8] | None = None
 
@@ -477,7 +480,9 @@ class _RenderTask(QtCore.QRunnable):
             if not self.cancelled.is_set():
                 self._render_and_report()
         finally:
-            self._finished(self)
+            finished = self._finished()
+            if finished is not None:
+                finished(self)
 
     def _report_extras(self, extras: OutputExtras) -> None:
         if not self.cancelled.is_set():

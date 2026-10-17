@@ -404,7 +404,7 @@ class MainWindowManager:
         self.projectFile = ""
         self.optionsWidget = None
 
-        self.settings = QtCore.QSettings()
+        self.settings = QtCore.QSettings(self.ui)
         # self.units = self.unitsFromString(self.settings.value("units", "PIXELS"))
 
         # UI element assignments from .ui file
