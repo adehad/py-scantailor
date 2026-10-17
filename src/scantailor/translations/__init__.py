@@ -1,12 +1,18 @@
 """Load the application's and Qt's translations for a locale.
 
-Compiled .qm files are built from the .ts sources by tools/build_translations.py.
+Qt loads compiled .qm catalogues, which are build output made from the .ts
+sources. Release bundles and wheels ship them; a source checkout compiles them
+on first use into the user's cache folder.
 """
 
 import pathlib
+import subprocess
+import tempfile
 
 from loguru import logger
 from PySide6 import QtCore, QtWidgets
+
+from .catalogues import compile_all, find_lrelease, sources_digest, translation_sources
 
 TRANSLATIONS_DIR = pathlib.Path(__file__).parent
 _APP_PREFIX = "scantailor"
@@ -57,6 +63,57 @@ def qt_translations_dir() -> pathlib.Path:
     )
 
 
+def _compiled_in(sources: list[pathlib.Path], folder: pathlib.Path) -> bool:
+    """Whether ``folder`` holds a catalogue for each source."""
+    return all((folder / f"{source.stem}.qm").is_file() for source in sources)
+
+
+def _default_cache_root() -> pathlib.Path:
+    location = QtCore.QStandardPaths.writableLocation(
+        QtCore.QStandardPaths.StandardLocation.CacheLocation
+    )
+    base = pathlib.Path(location) if location else pathlib.Path(tempfile.gettempdir())
+    return base / "translations"
+
+
+def compiled_directory(
+    directory: pathlib.Path = TRANSLATIONS_DIR,
+    cache_root: pathlib.Path | None = None,
+) -> pathlib.Path:
+    """Find the folder to load catalogues from, compiling them when they are missing.
+
+    A folder with no .ts sources, as in a release bundle, or with a .qm beside
+    every source, as in a wheel or after tools/build_translations.py, is used
+    as it is. Otherwise the sources are compiled into a folder of the cache
+    named after their digest, so that an edited source is compiled again and
+    checkouts at other commits do not share catalogues.
+
+    Args:
+        directory (pathlib.Path): Folder holding the scantailor_*.ts sources,
+            the compiled catalogues, or both.
+        cache_root (pathlib.Path | None): Where compiled catalogues are kept;
+            None uses the application's cache folder.
+
+    Returns:
+        pathlib.Path: Folder holding the catalogues; ``directory`` itself when
+            they could not be compiled, which leaves the UI in English.
+    """
+    sources = translation_sources(directory)
+    if _compiled_in(sources, directory):
+        return directory
+    root = cache_root if cache_root is not None else _default_cache_root()
+    target = root / sources_digest(directory)
+    if _compiled_in(sources, target):
+        return target
+    try:
+        compile_all(directory, target, find_lrelease())
+    except (OSError, subprocess.CalledProcessError) as error:
+        logger.warning(f"Could not compile the translations: {error}")
+        return directory
+    logger.info(f"Compiled {len(sources)} translations into {target}")
+    return target
+
+
 def load_translation(
     app: QtWidgets.QApplication,
     locale: QtCore.QLocale | None = None,
@@ -79,7 +136,8 @@ def load_translation(
     Args:
         app (QtWidgets.QApplication): Application to install the translators on.
         locale (QtCore.QLocale | None): Locale to load; None uses the system locale.
-        directory (pathlib.Path): Folder holding the compiled scantailor_*.qm files.
+        directory (pathlib.Path): Folder holding the scantailor_*.qm catalogues
+            or the .ts sources to compile them from; see ``compiled_directory``.
 
     Returns:
         list[QtCore.QTranslator]: Translators that were loaded and installed, Qt base
@@ -90,7 +148,7 @@ def load_translation(
     installed: list[QtCore.QTranslator] = []
     sources = (
         (_QT_BASE_PREFIX, qt_translations_dir()),
-        (_APP_PREFIX, directory),
+        (_APP_PREFIX, compiled_directory(directory)),
     )
     for prefix, folder in sources:
         translator = QtCore.QTranslator(app)

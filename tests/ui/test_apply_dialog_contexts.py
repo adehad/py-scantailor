@@ -1,7 +1,6 @@
 """Each stage apply dialog translates its labels under its own class name."""
 
 import ast
-import importlib.util
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -28,6 +27,7 @@ from scantailor.core.models import ImageId, PageId, SubPage
 from scantailor.core.stage_sequence import FilterStage
 from scantailor.filters.output.params import ApplyGroup
 from scantailor.translations import TRANSLATIONS_DIR, load_translation
+from scantailor.translations.catalogues import compile_all, find_lrelease
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _APPLY_TO_SOURCE = _REPO_ROOT / "src/scantailor/app/ui/dialogs/apply_to.py"
@@ -124,14 +124,8 @@ def german_qm_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
     Returns:
         Path: Folder holding the compiled scantailor_*.qm files.
     """
-    spec = importlib.util.spec_from_file_location(
-        "build_translations", _REPO_ROOT / "tools" / "build_translations.py"
-    )
-    assert spec is not None and spec.loader is not None
-    build_script: Any = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(build_script)
     out_dir = tmp_path_factory.mktemp("qm")
-    build_script.compile_all(TRANSLATIONS_DIR, out_dir, build_script.find_lrelease())
+    compile_all(TRANSLATIONS_DIR, out_dir, find_lrelease())
     return out_dir
 
 
