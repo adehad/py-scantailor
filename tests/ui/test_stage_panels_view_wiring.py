@@ -1,5 +1,6 @@
 """What the stage panels hand to the views: halves, content masks, tab pictures."""
 
+import gc
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -326,6 +327,24 @@ class TestContentMask:
         assert isinstance(mask, ContentMask)
         assert not mask.is_null()
         assert mask.find_content_in_area(60, 140, 100, 60) is not None
+
+    def test_dropped_panels_free_their_view_without_the_cycle_collector(self):
+        panels = StagePanels(FilterStage.SELECT_CONTENT, StageSequence())
+        panels._page = PAGE
+        panels.options.set_current_page(PAGE)  # type: ignore[attr-defined]
+        panels._source = _source()
+        panels._stage_image = np.zeros((HEIGHT, WIDTH), dtype=np.uint8)
+        panels._refresh_geometry()
+        destroyed: list[bool] = []
+        panels.view.destroyed.connect(lambda: destroyed.append(True))
+        was_enabled = gc.isenabled()
+        gc.disable()
+        try:
+            del panels
+            assert destroyed
+        finally:
+            if was_enabled:
+                gc.enable()
 
     def test_the_mask_is_computed_once_for_an_unchanged_page(self, monkeypatch):
         from scantailor.app.ui import stage_panels

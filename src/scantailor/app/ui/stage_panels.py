@@ -9,6 +9,7 @@ the decoded sources the renderer shares, decoding it off the GUI thread when it
 is not there yet.
 """
 
+import weakref
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import cast
@@ -801,15 +802,21 @@ class StagePanels(QtCore.QObject):
             xform.resulting_pre_crop_area.tobytes(),
         )
 
+        # The view keeps the provider, and these panels keep the view.
+        owner = weakref.ref(self)
+
         def provide() -> ContentMask | None:
-            source = self._source
+            panels = owner()
+            if panels is None:
+                return None
+            source = panels._source
             if source is None or source.image_id != page.image_id:
                 return None
-            cached = self._content_mask
+            cached = panels._content_mask
             if cached is None or cached[0] != key:
                 oriented = rotate_orthogonal(source.pixels, rotation)
                 cached = (key, compute_content_mask(oriented, xform))
-                self._content_mask = cached
+                panels._content_mask = cached
             return cached[1]
 
         return provide

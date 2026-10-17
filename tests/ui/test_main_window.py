@@ -22,6 +22,15 @@ def test_main_window_opens(qtbot: QtBot):
     qtbot.wait_active(window)
 
 
+def test_the_window_owns_its_settings_and_the_application_owns_the_units(
+    qtbot: QtBot, qapp: QtWidgets.QApplication
+):
+    manager = MainWindow.MainWindowManager()
+    qtbot.addWidget(manager.ui)
+    assert manager.settings.parent() is manager.ui
+    assert UnitsProvider.get_instance().parent() is qapp
+
+
 def test_show_about(qtbot: QtBot):
     manager = MainWindow.MainWindowManager()
     window = manager.ui
