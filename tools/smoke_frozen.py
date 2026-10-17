@@ -174,7 +174,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     with tempfile.TemporaryDirectory(prefix="scantailor-smoke-") as scratch:
         try:
-            smoke(args.cli.resolve(), args.workers, Path(scratch))
+            # Not resolve(): an AppImage picks the CLI by the symlink name it
+            # was started through.
+            smoke(args.cli.absolute(), args.workers, Path(scratch))
         except (SmokeFailure, subprocess.TimeoutExpired) as error:
             sys.stderr.write(f"smoke test FAILED: {error}\n")
             return 1

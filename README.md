@@ -66,16 +66,17 @@ and assembling multi-page documents are out of scope of this project.
 
 ## Building
 
-**Downloads:** every `v*` tag publishes three archives on the [GitHub Releases](https://github.com/adehad/py-scantailor/releases) page. Each carries its own Python and Qt, and nothing in the pipeline uses a GPU, so there is one build per platform.
+**Downloads:** every `v*` tag publishes three archives and a Linux AppImage on the [GitHub Releases](https://github.com/adehad/py-scantailor/releases) page. Each carries its own Python and Qt, and nothing in the pipeline uses a GPU, so there is one build per platform.
 
 | Platform | Archive | Window | Command line |
 | --- | --- | --- | --- |
 | Windows x64 | `ScanTailor-<tag>-windows-x64.zip` | `ScanTailor\ScanTailor.exe` | `ScanTailor\scantailor-cli.exe` |
 | Linux x64 | `ScanTailor-<tag>-linux-x64.tar.gz` | `ScanTailor/ScanTailor` | `ScanTailor/scantailor-cli` |
+| Linux x64 | `ScanTailor-<tag>-linux-x64.AppImage` | the AppImage | a symlink to it named `scantailor-cli` |
 | macOS Apple Silicon | `ScanTailor-<tag>-macos-arm64.zip` | `ScanTailor.app` | `ScanTailor.app/Contents/MacOS/scantailor-cli` |
 
 - **Windows:** unzip anywhere and run `ScanTailor.exe`. The folder also carries the Visual C++ runtime, so nothing else needs installing.
-- **Linux:** unpack with `tar -xzf ScanTailor-<tag>-linux-x64.tar.gz` and run `ScanTailor/ScanTailor`. It is built on Ubuntu 22.04 and needs glibc 2.35 or newer. Qt's X11 plugin uses the system's xcb libraries; if the window does not open, install them (on Debian and Ubuntu: `sudo apt install libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libegl1`). The command line runs without a display when `QT_QPA_PLATFORM=offscreen` is set.
+- **Linux:** unpack with `tar -xzf ScanTailor-<tag>-linux-x64.tar.gz` and run `ScanTailor/ScanTailor`. It is built on Ubuntu 22.04 and needs glibc 2.35 or newer. Qt's X11 plugin uses the system's xcb libraries; if the window does not open, install them (on Debian and Ubuntu: `sudo apt install libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libegl1`). The command line runs without a display when `QT_QPA_PLATFORM=offscreen` is set. The AppImage is the same build as one file: `chmod +x` it and run it, or start it through a symlink named `scantailor-cli` for the command line; without FUSE, pass `--appimage-extract-and-run`.
 - **macOS:** needs macOS 15 or later. Unzip and move `ScanTailor.app` to Applications. The app is not signed with an Apple Developer ID or notarised, so the first launch is blocked: right-click the app and choose **Open**; if macOS only offers to move it to the Bin, open it once, then allow it under **System Settings > Privacy & Security > Open Anyway**. The command line lives inside the bundle because it shares the bundle's libraries; link it onto your `PATH` with `ln -s /Applications/ScanTailor.app/Contents/MacOS/scantailor-cli /usr/local/bin/`. Intel Macs are not built; run from source there.
 
 **From source** (Windows, Linux or macOS) needs Python 3.14 and [PDM](https://pdm-project.org):
@@ -464,4 +465,4 @@ git push origin v1.0.0-rc1
 
 [`.github/workflows/release.yml`](.github/workflows/release.yml) then compiles the translations, builds the executables on each platform, smoke-tests them and creates a GitHub Release for the tag with the archives attached and generated release notes. Tags containing `-rc`, `-alpha` or `-beta` are published as pre-releases.
 
-Linux (Ubuntu 22.04) and macOS (Apple Silicon, macOS 15) are built alongside Windows. The full test suite runs on every push to `main` in the test workflow, so a release does not repeat it; every build runs [`tools/smoke_frozen.py`](tools/smoke_frozen.py), which drives the frozen `scantailor-cli` through `create`, `run` and `export pdf` on a few sample pages. Running the workflow by hand from the Actions tab (or `gh workflow run release.yml --ref <branch>`) builds and smoke-tests all three without publishing; those archives are named with the short commit hash instead of a tag.
+Linux (Ubuntu 22.04) and macOS (Apple Silicon, macOS 15) are built alongside Windows. The full test suite runs on every push to `main` in the test workflow, so a release does not repeat it; every build runs [`tools/smoke_frozen.py`](tools/smoke_frozen.py), which drives the frozen `scantailor-cli` through `create`, `run` and `export pdf` on a few sample pages. Running the workflow by hand from the Actions tab (or `gh workflow run release.yml --ref <branch>`) builds and smoke-tests all three and the AppImage without publishing; those files are named with the short commit hash instead of a tag.
