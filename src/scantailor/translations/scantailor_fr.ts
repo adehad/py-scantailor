@@ -5285,15 +5285,15 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="204"/>
-        <source>Width of the content box in millimetres, worked out from the image resolution. Drag the box edges in the page view to change it.</source>
+        <source>Width of the page box in the units chosen in the settings. Type a value to resize the box from its top left corner, or drag its edges in the page view.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Largeur des bornes du contenu en millimètres, calculée à partir de la résolution de l&apos;image. Faites glisser les bords dans la vue de la page pour la modifier.</translation>
+        <translation>Largeur des bornes de la page dans l&apos;unité choisie dans les paramètres. Saisissez une valeur pour redimensionner les bornes depuis leur coin supérieur gauche, ou faites glisser leurs bords dans la vue de la page.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="218"/>
-        <source>Height of the content box in millimetres, worked out from the image resolution. Drag the box edges in the page view to change it.</source>
+        <source>Height of the page box in the units chosen in the settings. Type a value to resize the box from its top left corner, or drag its edges in the page view.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Hauteur des bornes du contenu en millimètres, calculée à partir de la résolution de l&apos;image. Faites glisser les bords dans la vue de la page pour la modifier.</translation>
+        <translation>Hauteur des bornes de la page dans l&apos;unité choisie dans les paramètres. Saisissez une valeur pour redimensionner les bornes depuis leur coin supérieur gauche, ou faites glisser leurs bords dans la vue de la page.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="238"/>

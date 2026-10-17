@@ -5328,15 +5328,15 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="204"/>
-        <source>Width of the content box in millimetres, worked out from the image resolution. Drag the box edges in the page view to change it.</source>
+        <source>Width of the page box in the units chosen in the settings. Type a value to resize the box from its top left corner, or drag its edges in the page view.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Ширина полезной области в миллиметрах, рассчитанная по разрешению изображения. Чтобы изменить её, перетащите края области в окне страницы.</translation>
+        <translation>Ширина зоны распознавания в единицах, выбранных в настройках. Введите значение, чтобы изменить размер зоны от её левого верхнего угла, или перетащите её края в окне страницы.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="218"/>
-        <source>Height of the content box in millimetres, worked out from the image resolution. Drag the box edges in the page view to change it.</source>
+        <source>Height of the page box in the units chosen in the settings. Type a value to resize the box from its top left corner, or drag its edges in the page view.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Высота полезной области в миллиметрах, рассчитанная по разрешению изображения. Чтобы изменить её, перетащите края области в окне страницы.</translation>
+        <translation>Высота зоны распознавания в единицах, выбранных в настройках. Введите значение, чтобы изменить размер зоны от её левого верхнего угла, или перетащите её края в окне страницы.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="238"/>
