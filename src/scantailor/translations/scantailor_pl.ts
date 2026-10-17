@@ -2513,6 +2513,18 @@ Przetworzyć je teraz? Po zakończeniu przetwarzania wyeksportuj PDF ponownie.</
         <source>Clear All Zones</source>
         <translation>Wyczyść wszystkie obszary</translation>
     </message>
+    <message>
+        <location filename="../app/ui/image_views/output.py" line="1727"/>
+        <source>Show grid</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Pokaż siatkę</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/output.py" line="1730"/>
+        <source>Draw a line every 10 mm across the page, through its centre, to compare positions between pages.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Rysuje linię co 10 mm na stronie, przez jej środek, aby porównywać położenie między stronami.</translation>
+    </message>
 </context>
 <context>
     <name>PdfExportDialog</name>
@@ -4739,6 +4751,18 @@ Niezaznaczone: biały tekst na czarnym tle</translation>
         <location filename="../app/ui/image_views/page_layout.py" line="60"/>
         <source>Drag the guide.</source>
         <translation>Przesuń linię pomocniczą.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/page_layout.py" line="245"/>
+        <source>Show grid</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Pokaż siatkę</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/page_layout.py" line="251"/>
+        <source>Draw a line every 10 mm across the page, through its centre, to compare positions between pages.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Rysuje linię co 10 mm na stronie, przez jej środek, aby porównywać położenie między stronami.</translation>
     </message>
 </context>
 <context>

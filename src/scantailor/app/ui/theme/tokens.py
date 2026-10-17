@@ -52,6 +52,7 @@ class ViewColors:
         margin_outer_fill (str): Margins outer rectangle tint.
         guide (str): Alignment guide.
         guide_active (str): Alignment guide under the cursor.
+        page_grid (str): Millimetre grid over the page in Margins and Output.
         zone_picture_border (str): Picture zone outline.
         zone_picture_fill (str): Picture zone tint.
         zone_fill_border (str): Fill zone outline.
@@ -87,6 +88,7 @@ class ViewColors:
     margin_outer_fill: str
     guide: str
     guide_active: str
+    page_grid: str
     zone_picture_border: str
     zone_picture_fill: str
     zone_fill_border: str
@@ -207,6 +209,7 @@ LIGHT = Tokens(
         margin_outer_fill="rgba(160, 0, 160, 14)",
         guide="rgba(220, 110, 0, 200)",
         guide_active="#f08000",
+        page_grid="rgba(0, 110, 130, 80)",
         zone_picture_border="rgba(0, 80, 220, 220)",
         zone_picture_fill="rgba(0, 80, 220, 55)",
         zone_fill_border="rgba(0, 135, 50, 220)",
@@ -269,6 +272,7 @@ DARK = Tokens(
         margin_outer_fill="rgba(190, 80, 190, 20)",
         guide="rgba(240, 140, 30, 210)",
         guide_active="#ff9a1f",
+        page_grid="rgba(60, 170, 190, 110)",
         zone_picture_border="rgba(70, 140, 250, 230)",
         zone_picture_fill="rgba(70, 140, 250, 60)",
         zone_fill_border="rgba(40, 170, 75, 230)",

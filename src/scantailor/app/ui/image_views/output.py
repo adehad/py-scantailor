@@ -8,6 +8,7 @@ tabs, as in upstream, each tab has one job.
 ``DewarpingImageView`` is the dewarping grid on a view of its own.
 """
 
+import contextlib
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -49,6 +50,7 @@ from scantailor.app.ui.image_views.base import (
 )
 from scantailor.app.ui.image_views.despeckle_preview import DespecklePreviewer
 from scantailor.app.ui.image_views.dewarp_editor import DewarpEditor
+from scantailor.app.ui.image_views.page_grid import paint_page_grid
 from scantailor.app.ui.image_views.picture_mask_overlay import (
     MaskZone,
     PictureMaskOverlay,
@@ -306,7 +308,9 @@ class OutputImageView(ImageViewBase):
 
     Optional guides, a dashed cross through the centre of the view, help to
     judge the alignment of the output. The choice is kept in the application
-    settings under ``SHOW_GUIDES_KEY``.
+    settings under ``SHOW_GUIDES_KEY``. An optional millimetre grid through the
+    page centre does the same for positions off the centre; it needs
+    ``set_mm_per_pixel`` and is kept in ``ApplicationSettings``.
 
     Signals:
         zones_changed: The user created, reshaped, removed or recoloured a zone.
@@ -356,6 +360,8 @@ class OutputImageView(ImageViewBase):
         self._show_guides = bool(
             QSettings().value(self.SHOW_GUIDES_KEY, False, type=bool)
         )
+        self._grid_shown = ApplicationSettings.get_instance().output_grid_shown
+        self._mm_per_pixel = (0.0, 0.0)
 
         self._tab: ImageViewTab | None = None
         self._tabs: list[ImageViewTab] = []
@@ -422,6 +428,38 @@ class OutputImageView(ImageViewBase):
         """
         self._show_guides = shown
         QSettings().setValue(self.SHOW_GUIDES_KEY, shown)
+        self.update()
+
+    def grid_shown(self) -> bool:
+        """Return whether the millimetre grid is drawn over the page.
+
+        Returns:
+            bool: True while the grid shows.
+        """
+        return self._grid_shown
+
+    def set_grid_shown(self, shown: bool) -> None:
+        """Show or hide the millimetre grid and remember the choice.
+
+        Args:
+            shown (bool): True to draw the grid.
+        """
+        self._grid_shown = shown
+        settings = ApplicationSettings.get_instance()
+        settings.output_grid_shown = shown
+        # save() has logged the failure; the view still follows the choice.
+        with contextlib.suppress(OSError):
+            settings.save()
+        self.update()
+
+    def set_mm_per_pixel(self, horizontal: float, vertical: float) -> None:
+        """Set how many millimetres one pixel of the output page measures.
+
+        Args:
+            horizontal (float): Millimetres per pixel along x; 0 hides the grid.
+            vertical (float): Millimetres per pixel along y; 0 hides the grid.
+        """
+        self._mm_per_pixel = (horizontal, vertical)
         self.update()
 
     # Images and tabs
@@ -1153,6 +1191,14 @@ class OutputImageView(ImageViewBase):
     # Painting
 
     def _paint_overlay(self, painter: QPainter) -> None:
+        # The dewarping tab shows the page before dewarping, at another scale.
+        if self._grid_shown and self._tab is not ImageViewTab.DEWARPING:
+            paint_page_grid(
+                painter,
+                self._virtual_crop_area.boundingRect(),
+                self._mm_per_pixel,
+                self.virtual_to_widget,
+            )
         if self._tab is ImageViewTab.DEWARPING:
             self._dewarp.paint(painter)
         elif not self._pickup.is_active():
@@ -1678,6 +1724,17 @@ class OutputImageView(ImageViewBase):
         guides.setCheckable(True)
         guides.setChecked(self._show_guides)
         guides.toggled.connect(self.set_guides_shown)
+        grid = menu.addAction(icon("layout-grid"), self.tr("Show grid"))
+        grid.setToolTip(
+            self.tr(
+                "Draw a line every 10 mm across the page, through its centre, "
+                "to compare positions between pages."
+            )
+        )
+        grid.setCheckable(True)
+        grid.setChecked(self._grid_shown)
+        grid.toggled.connect(self.set_grid_shown)
+        menu.setToolTipsVisible(True)
         return menu
 
     def _add_creation_items(self, menu: QtWidgets.QMenu) -> None:

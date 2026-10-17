@@ -118,6 +118,10 @@ Guides
      - Takes the guides away.
    * - **Show hard margins rectangle**
      - Shows or hides the middle rectangle.
+   * - **Show grid**
+     - Draws a line every 10 mm through the centre of the page, for comparing
+       positions between pages. Zoomed out, every other line is left out. Pages
+       that are not aligned offer only this item. The choice is remembered.
 
 Hold **Ctrl+Alt** and drag a guide to move it. ScanTailor measures guides from the
 centre of the page, so a guide keeps its place on pages of every size. Double click

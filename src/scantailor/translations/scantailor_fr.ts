@@ -2511,6 +2511,18 @@ Les traiter maintenant? Exportez à nouveau le PDF une fois le traitement termin
         <source>Clear All Zones</source>
         <translation>Effacer toutes les zones</translation>
     </message>
+    <message>
+        <location filename="../app/ui/image_views/output.py" line="1727"/>
+        <source>Show grid</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Afficher la grille</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/output.py" line="1730"/>
+        <source>Draw a line every 10 mm across the page, through its centre, to compare positions between pages.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Trace une ligne tous les 10 mm sur la page, en passant par son centre, pour comparer les positions d&apos;une page à l&apos;autre.</translation>
+    </message>
 </context>
 <context>
     <name>PdfExportDialog</name>
@@ -4727,6 +4739,18 @@ Non coché: texte blanc sur fond noir</translation>
         <location filename="../app/ui/image_views/page_layout.py" line="60"/>
         <source>Drag the guide.</source>
         <translation>Glisser le guide.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/page_layout.py" line="245"/>
+        <source>Show grid</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Afficher la grille</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/page_layout.py" line="251"/>
+        <source>Draw a line every 10 mm across the page, through its centre, to compare positions between pages.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Trace une ligne tous les 10 mm sur la page, en passant par son centre, pour comparer les positions d&apos;une page à l&apos;autre.</translation>
     </message>
 </context>
 <context>

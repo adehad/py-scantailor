@@ -886,6 +886,8 @@ class StagePanels(QtCore.QObject):
         scale = np.array([image.shape[1] / rect.width, image.shape[0] / rect.height])
         self._output_transformation = xform
         self._output_scale = scale
+        mm_x, mm_y = rect_size_mm(xform, Rect(x=0, y=0, width=1, height=1))
+        view.set_mm_per_pixel(mm_x / scale[0], mm_y / scale[1])
         params = self.sequence.output_filter.get_params(page)
         mapper = _fill_zone_mapper(params, xform, scale, image)
         self._fill_zone_mapper = mapper
