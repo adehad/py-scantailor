@@ -41,6 +41,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     session = diagnostics.configure_logging(
         "cli",
         stderr_level="INFO" if args.verbose else "WARNING",
+        log_file=args.log_file,
         write_to_log_folder=args.command in _COMMANDS_WITH_A_LOG_FILE,
     )
     exit_code = _run(args, session.log_file)

@@ -23,6 +23,13 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--verbose", action="store_true", help="log progress to stderr")
+    parser.add_argument(
+        "--log-file",
+        type=Path,
+        metavar="PATH",
+        help="write the full log to PATH (run and export write one to the log "
+        "folder without it)",
+    )
     commands = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
 
     create = commands.add_parser(
