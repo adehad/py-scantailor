@@ -1,0 +1,70 @@
+---
+# Release Drafter keeps one draft release up to date as pull requests merge into
+# main. The release workflow publishes that draft when a v* tag is pushed.
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+change-template: "- $TITLE (#$NUMBER) by @$AUTHOR"
+change-title-escapes: '\<*_&'
+template: |
+  $CHANGES
+
+categories:
+  - type: pre-exclude
+    when:
+      label: skip-changelog
+  - title: Features
+    semver-increment: minor
+    exclusive: true
+    when:
+      labels: [enhancement, parity, ui]
+  - title: Fixes
+    exclusive: true
+    when:
+      labels: [bug, upstream-bug]
+  - title: Performance
+    exclusive: true
+    when:
+      label: performance
+  - title: Translations
+    exclusive: true
+    when:
+      label: translations
+  - title: Packaging
+    exclusive: true
+    when:
+      label: packaging
+  - title: Documentation
+    exclusive: true
+    when:
+      label: documentation
+  - title: Tests and maintenance
+    exclusive: true
+    when:
+      labels: [tests, tech-debt]
+  - title: Other changes
+  - type: version-resolver
+    semver-increment: major
+    when:
+      label: breaking
+  - type: version-resolver
+    semver-increment: patch
+
+autolabeler:
+  - labels: [bug]
+    branch: ['/^fix\//']
+  - labels: [enhancement]
+    branch: ['/^(feat|port)\//']
+  - labels: [ui]
+    branch: ['/^ui\//']
+  - labels: [documentation]
+    branch: ['/^docs\//']
+  - labels: [packaging]
+    branch: ['/^(build|ci)\//']
+  - labels: [performance]
+    branch: ['/^perf\//']
+  - labels: [tech-debt]
+    branch: ['/^refactor\//']
+  - labels: [tests]
+    branch: ['/^test\//']
+  - labels: [translations]
+    branch: ['/^translations?\//']
