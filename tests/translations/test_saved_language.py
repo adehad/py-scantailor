@@ -63,6 +63,35 @@ def test_saved_language_is_applied_at_startup(
     assert shown_text() == _GERMAN
 
 
+def test_startup_logs_the_language_and_the_catalogues_loaded(
+    qapp: QtWidgets.QApplication,
+    compiled_qm_dir: pathlib.Path,
+    removed_translators: None,
+    log_messages: list[str],
+) -> None:
+    """The log names the language and each catalogue file, for reports like #55."""
+    save_language("de")
+
+    install_saved_language(qapp, compiled_qm_dir)
+
+    line = next(m for m in log_messages if m.startswith("UI language de (de_DE): "))
+    assert "scantailor_de.qm" in line
+
+
+def test_startup_logs_when_no_catalogue_loaded(
+    qapp: QtWidgets.QApplication,
+    compiled_qm_dir: pathlib.Path,
+    removed_translators: None,
+    log_messages: list[str],
+) -> None:
+    """A language without a catalogue is logged as English."""
+    save_language("xx")
+
+    install_saved_language(qapp, compiled_qm_dir)
+
+    assert "UI language xx (C): no catalogue loaded, English" in log_messages
+
+
 @pytest.mark.parametrize(
     "language",
     [

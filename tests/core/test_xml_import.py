@@ -5,7 +5,6 @@ import shutil
 from pathlib import Path
 
 import pytest
-from loguru import logger
 
 from scantailor.core import xml_reader
 from scantailor.core.models import Dpi, ImageId, OrthogonalRotation, PageId, SubPage
@@ -1070,17 +1069,16 @@ class TestProjectFileEncoding:
         assert imported.project.images[0].id.file_path.parent.name == "Café"
 
     def test_cp1252_fallback_logs_a_warning(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        log_messages: list[str],
     ):
         monkeypatch.setattr(xml_reader, "_ansi_codepage", lambda: "cp1252")
-        messages: list[str] = []
-        sink = logger.add(messages.append, level="WARNING", format="{message}")
-        try:
-            import_xml_project_file(_write_project(tmp_path, "cp1252"))
-        finally:
-            logger.remove(sink)
 
-        assert any("cp1252" in message for message in messages)
+        import_xml_project_file(_write_project(tmp_path, "cp1252"))
+
+        assert any("cp1252" in message for message in log_messages)
 
     def test_declared_codepage_is_used_directly(self, tmp_path: Path):
         project_file = _write_project(
