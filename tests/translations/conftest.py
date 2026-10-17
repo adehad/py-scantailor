@@ -9,6 +9,7 @@ import pytest
 from PySide6 import QtCore, QtWidgets
 
 from scantailor.translations import TRANSLATIONS_DIR
+from scantailor.translations.catalogues import compile_all, find_lrelease
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -30,9 +31,7 @@ def build_script() -> ModuleType:
 
 
 @pytest.fixture(scope="session")
-def compiled_qm_dir(
-    build_script: ModuleType, tmp_path_factory: pytest.TempPathFactory
-) -> pathlib.Path:
+def compiled_qm_dir(tmp_path_factory: pytest.TempPathFactory) -> pathlib.Path:
     """Compile every bundled .ts file once per session.
 
     The .qm files are gitignored build output, so tests compile their own copy
@@ -42,7 +41,7 @@ def compiled_qm_dir(
         pathlib.Path: Folder holding the compiled scantailor_*.qm files.
     """
     out_dir = tmp_path_factory.mktemp("qm")
-    build_script.compile_all(TRANSLATIONS_DIR, out_dir, build_script.find_lrelease())
+    compile_all(TRANSLATIONS_DIR, out_dir, find_lrelease())
     return out_dir
 
 
