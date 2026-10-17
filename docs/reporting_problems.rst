@@ -61,3 +61,12 @@ can replace names you do not want to share; keep the rest of each line.
 If one page comes out wrong, the log shows what ScanTailor decided, but the scan
 itself is often what makes the problem reproducible. Attach that page too if you
 can share it.
+
+The command line
+****************
+
+``scantailor-cli run`` and ``scantailor-cli export`` write a log in the same
+folder. Other commands write one only with ``--log-file PATH``, which also
+works for ``run`` and ``export`` to put the log somewhere else, for example in a
+CI job's artefacts. When a command fails unexpectedly, its error message names
+the log file.
