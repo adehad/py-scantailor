@@ -825,3 +825,38 @@ class TestPdfSourceAndTextGeometry:
 
         assert project.pdf_sources == []
         assert project.text_geometry == []
+
+
+class TestMostCommonDpi:
+    @staticmethod
+    def _project(*dpis: Dpi) -> Project:
+        project = Project()
+        for index, dpi in enumerate(dpis):
+            project.add_image(
+                ImageId(file_path=Path(f"scan_{index}.png")),
+                ImageMetadata(width=1200, height=1600, dpi=dpi),
+            )
+        return project
+
+    def test_the_resolution_most_images_share_wins(self):
+        project = self._project(Dpi.uniform(300), Dpi.uniform(600), Dpi.uniform(300))
+
+        assert project.most_common_dpi() == Dpi.uniform(300)
+
+    def test_one_resolution_for_every_image_is_the_most_common(self):
+        project = self._project(Dpi(horizontal=300, vertical=600))
+
+        assert project.most_common_dpi() == Dpi(horizontal=300, vertical=600)
+
+    def test_a_tie_has_no_most_common_resolution(self):
+        project = self._project(Dpi.uniform(300), Dpi.uniform(600))
+
+        assert project.most_common_dpi() is None
+
+    def test_images_without_a_usable_resolution_are_not_counted(self):
+        project = self._project(Dpi(), Dpi(), Dpi.uniform(400))
+
+        assert project.most_common_dpi() == Dpi.uniform(400)
+
+    def test_an_empty_project_has_no_most_common_resolution(self):
+        assert Project().most_common_dpi() is None

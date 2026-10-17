@@ -653,6 +653,7 @@ class MainWindowManager:
         if self._panels is not None:
             self._panels.set_dpi_overrides(self._dpi_overrides)
             self._show_source_image_info()
+        self._show_source_dpi()
 
     def _thumbnail_digest(self, page: PageId, _stage: str) -> Hashable:
         """Return what identifies the parameters a page's thumbnail was made with."""
@@ -1315,13 +1316,22 @@ class MainWindowManager:
         self._request_render()
 
     def _update_status_bar(self) -> None:
-        """Show the position and name of the current page in the status bar."""
+        """Show the position, name and source DPI of the current page."""
         page = self._current_page
         displayed = self.thumbnails.pages()
         if page is None or page not in displayed:
             self.status_panel.clear()
             return
         self.status_panel.update_page(displayed.index(page) + 1, len(displayed), page)
+        self._show_source_dpi()
+
+    def _show_source_dpi(self) -> None:
+        info = self._current_image_info()
+        project = self.project
+        self.status_panel.set_source_dpi(
+            None if info is None else info.metadata.dpi,
+            None if project is None else project.most_common_dpi(),
+        )
 
     def _request_render(self) -> None:
         """Render the current page up to the current stage in the background."""

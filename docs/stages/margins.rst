@@ -151,5 +151,6 @@ Apply To and matching
    * - **Source DPI**
      - Shows the resolution of the current page's image. Pick a preset or type both
        values to correct it. A value that looks wrong turns red and shows a hint.
+       The status bar shows the same resolution in every stage.
    * - **Fix all...**
      - Opens the Fix DPI dialog for every image in the project.
