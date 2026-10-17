@@ -19,8 +19,11 @@ def app(qapp: QtWidgets.QApplication, monkeypatch):
     """Application restored to its original look; QSettings is isolated by conftest."""
     monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
     for widget in qapp.topLevelWidgets():
-        widget.hide()
-        widget.deleteLater()
+        # A menu or combo box popup of a window an earlier test left behind is a
+        # window too, and its wrapper can be gone by the time the loop reaches it.
+        if shiboken6.isValid(widget):
+            widget.hide()
+            widget.deleteLater()
     QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
     style = qapp.style().name()
     palette = qapp.palette()
