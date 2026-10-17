@@ -4265,6 +4265,36 @@ You should remove them from the project.</source>
         <source>Image size in current units.</source>
         <translation>현재 단위로 된 이미지 크기.</translation>
     </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="77"/>
+        <source>Resolution of the page&apos;s source image. When most pages have another resolution, theirs follows in brackets.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>페이지 원본 이미지의 해상도입니다. 대부분의 페이지가 다른 해상도이면 그 해상도가 괄호 안에 표시됩니다.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="80"/>
+        <source>Resolution of the source image.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>원본 이미지의 해상도입니다.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="168"/>
+        <source>%1 (most pages %2)</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>%1 (대부분의 페이지 %2)</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="176"/>
+        <source>%1 dpi</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>%1 dpi</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="178"/>
+        <source>%1 x %2 dpi</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>%1 x %2 dpi</translation>
+    </message>
 </context>
 <context>
     <name>SystemLoadWidget</name>

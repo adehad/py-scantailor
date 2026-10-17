@@ -9,7 +9,7 @@ from pytestqt.qtbot import QtBot
 from scantailor.app.ui import MainWindow
 from scantailor.app.ui.dialogs.about import AboutDialog
 from scantailor.app.ui.units_provider import UnitsProvider
-from scantailor.core.models import Margins
+from scantailor.core.models import Dpi, Margins
 from scantailor.core.settings import ApplicationSettings, Units
 from scantailor.core.stage_sequence import FilterStage
 
@@ -591,6 +591,27 @@ class TestStatusBar:
         assert panel.page_info_label.text() == "page_001"
         # 600 x 800 pixels at 300 dpi.
         assert panel.phys_size_label.text() == "51 x 68 mm"
+        project_window.renderer.wait_for_done()
+
+    def test_status_bar_shows_the_source_dpi_of_the_page(
+        self, project_window: MainWindow.MainWindowManager
+    ):
+        assert project_window.status_panel.source_dpi_label.text() == "300 dpi"
+        project_window.renderer.wait_for_done()
+
+    def test_status_bar_points_out_a_page_scanned_at_another_dpi(
+        self, project_window: MainWindow.MainWindowManager
+    ):
+        project = project_window.project
+        assert project is not None
+        odd = project.images[-1]
+        odd.metadata = odd.metadata.model_copy(update={"dpi": Dpi.uniform(600)})
+        project_window._refresh_dpi_overrides()
+        panel = project_window.status_panel
+
+        assert panel.source_dpi_label.text() == "300 dpi"
+        project_window.goLastPage()
+        assert panel.source_dpi_label.text() == "600 dpi (most pages 300 dpi)"
         project_window.renderer.wait_for_done()
 
     def test_status_bar_follows_the_current_page(

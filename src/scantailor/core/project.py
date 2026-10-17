@@ -7,6 +7,7 @@ Handles loading, saving, and managing ScanTailor projects. Supports:
 
 import json
 import os
+from collections import Counter
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from enum import IntEnum
 from pathlib import Path
@@ -481,6 +482,22 @@ class Project(BaseModel):
             (entry.geometry for entry in self.text_geometry if entry.page == page),
             None,
         )
+
+    def most_common_dpi(self) -> Dpi | None:
+        """Return the resolution most of the project's images were scanned at.
+
+        Images without a usable DPI are left out of the count.
+
+        Returns:
+            Dpi | None: The resolution shared by more images than any other; None
+            when no image has a usable DPI or two resolutions are equally common.
+        """
+        counts = Counter(
+            info.metadata.dpi for info in self.images if info.metadata.is_dpi_ok()
+        ).most_common(2)
+        if not counts or (len(counts) == 2 and counts[0][1] == counts[1][1]):
+            return None
+        return counts[0][0]
 
     def image_ids(self) -> list[ImageId]:
         """Return the id of every image in the project."""

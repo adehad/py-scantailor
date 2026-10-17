@@ -8,7 +8,7 @@ from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.app.ui.widgets.status_bar_panel import StatusBarPanel
-from scantailor.core.models import ImageId, PageId, SubPage
+from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 from scantailor.core.settings import Units
 
 LONG_NAME = "abcdefghijklmnopqrstuvwxyz.png"
@@ -173,4 +173,53 @@ class TestSeparators:
         panel.update_page(1, 3, page("scan.png"))
 
         visible = [separator.isVisible() for separator, _label in panel._fields]
-        assert visible == [False, False, False, True]
+        assert visible == [False, False, False, False, True]
+
+
+class TestSourceDpi:
+    def test_a_uniform_resolution_is_shown_once(self, panel: StatusBarPanel) -> None:
+        panel.set_source_dpi(Dpi.uniform(300))
+
+        assert panel.source_dpi_label.text() == "300 dpi"
+        assert panel.source_dpi_label.isVisible()
+
+    def test_unequal_axes_are_both_shown(self, panel: StatusBarPanel) -> None:
+        panel.set_source_dpi(Dpi(horizontal=300, vertical=600))
+
+        assert panel.source_dpi_label.text() == "300 x 600 dpi"
+
+    def test_a_page_unlike_most_pages_also_shows_their_resolution(
+        self, panel: StatusBarPanel
+    ) -> None:
+        panel.set_source_dpi(Dpi.uniform(600), usual=Dpi.uniform(300))
+
+        assert panel.source_dpi_label.text() == "600 dpi (most pages 300 dpi)"
+
+    def test_a_page_like_most_pages_shows_only_its_own(
+        self, panel: StatusBarPanel
+    ) -> None:
+        panel.set_source_dpi(Dpi.uniform(300), usual=Dpi.uniform(300))
+
+        assert panel.source_dpi_label.text() == "300 dpi"
+
+    @pytest.mark.parametrize("dpi", [None, Dpi(), Dpi(horizontal=1, vertical=1)])
+    def test_an_unknown_resolution_hides_the_field(
+        self, panel: StatusBarPanel, dpi: Dpi | None
+    ) -> None:
+        panel.set_source_dpi(Dpi.uniform(300))
+
+        panel.set_source_dpi(dpi)
+
+        assert panel.source_dpi_label.text() == ""
+        assert not panel.source_dpi_label.isVisible()
+
+    def test_the_field_explains_itself(self, panel: StatusBarPanel) -> None:
+        assert "most pages" in panel.source_dpi_label.toolTip()
+        assert panel.source_dpi_label.statusTip() != ""
+
+    def test_clear_hides_it(self, panel: StatusBarPanel) -> None:
+        panel.set_source_dpi(Dpi.uniform(300))
+
+        panel.clear()
+
+        assert panel.source_dpi_label.text() == ""
