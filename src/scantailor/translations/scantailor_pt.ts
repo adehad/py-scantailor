@@ -5382,15 +5382,15 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="204"/>
-        <source>Width of the content box in millimetres, worked out from the image resolution. Drag the box edges in the page view to change it.</source>
+        <source>Width of the page box in the units chosen in the settings. Type a value to resize the box from its top left corner, or drag its edges in the page view.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Largura da caixa de conteúdo em milímetros, calculada a partir da resolução da imagem. Arraste as margens da caixa na vista da página para a alterar.</translation>
+        <translation>Largura da caixa da página nas unidades escolhidas nas definições. Escreva um valor para redimensionar a caixa a partir do canto superior esquerdo, ou arraste as suas margens na vista da página.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="218"/>
-        <source>Height of the content box in millimetres, worked out from the image resolution. Drag the box edges in the page view to change it.</source>
+        <source>Height of the page box in the units chosen in the settings. Type a value to resize the box from its top left corner, or drag its edges in the page view.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Altura da caixa de conteúdo em milímetros, calculada a partir da resolução da imagem. Arraste as margens da caixa na vista da página para a alterar.</translation>
+        <translation>Altura da caixa da página nas unidades escolhidas nas definições. Escreva um valor para redimensionar a caixa a partir do canto superior esquerdo, ou arraste as suas margens na vista da página.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="238"/>

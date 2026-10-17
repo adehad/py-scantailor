@@ -439,6 +439,7 @@ class StagePanels(QtCore.QObject):
                 widget.page_mode_changed.connect(forward)
                 widget.content_mode_changed.connect(forward)
                 widget.fine_tune_changed.connect(forward)
+                widget.page_box_changed.connect(forward)
             case FilterStage.PAGE_LAYOUT:
                 widget = page_layout.OptionsWidget(sequence.page_layout_filter)
                 widget.margins_changed.connect(forward)
@@ -609,7 +610,9 @@ class StagePanels(QtCore.QObject):
         self, image_id: ImageId, pixels: NDArray[np.uint8], dpi: float
     ) -> None:
         self._source = _Source(image_id, pixels, dpi)
-        if isinstance(self.options, page_layout.OptionsWidget):
+        if isinstance(
+            self.options, page_layout.OptionsWidget | select_content.OptionsWidget
+        ):
             self.options.set_page_dpi(dpi, dpi)
         if isinstance(self.options, fix_orientation.OptionsWidget):
             height, width = pixels.shape[:2]

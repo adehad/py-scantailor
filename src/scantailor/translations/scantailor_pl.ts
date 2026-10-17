@@ -5305,15 +5305,15 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="204"/>
-        <source>Width of the content box in millimetres, worked out from the image resolution. Drag the box edges in the page view to change it.</source>
+        <source>Width of the page box in the units chosen in the settings. Type a value to resize the box from its top left corner, or drag its edges in the page view.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Szerokość obszaru zawartości w milimetrach, obliczona z rozdzielczości obrazu. Aby ją zmienić, przeciągnij krawędzie obszaru w widoku strony.</translation>
+        <translation>Szerokość obszaru strony w jednostkach wybranych w ustawieniach. Wpisz wartość, aby zmienić rozmiar obszaru od jego lewego górnego rogu, albo przeciągnij jego krawędzie w widoku strony.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="218"/>
-        <source>Height of the content box in millimetres, worked out from the image resolution. Drag the box edges in the page view to change it.</source>
+        <source>Height of the page box in the units chosen in the settings. Type a value to resize the box from its top left corner, or drag its edges in the page view.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Wysokość obszaru zawartości w milimetrach, obliczona z rozdzielczości obrazu. Aby ją zmienić, przeciągnij krawędzie obszaru w widoku strony.</translation>
+        <translation>Wysokość obszaru strony w jednostkach wybranych w ustawieniach. Wpisz wartość, aby zmienić rozmiar obszaru od jego lewego górnego rogu, albo przeciągnij jego krawędzie w widoku strony.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="238"/>

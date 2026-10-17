@@ -19,8 +19,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 from scantailor.core.models import PageId
+from scantailor.core.settings import Units
+from scantailor.core.units import convert_length, spin_box_precision
+from scantailor.filters.select_content.content_box import PageBox
 from scantailor.filters.select_content.detection import (
     ContentDetectionMode,
     PageDetectionMode,
@@ -33,7 +37,7 @@ class OptionsWidget(QWidget):
 
     Provides controls for:
     - Page box detection mode (disabled/auto/manual) with optional fine-tuning
-    - Page dimensions (width/height)
+    - Size of a manual page box (width/height) in the current units
     - Content box detection mode (disabled/auto/manual)
     - Apply to multiple pages button
 
@@ -44,29 +48,37 @@ class OptionsWidget(QWidget):
             Args: page_id (PageId), mode (ContentDetectionMode)
         fine_tune_changed: Emitted when fine-tune corners checkbox changes.
             Args: page_id (PageId), enabled (bool)
+        page_box_changed: Emitted when the width or height fields resized the
+            page box. Args: page_id (PageId)
         apply_to_requested: Emitted when user clicks "Apply to..."
     """
 
     page_mode_changed = Signal(PageId, PageDetectionMode)
     content_mode_changed = Signal(PageId, ContentDetectionMode)
     fine_tune_changed = Signal(PageId, bool)
+    page_box_changed = Signal(PageId)
     apply_to_requested = Signal()
 
     def __init__(
         self,
         filter_: Filter,
         parent: QWidget | None = None,
+        units_provider: UnitsProvider | None = None,
     ) -> None:
         """Initialize the options widget.
 
         Args:
-            filter_: The Select Content filter instance.
-            parent: The parent widget.
+            filter_ (Filter): The Select Content filter instance.
+            parent (QWidget | None): The parent widget.
+            units_provider (UnitsProvider | None): Source of the unit the page
+                size is shown in; the shared provider when None.
         """
         super().__init__(parent)
 
         self._filter = filter_
+        self._units_provider = units_provider or UnitsProvider.get_instance()
         self._current_page_id: PageId | None = None
+        self._dpi = (0.0, 0.0)
         self._updating = False  # Prevent signal loops
 
         self._setup_ui()
@@ -170,8 +182,10 @@ class OptionsWidget(QWidget):
         )
         options_layout.addWidget(self._fine_tune_check)
 
-        # Dimensions widget
-        dimensions_layout = QHBoxLayout()
+        self._dimensions_widget = QWidget(self._page_options_group)
+        self._dimensions_widget.setObjectName("dimensionsWidget")
+        dimensions_layout = QHBoxLayout(self._dimensions_widget)
+        dimensions_layout.setContentsMargins(0, 0, 0, 0)
         dimensions_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
@@ -198,28 +212,28 @@ class OptionsWidget(QWidget):
 
         self._width_spinbox = QDoubleSpinBox()
         self._width_spinbox.setObjectName("widthSpinBox")
-        self._width_spinbox.setDecimals(1)
         self._width_spinbox.setRange(0.1, 99999.0)
+        self._width_spinbox.setKeyboardTracking(False)
         self._width_spinbox.setToolTip(
             QtCore.QCoreApplication.translate(
                 "select_content::OptionsWidget",
-                "Width of the content box in millimetres, worked out from the "
-                "image resolution. Drag the box edges in the page view to "
-                "change it.",
+                "Width of the page box in the units chosen in the "
+                "settings. Type a value to resize the box from its top left "
+                "corner, or drag its edges in the page view.",
             )
         )
         dims_grid.addWidget(self._width_spinbox, 0, 1)
 
         self._height_spinbox = QDoubleSpinBox()
         self._height_spinbox.setObjectName("heightSpinBox")
-        self._height_spinbox.setDecimals(1)
         self._height_spinbox.setRange(0.1, 99999.0)
+        self._height_spinbox.setKeyboardTracking(False)
         self._height_spinbox.setToolTip(
             QtCore.QCoreApplication.translate(
                 "select_content::OptionsWidget",
-                "Height of the content box in millimetres, worked out from the "
-                "image resolution. Drag the box edges in the page view to "
-                "change it.",
+                "Height of the page box in the units chosen in the "
+                "settings. Type a value to resize the box from its top left "
+                "corner, or drag its edges in the page view.",
             )
         )
         dims_grid.addWidget(self._height_spinbox, 1, 1)
@@ -228,7 +242,7 @@ class OptionsWidget(QWidget):
         dimensions_layout.addItem(
             QSpacerItem(1, 1, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         )
-        options_layout.addLayout(dimensions_layout)
+        options_layout.addWidget(self._dimensions_widget)
 
         page_layout.addWidget(self._page_options_group, 2, 0, 1, 2)
         outer_layout.addWidget(self._page_box_group)
@@ -356,6 +370,10 @@ class OptionsWidget(QWidget):
         # Fine tune checkbox
         self._fine_tune_check.toggled.connect(self._on_fine_tune_changed)
 
+        self._width_spinbox.valueChanged.connect(self._on_dimensions_changed)
+        self._height_spinbox.valueChanged.connect(self._on_dimensions_changed)
+        self._units_provider.units_changed.connect(self._show_page_size)
+
         # Apply button
         self._apply_btn.clicked.connect(self.apply_to_requested.emit)
 
@@ -382,9 +400,9 @@ class OptionsWidget(QWidget):
             self._page_auto_btn.setChecked(params.is_page_auto())
             self._page_manual_btn.setChecked(params.is_page_manual())
 
-            # Show/hide page options based on mode
-            show_page_options = not params.is_page_disabled()
-            self._page_options_group.setVisible(show_page_options)
+            self._page_options_group.setVisible(not params.is_page_disabled())
+            self._fine_tune_check.setVisible(params.is_page_auto())
+            self._dimensions_widget.setVisible(params.is_page_manual())
 
             # Update fine tune checkbox
             self._fine_tune_check.setChecked(params.fine_tune_corners)
@@ -393,14 +411,72 @@ class OptionsWidget(QWidget):
             self._content_disable_btn.setChecked(params.is_content_disabled())
             self._content_auto_btn.setChecked(params.is_content_auto())
             self._content_manual_btn.setChecked(params.is_content_manual())
-
-            # Update dimension spinboxes if we have size info
-            if params.content_size_mm.width_mm > 0:
-                self._width_spinbox.setValue(params.content_size_mm.width_mm)
-            if params.content_size_mm.height_mm > 0:
-                self._height_spinbox.setValue(params.content_size_mm.height_mm)
         finally:
             self._updating = False
+        self._show_page_size()
+
+    def set_page_dpi(self, horizontal: float, vertical: float) -> None:
+        """Tell the widget the resolution of the current page.
+
+        The page box is held in pixels, so every unit but pixels needs it; the
+        size is shown unconverted while it is unknown.
+
+        Args:
+            horizontal (float): Dots per inch along x, or 0 when unknown.
+            vertical (float): Dots per inch along y, or 0 when unknown.
+        """
+        self._dpi = (horizontal, vertical)
+        self._show_page_size()
+
+    def _show_page_size(self) -> None:
+        """Show the current page box size in the current unit."""
+        if self._current_page_id is None:
+            return
+        page_box = self._filter.get_params(self._current_page_id).page_box
+        units = self._units_provider.units
+        decimals, step = spin_box_precision(units)
+        horizontal, vertical = self._dpi
+        was_updating, self._updating = self._updating, True
+        try:
+            for spin, pixels, dpi in (
+                (self._width_spinbox, page_box.width, horizontal),
+                (self._height_spinbox, page_box.height, vertical),
+            ):
+                spin.setDecimals(decimals)
+                spin.setSingleStep(step)
+                spin.setValue(convert_length(pixels, Units.PIXELS, units, dpi))
+        finally:
+            self._updating = was_updating
+
+    def _on_dimensions_changed(self) -> None:
+        """Resize the page box to the typed size, keeping its top left corner.
+
+        As when the box is dragged, the page box still grows to hold the
+        content box.
+        """
+        if self._current_page_id is None or self._updating:
+            return
+        params = self._filter.get_params(self._current_page_id)
+        units = self._units_provider.units
+        horizontal, vertical = self._dpi
+        resized = PageBox(
+            x=params.page_box.x,
+            y=params.page_box.y,
+            width=convert_length(
+                self._width_spinbox.value(), units, Units.PIXELS, horizontal
+            ),
+            height=convert_length(
+                self._height_spinbox.value(), units, Units.PIXELS, vertical
+            ),
+        )
+        if params.content_box.is_valid():
+            united = resized.to_content_box().union(params.content_box)
+            resized = PageBox(
+                x=united.x, y=united.y, width=united.width, height=united.height
+            )
+        self._filter.set_manual_page(self._current_page_id, resized)
+        self._show_page_size()
+        self.page_box_changed.emit(self._current_page_id)
 
     def _on_page_mode_changed(self, mode: PageDetectionMode) -> None:
         """Handle page detection mode button clicks.

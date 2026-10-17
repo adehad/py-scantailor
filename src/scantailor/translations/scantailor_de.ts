@@ -5396,15 +5396,15 @@ Deaktiviert: weißer Text auf schwarzem Hintergrund</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="204"/>
-        <source>Width of the content box in millimetres, worked out from the image resolution. Drag the box edges in the page view to change it.</source>
+        <source>Width of the page box in the units chosen in the settings. Type a value to resize the box from its top left corner, or drag its edges in the page view.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Breite des Inhaltsbereichs in Millimetern, berechnet aus der Bildauflösung. Ziehen Sie die Kanten des Bereichs in der Seitenansicht, um sie zu ändern.</translation>
+        <translation>Breite des Seitenbereichs in der in den Einstellungen gewählten Einheit. Geben Sie einen Wert ein, um den Bereich von seiner oberen linken Ecke aus zu ändern, oder ziehen Sie seine Kanten in der Seitenansicht.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="218"/>
-        <source>Height of the content box in millimetres, worked out from the image resolution. Drag the box edges in the page view to change it.</source>
+        <source>Height of the page box in the units chosen in the settings. Type a value to resize the box from its top left corner, or drag its edges in the page view.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Höhe des Inhaltsbereichs in Millimetern, berechnet aus der Bildauflösung. Ziehen Sie die Kanten des Bereichs in der Seitenansicht, um sie zu ändern.</translation>
+        <translation>Höhe des Seitenbereichs in der in den Einstellungen gewählten Einheit. Geben Sie einen Wert ein, um den Bereich von seiner oberen linken Ecke aus zu ändern, oder ziehen Sie seine Kanten in der Seitenansicht.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="238"/>
