@@ -2559,6 +2559,18 @@ Process them now? Export the PDF again once processing is done.</source>
         <source>Clear All Zones</source>
         <translation>Eliminar todas las zonas</translation>
     </message>
+    <message>
+        <location filename="../app/ui/image_views/output.py" line="1727"/>
+        <source>Show grid</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Mostrar cuadrícula</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/output.py" line="1730"/>
+        <source>Draw a line every 10 mm across the page, through its centre, to compare positions between pages.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Dibuja una línea cada 10 mm a lo largo de la página, pasando por su centro, para comparar posiciones entre páginas.</translation>
+    </message>
 </context>
 <context>
     <name>PdfExportDialog</name>
@@ -4773,6 +4785,18 @@ Desmarcado: texto blanco sobre fondo negro</translation>
         <location filename="../app/ui/image_views/page_layout.py" line="231"/>
         <source>Show hard margins rectangle</source>
         <translation>Mostrar el rectángulo de márgenes duros</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/page_layout.py" line="245"/>
+        <source>Show grid</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Mostrar cuadrícula</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/page_layout.py" line="251"/>
+        <source>Draw a line every 10 mm across the page, through its centre, to compare positions between pages.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Dibuja una línea cada 10 mm a lo largo de la página, pasando por su centro, para comparar posiciones entre páginas.</translation>
     </message>
 </context>
 <context>

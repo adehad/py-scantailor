@@ -207,7 +207,8 @@ three quarters of a second.
 
 The **Show guides** item of the context menu of the output view draws a dashed
 cross through the centre of the view, for judging the alignment of the output.
-The choice is remembered.
+**Show grid** draws a line every 10 mm through the centre of the page, as in
+:doc:`margins`; the dewarping tab does not show it. Both choices are remembered.
 
 Zones
 =====

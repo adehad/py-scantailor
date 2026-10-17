@@ -2555,6 +2555,18 @@ Jetzt verarbeiten? Exportieren Sie das PDF nach Abschluss der Verarbeitung erneu
         <source>Clear All Zones</source>
         <translation>Alle Zonen löschen</translation>
     </message>
+    <message>
+        <location filename="../app/ui/image_views/output.py" line="1727"/>
+        <source>Show grid</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Raster anzeigen</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/output.py" line="1730"/>
+        <source>Draw a line every 10 mm across the page, through its centre, to compare positions between pages.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Zeichnet alle 10 mm eine Linie über die Seite, durch ihre Mitte, um Positionen zwischen den Seiten zu vergleichen.</translation>
+    </message>
 </context>
 <context>
     <name>PdfExportDialog</name>
@@ -4824,6 +4836,18 @@ Deaktiviert: weißer Text auf schwarzem Hintergrund</translation>
         <location filename="../app/ui/image_views/page_layout.py" line="60"/>
         <source>Drag the guide.</source>
         <translation>Hilfslinie ziehen</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/page_layout.py" line="245"/>
+        <source>Show grid</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Raster anzeigen</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/page_layout.py" line="251"/>
+        <source>Draw a line every 10 mm across the page, through its centre, to compare positions between pages.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Zeichnet alle 10 mm eine Linie über die Seite, durch ihre Mitte, um Positionen zwischen den Seiten zu vergleichen.</translation>
     </message>
 </context>
 <context>
