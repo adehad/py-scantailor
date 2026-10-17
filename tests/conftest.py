@@ -2,12 +2,71 @@
 
 import faulthandler
 import pathlib
+import sys
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
 from _pytest.faulthandler import fault_handler_stderr_fd_key
+from loguru import logger
 
+from scantailor.core import diagnostics
 from scantailor.core.settings import ApplicationSettings
+
+
+def quiet_loguru() -> None:
+    """Replace every loguru handler with one stderr sink at WARNING.
+
+    loguru's import-time sink writes DEBUG with local variables to stderr,
+    which buries test and script output.
+    """
+    logger.remove()
+    logger.add(sys.stderr, level="WARNING", diagnose=False)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def quiet_stderr_logging() -> None:
+    """Keep loguru's stderr output to warnings and errors for the whole run."""
+    quiet_loguru()
+
+
+@pytest.fixture(autouse=True)
+def no_process_diagnostics(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> list[dict[str, Any]]:
+    """Stand in for configure_logging and record how it was called.
+
+    The real one writes to the user's log folder and replaces the process hooks
+    pytest and pytest-qt rely on. tests/core/test_diagnostics.py imports the
+    real function by name before this patch, so it still tests it.
+
+    Returns:
+        list[dict[str, Any]]: One entry per call: the kind and the options.
+    """
+    calls: list[dict[str, Any]] = []
+
+    def fake_configure_logging(
+        kind: diagnostics.SessionKind, **options: Any
+    ) -> diagnostics.DiagnosticsSession:
+        calls.append({"kind": kind, **options})
+        log_file = options.get("log_file")
+        if log_file is None and options.get("write_to_log_folder", True):
+            log_file = tmp_path / diagnostics.session_log_name(kind)
+        return diagnostics.DiagnosticsSession(log_file=log_file)
+
+    monkeypatch.setattr(diagnostics, "configure_logging", fake_configure_logging)
+    return calls
+
+
+@pytest.fixture
+def log_messages() -> Iterator[list[str]]:
+    """Capture loguru messages emitted during the test."""
+    messages: list[str] = []
+    handler_id = logger.add(
+        lambda message: messages.append(message.record["message"]), level="DEBUG"
+    )
+    yield messages
+    logger.remove(handler_id)
 
 
 @pytest.fixture(autouse=True)

@@ -3,7 +3,8 @@
 import sys
 from argparse import Namespace
 from collections.abc import Sequence
-from typing import TextIO
+from pathlib import Path
+from typing import Final, TextIO
 
 from loguru import logger
 from pydantic import BaseModel
@@ -20,6 +21,10 @@ from scantailor.cli.operations import (
 )
 from scantailor.cli.parser import build_parser
 from scantailor.cli.reports import BatchReport
+from scantailor.core import diagnostics
+
+# Commands that process pages, where a failure is worth a log file by default.
+_COMMANDS_WITH_A_LOG_FILE: Final = frozenset({"run", "export"})
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -33,7 +38,27 @@ def main(argv: Sequence[str] | None = None) -> int:
         int: An ExitCode value.
     """
     args = build_parser().parse_args(argv)
-    _configure_logging(verbose=args.verbose)
+    session = diagnostics.configure_logging(
+        "cli",
+        stderr_level="INFO" if args.verbose else "WARNING",
+        write_to_log_folder=args.command in _COMMANDS_WITH_A_LOG_FILE,
+    )
+    exit_code = _run(args, session.log_file)
+    session.end()
+    return exit_code
+
+
+def _run(args: Namespace, log_file: Path | None) -> int:
+    """Run the parsed command, write its JSON report and pick the exit code.
+
+    Args:
+        args (argparse.Namespace): The parsed command line.
+        log_file (Path | None): This session's log, named in the message about
+            an unexpected failure.
+
+    Returns:
+        int: An ExitCode value.
+    """
     try:
         report = _dispatch(args)
     except CliError as error:
@@ -41,7 +66,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return int(error.code)
     except Exception:
         logger.exception("Unexpected failure")
-        sys.stderr.write("error: unexpected failure, see the log on stderr\n")
+        where = f"see the log in {log_file}" if log_file else "see the log on stderr"
+        sys.stderr.write(f"error: unexpected failure, {where}\n")
         return int(ExitCode.FAILED)
     _write_json(sys.stdout, report)
     if isinstance(report, BatchReport) and report.failed:
@@ -85,12 +111,6 @@ def _dispatch(args: Namespace) -> BaseModel:
 def _write_json(stream: TextIO, report: BaseModel) -> None:
     """Write a report as indented JSON followed by a newline."""
     stream.write(report.model_dump_json(indent=2) + "\n")
-
-
-def _configure_logging(*, verbose: bool) -> None:
-    """Send log records to stderr so stdout carries only the JSON result."""
-    logger.remove()
-    logger.add(sys.stderr, level="INFO" if verbose else "WARNING")
 
 
 if __name__ == "__main__":

@@ -5,7 +5,6 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
-from loguru import logger
 
 from scantailor.core.stage_params import apply_stage_defaults, collect_stage_defaults
 from scantailor.core.stage_sequence import StageSequence
@@ -50,21 +49,18 @@ class TestPageLayoutStageSettings:
 
         assert stage.guides == (Guide(position_mm=1.0, is_horizontal=True),)
 
-    def test_a_guide_with_an_unreadable_position_is_skipped_and_logged(self):
-        messages: list[str] = []
-        handler = logger.add(lambda m: messages.append(m.record["message"]))
-        try:
-            stage = _stage(
-                "<page-layout><guides>"
-                '<guide orientation="vertical" position="abc"/>'
-                '<guide orientation="vertical" position="4"/>'
-                "</guides></page-layout>"
-            )
-        finally:
-            logger.remove(handler)
+    def test_a_guide_with_an_unreadable_position_is_skipped_and_logged(
+        self, log_messages: list[str]
+    ):
+        stage = _stage(
+            "<page-layout><guides>"
+            '<guide orientation="vertical" position="abc"/>'
+            '<guide orientation="vertical" position="4"/>'
+            "</guides></page-layout>"
+        )
 
         assert stage.guides == (Guide(position_mm=4.0, is_horizontal=False),)
-        assert any("guide" in message for message in messages)
+        assert any("guide" in message for message in log_messages)
 
     @pytest.mark.parametrize(("flag", "shown"), [("1", True), ("0", False)])
     def test_the_middle_rectangle_flag_is_read(self, flag: str, shown: bool):

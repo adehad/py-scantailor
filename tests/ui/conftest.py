@@ -11,7 +11,6 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import numpy as np
 import pytest
 import shiboken6
-from loguru import logger
 from PySide6 import QtCore, QtGui, QtWidgets
 from pytestqt.qtbot import QtBot
 
@@ -309,17 +308,6 @@ def respond_to_modal(qtbot: QtBot) -> Iterator[ModalResponder]:
     assert unanswered == 0, (
         f"{unanswered} scheduled modal response(s) never met a modal dialog"
     )
-
-
-@pytest.fixture
-def log_messages() -> Iterator[list[str]]:
-    """Capture loguru messages emitted during the test."""
-    messages: list[str] = []
-    handler_id = logger.add(
-        lambda message: messages.append(message.record["message"]), level="DEBUG"
-    )
-    yield messages
-    logger.remove(handler_id)
 
 
 @dataclasses.dataclass
