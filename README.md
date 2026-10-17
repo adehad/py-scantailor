@@ -83,6 +83,8 @@ pdm run docs                  # the user guide, into dist/docs
 
 `pdm run exe` builds the standalone program for the platform you run it on, with PyInstaller and [`app.spec`](app.spec). Pushing a tag that starts with `v`, such as `v1.0.0`, makes [`.github/workflows/release.yml`](.github/workflows/release.yml) build, smoke-test and publish every platform to GitHub Releases. Tags containing `-rc`, `-alpha` or `-beta` become pre-releases.
 
+Release notes are drafted from merged pull requests and grouped by label, so label each pull request (`enhancement`, `bug`, `translations` and so on). A branch named `fix/...`, `feat/...`, `docs/...`, `perf/...` or `refactor/...` is labelled automatically. A `breaking` label raises the next major version; `skip-changelog` leaves a pull request out of the notes.
+
 ## Credits and licence
 
 pyScanTailor builds on ScanTailor by Joseph Artsimovich and on the forks that followed it: ScanTailor Enhanced, ScanTailor Featured, ScanTailor Universal and ScanTailor Advanced. [FORK_HISTORY.md](FORK_HISTORY.md) links to each one and lists the features they added.
