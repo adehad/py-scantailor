@@ -1,8 +1,7 @@
 """Tests for the stage list: numbers inside the rows and rows sized from the font."""
 
 import pytest
-import shiboken6
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtGui, QtWidgets
 
 from scantailor.app.ui import theme
 from scantailor.app.ui.theme.tokens import DARK, LIGHT
@@ -61,20 +60,10 @@ def test_rows_and_the_play_button_grow_with_the_font(stage_list, qtbot):
 
 
 @pytest.fixture
-def themed(qapp: QtWidgets.QApplication, monkeypatch):
+def themed(original_look: QtWidgets.QApplication, monkeypatch):
     """Theme the application for one test and restore it afterwards."""
     monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
-    style = qapp.style().name()
-    palette = qapp.palette()
-    font = qapp.font()
-    yield qapp
-    controller = qapp.findChild(QtCore.QObject, "scantailorThemeController")
-    if controller is not None:
-        shiboken6.delete(controller)
-    qapp.setStyleSheet("")
-    qapp.setStyle(style)
-    qapp.setPalette(palette)
-    qapp.setFont(font)
+    return original_look
 
 
 @pytest.mark.parametrize("scheme", theme.SCHEMES)

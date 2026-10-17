@@ -5,7 +5,6 @@ import pathlib
 import re
 
 import pytest
-import shiboken6
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from scantailor.app.ui import theme
@@ -16,24 +15,16 @@ SRC_ROOT = pathlib.Path(theme.__file__).resolve().parents[3]
 
 
 @pytest.fixture
-def app(qapp: QtWidgets.QApplication, monkeypatch):
+def app(original_look: QtWidgets.QApplication, monkeypatch):
     """Application restored to its original look; QSettings is isolated by conftest."""
     monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
-    for widget in qapp.topLevelWidgets():
+    # A collection while hiding could delete a window later in the list.
+    gc.collect()
+    for widget in original_look.topLevelWidgets():
         widget.hide()
         widget.deleteLater()
     QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
-    style = qapp.style().name()
-    palette = qapp.palette()
-    font = qapp.font()
-    yield qapp
-    controller = qapp.findChild(QtCore.QObject, "scantailorThemeController")
-    if controller is not None:
-        shiboken6.delete(controller)
-    qapp.setStyleSheet("")
-    qapp.setStyle(style)
-    qapp.setPalette(palette)
-    qapp.setFont(font)
+    return original_look
 
 
 def window_lightness(app: QtWidgets.QApplication) -> int:

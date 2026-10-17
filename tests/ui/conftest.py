@@ -1,6 +1,7 @@
 """Shared harness for automated UI pathway tests (pytest-qt, offscreen)."""
 
 import dataclasses
+import gc
 import os
 import pathlib
 from collections.abc import Callable, Iterator
@@ -83,6 +84,27 @@ def no_window_outlives_its_test() -> Iterator[None]:
         if widget.isVisible():
             widget.hide()
     QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
+
+
+@pytest.fixture
+def original_look(qapp: QtWidgets.QApplication) -> Iterator[QtWidgets.QApplication]:
+    """Give the application back its style, palette and font after a themed test.
+
+    Restyling walks every widget, so the garbage collector runs first: a widget
+    it frees in the middle of that walk would be deleted under Qt.
+    """
+    style = qapp.style().name()
+    palette = qapp.palette()
+    font = qapp.font()
+    yield qapp
+    gc.collect()
+    controller = qapp.findChild(QtCore.QObject, "scantailorThemeController")
+    if controller is not None:
+        shiboken6.delete(controller)
+    qapp.setStyleSheet("")
+    qapp.setStyle(style)
+    qapp.setPalette(palette)
+    qapp.setFont(font)
 
 
 @pytest.fixture(autouse=True)

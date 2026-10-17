@@ -1,7 +1,6 @@
 """Tests for the group box that folds from its whole header row."""
 
 import pytest
-import shiboken6
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from scantailor.app.ui import theme
@@ -11,21 +10,11 @@ from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 
 
 @pytest.fixture
-def app(qapp: QtWidgets.QApplication, monkeypatch):
+def app(original_look: QtWidgets.QApplication, monkeypatch):
     """Application in the light look, restored afterwards."""
     monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
-    style = qapp.style().name()
-    palette = qapp.palette()
-    font = qapp.font()
-    theme.apply_theme(qapp, "light")
-    yield qapp
-    controller = qapp.findChild(QtCore.QObject, "scantailorThemeController")
-    if controller is not None:
-        shiboken6.delete(controller)
-    qapp.setStyleSheet("")
-    qapp.setStyle(style)
-    qapp.setPalette(palette)
-    qapp.setFont(font)
+    theme.apply_theme(original_look, "light")
+    return original_look
 
 
 @pytest.fixture

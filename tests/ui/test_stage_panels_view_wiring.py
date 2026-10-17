@@ -1,5 +1,6 @@
 """What the stage panels hand to the views: halves, content masks, tab pictures."""
 
+import gc
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -56,11 +57,19 @@ def _panels(stage: FilterStage) -> StagePanels:
 
 @pytest.fixture(autouse=True)
 def _release_panels() -> Iterator[None]:
-    """Stop the panels watching their viewports before they are collected."""
+    """Stop the panels watching their viewports, then free them now.
+
+    Each panel and its parentless view refer to each other, so only the cyclic
+    garbage collector frees them. Left to it, they would be deleted at whatever
+    moment a later test happens to trigger a collection, which may be while Qt
+    walks every widget.
+    """
     yield
     while _made:
         panels = _made.pop()
         panels.view.viewport().removeEventFilter(panels)
+        del panels
+    gc.collect()
 
 
 def _source() -> _Source:

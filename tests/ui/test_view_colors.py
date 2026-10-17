@@ -5,8 +5,7 @@ import pathlib
 import re
 
 import pytest
-import shiboken6
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtGui, QtWidgets
 
 from scantailor.app.ui import image_views, theme
 from scantailor.app.ui.theme.tokens import (
@@ -118,24 +117,14 @@ class TestViewTokens:
 
 
 @pytest.fixture
-def themed(qapp: QtWidgets.QApplication, monkeypatch):
+def themed(original_look: QtWidgets.QApplication, monkeypatch):
     """Apply a scheme and restore the application look afterwards."""
     monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
-    style = qapp.style().name()
-    palette = qapp.palette()
-    font = qapp.font()
 
     def apply(scheme: str) -> None:
-        theme.apply_theme(qapp, scheme)
+        theme.apply_theme(original_look, scheme)
 
     yield apply
-    controller = qapp.findChild(QtCore.QObject, "scantailorThemeController")
-    if controller is not None:
-        shiboken6.delete(controller)
-    qapp.setStyleSheet("")
-    qapp.setStyle(style)
-    qapp.setPalette(palette)
-    qapp.setFont(font)
     set_active_tokens(LIGHT)
 
 

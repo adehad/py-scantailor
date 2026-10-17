@@ -4,7 +4,6 @@ import pathlib
 import re
 
 import pytest
-import shiboken6
 from PySide6 import QtCore, QtGui, QtSvg, QtWidgets
 
 from scantailor.app.ui import icons, theme
@@ -150,20 +149,10 @@ def test_binder_ignores_buttons_without_the_property(palette_app, qtbot):
 
 
 @pytest.fixture
-def themed_app(qapp: QtWidgets.QApplication):
+def themed_app(original_look: QtWidgets.QApplication) -> QtWidgets.QApplication:
     """Application with the theme (and so the icon binder) installed."""
-    original = qapp.palette()
-    style = qapp.style().name()
-    font = qapp.font()
-    theme.apply_theme(qapp, "light")
-    yield qapp
-    controller = qapp.findChild(QtCore.QObject, "scantailorThemeController")
-    if controller is not None:
-        shiboken6.delete(controller)
-    qapp.setStyleSheet("")
-    qapp.setStyle(style)
-    qapp.setPalette(original)
-    qapp.setFont(font)
+    theme.apply_theme(original_look, "light")
+    return original_look
 
 
 def test_main_window_toolbar_buttons_get_palette_icons_from_the_form(
@@ -192,26 +181,18 @@ def test_main_window_toolbar_buttons_get_palette_icons_from_the_form(
         assert (off != on) == (name in toggles), name
 
 
-def test_icon_label_redraws_when_the_look_switches_scheme(qapp, qtbot, monkeypatch):
+def test_icon_label_redraws_when_the_look_switches_scheme(
+    original_look, qtbot, monkeypatch
+):
     monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
-    original = (qapp.palette(), qapp.style().name(), qapp.font())
-    try:
-        theme.apply_theme(qapp, "light")
-        label = icons.IconLabel("arrow-up", 24)
-        qtbot.addWidget(label)
-        label.show()
-        assert ink_color(label.pixmap()).name() == LIGHT.text
-        theme.apply_theme(qapp, "dark")
-        assert ink_color(label.pixmap()).name() == DARK.text
-        assert label.size() == SIZE
-    finally:
-        controller = qapp.findChild(QtCore.QObject, "scantailorThemeController")
-        if controller is not None:
-            shiboken6.delete(controller)
-        qapp.setStyleSheet("")
-        qapp.setStyle(original[1])
-        qapp.setPalette(original[0])
-        qapp.setFont(original[2])
+    theme.apply_theme(original_look, "light")
+    label = icons.IconLabel("arrow-up", 24)
+    qtbot.addWidget(label)
+    label.show()
+    assert ink_color(label.pixmap()).name() == LIGHT.text
+    theme.apply_theme(original_look, "dark")
+    assert ink_color(label.pixmap()).name() == DARK.text
+    assert label.size() == SIZE
 
 
 def test_every_glyph_file_is_a_valid_svg_drawn_with_current_colour():
@@ -284,18 +265,10 @@ def dominant_colors(pixmap: QtGui.QPixmap) -> set[str]:
 
 
 @pytest.fixture
-def scheme_app(qapp: QtWidgets.QApplication, monkeypatch):
+def scheme_app(original_look: QtWidgets.QApplication, monkeypatch):
     """Application with the real theme, restored afterwards."""
     monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
-    original = (qapp.palette(), qapp.style().name(), qapp.font())
-    yield qapp
-    controller = qapp.findChild(QtCore.QObject, "scantailorThemeController")
-    if controller is not None:
-        shiboken6.delete(controller)
-    qapp.setStyleSheet("")
-    qapp.setStyle(original[1])
-    qapp.setPalette(original[0])
-    qapp.setFont(original[2])
+    yield original_look
     icons.set_semantic_colors(QtGui.QColor("#008a1a"), QtGui.QColor("#d92d20"))
 
 
