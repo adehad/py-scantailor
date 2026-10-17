@@ -1,6 +1,6 @@
 # Release: on a pushed v* tag, freeze with PyInstaller on Windows, Linux and
-# macOS, wrap the Linux build as an AppImage, smoke-test each build and attach
-# them all to a GitHub Release.
+# macOS, wrap the Linux build as an AppImage, smoke-test each build and publish
+# them all as a GitHub Release, using the notes Release Drafter has collected.
 # A manual run (workflow_dispatch) builds and smoke-tests without publishing.
 name: Release
 
@@ -194,13 +194,33 @@ jobs:
           merge-multiple: true
           path: release
 
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: release/*
-          generate_release_notes: true
-          prerelease: >-
+      # Release Drafter keeps one draft with the notes of every pull request merged
+      # since the last release. The tag takes that draft over rather than starting a
+      # second release; without a draft, GitHub generates the notes instead.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          PRERELEASE: >-
             ${{
               contains(github.ref_name, '-rc')
               || contains(github.ref_name, '-alpha')
               || contains(github.ref_name, '-beta')
             }}
+        run: |
+          # The REST lookup by tag sees published releases only, not the draft.
+          if gh api "repos/$GH_REPO/releases/tags/$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" release/* --clobber
+            exit 0
+          fi
+          draft_id=$(gh api "repos/$GH_REPO/releases" --paginate --jq '.[] | select(.draft) | .id' | head -n 1)
+          if [ -z "$draft_id" ]; then
+            prerelease_flag=()
+            if [ "$PRERELEASE" = "true" ]; then prerelease_flag=(--prerelease); fi
+            gh release create "$TAG" release/* --verify-tag --title "$TAG" --generate-notes "${prerelease_flag[@]}"
+            exit 0
+          fi
+          gh api --method PATCH "repos/$GH_REPO/releases/$draft_id" -f tag_name="$TAG" -f name="$TAG" -F prerelease="$PRERELEASE" > /dev/null
+          gh release upload "$TAG" release/* --clobber
+          gh release edit "$TAG" --draft=false
