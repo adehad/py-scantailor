@@ -2886,6 +2886,18 @@ Process them now? Export the PDF again once processing is done.</source>
         <source>Clear All Zones</source>
         <translation>모든 영역 지우기</translation>
     </message>
+    <message>
+        <location filename="../app/ui/image_views/output.py" line="1727"/>
+        <source>Show grid</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>격자 표시</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/output.py" line="1730"/>
+        <source>Draw a line every 10 mm across the page, through its centre, to compare positions between pages.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>페이지 중심을 지나도록 10mm마다 선을 그려 페이지 사이의 위치를 비교합니다.</translation>
+    </message>
 </context>
 <context>
     <name>OutputOptionsWidget</name>
@@ -5749,6 +5761,18 @@ Unchecked: white text on black background</source>
         <location filename="../app/ui/image_views/page_layout.py" line="60"/>
         <source>Drag the guide.</source>
         <translation>가이드 드래그.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/page_layout.py" line="245"/>
+        <source>Show grid</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>격자 표시</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/page_layout.py" line="251"/>
+        <source>Draw a line every 10 mm across the page, through its centre, to compare positions between pages.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>페이지 중심을 지나도록 10mm마다 선을 그려 페이지 사이의 위치를 비교합니다.</translation>
     </message>
 </context>
 <context>

@@ -2552,6 +2552,18 @@ Process them now? Export the PDF again once processing is done.</source>
         <source>Clear All Zones</source>
         <translation>Очистить все зоны</translation>
     </message>
+    <message>
+        <location filename="../app/ui/image_views/output.py" line="1727"/>
+        <source>Show grid</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Показать сетку</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/output.py" line="1730"/>
+        <source>Draw a line every 10 mm across the page, through its centre, to compare positions between pages.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Рисует линию через каждые 10 мм по странице через её центр, чтобы сравнивать положение элементов на разных страницах.</translation>
+    </message>
 </context>
 <context>
     <name>PdfExportDialog</name>
@@ -4754,6 +4766,18 @@ Unchecked: white text on black background</source>
         <location filename="../app/ui/image_views/page_layout.py" line="60"/>
         <source>Drag the guide.</source>
         <translation>Перетаскивайте направляющую.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/page_layout.py" line="245"/>
+        <source>Show grid</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Показать сетку</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/image_views/page_layout.py" line="251"/>
+        <source>Draw a line every 10 mm across the page, through its centre, to compare positions between pages.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Рисует линию через каждые 10 мм по странице через её центр, чтобы сравнивать положение элементов на разных страницах.</translation>
     </message>
 </context>
 <context>

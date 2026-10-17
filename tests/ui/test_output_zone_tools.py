@@ -659,21 +659,23 @@ class TestContextMenu:
 
         menu = view.build_context_menu(_w(view, 200, 200))
 
-        assert self._texts(menu) == ["Properties", "Delete", "Show guides"]
+        assert self._texts(menu) == ["Properties", "Delete", "Show guides", "Show grid"]
 
     def test_a_fill_zone_offers_pick_color_and_delete(self, qtbot: QtBot):
         view = _tabbed(qtbot, ImageViewTab.FILL_ZONES, _fill(SQUARE))
 
         menu = view.build_context_menu(_w(view, 200, 200))
 
-        assert self._texts(menu) == ["Pick color", "Delete", "Show guides"]
+        assert self._texts(menu) == ["Pick color", "Delete", "Show guides", "Show grid"]
 
-    def test_no_zone_under_the_cursor_gives_only_the_guides(self, qtbot: QtBot):
+    def test_no_zone_under_the_cursor_gives_only_the_guides_and_grid(
+        self, qtbot: QtBot
+    ):
         view = _tabbed(qtbot, ImageViewTab.PICTURE_ZONES, _picture())
 
         menu = view.build_context_menu(_w(view, 500, 700))
 
-        assert self._texts(menu) == ["Show guides"]
+        assert self._texts(menu) == ["Show guides", "Show grid"]
 
     def test_every_zone_under_the_cursor_is_listed_smallest_first(self, qtbot: QtBot):
         big = _picture([(50, 50), (350, 50), (350, 350), (50, 350)])
@@ -687,6 +689,7 @@ class TestContextMenu:
             "Properties",
             "Delete",
             "Show guides",
+            "Show grid",
         ]
 
     def test_several_zones_get_colour_swatches_to_tell_them_apart(self, qtbot: QtBot):
@@ -747,12 +750,12 @@ class TestContextMenu:
 
         assert "Create Picture Zone" not in self._texts(menu)
 
-    def test_the_output_tab_menu_has_only_the_guides(self, qtbot: QtBot):
+    def test_the_output_tab_menu_has_only_the_guides_and_grid(self, qtbot: QtBot):
         view = _tabbed(qtbot, ImageViewTab.OUTPUT, _picture())
 
         menu = view.build_context_menu(_w(view, 200, 200))
 
-        assert self._texts(menu) == ["Show guides"]
+        assert self._texts(menu) == ["Show guides", "Show grid"]
 
 
 class TestPictureProperties:

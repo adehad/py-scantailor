@@ -7,9 +7,10 @@ margins. Dragging a side of the content box does the same from the other end:
 the margin changes and the page moves so that the side stays under the pointer.
 Holding Ctrl and/or Shift moves the content within the page. Alignment guides
 can be added from the context menu; a double click on content snaps it to the
-nearest guide.
+nearest guide. The context menu also turns on a millimetre grid over the page.
 """
 
+import contextlib
 import math
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -28,16 +29,19 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QAction, QPainter, QPen, QTransform
 
+from scantailor.app.ui.icons import icon
 from scantailor.app.ui.image_views.base import (
     Edge,
     ImageViewBase,
     matrix_to_qtransform,
     point_to_segment_distance,
 )
+from scantailor.app.ui.image_views.page_grid import paint_page_grid
 from scantailor.app.ui.image_views.page_layout_state import Guide, PageLayoutState
 from scantailor.app.ui.theme.tokens import view_color
 from scantailor.core.content_mask import ContentMask
 from scantailor.core.models import Margins
+from scantailor.core.settings import ApplicationSettings
 
 _MARGINS_TIP = cast(
     str,
@@ -158,6 +162,7 @@ class PageLayoutImageView(ImageViewBase):
         self._dragged_guide: Guide | None = None
         self._context_pos = QPointF()
         self._mask_provider: Callable[[], ContentMask | None] | None = None
+        self._grid_shown = ApplicationSettings.get_instance().margins_grid_shown
 
         self._state = state if state is not None else PageLayoutState(self)
         self._seen_links = (False, False)
@@ -235,20 +240,63 @@ class PageLayoutImageView(ImageViewBase):
         )
         self._show_middle_rect_action.setCheckable(True)
         self._show_middle_rect_action.toggled.connect(self._toggle_middle_rect)
+        self._show_grid_action = QAction(
+            icon("layout-grid"),
+            QCoreApplication.translate("page_layout::ImageView", "Show grid"),
+            self,
+        )
+        self._show_grid_action.setToolTip(
+            QCoreApplication.translate(
+                "page_layout::ImageView",
+                "Draw a line every 10 mm across the page, through its centre, "
+                "to compare positions between pages.",
+            )
+        )
+        self._show_grid_action.setCheckable(True)
+        self._show_grid_action.toggled.connect(self.set_grid_shown)
 
         menu = self._context_menu
+        menu.setToolTipsVisible(True)
         menu.addAction(self._add_horizontal_guide_action)
         menu.addAction(self._add_vertical_guide_action)
         menu.addAction(self._remove_all_guides_action)
         menu.addAction(self._remove_guide_action)
         self._guide_actions_separator = menu.addSeparator()
         menu.addAction(self._show_middle_rect_action)
+        menu.addAction(self._show_grid_action)
         self._sync_context_menu()
 
     def _sync_context_menu(self) -> None:
-        self._show_middle_rect_action.blockSignals(True)
-        self._show_middle_rect_action.setChecked(self._state.middle_rect_shown)
-        self._show_middle_rect_action.blockSignals(False)
+        for action, checked in (
+            (self._show_middle_rect_action, self._state.middle_rect_shown),
+            (self._show_grid_action, self._grid_shown),
+        ):
+            action.blockSignals(True)
+            action.setChecked(checked)
+            action.blockSignals(False)
+
+    def grid_shown(self) -> bool:
+        """Return whether the millimetre grid is drawn over the page.
+
+        Returns:
+            bool: True while the grid shows.
+        """
+        return self._grid_shown
+
+    def set_grid_shown(self, shown: bool) -> None:
+        """Show or hide the millimetre grid and remember the choice.
+
+        Args:
+            shown (bool): True to draw the grid.
+        """
+        self._grid_shown = shown
+        self._sync_context_menu()
+        settings = ApplicationSettings.get_instance()
+        settings.margins_grid_shown = shown
+        # save() has logged the failure; the view still follows the choice.
+        with contextlib.suppress(OSError):
+            settings.save()
+        self.update()
 
     def set_rectangles(
         self, inner_rect: QRectF, middle_rect: QRectF, outer_rect: QRectF
@@ -697,6 +745,10 @@ class PageLayoutImageView(ImageViewBase):
         return ""
 
     def _paint_overlay(self, painter: QPainter) -> None:
+        if self._grid_shown:
+            paint_page_grid(
+                painter, self._extent_rect(), self._mm_per_pixel, self.virtual_to_widget
+            )
         if self._aligned and not self._outer_rect.isEmpty():
             self._paint_rect(painter, self._outer_rect, "margin_outer")
         if self._middle_rect_active():
@@ -953,30 +1005,32 @@ class PageLayoutImageView(ImageViewBase):
         self._finish_grab(grab)
 
     def contextMenuEvent(self, event: QtGui.QContextMenuEvent) -> None:
-        """Show the guide menu.
+        """Show the guide and grid menu.
+
+        A page that is not aligned has no guides, so its menu only has the grid.
 
         Args:
             event (QtGui.QContextMenuEvent): The context menu event.
         """
-        if self._grab is not None or not self._aligned:
+        if self._grab is not None:
             return
         self._context_pos = QPointF(event.pos()) + QPointF(0.5, 0.5)
-        if not self._outer_rect.contains(
+        if not self._extent_rect().contains(
             self.widget_to_virtual_point(self._context_pos)
         ):
             return
-        self._hovered_guide = self._guide_at(self._context_pos)
+        self._hovered_guide = (
+            self._guide_at(self._context_pos) if self._aligned else None
+        )
         on_guide = self._hovered_guide is not None
-        self._add_horizontal_guide_action.setVisible(not on_guide)
-        self._add_vertical_guide_action.setVisible(not on_guide)
+        guide_items = self._aligned and not on_guide
+        self._add_horizontal_guide_action.setVisible(guide_items)
+        self._add_vertical_guide_action.setVisible(guide_items)
         self._remove_all_guides_action.setVisible(
-            not on_guide and bool(self._state.guides)
+            guide_items and bool(self._state.guides)
         )
         self._remove_guide_action.setVisible(on_guide)
-        self._guide_actions_separator.setVisible(
-            not on_guide and not self._null_content
-        )
-        self._show_middle_rect_action.setVisible(
-            not on_guide and not self._null_content
-        )
+        self._guide_actions_separator.setVisible(guide_items)
+        self._show_middle_rect_action.setVisible(guide_items and not self._null_content)
+        self._show_grid_action.setVisible(not on_guide)
         self._context_menu.popup(event.globalPos())

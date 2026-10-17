@@ -136,6 +136,10 @@ class ApplicationSettings(BaseModel):
         default=ZoneCreationMode.POLYGONAL
     )
 
+    # Millimetre grids over the page in the Margins and Output views
+    margins_grid_shown: bool = Field(default=False)
+    output_grid_shown: bool = Field(default=False)
+
     # Output settings
     tiff_bw_compression: TiffCompression = Field(default=TiffCompression.CCITT_FAX4)
     tiff_color_compression: TiffCompression = Field(default=TiffCompression.LZW)
