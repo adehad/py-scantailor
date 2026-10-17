@@ -6301,15 +6301,15 @@ Unchecked: white text on black background</source>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="204"/>
-        <source>Width of the content box in millimetres, worked out from the image resolution. Drag the box edges in the page view to change it.</source>
+        <source>Width of the page box in the units chosen in the settings. Type a value to resize the box from its top left corner, or drag its edges in the page view.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>이미지 해상도로 계산한 컨텐츠 박스의 너비(밀리미터)입니다. 바꾸려면 페이지 보기에서 박스 가장자리를 끄세요.</translation>
+        <translation>설정에서 선택한 단위로 나타낸 페이지 박스의 너비입니다. 값을 입력하면 왼쪽 위 모서리를 기준으로 박스 크기가 바뀌며, 페이지 보기에서 가장자리를 끌어서 바꿀 수도 있습니다.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="218"/>
-        <source>Height of the content box in millimetres, worked out from the image resolution. Drag the box edges in the page view to change it.</source>
+        <source>Height of the page box in the units chosen in the settings. Type a value to resize the box from its top left corner, or drag its edges in the page view.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>이미지 해상도로 계산한 컨텐츠 박스의 높이(밀리미터)입니다. 바꾸려면 페이지 보기에서 박스 가장자리를 끄세요.</translation>
+        <translation>설정에서 선택한 단위로 나타낸 페이지 박스의 높이입니다. 값을 입력하면 왼쪽 위 모서리를 기준으로 박스 크기가 바뀌며, 페이지 보기에서 가장자리를 끌어서 바꿀 수도 있습니다.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="238"/>

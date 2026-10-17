@@ -5325,15 +5325,15 @@ Desmarcado: texto blanco sobre fondo negro</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="204"/>
-        <source>Width of the content box in millimetres, worked out from the image resolution. Drag the box edges in the page view to change it.</source>
+        <source>Width of the page box in the units chosen in the settings. Type a value to resize the box from its top left corner, or drag its edges in the page view.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Ancho de la caja de contenido en milímetros, calculado a partir de la resolución de la imagen. Arrastre los bordes de la caja en la vista de página para cambiarlo.</translation>
+        <translation>Ancho de la caja de página en las unidades elegidas en la configuración. Escriba un valor para redimensionar la caja desde su esquina superior izquierda o arrastre sus bordes en la vista de página.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="218"/>
-        <source>Height of the content box in millimetres, worked out from the image resolution. Drag the box edges in the page view to change it.</source>
+        <source>Height of the page box in the units chosen in the settings. Type a value to resize the box from its top left corner, or drag its edges in the page view.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Alto de la caja de contenido en milímetros, calculado a partir de la resolución de la imagen. Arrastre los bordes de la caja en la vista de página para cambiarlo.</translation>
+        <translation>Alto de la caja de página en las unidades elegidas en la configuración. Escriba un valor para redimensionar la caja desde su esquina superior izquierda o arrastre sus bordes en la vista de página.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="238"/>
