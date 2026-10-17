@@ -82,10 +82,11 @@ and assembling multi-page documents are out of scope of this project.
 
 ```bash
 pdm install
-pdm run translations        # compile the .ts catalogues into the gitignored .qm files
 pdm run scantailor          # the application
 pdm run scantailor-cli --help
 ```
+
+The first start compiles the translations into the user cache folder; `pdm run translations` compiles them beside the sources instead.
 
 **Community examples / test data:** See also [scantailor-testing](https://github.com/ImageProcessing-ElectronicPublications/scantailor-testing).
 
