@@ -28,7 +28,7 @@ def _image() -> np.ndarray:
 def counted(monkeypatch):
     """Count how often content and page detection actually run."""
     calls = {"content": 0, "page": 0}
-    content, page = content_filter.find_content_box, content_filter.find_page_edges
+    content, page = content_filter.find_content_box, content_filter.find_page_box
 
     def count_content(*args, **kwargs):
         calls["content"] += 1
@@ -39,7 +39,7 @@ def counted(monkeypatch):
         return page(*args, **kwargs)
 
     monkeypatch.setattr(content_filter, "find_content_box", count_content)
-    monkeypatch.setattr(content_filter, "find_page_edges", count_page)
+    monkeypatch.setattr(content_filter, "find_page_box", count_page)
     return calls
 
 

@@ -105,7 +105,7 @@ class TestPaintOutsideDarkest:
         outside[:, 70:] = True
         gray[:5, :5] = 0  # darker than anything inside
 
-        painted = content_finder._paint_outside_darkest(gray, outside)
+        painted = content_finder.paint_outside_darkest(gray, outside)
 
         expected = np.where(outside, gray[~outside].min(), gray).astype(np.uint8)
         assert np.array_equal(painted, expected)
@@ -116,7 +116,7 @@ class TestPaintOutsideDarkest:
         outside[:3] = True
         before = gray.copy()
 
-        content_finder._paint_outside_darkest(gray, outside)
+        content_finder.paint_outside_darkest(gray, outside)
 
         assert np.array_equal(gray, before)
 

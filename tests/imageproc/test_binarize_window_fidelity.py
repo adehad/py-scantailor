@@ -25,21 +25,24 @@ def _noisy_image(height: int = 23, width: int = 31) -> NDArray[np.uint8]:
 
 
 def _window_mean_and_deviation(
-    image: NDArray[np.uint8], y: int, x: int, size: int
+    image: NDArray[np.uint8], y: int, x: int, size: int | tuple[int, int]
 ) -> tuple[float, float]:
     height, width = image.shape
-    before = size >> 1
-    after = size - before
+    window_width, window_height = (size, size) if isinstance(size, int) else size
     window = image[
-        max(0, y - before) : min(height, y + after),
-        max(0, x - before) : min(width, x + after),
+        max(0, y - (window_height >> 1)) : min(
+            height, y + window_height - (window_height >> 1)
+        ),
+        max(0, x - (window_width >> 1)) : min(
+            width, x + window_width - (window_width >> 1)
+        ),
     ].astype(np.float64)
     return float(window.mean()), float(window.std())
 
 
 def _reference(
     image: NDArray[np.uint8],
-    size: int,
+    size: int | tuple[int, int],
     threshold_of: Callable[[float, float], float],
 ) -> NDArray[np.uint8]:
     """Per-pixel transcription: ink where gray < threshold_of(mean, deviation)."""
@@ -52,8 +55,8 @@ def _reference(
     return result
 
 
-@pytest.mark.parametrize("size", [7, 8])
-def test_sauvola_matches_clipped_window_reference(size: int) -> None:
+@pytest.mark.parametrize("size", [7, 8, (5, 12), (31, 23)])
+def test_sauvola_matches_clipped_window_reference(size: int | tuple[int, int]) -> None:
     image = _noisy_image()
     k, delta = 0.3, 4.0
 

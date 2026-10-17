@@ -5368,9 +5368,9 @@ Deaktiviert: weißer Text auf schwarzem Hintergrund</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="122"/>
-        <source>Find the edges of the paper from long straight lines near the image border. Use it when the scanner lid or background shows around the page. If no edges are found, the whole image is used.</source>
+        <source>Find the edges of the paper where the dark scanner background around it ends, or from long straight lines near the image border when the background is light. Use it when the scanner lid or background shows around the page. If no edges are found, the whole image is used.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Die Papierkanten anhand langer gerader Linien nahe dem Bildrand finden. Verwenden Sie es, wenn Scannerdeckel oder Hintergrund um die Seite sichtbar sind. Werden keine Kanten gefunden, wird das ganze Bild verwendet.</translation>
+        <translation>Die Papierkanten dort finden, wo der dunkle Scannerhintergrund um das Papier endet, oder bei hellem Hintergrund anhand langer gerader Linien nahe dem Bildrand. Verwenden Sie es, wenn Scannerdeckel oder Hintergrund um die Seite sichtbar sind. Werden keine Kanten gefunden, wird das ganze Bild verwendet.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="138"/>
@@ -5380,9 +5380,9 @@ Deaktiviert: weißer Text auf schwarzem Hintergrund</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="164"/>
-        <source>Move the detected page corners inward while they sit on dark scanner background. This helps when the paper lies slightly crooked on the scanner glass.</source>
+        <source>Move the detected page corners inward while they sit on dark scanner background. This helps when the paper lies slightly crooked on the scanner glass. It has no effect on a light background.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Die erkannten Seitenecken nach innen verschieben, solange sie auf dunklem Scannerhintergrund liegen. Das hilft, wenn das Papier leicht schräg auf dem Scannerglas liegt.</translation>
+        <translation>Die erkannten Seitenecken nach innen verschieben, solange sie auf dunklem Scannerhintergrund liegen. Das hilft, wenn das Papier leicht schräg auf dem Scannerglas liegt. Bei hellem Hintergrund hat es keine Wirkung.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="182"/>

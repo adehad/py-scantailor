@@ -5354,9 +5354,9 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="122"/>
-        <source>Find the edges of the paper from long straight lines near the image border. Use it when the scanner lid or background shows around the page. If no edges are found, the whole image is used.</source>
+        <source>Find the edges of the paper where the dark scanner background around it ends, or from long straight lines near the image border when the background is light. Use it when the scanner lid or background shows around the page. If no edges are found, the whole image is used.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Encontra as margens do papel a partir de linhas retas longas junto à borda da imagem. Use-o quando a tampa ou o fundo do digitalizador aparecem à volta da página. Se não forem encontradas margens, usa-se a imagem inteira.</translation>
+        <translation>Encontrar as margens do papel onde termina o fundo escuro do digitalizador à sua volta, ou a partir de linhas retas longas junto ao bordo da imagem quando o fundo é claro. Use quando a tampa ou o fundo do digitalizador aparecem à volta da página. Se não forem encontradas margens, é usada a imagem inteira.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="138"/>
@@ -5366,9 +5366,9 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="164"/>
-        <source>Move the detected page corners inward while they sit on dark scanner background. This helps when the paper lies slightly crooked on the scanner glass.</source>
+        <source>Move the detected page corners inward while they sit on dark scanner background. This helps when the paper lies slightly crooked on the scanner glass. It has no effect on a light background.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Move para dentro os cantos de página detetados enquanto estiverem sobre o fundo escuro do digitalizador. Ajuda quando o papel está ligeiramente torto sobre o vidro.</translation>
+        <translation>Mover os cantos detetados da página para dentro enquanto estiverem sobre o fundo escuro do digitalizador. Ajuda quando o papel está ligeiramente torto no vidro do digitalizador. Não tem efeito com um fundo claro.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="182"/>

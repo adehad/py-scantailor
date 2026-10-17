@@ -14,6 +14,11 @@ Content box finder
 
 .. automodule:: scantailor.filters.select_content.content_box_finder
 
+Page box detection
+------------------
+
+.. automodule:: scantailor.filters.select_content.page_finder
+
 Largest whitespace
 ------------------
 

@@ -5297,9 +5297,9 @@ Desmarcado: texto blanco sobre fondo negro</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="122"/>
-        <source>Find the edges of the paper from long straight lines near the image border. Use it when the scanner lid or background shows around the page. If no edges are found, the whole image is used.</source>
+        <source>Find the edges of the paper where the dark scanner background around it ends, or from long straight lines near the image border when the background is light. Use it when the scanner lid or background shows around the page. If no edges are found, the whole image is used.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Encuentra los bordes del papel a partir de líneas rectas largas cerca del borde de la imagen. Úselo cuando la tapa o el fondo del escáner se ven alrededor de la página. Si no se encuentran bordes, se usa la imagen completa.</translation>
+        <translation>Encontrar los bordes del papel donde termina el fondo oscuro del escáner que lo rodea, o a partir de líneas rectas largas cerca del borde de la imagen cuando el fondo es claro. Úselo cuando la tapa o el fondo del escáner se vean alrededor de la página. Si no se encuentran bordes, se usa la imagen completa.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="138"/>
@@ -5309,9 +5309,9 @@ Desmarcado: texto blanco sobre fondo negro</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="164"/>
-        <source>Move the detected page corners inward while they sit on dark scanner background. This helps when the paper lies slightly crooked on the scanner glass.</source>
+        <source>Move the detected page corners inward while they sit on dark scanner background. This helps when the paper lies slightly crooked on the scanner glass. It has no effect on a light background.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Mueve hacia dentro las esquinas de página detectadas mientras estén sobre el fondo oscuro del escáner. Ayuda cuando el papel está un poco torcido sobre el cristal del escáner.</translation>
+        <translation>Mover hacia dentro las esquinas detectadas de la página mientras estén sobre el fondo oscuro del escáner. Ayuda cuando el papel está ligeramente torcido sobre el cristal del escáner. No tiene efecto con un fondo claro.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="182"/>
