@@ -5,6 +5,7 @@ import pathlib
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from .app._ui import resources_rc
+from .app.ui.garbage_collection import collect_garbage_on_the_gui_thread
 from .app.ui.MainWindow import MainWindowManager
 from .app.ui.theme import apply_theme
 from .core.settings import ApplicationSettings
@@ -54,6 +55,7 @@ def main() -> int:
     """Run main  UI application."""
     setup_qcore()
     app = QtWidgets.QApplication([])
+    collect_garbage_on_the_gui_thread(app)
     apply_theme(app)
     set_window_icon(app)
     install_saved_language(app)

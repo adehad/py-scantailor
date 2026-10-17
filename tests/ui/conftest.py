@@ -1,6 +1,7 @@
 """Shared harness for automated UI pathway tests (pytest-qt, offscreen)."""
 
 import dataclasses
+import gc
 import os
 import pathlib
 from collections.abc import Callable, Iterator
@@ -17,6 +18,10 @@ from pytestqt.qtbot import QtBot
 
 from scantailor.app._ui import resources_rc
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
+from scantailor.app.ui.garbage_collection import (
+    GuiThreadCollector,
+    collect_garbage_on_the_gui_thread,
+)
 from scantailor.app.ui.MainWindow import MainWindowManager, SaveChoice
 from scantailor.main import setup_qcore
 
@@ -67,6 +72,22 @@ def isolated_settings(tmp_path: pathlib.Path) -> Iterator[pathlib.Path]:
     QtCore.QSettings.setDefaultFormat(previous_format)
     QtCore.QCoreApplication.setOrganizationName(previous_org)
     QtCore.QCoreApplication.setApplicationName(previous_app)
+
+
+@pytest.fixture(autouse=True)
+def garbage_is_collected_on_the_gui_thread(
+    qapp: QtWidgets.QApplication,
+) -> Iterator[GuiThreadCollector]:
+    """Collect cyclic garbage on the GUI thread only, as the application does.
+
+    The collection at teardown frees what the test left while Qt is idle, and
+    automatic collection comes back for the tests outside this package that run
+    on the same worker.
+    """
+    collector = collect_garbage_on_the_gui_thread(qapp)
+    yield collector
+    gc.collect()
+    collector.stop()
 
 
 @pytest.fixture(autouse=True)
