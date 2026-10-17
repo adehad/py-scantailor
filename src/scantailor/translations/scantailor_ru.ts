@@ -5300,9 +5300,9 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="122"/>
-        <source>Find the edges of the paper from long straight lines near the image border. Use it when the scanner lid or background shows around the page. If no edges are found, the whole image is used.</source>
+        <source>Find the edges of the paper where the dark scanner background around it ends, or from long straight lines near the image border when the background is light. Use it when the scanner lid or background shows around the page. If no edges are found, the whole image is used.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Находит края бумаги по длинным прямым линиям у границы изображения. Используйте, если вокруг страницы видна крышка или фон сканера. Если края не найдены, используется всё изображение.</translation>
+        <translation>Найти края бумаги там, где заканчивается окружающий её тёмный фон сканера, а при светлом фоне по длинным прямым линиям у края изображения. Используйте, когда вокруг страницы видна крышка или фон сканера. Если края не найдены, используется всё изображение.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="138"/>
@@ -5312,9 +5312,9 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="164"/>
-        <source>Move the detected page corners inward while they sit on dark scanner background. This helps when the paper lies slightly crooked on the scanner glass.</source>
+        <source>Move the detected page corners inward while they sit on dark scanner background. This helps when the paper lies slightly crooked on the scanner glass. It has no effect on a light background.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Сдвигает найденные углы страницы внутрь, пока они лежат на тёмном фоне сканера. Помогает, если бумага лежит на стекле немного криво.</translation>
+        <translation>Сдвигать найденные углы страницы внутрь, пока они лежат на тёмном фоне сканера. Помогает, когда бумага лежит на стекле сканера слегка криво. При светлом фоне не действует.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="182"/>

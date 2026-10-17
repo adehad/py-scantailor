@@ -5257,9 +5257,9 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="122"/>
-        <source>Find the edges of the paper from long straight lines near the image border. Use it when the scanner lid or background shows around the page. If no edges are found, the whole image is used.</source>
+        <source>Find the edges of the paper where the dark scanner background around it ends, or from long straight lines near the image border when the background is light. Use it when the scanner lid or background shows around the page. If no edges are found, the whole image is used.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Trouver les bords du papier à partir de longues lignes droites près du bord de l&apos;image. Utilisez ce mode quand le couvercle ou le fond du scanner apparaît autour de la page. Si aucun bord n&apos;est trouvé, toute l&apos;image est utilisée.</translation>
+        <translation>Trouver les bords du papier là où s&apos;arrête le fond sombre du scanner qui l&apos;entoure, ou à partir de longues lignes droites près du bord de l&apos;image quand le fond est clair. À utiliser quand le capot ou le fond du scanner apparaît autour de la page. Si aucun bord n&apos;est trouvé, l&apos;image entière est utilisée.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="138"/>
@@ -5269,9 +5269,9 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="164"/>
-        <source>Move the detected page corners inward while they sit on dark scanner background. This helps when the paper lies slightly crooked on the scanner glass.</source>
+        <source>Move the detected page corners inward while they sit on dark scanner background. This helps when the paper lies slightly crooked on the scanner glass. It has no effect on a light background.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Déplacer les coins détectés de la page vers l&apos;intérieur tant qu&apos;ils se trouvent sur le fond sombre du scanner. Utile quand le papier est posé légèrement de travers sur la vitre.</translation>
+        <translation>Déplacer vers l&apos;intérieur les coins de page détectés tant qu&apos;ils se trouvent sur le fond sombre du scanner. Utile quand le papier est légèrement de travers sur la vitre du scanner. Sans effet sur un fond clair.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="182"/>

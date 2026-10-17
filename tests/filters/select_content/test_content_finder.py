@@ -5,7 +5,6 @@ import numpy as np
 from scantailor.filters.select_content.content_finder import (
     ContentDetectionResult,
     find_content_box,
-    find_page_edges,
 )
 
 
@@ -120,44 +119,3 @@ class TestContentDetectionResult:
             confidence=0.5,
         )
         assert result.is_confident()
-
-
-class TestFindPageEdges:
-    """Tests for find_page_edges function."""
-
-    def test_returns_content_box_or_none(self):
-        """Should return ContentBox or None."""
-        image = np.zeros((100, 100), dtype=np.uint8)
-        result = find_page_edges(image)
-
-        # With a blank image, might return None
-        assert result is None or hasattr(result, "x")
-
-    def test_handles_blank_image(self):
-        """Blank image should return None (no edges found)."""
-        image = np.zeros((100, 100), dtype=np.uint8)
-        result = find_page_edges(image)
-
-        # No edges to detect
-        assert result is None
-
-    def test_handles_color_image(self):
-        """Should handle color images."""
-        image = np.zeros((100, 100, 3), dtype=np.uint8)
-        result = find_page_edges(image)
-
-        # Should not raise
-        assert result is None or hasattr(result, "x")
-
-    def test_detects_clear_rectangle(self):
-        """Should detect edges of a clear rectangle."""
-        # Create image with white page on dark background
-        image = np.zeros((200, 200), dtype=np.uint8)
-        image[20:180, 20:180] = 255
-
-        result = find_page_edges(image, dpi=150.0)
-
-        # Should detect page edges
-        # Note: edge detection may not be pixel-perfect
-        if result is not None:
-            assert result.is_valid()

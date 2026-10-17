@@ -5277,9 +5277,9 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="122"/>
-        <source>Find the edges of the paper from long straight lines near the image border. Use it when the scanner lid or background shows around the page. If no edges are found, the whole image is used.</source>
+        <source>Find the edges of the paper where the dark scanner background around it ends, or from long straight lines near the image border when the background is light. Use it when the scanner lid or background shows around the page. If no edges are found, the whole image is used.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Znajduje krawędzie papieru na podstawie długich prostych linii przy brzegu obrazu. Użyj tego, gdy wokół strony widać pokrywę lub tło skanera. Jeśli nie znajdzie krawędzi, używany jest cały obraz.</translation>
+        <translation>Znajdź krawędzie papieru tam, gdzie kończy się otaczające go ciemne tło skanera, a przy jasnym tle na podstawie długich prostych linii przy krawędzi obrazu. Użyj tego, gdy wokół strony widać pokrywę lub tło skanera. Jeśli krawędzie nie zostaną znalezione, użyty zostanie cały obraz.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="138"/>
@@ -5289,9 +5289,9 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="164"/>
-        <source>Move the detected page corners inward while they sit on dark scanner background. This helps when the paper lies slightly crooked on the scanner glass.</source>
+        <source>Move the detected page corners inward while they sit on dark scanner background. This helps when the paper lies slightly crooked on the scanner glass. It has no effect on a light background.</source>
         <extracomment>Machine draft, pending native review.</extracomment>
-        <translation>Przesuwa wykryte rogi strony do środka, dopóki leżą na ciemnym tle skanera. Pomaga, gdy papier leży lekko krzywo na szybie skanera.</translation>
+        <translation>Przesuwaj wykryte narożniki strony do środka, dopóki leżą na ciemnym tle skanera. Pomaga, gdy papier leży lekko krzywo na szybie skanera. Przy jasnym tle nie ma to wpływu.</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/select_content.py" line="182"/>
