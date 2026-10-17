@@ -75,14 +75,9 @@ def test_pages_of_a_version_3_project_do_not_fill_outside_the_page_box(
     )
 
 
-def test_importing_fill_outside_page_box_logs_no_dropped_setting(tmp_path: Path):
-    from loguru import logger
+def test_importing_fill_outside_page_box_logs_no_dropped_setting(
+    tmp_path: Path, log_messages: list[str]
+):
+    _import(tmp_path, "version4", {})
 
-    messages: list[str] = []
-    sink = logger.add(messages.append, level="WARNING", format="{message}")
-    try:
-        _import(tmp_path, "version4", {})
-    finally:
-        logger.remove(sink)
-
-    assert not any("page box" in message for message in messages)
+    assert not any("page box" in message for message in log_messages)

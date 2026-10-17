@@ -2,11 +2,13 @@
 
 import pathlib
 
+from loguru import logger
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from .app._ui import resources_rc
 from .app.ui.MainWindow import MainWindowManager
 from .app.ui.theme import apply_theme
+from .core import diagnostics
 from .core.settings import ApplicationSettings
 from .translations import TRANSLATIONS_DIR, load_translation, locale_for_language
 
@@ -47,19 +49,41 @@ def install_saved_language(
         list[QtCore.QTranslator]: The translators installed, empty for English.
     """
     language = ApplicationSettings.get_instance().language
-    return load_translation(app, locale_for_language(language), directory)
+    locale = locale_for_language(language)
+    translators = load_translation(app, locale, directory)
+    catalogues = ", ".join(translator.filePath() for translator in translators)
+    logger.info(
+        "UI language {} ({}): {}",
+        language or "system",
+        locale.name(),
+        catalogues or "no catalogue loaded, English",
+    )
+    return translators
 
 
 def main() -> int:
-    """Run main  UI application."""
+    """Run the window application.
+
+    Logging is set up before the QApplication, so a failure to create it is
+    recorded after the start-up banner.
+
+    Returns:
+        int: The exit code of the Qt event loop.
+    """
+    session = diagnostics.configure_logging("gui", stderr_level="INFO")
+    restore_qt_handler = diagnostics.install_qt_message_handler()
     setup_qcore()
     app = QtWidgets.QApplication([])
+    app.aboutToQuit.connect(restore_qt_handler)
+    logger.info("Qt platform {}, style {}", app.platformName(), app.style().name())
     apply_theme(app)
     set_window_icon(app)
     install_saved_language(app)
     main_window = MainWindowManager()
     main_window.show()
-    return app.exec()
+    exit_code = app.exec()
+    session.end()
+    return exit_code
 
 
 if __name__ == "__main__":

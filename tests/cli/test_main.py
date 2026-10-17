@@ -2,9 +2,11 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+from scantailor.cli import main as cli_main
 from scantailor.cli.errors import ExitCode
 from scantailor.cli.main import main
 
@@ -93,3 +95,60 @@ def test_run_with_a_missing_source_exits_failed_and_names_the_page(
     assert code == ExitCode.FAILED == 1
     assert report["written"] == 1
     assert list(report["failed"]) == ["page_02.png"]
+
+
+@pytest.mark.parametrize(
+    ("argv", "wants_file"),
+    [
+        (["status", "p.json"], False),
+        (["options", "show", "p.json"], False),
+        (["run", "p.json"], True),
+        (["export", "pdf", "p.json", "b.pdf"], True),
+    ],
+)
+def test_only_commands_that_process_pages_write_a_log_file(
+    no_process_diagnostics: list[dict[str, Any]], argv: list[str], wants_file: bool
+) -> None:
+    main(argv)
+
+    assert no_process_diagnostics[-1]["kind"] == "cli"
+    assert no_process_diagnostics[-1]["write_to_log_folder"] is wants_file
+
+
+@pytest.mark.parametrize(("verbose", "level"), [(False, "WARNING"), (True, "INFO")])
+def test_verbose_lowers_the_stderr_level(
+    no_process_diagnostics: list[dict[str, Any]], verbose: bool, level: str
+) -> None:
+    main([*(["--verbose"] if verbose else []), "status", "p.json"])
+
+    assert no_process_diagnostics[-1]["stderr_level"] == level
+
+
+def test_unexpected_failure_names_the_log_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def crash(_args: object) -> None:
+        raise RuntimeError("bug")
+
+    monkeypatch.setattr(cli_main, "_dispatch", crash)
+
+    code = main(["run", str(tmp_path / "p.json")])
+
+    err = capsys.readouterr().err
+    assert code == ExitCode.FAILED
+    assert f"see the log in {tmp_path}" in err
+    assert "cli-" in err
+
+
+def test_unexpected_failure_without_a_log_file_points_at_stderr(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def crash(_args: object) -> None:
+        raise RuntimeError("bug")
+
+    monkeypatch.setattr(cli_main, "_dispatch", crash)
+
+    code = main(["status", "p.json"])
+
+    assert code == ExitCode.FAILED
+    assert "see the log on stderr" in capsys.readouterr().err
