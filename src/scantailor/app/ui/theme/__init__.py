@@ -8,7 +8,10 @@ scheme, and the ``SCANTAILOR_THEME`` environment variable overrides both. The ke
 hovered group header or splitter.
 """
 
+import contextlib
+import gc
 import os
+from collections.abc import Iterator
 
 from loguru import logger
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -107,6 +110,24 @@ def system_color_scheme(app: QtWidgets.QApplication) -> QtCore.Qt.ColorScheme:
     return app.styleHints().colorScheme()
 
 
+@contextlib.contextmanager
+def _restyling() -> Iterator[None]:
+    """Hold off the cyclic garbage collector while Qt restyles every widget.
+
+    QApplication.setStyle, setStyleSheet, setPalette and setFont walk a snapshot
+    of every widget and call into Python for each one. A collection started by
+    that Python code can delete a widget whose last owner was an unreachable
+    wrapper cycle, and Qt then sends the next event to freed memory.
+    """
+    was_enabled = gc.isenabled()
+    gc.disable()
+    try:
+        yield
+    finally:
+        if was_enabled:
+            gc.enable()
+
+
 class _ThemeController(QtCore.QObject):
     """Owns the application look and re-applies it when the OS scheme changes."""
 
@@ -117,9 +138,10 @@ class _ThemeController(QtCore.QObject):
         self._requested: str | None = None
         self._requested_hover: str | None = None
         self.scheme = "light"
-        # Native styles ignore the palette and several QSS rules.
-        app.setStyle(LayoutStyle(QtWidgets.QStyleFactory.create("Fusion")))
-        apply_fonts(app)
+        with _restyling():
+            # Native styles ignore the palette and several QSS rules.
+            app.setStyle(LayoutStyle(QtWidgets.QStyleFactory.create("Fusion")))
+            apply_fonts(app)
         app.installEventFilter(IconBinder(self))
         app.installEventFilter(TabularFigures(self))
         app.installEventFilter(SpinBoxTextInset(self))
@@ -134,23 +156,26 @@ class _ThemeController(QtCore.QObject):
         return self._draw()
 
     def _draw(self) -> str:
-        mode = self._requested if self._requested is not None else resolve_mode()
-        scheme = resolve_scheme(self._app, mode)
-        tokens = _TOKENS[scheme]
-        self.scheme = scheme
-        set_active_tokens(tokens)
-        set_semantic_colors(QtGui.QColor(tokens.positive), QtGui.QColor(tokens.danger))
-        self._app.setPalette(build_palette(tokens))
-        hover = self._requested_hover or resolve_hover()
-        self._app.setStyleSheet(
-            build_stylesheet(
-                tokens,
-                write_assets(tokens, scheme),
-                self._app.font(),
-                accent_hover=hover == ACCENT,
+        with _restyling():
+            mode = self._requested if self._requested is not None else resolve_mode()
+            scheme = resolve_scheme(self._app, mode)
+            tokens = _TOKENS[scheme]
+            self.scheme = scheme
+            set_active_tokens(tokens)
+            set_semantic_colors(
+                QtGui.QColor(tokens.positive), QtGui.QColor(tokens.danger)
             )
-        )
-        return scheme
+            self._app.setPalette(build_palette(tokens))
+            hover = self._requested_hover or resolve_hover()
+            self._app.setStyleSheet(
+                build_stylesheet(
+                    tokens,
+                    write_assets(tokens, scheme),
+                    self._app.font(),
+                    accent_hover=hover == ACCENT,
+                )
+            )
+            return scheme
 
     def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
         """Rebuild the stylesheet sizes when the application font changes.

@@ -1,5 +1,6 @@
 """Tests for the cross-platform light and dark look."""
 
+import gc
 import pathlib
 import re
 
@@ -137,6 +138,60 @@ def test_applying_twice_installs_one_controller(app):
     theme.apply_theme(app, "dark")
     controllers = app.findChildren(QtCore.QObject, "scantailorThemeController")
     assert len(controllers) == 1
+
+
+class CollectsGarbageWhileRestyling(QtCore.QObject):
+    """Drops the last owner of a widget cycle mid-restyle, then lets the GC run.
+
+    This stands in for an automatic collection triggered by any Python code that
+    Qt calls while it walks its widgets, which is when a widget deleted from
+    under it crashes the application.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.owner: list[QtWidgets.QWidget] = []
+        self.dropped = False
+
+    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        if (
+            event.type()
+            in (QtCore.QEvent.Type.StyleChange, QtCore.QEvent.Type.PaletteChange)
+            and self.owner
+        ):
+            self.owner.clear()
+            self.dropped = True
+            if gc.isenabled():
+                gc.collect()
+        return False
+
+
+@pytest.mark.parametrize("first_scheme", [None, "light"])
+def test_a_widget_freed_by_the_gc_mid_restyle_is_not_deleted_under_qt(
+    app, first_scheme
+):
+    if first_scheme is not None:
+        theme.apply_theme(app, first_scheme)
+    dialogs = []
+    for _ in range(20):
+        dialog = QtWidgets.QDialog()
+        dialog.ensurePolished()
+        dialog.cycle = dialog
+        dialogs.append(dialog)
+    collector = CollectsGarbageWhileRestyling()
+    collector.owner.extend(dialogs)
+    destroyed: list[bool] = []
+    dialogs[-1].destroyed.connect(lambda: destroyed.append(True))
+    del dialog, dialogs
+    app.installEventFilter(collector)
+    try:
+        theme.apply_theme(app, "dark")
+    finally:
+        app.removeEventFilter(collector)
+    assert collector.dropped
+    assert gc.isenabled()
+    gc.collect()
+    assert destroyed
 
 
 def test_palette_accent_matches_the_scheme(app):
