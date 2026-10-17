@@ -1,0 +1,35 @@
+name: Bug report
+description: Something went wrong, or a page came out wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Include the stage, and the page name if it is about one page.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version and platform
+      description: From Help > About, and your operating system.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: textarea
+    id: log
+    attributes:
+      label: Log file
+      description: >-
+        Help > Open log folder. Attach the newest gui-*.log from the day of the
+        problem, and any crash-*.log beside it. Logs contain your file and folder
+        names; check them first.
+  - type: textarea
+    id: sample
+    attributes:
+      label: Sample page
+      description: If one page is detected wrongly, attach that scan if you can share it.

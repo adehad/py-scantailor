@@ -1,5 +1,6 @@
 """Main Window."""
 
+import contextlib
 import enum
 import pathlib
 from collections.abc import Callable, Collection, Hashable, Iterable
@@ -79,7 +80,7 @@ from scantailor.app.ui.utils import get_cwidget
 from scantailor.app.ui.widgets.processing_indicator import ProcessingIndicator
 from scantailor.app.ui.widgets.stage_list_view import StageListView
 from scantailor.app.ui.widgets.status_bar_panel import StatusBarPanel
-from scantailor.core import propagation
+from scantailor.core import diagnostics, propagation
 from scantailor.core.batch import (
     BatchResult,
     PageDetected,
@@ -441,6 +442,9 @@ class MainWindowManager:
         self.actionInches = get_cwidget(self.ui, QtGui.QAction, "actionInches")
         self.actionAbout = get_cwidget(self.ui, QtGui.QAction, "actionAbout")
         self.actionUserGuide = get_cwidget(self.ui, QtGui.QAction, "actionUserGuide")
+        self.actionOpenLogFolder = get_cwidget(
+            self.ui, QtGui.QAction, "actionOpenLogFolder"
+        )
         self.actionReloadPage = get_cwidget(self.ui, QtGui.QAction, "actionReloadPage")
         self.actionSwitchFilter1 = get_cwidget(
             self.ui, QtGui.QAction, "actionSwitchFilter1"
@@ -549,6 +553,7 @@ class MainWindowManager:
         self.actionGotoPage.triggered.connect(self.execGotoPageDialog)
         self.actionAbout.triggered.connect(self.showAboutDialog)
         self.actionUserGuide.triggered.connect(self.openUserGuide)
+        self.actionOpenLogFolder.triggered.connect(self.openLogFolder)
         self.actionReloadPage.triggered.connect(self.reloadCurrentPage)
         self.actionSwitchFilter1.triggered.connect(self.switchFilter1)
         self.actionSwitchFilter2.triggered.connect(self.switchFilter2)
@@ -2366,6 +2371,15 @@ class MainWindowManager:
         """Open the online user guide in the system web browser."""
         if not QtGui.QDesktopServices.openUrl(QtCore.QUrl(USER_GUIDE_URL)):
             _LOG.warning("Could not open the user guide at {}", USER_GUIDE_URL)
+
+    def openLogFolder(self) -> None:
+        """Show the log folder in the file manager, to attach logs to a bug report."""
+        folder = diagnostics.log_folder()
+        # A folder that cannot be created makes openUrl fail, which is logged.
+        with contextlib.suppress(OSError):
+            folder.mkdir(parents=True, exist_ok=True)
+        if not QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(folder))):
+            _LOG.warning("Could not open the log folder {}", folder)
 
     def showAboutDialog(self) -> None:
         """Show about dialog."""

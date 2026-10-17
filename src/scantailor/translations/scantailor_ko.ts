@@ -1806,12 +1806,12 @@
         <translation>도움</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="122"/>
+        <location filename="../app/ui/MainWindow.ui" line="125"/>
         <source>Thumbnails</source>
         <translation>미리 보기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="161"/>
+        <location filename="../app/ui/MainWindow.ui" line="164"/>
         <source>Keep current page in view.</source>
         <translation>현재 페이지를 계속 봅니다.</translation>
     </message>
@@ -1820,166 +1820,179 @@
         <translation type="vanished">다음 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="727"/>
+        <location filename="../app/ui/MainWindow.ui" line="730"/>
         <source>Filters</source>
         <translation>필터</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="843"/>
+        <location filename="../app/ui/MainWindow.ui" line="846"/>
         <source>Debug Mode</source>
         <translation>디버그 모드</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="854"/>
+        <location filename="../app/ui/MainWindow.ui" line="857"/>
         <source>Save Project</source>
         <translation>프로젝트 저장</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="865"/>
+        <location filename="../app/ui/MainWindow.ui" line="868"/>
         <source>Save Project As ...</source>
         <translation>프로젝트 다른 이름으로 저장</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="876"/>
-        <location filename="../app/ui/MainWindow.ui" line="931"/>
+        <location filename="../app/ui/MainWindow.ui" line="879"/>
+        <location filename="../app/ui/MainWindow.ui" line="934"/>
         <source>Next Page</source>
         <translation>다음 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="887"/>
-        <location filename="../app/ui/MainWindow.ui" line="920"/>
+        <location filename="../app/ui/MainWindow.ui" line="890"/>
+        <location filename="../app/ui/MainWindow.ui" line="923"/>
         <source>Previous Page</source>
         <translation>이전 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="898"/>
+        <location filename="../app/ui/MainWindow.ui" line="901"/>
         <source>New Project ...</source>
         <translation>새 프로젝트</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="909"/>
+        <location filename="../app/ui/MainWindow.ui" line="912"/>
         <source>Open Project ...</source>
         <translation>프로젝트 열기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="942"/>
+        <location filename="../app/ui/MainWindow.ui" line="945"/>
         <source>Close Project</source>
         <translation>프로젝트 닫기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="953"/>
+        <location filename="../app/ui/MainWindow.ui" line="956"/>
         <source>Quit</source>
         <translation>종료</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="964"/>
+        <location filename="../app/ui/MainWindow.ui" line="967"/>
         <source>Settings ...</source>
         <translation>설정</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="975"/>
+        <location filename="../app/ui/MainWindow.ui" line="978"/>
         <source>First Page</source>
         <translation>첫번째 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="986"/>
+        <location filename="../app/ui/MainWindow.ui" line="989"/>
         <source>Last Page</source>
         <translation>마지막 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="997"/>
+        <location filename="../app/ui/MainWindow.ui" line="1000"/>
         <source>User guide</source>
         <extracomment>Machine draft, pending native review.</extracomment>
         <translation>사용자 안내서</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1000"/>
+        <location filename="../app/ui/MainWindow.ui" line="1003"/>
         <source>Open the online manual in your web browser</source>
         <extracomment>Machine draft, pending native review.</extracomment>
         <translation>웹 브라우저에서 온라인 설명서 열기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1008"/>
+        <location filename="../app/ui/MainWindow.ui" line="1012"/>
+        <source>Open log folder</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>로그 폴더 열기</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.ui" line="1015"/>
+        <location filename="../app/ui/MainWindow.ui" line="1018"/>
+        <source>Show the folder of log files to attach to a bug report</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>버그 보고서에 첨부할 로그 파일이 있는 폴더 표시</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/MainWindow.ui" line="1023"/>
         <source>About</source>
         <translation>ScanTailor Advanced 정보</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1019"/>
+        <location filename="../app/ui/MainWindow.ui" line="1034"/>
         <source>Fix DPI ...</source>
         <translation>DPI 수정</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1030"/>
+        <location filename="../app/ui/MainWindow.ui" line="1045"/>
         <source>Relinking ...</source>
         <translation>재 링크 도구</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1041"/>
+        <location filename="../app/ui/MainWindow.ui" line="1056"/>
         <source>Reverse two-page spread order</source>
         <translation>두 페이지 펼침 순서 뒤집기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1044"/>
+        <location filename="../app/ui/MainWindow.ui" line="1059"/>
         <source>Swap left/right page order for two-page scans (e.g. Japanese book reading order).</source>
         <translation>두 페이지 스캔의 좌우 페이지 순서를 바꿉니다 (예: 일본식 책 읽기 순서).</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1055"/>
-        <location filename="../app/ui/MainWindow.ui" line="1066"/>
-        <location filename="../app/ui/MainWindow.ui" line="1080"/>
-        <location filename="../app/ui/MainWindow.ui" line="1094"/>
-        <location filename="../app/ui/MainWindow.ui" line="1108"/>
-        <location filename="../app/ui/MainWindow.ui" line="1122"/>
+        <location filename="../app/ui/MainWindow.ui" line="1070"/>
+        <location filename="../app/ui/MainWindow.ui" line="1081"/>
+        <location filename="../app/ui/MainWindow.ui" line="1095"/>
+        <location filename="../app/ui/MainWindow.ui" line="1109"/>
+        <location filename="../app/ui/MainWindow.ui" line="1123"/>
+        <location filename="../app/ui/MainWindow.ui" line="1137"/>
         <source>Switch filter to orientation</source>
         <translation>필터를 방향 수정으로 바꾸기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1069"/>
+        <location filename="../app/ui/MainWindow.ui" line="1084"/>
         <source>Switch filter to split pages</source>
         <translation>필터를 페이지 분할로 바꾸기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1083"/>
+        <location filename="../app/ui/MainWindow.ui" line="1098"/>
         <source>Switch filter to deskew</source>
         <translation>필터를 기울기 보정으로 바꾸기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1097"/>
+        <location filename="../app/ui/MainWindow.ui" line="1112"/>
         <source>Switch filter to select content</source>
         <translation>필터를 컨텐츠 선택으로 바꾸기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1111"/>
+        <location filename="../app/ui/MainWindow.ui" line="1126"/>
         <source>Switch filter to margins</source>
         <translation>필터를 테두리로 바꾸기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1125"/>
+        <location filename="../app/ui/MainWindow.ui" line="1140"/>
         <source>Switch filter to output</source>
         <translation>필터를 출력으로 바꾸기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1139"/>
+        <location filename="../app/ui/MainWindow.ui" line="1154"/>
         <source>Pixels</source>
         <translation>픽셀</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1156"/>
+        <location filename="../app/ui/MainWindow.ui" line="1171"/>
         <source>Millimetres</source>
         <translation>밀리미터</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1170"/>
+        <location filename="../app/ui/MainWindow.ui" line="1185"/>
         <source>Inches</source>
         <translation>인치</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1184"/>
+        <location filename="../app/ui/MainWindow.ui" line="1199"/>
         <source>Centimetres</source>
         <translation>센티미터</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1195"/>
+        <location filename="../app/ui/MainWindow.ui" line="1210"/>
         <source>Default parameters ...</source>
         <translation>기본 매개 변수</translation>
     </message>
@@ -2071,33 +2084,33 @@ To determine it, run batch processing at &quot;Select Content&quot; or &quot;Mar
         <translation type="vanished">삭제</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="688"/>
+        <location filename="../app/ui/MainWindow.ui" line="691"/>
         <source>Use Home, End, PgUp/Q, PgDown/W to navigate between pages or Shift+PgUp/Q and Shift+PgDown/W to navigate between selected ones. Alt+Wheel - scale thumbnails.</source>
         <translation>Home, End, PgUp/Q, PgDown/W 를 눌러 페이지를 이동하거나 Shift+PgUp/Q and Shift+PgDown/W 로 선택된 페이지를 이동할 수 있습니다. Alt+Wheel은 미리 보기 크기를 조절합니다.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1206"/>
-        <location filename="../app/ui/MainWindow.ui" line="1209"/>
-        <location filename="../app/ui/MainWindow.ui" line="1248"/>
-        <location filename="../app/ui/MainWindow.ui" line="1251"/>
+        <location filename="../app/ui/MainWindow.ui" line="1221"/>
+        <location filename="../app/ui/MainWindow.ui" line="1224"/>
+        <location filename="../app/ui/MainWindow.ui" line="1263"/>
+        <location filename="../app/ui/MainWindow.ui" line="1266"/>
         <source>Previous Selected Page</source>
         <translation>이전 선택된 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1220"/>
-        <location filename="../app/ui/MainWindow.ui" line="1223"/>
-        <location filename="../app/ui/MainWindow.ui" line="1234"/>
-        <location filename="../app/ui/MainWindow.ui" line="1237"/>
+        <location filename="../app/ui/MainWindow.ui" line="1235"/>
+        <location filename="../app/ui/MainWindow.ui" line="1238"/>
+        <location filename="../app/ui/MainWindow.ui" line="1249"/>
+        <location filename="../app/ui/MainWindow.ui" line="1252"/>
         <source>Next Selected Page</source>
         <translation>다음 선택된 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="220"/>
+        <location filename="../app/ui/MainWindow.ui" line="223"/>
         <source>Previous page.</source>
         <translation>이전 페이지</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="257"/>
+        <location filename="../app/ui/MainWindow.ui" line="260"/>
         <source>Next page.</source>
         <translation>다음 페이지</translation>
     </message>
@@ -2106,68 +2119,68 @@ To determine it, run batch processing at &quot;Select Content&quot; or &quot;Mar
         <translation type="vanished">선택된 페이지만 필터링하기</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="294"/>
+        <location filename="../app/ui/MainWindow.ui" line="297"/>
         <source>Navigate through selected pages only.</source>
         <translation>선택된 페이지 사이로만 이동합니다.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="344"/>
+        <location filename="../app/ui/MainWindow.ui" line="347"/>
         <source>Magnify thumbnails.  (Ctrl++)</source>
         <translation>미리 보기 확대.  (Ctrl++)</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="381"/>
+        <location filename="../app/ui/MainWindow.ui" line="384"/>
         <source>Diminish thumbnails.  (Ctrl+-)</source>
         <translation>미리 보기 축소.  (Ctrl+-)</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="428"/>
+        <location filename="../app/ui/MainWindow.ui" line="431"/>
         <source>Go To Page...  (Ctrl+G)</source>
         <translation>페이지로 이동...  (Ctrl+G)</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="465"/>
+        <location filename="../app/ui/MainWindow.ui" line="468"/>
         <source>Enable multi page selection mode.</source>
         <translation>여러 페이지 선택 모드를 켭니다.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="505"/>
+        <location filename="../app/ui/MainWindow.ui" line="508"/>
         <source>Single/multi column display.</source>
         <translation>한 열/여러 열 표시.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="548"/>
+        <location filename="../app/ui/MainWindow.ui" line="551"/>
         <source>Pause automatic thumbnail reordering while thumbnails refresh.</source>
         <translation>미리 보기를 새로 고치는 동안 미리 보기 자동 재정렬을 멈춥니다.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="585"/>
+        <location filename="../app/ui/MainWindow.ui" line="588"/>
         <source>Sorting order.</source>
         <translation>정렬 순서.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="628"/>
+        <location filename="../app/ui/MainWindow.ui" line="631"/>
         <source>Highlight deviation.</source>
         <translation>편차 강조.</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1262"/>
+        <location filename="../app/ui/MainWindow.ui" line="1277"/>
         <source>Go To Page</source>
         <translation>페이지로 이동</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1273"/>
+        <location filename="../app/ui/MainWindow.ui" line="1288"/>
         <source>Magnify thumbnails</source>
         <translation>미리 보기 확대</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1281"/>
+        <location filename="../app/ui/MainWindow.ui" line="1296"/>
         <source>Diminish thumbnails</source>
         <translation>미리 보기 축소</translation>
     </message>
     <message>
-        <location filename="../app/ui/MainWindow.ui" line="1289"/>
-        <location filename="../app/ui/MainWindow.ui" line="1292"/>
+        <location filename="../app/ui/MainWindow.ui" line="1304"/>
+        <location filename="../app/ui/MainWindow.ui" line="1307"/>
         <source>Reload current page</source>
         <translation>현재 페이지 다시 불러오기</translation>
     </message>
