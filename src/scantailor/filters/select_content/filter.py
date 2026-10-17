@@ -8,9 +8,10 @@ from numpy.typing import NDArray
 from scantailor.core.models import PageId
 
 from .content_box import ContentBox, PageBox, PhysicalSize
-from .content_finder import ContentDetectionResult, find_content_box, find_page_edges
+from .content_finder import ContentDetectionResult, find_content_box
 from .dependencies import Dependencies
 from .detection import ContentDetectionMode, PageDetectionMode
+from .page_finder import find_page_box
 from .params import Params
 from .settings import Settings
 
@@ -82,6 +83,13 @@ def _made(
 ) -> NDArray[np.uint8]:
     """Return the image, making it first when it is given as a function."""
     return image() if callable(image) else image
+
+
+def _made_mask(
+    mask: NDArray[np.bool_] | Callable[[], NDArray[np.bool_]] | None,
+) -> NDArray[np.bool_] | None:
+    """Return the mask, making it first when it is given as a function."""
+    return mask() if callable(mask) else mask
 
 
 def _content_within_page(params: Params) -> bool:
@@ -179,23 +187,29 @@ class Filter:
         page_id: PageId,
         dpi: float = 300.0,
         store_result: bool = True,
-    ) -> PageBox | None:
-        """Detect page boundaries in an image.
+        outside: NDArray[np.bool_] | None = None,
+    ) -> PageBox:
+        """Detect where the page lies on the scanner background.
 
         Args:
             image: Grayscale or color image.
             page_id: Page identifier.
             dpi: Image resolution.
             store_result: Whether to store the result in settings.
+            outside: Pixels of ``image`` with no source pixel behind them;
+                they count as background.
 
         Returns:
-            PageBox if detected, None otherwise.
+            The page box; the whole image when no page was found.
         """
         params = self.get_params(page_id)
-        tolerance = self._settings.get_page_detection_tolerance()
-
-        content_box = find_page_edges(
-            image, dpi=dpi, tolerance=tolerance, fine_tune=params.fine_tune_corners
+        content_box = find_page_box(
+            image,
+            dpi=dpi,
+            expected_size_mm=self._settings.get_page_detection_box(),
+            tolerance=self._settings.get_page_detection_tolerance(),
+            fine_tune=params.fine_tune_corners,
+            outside=outside,
         )
 
         if content_box is None:
@@ -314,7 +328,9 @@ class Filter:
         # Handle page detection
         if params.is_page_auto():
             if update_page:
-                self.detect_page(_made(image), page_id, dpi=dpi)
+                self.detect_page(
+                    _made(image), page_id, dpi=dpi, outside=_made_mask(outside)
+                )
                 params = self.get_params(page_id)
                 update_content = update_content or not _content_within_page(params)
         elif params.is_page_disabled():

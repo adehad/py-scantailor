@@ -72,7 +72,9 @@ When to enable the Page Box
      - The scan shows the page on a dark background, a scanner bed or a shadow along
        its edges. Content detection can take those edges for text or pictures, and
        the Page Box keeps the search inside the paper. The Margins stage then
-       measures the margins from the paper edge instead of the scan edge.
+       measures the margins from the paper edge instead of the scan edge. A side
+       where the scanner cut the background off, so the paper runs to the scan
+       edge, keeps the scan edge as the page edge.
    * - **Manual**
      - **Auto** finds the paper edge in the wrong place. Drag the sides of the box in
        the image, as for the content box.

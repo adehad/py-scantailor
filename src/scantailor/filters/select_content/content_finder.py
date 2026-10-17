@@ -1,4 +1,4 @@
-"""Content box and page edge detection."""
+"""Content box detection."""
 
 from collections.abc import Callable, Hashable
 from dataclasses import dataclass
@@ -116,7 +116,7 @@ def find_content_box(
                 return None
             painted = scaled
             if made.any():
-                painted = scale(_paint_outside_darkest(gray, made))
+                painted = scale(paint_outside_darkest(gray, made))
             return find_content_rect(painted, page_rect)
 
         found = _CONTENT_MEMO.get_or_compute(
@@ -125,7 +125,7 @@ def find_content_box(
     else:
         everything_outside = mask is not None and bool(mask.all())
         if mask is not None and mask.any() and not everything_outside:
-            scaled = scale(_paint_outside_darkest(gray, mask))
+            scaled = scale(paint_outside_darkest(gray, mask))
         found = (
             None
             if everything_outside
@@ -165,7 +165,7 @@ def find_content_box(
     )
 
 
-def _paint_outside_darkest(
+def paint_outside_darkest(
     gray: NDArray[np.uint8], outside: NDArray[np.bool_]
 ) -> NDArray[np.uint8]:
     """Return ``gray`` with the ``outside`` pixels set to the darkest level inside."""
@@ -174,103 +174,3 @@ def _paint_outside_darkest(
     painted = gray.copy()
     np.copyto(painted, darkest, where=outside)
     return painted
-
-
-def find_page_edges(
-    image: NDArray[np.uint8],
-    dpi: float = _DEFAULT_DPI,
-    tolerance: float = 0.1,
-    fine_tune: bool = False,
-) -> ContentBox | None:
-    """Detect page boundaries in an image.
-
-    Looks for strong edges that indicate the physical page boundary
-    (as opposed to content within the page).
-
-    Args:
-        image: Grayscale or color image.
-        dpi: Image resolution.
-        tolerance: Edge detection threshold (0-1).
-        fine_tune: Whether to refine corner detection.
-
-    Returns:
-        ContentBox representing page boundaries, or None if not found.
-    """
-    # Convert to grayscale if needed
-    if len(image.shape) == 3:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    else:
-        gray = image.copy()
-
-    h, w = gray.shape[:2]
-
-    # Scale to processing resolution
-    scale = _TARGET_DPI / dpi
-    if scale < 1.0:
-        new_w = max(1, int(w * scale))
-        new_h = max(1, int(h * scale))
-        scaled = cv2.resize(gray, (new_w, new_h), interpolation=cv2.INTER_AREA)
-    else:
-        scaled = gray
-        scale = 1.0
-
-    # Detect edges
-    edges = cv2.Canny(scaled, 50, 150)
-
-    # Dilate edges to connect nearby edges
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    edges = cv2.dilate(edges, kernel, iterations=1)
-
-    # Find lines using Hough transform
-    lines = cv2.HoughLinesP(
-        edges,
-        rho=1,
-        theta=np.pi / 180,
-        threshold=int(min(scaled.shape) * 0.3),
-        minLineLength=int(min(scaled.shape) * 0.2),
-        maxLineGap=int(min(scaled.shape) * 0.05),
-    )
-
-    if lines is None or len(lines) < 4:
-        return None
-
-    # Find boundary lines (approximately horizontal/vertical at edges)
-    sh, sw = scaled.shape[:2]
-    edge_threshold = 0.1 * min(sw, sh)
-
-    left_edge = sw
-    right_edge = 0
-    top_edge = sh
-    bottom_edge = 0
-
-    for line in lines:
-        x1, y1, x2, y2 = line[0]
-
-        # Check if line is approximately vertical (for left/right edges)
-        if abs(x2 - x1) < abs(y2 - y1) * 0.2:
-            avg_x = (x1 + x2) / 2
-            if avg_x < edge_threshold:
-                left_edge = min(left_edge, int(avg_x))
-            elif avg_x > sw - edge_threshold:
-                right_edge = max(right_edge, int(avg_x))
-
-        # Check if line is approximately horizontal (for top/bottom edges)
-        if abs(y2 - y1) < abs(x2 - x1) * 0.2:
-            avg_y = (y1 + y2) / 2
-            if avg_y < edge_threshold:
-                top_edge = min(top_edge, int(avg_y))
-            elif avg_y > sh - edge_threshold:
-                bottom_edge = max(bottom_edge, int(avg_y))
-
-    # Check if we found valid edges
-    if left_edge >= right_edge or top_edge >= bottom_edge:
-        return None
-
-    # Scale back to original resolution
-    inv_scale = 1.0 / scale
-    return ContentBox(
-        x=left_edge * inv_scale,
-        y=top_edge * inv_scale,
-        width=(right_edge - left_edge) * inv_scale,
-        height=(bottom_edge - top_edge) * inv_scale,
-    )

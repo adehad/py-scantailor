@@ -9,6 +9,11 @@ Content detection
 
 .. automodule:: scantailor.filters.select_content.content_finder
 
+Page detection
+--------------
+
+.. automodule:: scantailor.filters.select_content.page_finder
+
 Content box finder
 ------------------
 
