@@ -1,4 +1,4 @@
-"""Status bar panel showing the page, its size and the cursor position."""
+"""Status bar panel showing the page, its size, its resolution and the cursor."""
 
 import math
 from pathlib import PurePath
@@ -7,7 +7,7 @@ from PySide6 import QtCore, QtWidgets
 
 from scantailor.app.ui.theme.fonts import tabular
 from scantailor.app.ui.units_provider import UnitsProvider
-from scantailor.core.models import PageId, SubPage
+from scantailor.core.models import Dpi, PageId, SubPage
 from scantailor.core.settings import Units
 from scantailor.core.units import convert_length, units_suffix
 
@@ -34,10 +34,12 @@ def _short_file_name(page: PageId) -> str:
 
 
 class StatusBarPanel(QtWidgets.QWidget):
-    """Page number, page name, page size and cursor position of the current view.
+    """Page number, name, size, source DPI and cursor position of the current view.
 
     Sizes and positions arrive in pixels and are shown in the unit of the
-    ``UnitsProvider``, which the panel follows.
+    ``UnitsProvider``, which the panel follows. The source DPI is the one the
+    project holds for the page's image, so a page scanned at another resolution
+    than the rest stands out.
     """
 
     def __init__(
@@ -68,6 +70,14 @@ class StatusBarPanel(QtWidgets.QWidget):
         )
         self.phys_size_label = self._add_field(
             layout, self.tr("Image size."), self.tr("Image size in current units.")
+        )
+        self.source_dpi_label = self._add_field(
+            layout,
+            self.tr(
+                "Resolution of the page's source image. When most pages have another "
+                "resolution, theirs follows in brackets."
+            ),
+            self.tr("Resolution of the source image."),
         )
         self.page_no_label = self._add_field(
             layout,
@@ -139,6 +149,36 @@ class StatusBarPanel(QtWidgets.QWidget):
         self._size_px = size
         self._dpi = dpi
         self._show_measurements()
+
+    def set_source_dpi(self, dpi: Dpi | None, usual: Dpi | None = None) -> None:
+        """Show the resolution of the current page's source image.
+
+        Args:
+            dpi (Dpi | None): Resolution the project holds for the image; None or
+                an undefined one hides the field.
+            usual (Dpi | None): Resolution of most pages, shown beside ``dpi``
+                when the two differ; None when there is no such majority.
+        """
+        if dpi is None or dpi.is_null():
+            self.source_dpi_label.clear()
+        elif usual is None or usual.is_null() or usual == dpi:
+            self.source_dpi_label.setText(self._dpi_text(dpi))
+        else:
+            self.source_dpi_label.setText(
+                self.tr("%1 (most pages %2)")
+                .replace("%1", self._dpi_text(dpi))
+                .replace("%2", self._dpi_text(usual))
+            )
+        self._sync_visibility()
+
+    def _dpi_text(self, dpi: Dpi) -> str:
+        if dpi.horizontal == dpi.vertical:
+            return self.tr("%1 dpi").replace("%1", str(dpi.horizontal))
+        return (
+            self.tr("%1 x %2 dpi")
+            .replace("%1", str(dpi.horizontal))
+            .replace("%2", str(dpi.vertical))
+        )
 
     def set_cursor_position(self, position: QtCore.QPointF | None) -> None:
         """Show where the cursor is on the page.

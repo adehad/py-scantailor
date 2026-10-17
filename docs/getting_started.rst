@@ -160,6 +160,11 @@ tooltip gives the reason:
      - At this resolution the page would be more than 500 mm long along one side.
        Processing such a page can run out of memory.
 
+The status bar shows the resolution of the current page's image, for example
+``300 dpi``. When most pages of the project have another resolution, theirs
+follows in brackets, as in ``600 dpi (most pages 300 dpi)``, so a page scanned at
+a different setting stands out.
+
 The stage list
 --------------
 

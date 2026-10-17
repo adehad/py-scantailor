@@ -3355,6 +3355,36 @@ Sie sollten sie aus dem Projekt entfernen.</translation>
         <source> [R]</source>
         <translation> [R]</translation>
     </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="77"/>
+        <source>Resolution of the page&apos;s source image. When most pages have another resolution, theirs follows in brackets.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Auflösung des Quellbilds dieser Seite. Haben die meisten Seiten eine andere Auflösung, folgt deren Auflösung in Klammern.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="80"/>
+        <source>Resolution of the source image.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Auflösung des Quellbilds.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="168"/>
+        <source>%1 (most pages %2)</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>%1 (die meisten Seiten %2)</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="176"/>
+        <source>%1 dpi</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>%1 dpi</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="178"/>
+        <source>%1 x %2 dpi</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>%1 x %2 dpi</translation>
+    </message>
 </context>
 <context>
     <name>SystemLoadWidget</name>

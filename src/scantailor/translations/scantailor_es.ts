@@ -3342,6 +3342,36 @@ Debería elimnarlos del proyecto.</translation>
         <source> [R]</source>
         <translation> [D]</translation>
     </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="77"/>
+        <source>Resolution of the page&apos;s source image. When most pages have another resolution, theirs follows in brackets.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Resolución de la imagen de origen de la página. Si la mayoría de las páginas tienen otra resolución, la suya aparece entre paréntesis.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="80"/>
+        <source>Resolution of the source image.</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>Resolución de la imagen de origen.</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="168"/>
+        <source>%1 (most pages %2)</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>%1 (la mayoría de las páginas %2)</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="176"/>
+        <source>%1 dpi</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>%1 ppp</translation>
+    </message>
+    <message>
+        <location filename="../app/ui/widgets/status_bar_panel.py" line="178"/>
+        <source>%1 x %2 dpi</source>
+        <extracomment>Machine draft, pending native review.</extracomment>
+        <translation>%1 x %2 ppp</translation>
+    </message>
 </context>
 <context>
     <name>SystemLoadWidget</name>
