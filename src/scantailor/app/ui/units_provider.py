@@ -34,6 +34,9 @@ class UnitsProvider(QtCore.QObject):
         """
         if cls._instance is None:
             cls._instance = cls(ApplicationSettings.get_instance().units)
+            # Owned by the application rather than by whichever Python object
+            # last refers to it.
+            cls._instance.setParent(QtCore.QCoreApplication.instance())
         return cls._instance
 
     @classmethod
