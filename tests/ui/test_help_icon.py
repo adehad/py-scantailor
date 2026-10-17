@@ -1,5 +1,7 @@
 """Help buttons beside controls that have a tooltip, and help on every option."""
 
+from collections.abc import Iterator
+
 import pytest
 from PySide6 import QtCore, QtGui, QtWidgets
 from pytestqt.qtbot import QtBot
@@ -33,8 +35,14 @@ OPTION_CONTROLS = (
 
 
 @pytest.fixture
-def panel(qtbot: QtBot) -> QtWidgets.QWidget:
-    """A panel with a check box in a column and a spin box in a grid cell."""
+def panel(qapp: QtWidgets.QApplication, qtbot: QtBot) -> Iterator[QtWidgets.QWidget]:
+    """A panel with a check box in a column and a spin box in a grid cell.
+
+    An application style sheet left by an earlier test would fix the icon size
+    and the font, so the panel runs without one.
+    """
+    style_sheet = qapp.styleSheet()
+    qapp.setStyleSheet("")
     root = QtWidgets.QWidget()
     column = QtWidgets.QVBoxLayout(root)
     with_tip = QtWidgets.QCheckBox("Fill margins", root)
@@ -55,7 +63,8 @@ def panel(qtbot: QtBot) -> QtWidgets.QWidget:
     install_help_icons(root)
     root.show()
     qtbot.wait_exposed(root)
-    return root
+    yield root
+    qapp.setStyleSheet(style_sheet)
 
 
 def _child[T: QtWidgets.QWidget](
