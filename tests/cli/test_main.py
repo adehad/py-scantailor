@@ -124,6 +124,17 @@ def test_verbose_lowers_the_stderr_level(
     assert no_process_diagnostics[-1]["stderr_level"] == level
 
 
+@pytest.mark.parametrize("command", [["status", "p.json"], ["run", "p.json"]])
+def test_log_file_option_names_the_file_for_any_command(
+    no_process_diagnostics: list[dict[str, Any]], tmp_path: Path, command: list[str]
+) -> None:
+    target = tmp_path / "ci.log"
+
+    main(["--log-file", str(target), *command])
+
+    assert no_process_diagnostics[-1]["log_file"] == target
+
+
 def test_unexpected_failure_names_the_log_file(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

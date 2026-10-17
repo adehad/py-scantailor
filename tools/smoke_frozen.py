@@ -1,8 +1,9 @@
 """End-to-end smoke test of a frozen scantailor-cli.
 
 Renders a few sample pages, then drives the frozen executable through
-``create``, ``run`` and ``export pdf`` and checks each JSON result and the page
-count of the PDF. Exits non-zero with a message on the first failure.
+``create``, ``run`` and ``export pdf`` and checks each JSON result, the page
+count of the PDF and the log file ``run --log-file`` wrote. Exits non-zero with
+a message on the first failure.
 
 Usage:
     python tools/smoke_frozen.py dist/ScanTailor/scantailor-cli
@@ -22,6 +23,8 @@ from sample_book import SAMPLE_DPI, render_sample_page
 
 # Single pages only, so page split leaves the count unchanged.
 SMOKE_PAGES: Final = ("01_single_page", "05_skewed", "08_pictures")
+FROZEN_BANNER: Final = "frozen (PyInstaller)"
+SESSION_ENDED: Final = "| session ended"
 _COMMAND_TIMEOUT_SECONDS: Final = 600
 
 
@@ -119,6 +122,28 @@ def expect(condition: bool, message: str) -> None:
         raise SmokeFailure(message)
 
 
+def check_log_file(path: Path) -> None:
+    """Check that a frozen CLI session wrote its banner and ended cleanly.
+
+    Args:
+        path (Path): The file passed to ``--log-file``.
+
+    Raises:
+        SmokeFailure: The file is missing, lacks the frozen-build banner line, or
+            does not end with the clean-exit marker.
+    """
+    expect(path.is_file(), f"no log file at {path}")
+    lines = path.read_text(encoding="utf-8").rstrip().splitlines()
+    expect(
+        any(line.endswith(FROZEN_BANNER) for line in lines),
+        f"{path} has no '{FROZEN_BANNER}' banner line",
+    )
+    expect(
+        bool(lines) and lines[-1].endswith(SESSION_ENDED),
+        f"{path} does not end with '{SESSION_ENDED}'",
+    )
+
+
 def smoke(cli: Path, workers: int, work_dir: Path) -> None:
     """Drive the frozen CLI through create, run and export pdf.
 
@@ -133,6 +158,7 @@ def smoke(cli: Path, workers: int, work_dir: Path) -> None:
     pages = write_pages(work_dir / "pages")
     project = work_dir / "smoke.json"
     pdf = work_dir / "smoke.pdf"
+    log_file = work_dir / "run.log"
 
     created = run_cli(cli, "create", pages[0].parent, project)
     expect(
@@ -140,13 +166,16 @@ def smoke(cli: Path, workers: int, work_dir: Path) -> None:
         f"create added {created['pages']} pages, expected {len(pages)}",
     )
 
-    batch = run_cli(cli, "run", project, "--workers", str(workers))
+    batch = run_cli(
+        cli, "--log-file", log_file, "run", project, "--workers", str(workers)
+    )
     expect(not batch["failed"], f"run failed pages: {batch['failed']}")
     expect(not batch["cancelled"], f"run cancelled {batch['cancelled']} pages")
     expect(
         batch["written"] == len(pages),
         f"run wrote {batch['written']} pages, expected {len(pages)}",
     )
+    check_log_file(log_file)
 
     exported = run_cli(cli, "export", "pdf", project, pdf)
     expect(not exported["skipped"], f"export skipped pages: {exported['skipped']}")
