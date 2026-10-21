@@ -502,6 +502,20 @@ def _is_set(event: Event | None) -> bool:
     return event is not None and event.is_set()
 
 
+def _log_page_failure(page: PageId, phase: str, error: BaseException) -> None:
+    """Log a page's failure as an error, with a traceback unless the pool broke.
+
+    A broken pool fails every running and queued page with the same
+    ``BrokenProcessPool``, and the pool's own line already names the pages that
+    were running, so a traceback per page would repeat one stack many times.
+    """
+    with logger.contextualize(page=page_name(page), stage="batch"):
+        if isinstance(error, BrokenProcessPool):
+            logger.error("{} failed: worker process died ({})", phase, _describe(error))
+        else:
+            logger.opt(exception=error).error("{} failed: {}", phase, _describe(error))
+
+
 def _describe(error: BaseException) -> str:
     return f"{type(error).__name__}: {error}"
 
@@ -641,10 +655,7 @@ def _detect_geometry(
     ) -> None:
         if params is None:
             error = error or RuntimeError("no result")
-            with logger.contextualize(page=page_name(job.page), stage="batch"):
-                logger.opt(exception=error).error(
-                    "geometry pass failed: {}", _describe(error)
-                )
+            _log_page_failure(job.page, "geometry pass", error)
             report(PageFailed(job.page, _describe(error)))
             return
         apply_stage_params(stages, _load_entries(params))
@@ -859,10 +870,7 @@ def run_batch(
                 report(PageDone(job.page, *rendered))
             else:
                 error = error or RuntimeError("no result")
-                with logger.contextualize(page=page_name(job.page), stage="batch"):
-                    logger.opt(exception=error).error(
-                        "render failed: {}", _describe(error)
-                    )
+                _log_page_failure(job.page, "render", error)
                 report(PageFailed(job.page, _describe(error)))
 
         unscheduled = run_pool(
