@@ -200,6 +200,46 @@ interrupt the opening:
      - Fix DPI
      - The project does not open.
 
+.. _open-project-argument:
+
+Opening a project when the program starts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Give the project file as the first argument, and the window opens it once it
+appears:
+
+.. code-block:: console
+
+   ScanTailor book.ScanTailor
+
+A relative path is read from the folder you start the program in. Arguments
+after the first are ignored. Qt's own options, such as ``-style fusion``, may
+come before the project file. If the file is missing or is not a project, the
+program shows the same warning as **File > Open Project ...** and stays on the
+welcome panel.
+
+How you can open a project by double-clicking it depends on the build:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Build
+     - Opening a ``.ScanTailor`` file from the file manager
+   * - Windows
+     - Choose **Open with** on the file and pick ``ScanTailor.exe``. Windows
+       passes the file as the first argument.
+   * - Linux AppImage
+     - The AppImage declares the ``application/x-scantailor-project`` file type.
+       Once a desktop integration tool such as AppImageLauncher or Gear Lever
+       installs it, ``.ScanTailor`` files open in the program.
+   * - macOS
+     - Not supported yet: the Finder sends the file as an open event, not as an
+       argument. Start the program from a terminal with
+       ``ScanTailor.app/Contents/MacOS/ScanTailor book.ScanTailor``.
+
+The command line tool ``scantailor-cli`` is separate and never opens a window.
+
 Getting help in the program
 ---------------------------
 

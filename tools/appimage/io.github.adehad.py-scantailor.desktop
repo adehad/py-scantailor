@@ -6,3 +6,4 @@ Exec=ScanTailor %f
 Icon=scantailor
 Terminal=false
 Categories=Graphics;Scanning;
+MimeType=application/x-scantailor-project;

@@ -1,6 +1,8 @@
 """Main Entrypoint for the application."""
 
 import pathlib
+import sys
+from collections.abc import Sequence
 
 from loguru import logger
 from PySide6 import QtCore, QtGui, QtWidgets
@@ -74,6 +76,50 @@ def install_saved_language(
     return translators
 
 
+def project_file_from_arguments(arguments: Sequence[str]) -> pathlib.Path | None:
+    """Pick the project file named on the command line, if any.
+
+    The first argument after the program name is the project, as in ScanTailor
+    Advanced; any further arguments are ignored.
+
+    Args:
+        arguments (Sequence[str]): The program name and its arguments, as
+            QApplication.arguments() returns them with Qt's own options removed.
+
+    Returns:
+        pathlib.Path | None: The project file made absolute against the working
+            directory, so the recent projects list can find it again, or None if
+            no argument was given.
+    """
+    if len(arguments) < 2:
+        return None
+    if len(arguments) > 2:
+        logger.warning("Ignoring extra command line arguments: {}", arguments[2:])
+    return pathlib.Path(arguments[1]).absolute()
+
+
+def open_project_from_arguments(
+    window: MainWindowManager, arguments: Sequence[str]
+) -> bool:
+    """Open the project named on the command line in the window.
+
+    A file that is missing or cannot be read gets the same warning as one chosen
+    through File > Open Project, and the window stays on the welcome panel.
+
+    Args:
+        window (MainWindowManager): The shown main window.
+        arguments (Sequence[str]): The program name and its arguments, without
+            Qt's own options.
+
+    Returns:
+        bool: True if a project was named and is now open.
+    """
+    project_file = project_file_from_arguments(arguments)
+    if project_file is None:
+        return False
+    return window.open_project_file(project_file)
+
+
 def main() -> int:
     """Run the window application.
 
@@ -87,7 +133,7 @@ def main() -> int:
     restore_qt_handler = diagnostics.install_qt_message_handler()
     setup_qcore()
     set_application_identity()
-    app = QtWidgets.QApplication([])
+    app = QtWidgets.QApplication(sys.argv)
     app.aboutToQuit.connect(restore_qt_handler)
     logger.info("Qt platform {}, style {}", app.platformName(), app.style().name())
     apply_theme(app)
@@ -95,6 +141,7 @@ def main() -> int:
     install_saved_language(app)
     main_window = MainWindowManager()
     main_window.show()
+    open_project_from_arguments(main_window, app.arguments())
     exit_code = app.exec()
     session.end()
     return exit_code
