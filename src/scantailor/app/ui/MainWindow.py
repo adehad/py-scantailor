@@ -142,8 +142,6 @@ _THUMBNAIL_RESIZE_DELAY_MS = 350
 _WHEEL_ZOOM_THRESHOLD = 30
 # A page that is half or more out of the thumbnail view stops being followed.
 _VISIBLE_FRACTION = 0.5
-# Written by SystemLoadWidget: how many pages a batch processes at once.
-_BATCH_THREADS_KEY = "settings/batch_processing_threads"
 _SELECT_CONTENT_OPTIONS = {
     "content_box": cast(
         str, QtCore.QT_TRANSLATE_NOOP("ApplyToDialog", "Apply content box")
@@ -376,6 +374,7 @@ class MainWindowManager:
         self.batch_runner.failed.connect(self._on_batch_failed)
         self.batch_dialog: BatchProgressDialog | None = None
         self._batch_renders = True
+        self._beep_when_finished = False
         self.last_batch_result: BatchResult | None = None
         self.pdf_job = PdfJob(self.ui)
         self.pdf_job.progress.connect(self._on_pdf_progress)
@@ -1789,11 +1788,6 @@ class MainWindowManager:
         """Return every page in display order, whichever order is chosen."""
         return self.thumbnails.pages()
 
-    def _batch_worker_count(self) -> int | None:
-        """Return the page parallelism chosen in the system load slider, if any."""
-        saved = self.settings.value(_BATCH_THREADS_KEY, 0, type=int)
-        return saved if isinstance(saved, int) and saved > 0 else None
-
     def startBatchProcessing(self) -> None:
         """Run every page, in display order, up to the selected stage.
 
@@ -1824,15 +1818,17 @@ class MainWindowManager:
         renders = end_stage == FilterStage.OUTPUT
         self._batch_renders = renders
         dialog = BatchProgressDialog(len(pages), self.ui, renders=renders)
+        dialog.beep_when_finished = self._beep_when_finished
         dialog.stop_requested.connect(self.stopBatchProcessing)
+        dialog.load_changed.connect(self._on_batch_load_changed)
         self.batch_dialog = dialog
         dialog.show()
+        self.batch_runner.worker_limit = dialog.load
         self.batch_runner.start(
             self.stages,
             pages,
             project.output_directory,
             layout_direction=project.layout_direction,
-            max_workers=self._batch_worker_count(),
             dpi_overrides=self._dpi_overrides,
             file_labels=project.output_file_label_map(),
             end_stage=end_stage,
@@ -1861,6 +1857,16 @@ class MainWindowManager:
         self.imageViewFrame.setEnabled(not in_progress)
         self.processing_indicator.set_active(in_progress)
 
+    def _on_batch_load_changed(self, count: int) -> None:
+        self.batch_runner.worker_limit = count
+
+    def _announce_batch_completed(self) -> None:
+        """Flash the taskbar entry if the user is elsewhere, and beep if asked."""
+        if QtWidgets.QApplication.activeWindow() is None:
+            QtWidgets.QApplication.alert(self.ui)
+        if self._beep_when_finished:
+            QtWidgets.QApplication.beep()
+
     def _on_batch_detected(self, event: PageDetected) -> None:
         if self.batch_dialog is not None:
             self.batch_dialog.add_detected(event)
@@ -1888,6 +1894,7 @@ class MainWindowManager:
                 )
         self._set_batch_ui(False)
         if self.batch_dialog is not None:
+            self._beep_when_finished = self.batch_dialog.beep_when_finished
             self.batch_dialog.finish(result)
         if self.project is None:
             return
@@ -1900,6 +1907,9 @@ class MainWindowManager:
         self._remember_aggregate_size()
         self._request_render()
         self._run_deferred_auto_save()
+        if not result.cancelled:
+            self._announce_batch_completed()
+            self.goFirstPage()
 
     def _on_batch_failed(self, message: str) -> None:
         self._set_batch_ui(False)

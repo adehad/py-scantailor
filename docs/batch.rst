@@ -53,6 +53,11 @@ The window also has these parts:
    * - Result list
      - One line per page, with the file written or the error that stopped it. A
        failed page does not stop the rest of the batch.
+   * - System load slider
+     - How many pages run at once. See `How many pages run at once`_.
+   * - Beep when finished
+     - Beeps when the batch completes. Off by default; the program keeps the
+       choice for the next batch until it closes.
    * - Stop
      - Starts no new pages. Pages already running finish, and the status reads
        **Stopping...**. When the batch ends, the button reads **Close**. Closing the
@@ -64,10 +69,30 @@ The window also has these parts:
 How many pages run at once
 --------------------------
 
-Worker processes handle the pages in parallel, one process per CPU core. On
-Windows the count is capped at 61, the most worker processes one pool can hold.
-The application settings can store a worker count, but this build has no control
-to set it, so the default applies.
+Worker processes handle the pages in parallel. The system load slider in the
+Batch processing window sets how many pages run at once, from one up to the
+number of CPU cores, with **-** and **+** for one step. Dragging it shows the
+count as ``n/N``. Set it lower to keep the computer responsive while a batch
+runs.
+
+The slider works while the batch runs: a lower count takes effect as running
+pages finish, and a higher one the next time a page starts. The program saves
+the count and uses it for every later batch. At the full core count it saves
+nothing, so a later move to a computer with more cores uses them all.
+
+On Windows at most 61 pages run at once, the most worker processes one pool can
+hold. A 32-bit build allows at most two.
+
+When a batch completes
+----------------------
+
+When every page has run, the program:
+
+- flashes its taskbar entry, if you were working in another program;
+- beeps, if **Beep when finished** is checked;
+- selects the first page.
+
+A batch you stop does none of these, and the selected page stays where it was.
 
 What is locked while a batch runs
 ---------------------------------

@@ -371,6 +371,7 @@ def run_pool[Job, Result](
     initargs: tuple[Any, ...] = (),
     executor: ProcessPoolExecutor | None = None,
     name_job: Callable[[Job], str] | None = None,
+    worker_limit: Callable[[], int | None] | None = None,
 ) -> list[Job]:
     """Run ``function`` over ``jobs`` in spawned worker processes.
 
@@ -396,17 +397,26 @@ def run_pool[Job, Result](
         name_job (Callable[[Any], str] | None): Names a job in the log line
             written when a worker process dies, which lists the jobs that were
             running; no such line is written when None.
+        worker_limit (Callable[[], int | None] | None): Asked before each job is
+            scheduled for how many jobs may run at once, so the limit can change
+            while the pool runs. Its answer is clamped to between one and the
+            pool size, and None means the pool size; so does passing None.
 
     Returns:
         list[Any]: Jobs that were never scheduled because of cancellation.
     """
     workers = pool_size(max_workers)
+
+    def running_limit() -> int:
+        limit = None if worker_limit is None else worker_limit()
+        return workers if limit is None else min(workers, max(1, limit))
+
     if executor is None:
         with spawn_pool(workers, initializer, initargs) as own_pool:
             return _drain(
-                own_pool, workers, function, jobs, on_outcome, cancel, name_job
+                own_pool, running_limit, function, jobs, on_outcome, cancel, name_job
             )
-    return _drain(executor, workers, function, jobs, on_outcome, cancel, name_job)
+    return _drain(executor, running_limit, function, jobs, on_outcome, cancel, name_job)
 
 
 def spawn_pool(
@@ -437,7 +447,7 @@ def spawn_pool(
 
 def _drain[Job, Result](
     executor: ProcessPoolExecutor,
-    workers: int,
+    running_limit: Callable[[], int],
     function: Callable[[Job], Result],
     jobs: Sequence[Job],
     on_outcome: Callable[[Job, Result | None, BaseException | None], None],
@@ -448,7 +458,7 @@ def _drain[Job, Result](
     in_flight: dict[Future[Result], Job] = {}
     broken_pool_logged = False
     while True:
-        while queue and len(in_flight) < workers and not _is_set(cancel):
+        while queue and len(in_flight) < running_limit() and not _is_set(cancel):
             job = queue.popleft()
             try:
                 in_flight[executor.submit(function, job)] = job
@@ -629,6 +639,7 @@ def _detect_geometry(
     dpi_overrides: DpiOverrides | None,
     pool: ProcessPoolExecutor,
     workers: int,
+    worker_limit: Callable[[], int | None] | None,
     cancel: Event | None,
     report: Callable[[BatchEvent], None],
     result: BatchResult,
@@ -678,6 +689,7 @@ def _detect_geometry(
         cancel=cancel,
         executor=pool,
         name_job=_job_page_name,
+        worker_limit=worker_limit,
     )
     result.cancelled.extend(job.page for job in unscheduled)
     return [page for page in pages if page in detected]
@@ -773,6 +785,7 @@ def run_batch(
     tiff_compressions: TiffCompressions | None = None,
     file_labels: Mapping[Path, int] | None = None,
     end_stage: FilterStage = FilterStage.OUTPUT,
+    worker_limit: Callable[[], int | None] | None = None,
 ) -> BatchResult:
     """Process pages through the pipeline up to ``end_stage``.
 
@@ -809,6 +822,9 @@ def run_batch(
             Stored output file labels of the
             sources, as in ``output_file_names``.
         end_stage (FilterStage): Last stage to run. Only Output renders.
+        worker_limit (Callable[[], int | None] | None): Asked before each page is
+            started for how many pages may run at once, at most ``max_workers``.
+            None, as the argument or the answer, means ``max_workers``.
 
     Returns:
         BatchResult: Written, failed and never-started pages.
@@ -856,6 +872,7 @@ def run_batch(
             dpi_overrides,
             pool,
             workers,
+            worker_limit,
             cancel,
             report,
             result,
@@ -876,6 +893,7 @@ def run_batch(
                 dpi_overrides or {},
                 pool,
                 workers,
+                worker_limit,
                 cancel,
                 report,
                 result,
@@ -895,6 +913,7 @@ def _render_ready_pages(
     dpi_overrides: DpiOverrides,
     pool: ProcessPoolExecutor,
     workers: int,
+    worker_limit: Callable[[], int | None] | None,
     cancel: Event | None,
     report: Callable[[BatchEvent], None],
     result: BatchResult,
@@ -909,6 +928,8 @@ def _render_ready_pages(
         dpi_overrides (DpiOverrides): Project resolutions of the images.
         pool (concurrent.futures.ProcessPoolExecutor): Workers to render on.
         workers (int): Size of ``pool``.
+        worker_limit (Callable[[], int | None] | None): Live limit on the pages
+            rendered at once, as in ``run_pool``.
         cancel (threading.Event | None): Stops further pages from starting.
         report (Callable[[BatchEvent], None]): Receives a ``PageDone`` or
             ``PageFailed`` per attempted page.
@@ -941,6 +962,7 @@ def _render_ready_pages(
         cancel=cancel,
         executor=pool,
         name_job=_job_page_name,
+        worker_limit=worker_limit,
     )
     result.cancelled.extend(job.page for job in unscheduled)
 
