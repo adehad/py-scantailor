@@ -105,7 +105,9 @@ Once every page has output, the Export PDF dialog opens:
        pages without loss.
    * - JPEG quality
      - Quality of grey and colour pages, from 1 to 100. The default is 85. Lower
-       values make smaller, blurrier files.
+       values make smaller, blurrier files. Pages with 16 colours or fewer, such
+       as posterized output, skip JPEG and are stored without loss as palette
+       images, which is also smaller.
    * - Carry text layer
      - Copies the text of the source PDF onto the matching output pages, so you
        can search and select text in the exported PDF. Available only when the

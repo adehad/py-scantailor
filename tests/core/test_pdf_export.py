@@ -34,8 +34,17 @@ def _grey_page() -> np.ndarray:
 def _colour_page() -> np.ndarray:
     page = np.zeros((90, 110, 3), dtype=np.uint8)
     page[:, :, 2] = 220  # red in BGR
+    page[:, :, 1] = np.linspace(
+        0, 200, 110, dtype=np.uint8
+    )  # too many colours for a palette
     page[30:60, 30:80] = (200, 40, 40)  # blue patch
     return page
+
+
+def _toned_page(levels: list[int], width: int = 101, height: int = 37) -> np.ndarray:
+    """A grey page cycling through the given levels, like posterized output."""
+    index = (np.arange(width)[None, :] // 3 + np.arange(height)[:, None]) % len(levels)
+    return np.array(levels, dtype=np.uint8)[index]
 
 
 def _render(pdf_path: Path, index: int, scale: float) -> np.ndarray:
@@ -130,6 +139,94 @@ def test_grey_and_colour_pages_are_dct_encoded(
     expected = image if image.ndim == 2 else image[:, :, ::-1]
     assert decoded.shape == expected.shape
     assert np.abs(decoded.astype(int) - expected.astype(int)).mean() < 4
+
+
+@pytest.mark.parametrize(
+    ("levels", "bits"),
+    [
+        ([40, 255], 1),
+        ([0, 150, 255], 2),
+        ([0, 150, 205, 255], 2),
+        ([0, 60, 150, 205, 255], 4),
+        (list(range(0, 256, 17)), 4),
+    ],
+    ids=["2-tones", "3-tones", "4-tones", "5-tones", "16-tones"],
+)
+def test_page_with_few_grey_tones_is_stored_losslessly_as_a_palette(
+    tmp_path: Path, levels: list[int], bits: int
+):
+    # Width 101 leaves a partial byte at the end of every row at each bit depth.
+    image = _toned_page(levels)
+    out = tmp_path / "out.pdf"
+    export_pdf([(image, 72)], out)
+
+    with pikepdf.open(out) as pdf:
+        xobject = pdf.pages[0].Resources.XObject.Im0
+        assert xobject.Filter == "/FlateDecode"
+        assert xobject.BitsPerComponent == bits
+        assert xobject.ColorSpace[0] == "/Indexed"
+        assert xobject.ColorSpace[1] == "/DeviceGray"
+    # At 72 dpi one image pixel is one point, so a scale 1 render needs no resampling.
+    rendered = cv2.cvtColor(_render(out, 0, scale=1.0), cv2.COLOR_BGRA2GRAY)
+    assert np.array_equal(rendered, image)
+
+
+def test_page_with_few_colours_keeps_each_colour_exactly(tmp_path: Path):
+    bgr_colours = np.array(
+        [(255, 255, 255), (40, 40, 200), (200, 120, 30)], dtype=np.uint8
+    )
+    image = bgr_colours[_toned_page([0, 1, 2])]
+    out = tmp_path / "out.pdf"
+    export_pdf([(image, 300)], out)
+
+    with pikepdf.open(out) as pdf:
+        xobject = pdf.pages[0].Resources.XObject.Im0
+        assert xobject.Filter == "/FlateDecode"
+        assert xobject.BitsPerComponent == 2
+        assert xobject.ColorSpace[1] == "/DeviceRGB"
+        decoded = np.asarray(PdfImage(xobject).as_pil_image().convert("RGB"))
+    assert np.array_equal(decoded, image[:, :, ::-1])
+
+
+def test_page_with_seventeen_grey_tones_falls_back_to_jpeg(tmp_path: Path):
+    seventeen = [*range(0, 256, 16), 255]
+    out = tmp_path / "out.pdf"
+    export_pdf([(_toned_page(seventeen), 300)], out)
+
+    with pikepdf.open(out) as pdf:
+        xobject = pdf.pages[0].Resources.XObject.Im0
+        assert xobject.Filter == "/DCTDecode"
+        assert xobject.ColorSpace == "/DeviceGray"
+
+
+def test_colour_missed_by_the_sample_still_gets_a_palette_entry(tmp_path: Path):
+    image = np.full((60, 200, 3), 255, dtype=np.uint8)
+    image[7, 3] = (10, 20, 30)  # flat index 1403, off the 97-pixel stride
+    out = tmp_path / "out.pdf"
+    export_pdf([(image, 72)], out)
+
+    with pikepdf.open(out) as pdf:
+        xobject = pdf.pages[0].Resources.XObject.Im0
+        assert xobject.Filter == "/FlateDecode"
+        decoded = np.asarray(PdfImage(xobject).as_pil_image().convert("RGB"))
+    assert tuple(decoded[7, 3]) == (30, 20, 10)
+    assert (decoded[0, 0] == 255).all()
+
+
+def test_palette_page_is_smaller_than_its_jpeg(tmp_path: Path):
+    # Text bars in black plus a grey frame on white: what posterize leaves on a
+    # scanned page with grey decorations.
+    image = np.where(_text_page(1600, 1200), 0, 255).astype(np.uint8)
+    image[:, 40:60] = 150
+    image[:, 61:63] = 205
+    out = tmp_path / "out.pdf"
+    export_pdf([(image, 300)], out)
+    ok, jpeg = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 85])
+
+    assert ok
+    with pikepdf.open(out) as pdf:
+        stream = pdf.pages[0].Resources.XObject.Im0.read_raw_bytes()
+    assert len(stream) < len(jpeg) / 2
 
 
 def test_page_size_in_points_follows_pixels_and_dpi(tmp_path: Path):
