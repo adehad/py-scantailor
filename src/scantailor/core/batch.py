@@ -368,6 +368,7 @@ def run_pool[Job, Result](
     initializer: Callable[..., None] | None = None,
     initargs: tuple[Any, ...] = (),
     executor: ProcessPoolExecutor | None = None,
+    name_job: Callable[[Job], str] | None = None,
 ) -> list[Job]:
     """Run ``function`` over ``jobs`` in spawned worker processes.
 
@@ -390,6 +391,9 @@ def run_pool[Job, Result](
             A pool from ``spawn_pool`` to
             reuse, so consecutive phases pay the worker start-up cost once;
             ``max_workers`` must then be its size. It is left running.
+        name_job (Callable[[Any], str] | None): Names a job in the log line
+            written when a worker process dies, which lists the jobs that were
+            running; no such line is written when None.
 
     Returns:
         list[Any]: Jobs that were never scheduled because of cancellation.
@@ -397,8 +401,10 @@ def run_pool[Job, Result](
     workers = pool_size(max_workers)
     if executor is None:
         with spawn_pool(workers, initializer, initargs) as own_pool:
-            return _drain(own_pool, workers, function, jobs, on_outcome, cancel)
-    return _drain(executor, workers, function, jobs, on_outcome, cancel)
+            return _drain(
+                own_pool, workers, function, jobs, on_outcome, cancel, name_job
+            )
+    return _drain(executor, workers, function, jobs, on_outcome, cancel, name_job)
 
 
 def spawn_pool(
@@ -434,9 +440,11 @@ def _drain[Job, Result](
     jobs: Sequence[Job],
     on_outcome: Callable[[Job, Result | None, BaseException | None], None],
     cancel: Event | None,
+    name_job: Callable[[Job], str] | None = None,
 ) -> list[Job]:
     queue = deque(jobs)
     in_flight: dict[Future[Result], Job] = {}
+    broken_pool_logged = False
     while True:
         while queue and len(in_flight) < workers and not _is_set(cancel):
             job = queue.popleft()
@@ -447,6 +455,18 @@ def _drain[Job, Result](
         if not in_flight:
             break
         finished, _ = wait(in_flight, return_when=FIRST_COMPLETED)
+        if (
+            name_job is not None
+            and not broken_pool_logged
+            and any(_broke_the_pool(future) for future in finished)
+        ):
+            running = [
+                name_job(job)
+                for future, job in in_flight.items()
+                if not future.done() or _broke_the_pool(future)
+            ]
+            _log_broken_pool(running, len(queue))
+            broken_pool_logged = True
         for future in finished:
             job = in_flight.pop(future)
             error = future.exception()
@@ -455,6 +475,27 @@ def _drain[Job, Result](
             else:
                 on_outcome(job, None, error)
     return list(queue)
+
+
+def _broke_the_pool(future: Future[Any]) -> bool:
+    return future.done() and isinstance(future.exception(), BrokenProcessPool)
+
+
+def _log_broken_pool(running: Sequence[str], not_started: int) -> None:
+    """Name the pages a dead worker process took down with the pool.
+
+    Every running job fails with the same error, so only the crash file and the
+    last line a worker forwarded tell which page caused it.
+    """
+    text = (
+        f"worker process died; running: {', '.join(running)}; "
+        f"{not_started} pages not started"
+    )
+    forwarded = worker_logging()
+    if forwarded is not None and forwarded.folder is not None:
+        text += "; see crash-worker-*.log"
+    with logger.contextualize(stage="batch"):
+        logger.error(text)
 
 
 def _is_set(event: Event | None) -> bool:
@@ -530,6 +571,10 @@ class _PageJob:
     config: _PhaseConfig
     output_path: Path | None = None
     dpi_override: Dpi | None = None
+
+
+def _job_page_name(job: _PageJob) -> str:
+    return page_name(job.page)
 
 
 _worker_token: str | None = None
@@ -613,6 +658,7 @@ def _detect_geometry(
         max_workers=workers,
         cancel=cancel,
         executor=pool,
+        name_job=_job_page_name,
     )
     result.cancelled.extend(job.page for job in unscheduled)
     return [page for page in pages if page in detected]
@@ -826,6 +872,7 @@ def run_batch(
             max_workers=workers,
             cancel=cancel,
             executor=pool,
+            name_job=_job_page_name,
         )
     result.cancelled.extend(job.page for job in unscheduled)
     with logger.contextualize(stage="batch"):
