@@ -5,8 +5,6 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from loguru import logger
-
 from scantailor.cli.errors import CliError, ExitCode
 from scantailor.cli.project_file import (
     load_project,
@@ -131,9 +129,6 @@ def run_project(project_path: Path, max_workers: int | None) -> BatchReport:
         file_labels=project.output_file_label_map(),
     )
     save_project(project, stages, project_path)
-    logger.info(
-        "Batch finished: {} written, {} failed", len(result.written), len(result.failed)
-    )
     return BatchReport(
         output_directory=absolute(out_dir),
         written=len(result.written),
