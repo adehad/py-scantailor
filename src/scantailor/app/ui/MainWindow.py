@@ -566,7 +566,6 @@ class MainWindowManager:
         self.actionReverseTwoPageOrder.triggered.connect(
             self.toggleTwoPageSpreadReadingOrder
         )
-        self.actionDebug.toggled.connect(self.debugToggled)
         self.actionSettings.triggered.connect(self.openSettingsDialog)
         self.actionDefaults.triggered.connect(self.openDefaultParamsDialog)
         self.actionNewProject.triggered.connect(self.newProject)
@@ -1441,7 +1440,6 @@ class MainWindowManager:
 
     def _on_render_failed(self, page_id: PageId, message: str) -> None:
         self._set_render_pending(False)
-        _LOG.warning(f"Page {page_id} could not be shown: {message}")
 
     def set_thumbnail_widget(self, widget: QWidget) -> None:
         """Show ``widget`` in the thumbnails dock instead of the placeholder view.
@@ -2383,7 +2381,6 @@ class MainWindowManager:
 
     def showAboutDialog(self) -> None:
         """Show about dialog."""
-        _LOG.info("Show About Dialog")
         AboutDialog(self.ui).show()
 
     def reloadCurrentPage(self) -> None:
@@ -2477,10 +2474,6 @@ class MainWindowManager:
         self._invalidate_thumbnails()
         self._refresh_page_list()
         self.thumbnails.select_pages(selected)
-
-    def debugToggled(self, enabled: bool) -> None:
-        """Debug toggled."""
-        _LOG.info(f"Debug toggled: {enabled}")
 
     def openSettingsDialog(self) -> None:
         """Open settings dialog."""
