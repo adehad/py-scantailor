@@ -55,6 +55,32 @@ class Settings:
         with self._lock:
             self._params[self._key(page_id)] = params
 
+    def replace_params(self, page_id: PageId, expected: Params, params: Params) -> bool:
+        """Store parameters computed from ``expected`` unless the page has changed.
+
+        Processing runs on worker threads, so the user can change a page between
+        the start of a detection and its result; checking and storing under one
+        lock keeps that change instead of the stale result.
+
+        Args:
+            page_id: The page the parameters were computed for.
+            expected: The parameters the computation started from, as
+                ``get_params`` returned them.
+            params: The computed parameters.
+
+        Returns:
+            True if the params were stored, False if the page had changed.
+        """
+        key = self._key(page_id)
+        with self._lock:
+            current = self._params.get(key)
+            if current is None:
+                current = Params(layout_type=self._default_layout_type)
+            if current != expected:
+                return False
+            self._params[key] = params
+            return True
+
     def is_params_set(self, page_id: PageId) -> bool:
         """Check if parameters have been explicitly set for a page.
 
