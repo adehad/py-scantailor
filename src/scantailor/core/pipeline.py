@@ -463,15 +463,10 @@ def _run_stages(
                     )
                 if stage < options.start_stage:
                     continue
-                _log_stage(
-                    stage,
-                    stage_meta,
-                    dewarp_metrics,
-                    time.perf_counter() - started,
-                    level="INFO"
-                    if not render or stage == options.end_stage
-                    else "DEBUG",
-                )
+                if not render or stage == options.end_stage:
+                    _log_stage(
+                        stage, stage_meta, dewarp_metrics, time.perf_counter() - started
+                    )
             stages_completed.append(stage)
             if stage_meta:
                 metadata[stage.name] = stage_meta
@@ -499,16 +494,14 @@ def _log_stage(
     stage_meta: dict,
     dewarp_metrics: DewarpMetrics | None,
     seconds: float,
-    level: str,
 ) -> None:
     """Log what a stage settled on for the page in the current log context.
 
-    A run that renders only reports its last stage at INFO: the stages before it
-    were decided, and reported, by the geometry pass or the earlier view that
+    A run that renders only reports its last stage: the stages before it were
+    decided, and reported, by the geometry pass or the earlier view that
     detected them, and repeating them would multiply the lines per page.
     """
-    logger.log(
-        level,
+    logger.info(
         "{}; {:.2f} s",
         summarize_stage(stage, stage_meta, dewarp_metrics),
         seconds,
