@@ -129,6 +129,11 @@ def rebuild_pdf(
         exported = [page for page in pages if page in batch.written]
         if batch.cancelled or not exported:
             clock.stop()
+            logger.info(
+                "pdf export: not written, {} pages cancelled, {} failed",
+                len(batch.cancelled),
+                len(batch.failed),
+            )
             return result
 
         clock.start("text")
@@ -168,8 +173,22 @@ def rebuild_pdf(
         )
     clock.stop()
     result.pages_exported = len(exported)
-    logger.info("Rebuilt {} pages into {}", result.pages_exported, out_path)
+    logger.info("pdf export: {}", _export_summary(result, bilevel_codec, carry_text))
     return result
+
+
+def _export_summary(result: BookResult, codec: BilevelCodec, carry_text: bool) -> str:
+    """Say what a rebuilt PDF holds and where the time went, for the log."""
+    size_mb = result.out_path.stat().st_size / 1e6 if result.out_path.exists() else 0
+    text_layer = f"text layer on {result.text_pages}" if carry_text else "no text"
+    phases = ", ".join(
+        f"{name} {seconds:.1f}" for name, seconds in result.seconds.items()
+    )
+    return (
+        f"{result.pages_exported} pages, {len(result.failed)} failed, bilevel {codec}, "
+        f"{text_layer}, {size_mb:.1f} MB in {sum(result.seconds.values()):.1f} s "
+        f"({phases}) to {result.out_path}"
+    )
 
 
 def _output_dpi(batch: BatchResult, page: PageId, fallback: int) -> tuple[float, float]:

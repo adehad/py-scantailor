@@ -6,7 +6,7 @@ import pikepdf
 import pypdfium2 as pdfium
 import pytest
 
-from scantailor.core.pdf_book import rebuild_pdf
+from scantailor.core.pdf_book import BookResult, _export_summary, rebuild_pdf
 
 PAGE_WORDS = ["alpha", "bravo", "charlie"]
 
@@ -65,3 +65,22 @@ def test_text_can_be_left_out(tmp_path: Path):
 
     assert result.text_pages == 0
     assert _page_text(out, 0).strip() == ""
+
+
+def test_the_export_summary_gives_counts_size_and_phase_times(tmp_path: Path):
+    out = tmp_path / "book.pdf"
+    out.write_bytes(b"x" * 2_500_000)
+    result = BookResult(
+        out,
+        pages_exported=410,
+        failed={3: "ValueError: bad", 9: "ValueError: bad"},
+        text_pages=395,
+        seconds={"import": 1.0, "detect": 2.0, "render": 3.0, "text": 0.5},
+    )
+
+    summary = _export_summary(result, "jbig2", carry_text=True)
+
+    assert summary == (
+        "410 pages, 2 failed, bilevel jbig2, text layer on 395, 2.5 MB in 6.5 s "
+        f"(import 1.0, detect 2.0, render 3.0, text 0.5) to {out}"
+    )

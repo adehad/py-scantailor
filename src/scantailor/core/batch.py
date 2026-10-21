@@ -9,7 +9,9 @@ their own settings, so no lock-holding object is pickled.
 
 import multiprocessing
 import os
+import statistics
 import sys
+import time
 import uuid
 from collections import deque
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -94,6 +96,8 @@ class RenderInfo:
         post_deskew_angle: The rotation the worker measured after dewarping, to
             be stored in the page's parameters; None when the page was not
             dewarped.
+        seconds: Wall time the worker spent loading, rendering and writing
+            the page.
     """
 
     transformation: ImageTransformation
@@ -102,6 +106,7 @@ class RenderInfo:
     distortion_model: DistortionModelSpec | None = None
     dewarp: DewarpSpec | None = None
     post_deskew_angle: float | None = None
+    seconds: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -337,10 +342,25 @@ def configure_worker_threads() -> None:
     cv2.setNumThreads(1)
 
 
+def _quiet_worker_log() -> None:
+    """Keep a worker's per-page lines off the shared console.
+
+    A spawned worker starts with loguru's default DEBUG sink on the stderr it
+    shares with the parent, so every page would print its stage lines there.
+    Only warnings and errors reach it; the parent's log file gets none of a
+    worker's lines.
+    """
+    logger.remove()
+    logger.configure(extra={"page": "-", "stage": "-"})
+    if sys.stderr is not None:
+        logger.add(sys.stderr, level="WARNING", backtrace=False, diagnose=False)
+
+
 def _init_pool_worker(
     extra: Callable[..., None] | None, extra_args: tuple[Any, ...]
 ) -> None:
     configure_worker_threads()
+    _quiet_worker_log()
     if extra is not None:
         extra(*extra_args)
 
@@ -581,7 +601,10 @@ def _detect_geometry(
     ) -> None:
         if params is None:
             error = error or RuntimeError("no result")
-            logger.warning("Geometry pass failed for {}: {}", job.page, error)
+            with logger.contextualize(page=page_name(job.page), stage="batch"):
+                logger.opt(exception=error).error(
+                    "geometry pass failed: {}", _describe(error)
+                )
             report(PageFailed(job.page, _describe(error)))
             return
         apply_stage_params(stages, _load_entries(params))
@@ -614,6 +637,7 @@ def _as_writable(image: NDArray[np.uint8], is_binary: bool) -> NDArray:
 
 def _render_page(job: _PageJob) -> tuple[Path, RenderInfo]:
     """Render one page in a worker and write it; returns its path and geometry."""
+    started = time.perf_counter()
     with logger.contextualize(page=page_name(job.page)):
         if job.output_path is None:
             raise ValueError("A render job needs an output path")
@@ -648,6 +672,7 @@ def _render_page(job: _PageJob) -> tuple[Path, RenderInfo]:
             post_deskew_angle=_measured_post_deskew_angle(rendered)
             if was_dewarped
             else None,
+            seconds=time.perf_counter() - started,
         )
         return job.output_path, info
 
@@ -749,6 +774,9 @@ def run_batch(
             on_progress(event)
 
     workers = pool_size(max_workers)
+    started = time.perf_counter()
+    with logger.contextualize(stage="batch"):
+        logger.info("batch start: {} pages, {} workers", len(pages), workers)
     with ExitStack() as stack:
         pool = executor or stack.enter_context(spawn_pool(workers))
         ready = _detect_geometry(
@@ -790,6 +818,10 @@ def run_batch(
                 report(PageDone(job.page, *rendered))
             else:
                 error = error or RuntimeError("no result")
+                with logger.contextualize(page=page_name(job.page), stage="batch"):
+                    logger.opt(exception=error).error(
+                        "render failed: {}", _describe(error)
+                    )
                 report(PageFailed(job.page, _describe(error)))
 
         unscheduled = run_pool(
@@ -801,4 +833,24 @@ def run_batch(
             executor=pool,
         )
     result.cancelled.extend(job.page for job in unscheduled)
+    with logger.contextualize(stage="batch"):
+        logger.info(
+            "batch end: {}", _batch_summary(result, time.perf_counter() - started)
+        )
     return result
+
+
+def _batch_summary(result: BatchResult, seconds: float) -> str:
+    """Count a batch's outcomes and name its slowest page, for the log."""
+    text = (
+        f"{len(result.written)} written, {len(result.failed)} failed, "
+        f"{len(result.cancelled)} cancelled in {seconds:.1f} s"
+    )
+    timings = {page: info.seconds for page, info in result.render_info.items()}
+    if timings:
+        slowest = max(timings, key=timings.__getitem__)
+        text += (
+            f" (median page {statistics.median(timings.values()):.1f} s, "
+            f"slowest {page_name(slowest)} {timings[slowest]:.1f} s)"
+        )
+    return text
