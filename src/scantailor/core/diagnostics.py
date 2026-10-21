@@ -55,7 +55,9 @@ _FOLDER_BUDGET_BYTES: Final = 100 * 1024 * 1024
 # Crash files of each kind are kept apart, so the empty files of a terminated
 # pool cannot push out the crash dump of the window.
 _PRUNED_KINDS: Final = ("gui", "cli", "crash-gui", "crash-cli", "crash-worker")
-_SESSION_FILE: Final = re.compile(r"^(?P<kind>gui|cli)-\d{8}-\d{6}-(?P<pid>\d+)\.log$")
+_SESSION_FILE: Final = re.compile(
+    r"^(?:gui|cli|crash-(?:gui|cli|worker))-\d{8}-\d{6}-(?P<pid>\d+)\.log$"
+)
 _TAIL_BYTES: Final = 4096
 
 _QT_LEVELS: Final = {
@@ -121,9 +123,11 @@ def session_log_name(kind: SessionKind) -> str:
 def prune_logs(folder: Path) -> list[Path]:
     """Delete old log files so the folder stays within its budget.
 
-    Each of ``gui-*``, ``cli-*``, ``crash-gui-*``, ``crash-cli-*`` and
-    ``crash-worker-*`` keeps its newest 10 files, so a script calling the CLI
-    many times cannot push out the window log of the session that crashed.
+    Empty ``crash-*`` files whose process has ended go first: they record no
+    crash, and a terminated pool leaves one per worker. Then each of ``gui-*``,
+    ``cli-*``, ``crash-gui-*``, ``crash-cli-*`` and ``crash-worker-*`` keeps its
+    newest 10 files, so a script calling the CLI many times cannot push out the
+    window log of the session that crashed.
     Then the oldest ``*.log`` files go until the folder holds at most 100 MB.
     A file another running instance holds open cannot be deleted on Windows;
     it is skipped.
@@ -135,7 +139,10 @@ def prune_logs(folder: Path) -> list[Path]:
         list[Path]: The files deleted.
     """
     logs = sorted(folder.glob("*.log"), key=_modified_time, reverse=True)
-    deleted: list[Path] = []
+    deleted = [
+        path for path in logs if _is_finished_empty_crash_file(path) and _delete(path)
+    ]
+    logs = [path for path in logs if path not in deleted]
     for kind in _PRUNED_KINDS:
         of_kind = [path for path in logs if path.name.startswith(f"{kind}-")]
         deleted += [path for path in of_kind[_KEEP_PER_KIND:] if _delete(path)]
@@ -149,6 +156,15 @@ def prune_logs(folder: Path) -> list[Path]:
             deleted.append(path)
             total -= size
     return deleted
+
+
+def _is_finished_empty_crash_file(path: Path) -> bool:
+    return (
+        path.name.startswith("crash-")
+        and _SESSION_FILE.match(path.name) is not None
+        and _size(path) == 0
+        and not _is_live(path)
+    )
 
 
 def _modified_time(path: Path) -> float:

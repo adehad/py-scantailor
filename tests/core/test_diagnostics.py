@@ -198,6 +198,48 @@ class TestPruneLogs:
         assert deleted == [logs[1]]
         assert held_open.exists()
 
+    @pytest.mark.usefixtures("no_session_running")
+    @pytest.mark.parametrize("kind", ["gui", "cli", "worker"])
+    def test_an_empty_crash_file_of_an_ended_process_is_deleted(
+        self, tmp_path: Path, kind: str
+    ):
+        empty = _touch(tmp_path / f"crash-{kind}-20260101-000000-1000.log", 1, "")
+
+        assert diagnostics.prune_logs(tmp_path) == [empty]
+        assert not empty.exists()
+
+    def test_a_crash_file_with_a_dump_or_a_running_writer_is_kept(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        dump = _touch(
+            tmp_path / "crash-worker-20260101-000000-1000.log", 1, "Fatal Python\n"
+        )
+        running = _touch(tmp_path / "crash-worker-20260101-000000-1001.log", 2, "")
+        monkeypatch.setattr(diagnostics, "_is_live", lambda path: path == running)
+
+        assert diagnostics.prune_logs(tmp_path) == []
+        assert dump.exists()
+        assert running.exists()
+
+    @pytest.mark.usefixtures("no_session_running")
+    def test_empty_crash_files_do_not_push_out_an_older_crash_dump(
+        self, tmp_path: Path
+    ):
+        dump = _touch(tmp_path / "crash-worker-20260101-000000-1000.log", 1, "dump\n")
+        empties = [
+            _touch(
+                tmp_path / f"crash-worker-20260101-000000-{2000 + index}.log",
+                2 + index,
+                "",
+            )
+            for index in range(12)
+        ]
+
+        deleted = diagnostics.prune_logs(tmp_path)
+
+        assert sorted(deleted) == sorted(empties)
+        assert dump.exists()
+
     def test_an_empty_folder_deletes_nothing(self, tmp_path: Path):
         assert diagnostics.prune_logs(tmp_path) == []
 
@@ -252,6 +294,14 @@ class TestCleanExitMarker:
         path = tmp_path / f"gui-20260101-000000-{os.getpid()}.log"
         with path.open("a", encoding="utf-8"):
             assert diagnostics._is_live(path)
+
+    @pytest.mark.skipif(
+        sys.platform == "win32", reason="os.kill(pid, 0) ends the process on Windows"
+    )
+    def test_the_writer_pid_is_read_from_a_crash_file_name(self, tmp_path: Path):
+        path = tmp_path / f"crash-worker-20260101-000000-{os.getpid()}.log"
+
+        assert diagnostics._writer_is_running(path)
 
     def test_a_closed_file_of_an_exited_process_is_not_live(self, tmp_path: Path):
         child = subprocess.Popen([sys.executable, "-c", "pass"])
