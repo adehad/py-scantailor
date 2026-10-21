@@ -52,7 +52,8 @@ names the earlier file in a line ``previous session did not end cleanly``. That
 earlier file is the one to attach.
 
 ScanTailor keeps the newest ten files of each kind and at most 100 MB in total,
-and deletes older ones when it starts. A single session's log is capped at about
+and deletes older ones when it starts, along with empty crash files of processes
+that have ended. A single session's log is capped at about
 20 MB.
 
 Before you attach a log
