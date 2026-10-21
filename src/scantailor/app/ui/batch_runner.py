@@ -49,24 +49,25 @@ class _BatchWorker(QtCore.QObject):
     @QtCore.Slot()
     def run(self) -> None:
         """Run the batch; called on the worker thread."""
-        stages, pages, output_dir = self._arguments
-        try:
-            result = run_batch(
-                stages,
-                pages,
-                output_dir,
-                layout_direction=self._layout_direction,
-                max_workers=self._max_workers,
-                on_progress=self._on_event,
-                cancel=self._cancel,
-                dpi_overrides=self._dpi_overrides,
-                file_labels=self._file_labels,
-            )
-        except Exception as error:
-            logger.exception("Batch processing failed")
-            self.failed.emit(f"{type(error).__name__}: {error}")
-        else:
-            self.finished.emit(result)
+        with logger.contextualize(stage="batch"):
+            stages, pages, output_dir = self._arguments
+            try:
+                result = run_batch(
+                    stages,
+                    pages,
+                    output_dir,
+                    layout_direction=self._layout_direction,
+                    max_workers=self._max_workers,
+                    on_progress=self._on_event,
+                    cancel=self._cancel,
+                    dpi_overrides=self._dpi_overrides,
+                    file_labels=self._file_labels,
+                )
+            except Exception as error:
+                logger.exception("Batch processing failed")
+                self.failed.emit(f"{type(error).__name__}: {error}")
+            else:
+                self.finished.emit(result)
 
 
 class BatchRunner(QtCore.QObject):

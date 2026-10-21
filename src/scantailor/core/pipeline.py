@@ -24,7 +24,7 @@ import numpy as np
 from loguru import logger
 from numpy.typing import NDArray
 
-from scantailor.core.models import Dpi, PageId, SubPage
+from scantailor.core.models import Dpi, PageId, SubPage, page_name
 from scantailor.core.page_geometry import (
     page_crop_area,
     page_polygon,
@@ -434,30 +434,34 @@ def _run_stages(
     extras: OutputExtras | None = None
     dewarp_metrics: DewarpMetrics | None = None
 
-    for stage in FilterStage:
-        if stage > options.end_stage:
-            break
-        detect = stage >= detect_from
-        if options.should_cancel is not None and options.should_cancel():
-            raise PipelineCancelled
+    with logger.contextualize(page=page_name(page_id)):
+        for stage in FilterStage:
+            if stage > options.end_stage:
+                break
+            detect = stage >= detect_from
+            if options.should_cancel is not None and options.should_cancel():
+                raise PipelineCancelled
 
-        if stage == FilterStage.OUTPUT:
-            stage_meta, generated, distortion_model, extras, dewarp_metrics = (
-                _process_output(state, page_id, sequence, options)
-            )
-            if generated is not None:
-                output_image = generated.image
-                split = generated.split
-                output_dpi = sequence.output_filter.get_params(page_id).output_dpi
-        else:
-            stage_meta = _process_stage(
-                state, page_id, sequence, stage, options, detect
-            )
-        if stage < options.start_stage:
-            continue
-        stages_completed.append(stage)
-        if stage_meta:
-            metadata[stage.name] = stage_meta
+            with logger.contextualize(stage=stage.name.lower()):
+                if stage == FilterStage.OUTPUT:
+                    stage_meta, generated, distortion_model, extras, dewarp_metrics = (
+                        _process_output(state, page_id, sequence, options)
+                    )
+                    if generated is not None:
+                        output_image = generated.image
+                        split = generated.split
+                        output_dpi = sequence.output_filter.get_params(
+                            page_id
+                        ).output_dpi
+                else:
+                    stage_meta = _process_stage(
+                        state, page_id, sequence, stage, options, detect
+                    )
+            if stage < options.start_stage:
+                continue
+            stages_completed.append(stage)
+            if stage_meta:
+                metadata[stage.name] = stage_meta
 
     if output_image is None:
         skip_pixels = options.detect_only or not render

@@ -7,8 +7,7 @@ import pytest
 
 from scantailor.cli.errors import CliError, ExitCode
 from scantailor.cli.operations import project_status, set_option, show_options
-from scantailor.cli.project_file import load_project, page_name, save_project
-from scantailor.core.models import ImageId, PageId, SubPage
+from scantailor.cli.project_file import load_project, save_project
 
 
 def test_status_before_any_run_lists_both_pages_with_no_output(
@@ -111,12 +110,3 @@ def test_load_refuses_a_file_that_is_not_a_project(tmp_path: Path) -> None:
         load_project(broken)
 
     assert refused.value.code == ExitCode.PROJECT
-
-
-def test_page_name_marks_the_half_of_a_split_page() -> None:
-    image = ImageId(file_path=Path("scan.tif"), page=2)
-
-    assert page_name(PageId(image_id=image)) == "scan.tif#2"
-    assert page_name(PageId(image_id=image, sub_page=SubPage.LEFT_PAGE)) == (
-        "scan.tif#2/left_page"
-    )

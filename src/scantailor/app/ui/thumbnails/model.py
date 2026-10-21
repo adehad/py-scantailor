@@ -19,7 +19,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QImage
 
 from scantailor.app.ui.thumbnails.cache import ThumbnailCache, ThumbnailKey
-from scantailor.core.models import PageId, SubPage
+from scantailor.core.models import PageId, SubPage, page_name
 from scantailor.core.project import Project
 
 ThumbnailRenderer = Callable[[PageId, str], QImage]
@@ -124,6 +124,10 @@ class _RenderTask(QRunnable):
         self._signals = signals
 
     def run(self) -> None:
+        with logger.contextualize(page=page_name(self._key.page)):
+            self._render()
+
+    def _render(self) -> None:
         if not self._is_wanted(self._key):
             self._signals.skipped.emit(self._key)
             return
@@ -132,7 +136,7 @@ class _RenderTask(QRunnable):
             try:
                 rendered = self._renderer(self._key.page, self._key.stage)
             except Exception:
-                logger.exception("Thumbnail render failed for {}", self._key.page)
+                logger.exception("Thumbnail render failed")
                 self._signals.finished.emit(self._key, None)
                 return
             if rendered.isNull():

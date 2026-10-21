@@ -8,7 +8,6 @@ every save, the same way the GUI does it.
 from pathlib import Path
 
 from scantailor.cli.errors import CliError, ExitCode
-from scantailor.core.models import PageId
 from scantailor.core.project import Project
 from scantailor.core.stage_params import (
     apply_stage_defaults,
@@ -75,20 +74,3 @@ def output_directory_of(project: Project, project_path: Path) -> Path:
         pathlib.Path: An absolute output folder.
     """
     return (project_path.resolve().parent / project.output_directory).resolve()
-
-
-def page_name(page: PageId) -> str:
-    """Name a page for humans and JSON, such as ``scan01.tif`` or ``scan01.tif/left``.
-
-    Args:
-        page (PageId): The page to name.
-
-    Returns:
-        str: File name, then the sub page when the image holds two pages.
-    """
-    name = page.image_id.file_path.name
-    if page.image_id.page:
-        name = f"{name}#{page.image_id.page}"
-    if page.sub_page.name == "SINGLE_PAGE":
-        return name
-    return f"{name}/{page.sub_page.name.lower()}"
