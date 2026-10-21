@@ -39,8 +39,10 @@ Which files to attach
      - Left behind only when ScanTailor crashed. Attach any with the same date
        and time as the session log.
    * - ``crash-worker-<date>-<time>-<process>.log``
-     - Left behind when a worker process that processes pages crashed. Attach
-       the non-empty ones with the same date as the session log.
+     - Left behind when a worker process that processes pages crashed. The
+       session log then has a line ``worker process died`` naming the pages
+       that were running. Attach the non-empty ones with the same date as the
+       session log.
    * - ``cli-<date>-<time>-<process>.log``
      - One ``scantailor-cli run`` or ``export``. Attach it for a problem with
        the command line.
