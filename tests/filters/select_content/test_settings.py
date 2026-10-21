@@ -192,3 +192,35 @@ class TestSettings:
 
         # Should only include valid (non-empty) boxes
         assert len(boxes) == 2
+
+
+class TestReplaceParams:
+    def test_a_result_computed_from_the_default_params_is_stored(self):
+        settings = Settings()
+        page_id = make_page_id("test")
+        detected = Params(content_box=ContentBox(x=1.0, y=2.0, width=3.0, height=4.0))
+
+        stored = settings.replace_params(
+            page_id, settings.get_params(page_id), detected
+        )
+
+        assert stored
+        assert settings.get_params(page_id) == detected
+
+    def test_a_result_computed_before_the_page_changed_is_dropped(self):
+        settings = Settings()
+        page_id = make_page_id("test")
+        started_from = settings.get_params(page_id)
+        drawn = Params().with_manual_content(
+            ContentBox(x=10.0, y=10.0, width=5.0, height=5.0)
+        )
+        settings.set_params(page_id, drawn)
+
+        stored = settings.replace_params(
+            page_id,
+            started_from,
+            Params(content_box=ContentBox(x=1.0, y=2.0, width=3.0, height=4.0)),
+        )
+
+        assert not stored
+        assert settings.get_params(page_id) == drawn

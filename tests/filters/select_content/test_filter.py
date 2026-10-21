@@ -1,11 +1,13 @@
 """Tests for Select Content filter."""
 
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
 
 from scantailor.core.models import ImageId, PageId, SubPage
+from scantailor.filters.select_content import filter as select_filter_module
 from scantailor.filters.select_content.content_box import ContentBox, PageBox
 from scantailor.filters.select_content.detection import (
     ContentDetectionMode,
@@ -279,6 +281,82 @@ class TestFilterProcess:
             Filter().process(
                 lambda: np.zeros((10, 10), dtype=np.uint8), make_page_id("test")
             )
+
+
+class TestBoxDrawnWhileProcessing:
+    """Processing runs on worker threads; the user can draw a box while it runs."""
+
+    @staticmethod
+    def _page_image() -> np.ndarray:
+        image = np.full((200, 300), 255, dtype=np.uint8)
+        image[60:140, 80:220] = 0
+        return image
+
+    def test_a_content_detection_finishing_after_a_drawn_box_keeps_the_box(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        select_filter = Filter()
+        page_id = make_page_id("drawn")
+        drawn = ContentBox(x=10.0, y=10.0, width=50.0, height=40.0)
+        find = select_filter_module.find_content_box
+
+        def draw_during_detection(*args: Any, **kwargs: Any) -> Any:
+            select_filter.set_manual_content(page_id, drawn)
+            return find(*args, **kwargs)
+
+        monkeypatch.setattr(
+            select_filter_module, "find_content_box", draw_during_detection
+        )
+
+        returned = select_filter.process(self._page_image(), page_id)
+
+        stored = select_filter.get_params(page_id)
+        assert stored.content_detection_mode == ContentDetectionMode.MANUAL
+        assert stored.content_box == drawn
+        assert returned == stored
+
+    def test_a_page_detection_finishing_after_a_drawn_page_keeps_the_page(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        select_filter = Filter()
+        page_id = make_page_id("drawn")
+        select_filter.reset_page_to_auto(page_id)
+        drawn = PageBox(x=5.0, y=5.0, width=100.0, height=80.0)
+        find = select_filter_module.find_page_box
+
+        def draw_during_detection(*args: Any, **kwargs: Any) -> Any:
+            select_filter.set_manual_page(page_id, drawn)
+            return find(*args, **kwargs)
+
+        monkeypatch.setattr(
+            select_filter_module, "find_page_box", draw_during_detection
+        )
+
+        select_filter.process(self._page_image(), page_id)
+
+        stored = select_filter.get_params(page_id)
+        assert stored.page_detection_mode == PageDetectionMode.MANUAL
+        assert stored.page_box == drawn
+
+    def test_a_stored_detection_finishing_after_a_drawn_box_keeps_the_box(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        select_filter = Filter()
+        page_id = make_page_id("drawn")
+        drawn = ContentBox(x=10.0, y=10.0, width=50.0, height=40.0)
+        find = select_filter_module.find_content_box
+
+        def draw_during_detection(*args: Any, **kwargs: Any) -> Any:
+            select_filter.set_manual_content(page_id, drawn)
+            return find(*args, **kwargs)
+
+        monkeypatch.setattr(
+            select_filter_module, "find_content_box", draw_during_detection
+        )
+
+        select_filter.detect_content(self._page_image(), page_id)
+
+        assert select_filter.get_content_box(page_id) == drawn
 
 
 class TestFilterManualOperations:
