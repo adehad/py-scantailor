@@ -290,3 +290,29 @@ def test_manual_cutters_survive_after_an_earlier_auto_detection() -> None:
     assert params.is_manual()
     assert params.page_layout is not None
     assert params.page_layout.layout_type is PageLayoutType.SINGLE_PAGE_CUT
+
+
+def test_a_manual_angle_set_while_the_page_is_processed_is_kept(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sequence = StageSequence()
+    page = _page()
+    deskew = sequence.deskew_filter
+    deskew.set_manual_angle(page, MANUAL_ANGLE)
+    read = deskew.get_params
+    newer_angle = MANUAL_ANGLE / 2
+    changed = False
+
+    def set_angle_after_the_read(page_id: PageId) -> DeskewParams:
+        nonlocal changed
+        params = read(page_id)
+        if not changed:
+            changed = True
+            deskew.set_manual_angle(page, newer_angle)
+        return params
+
+    monkeypatch.setattr(deskew, "get_params", set_angle_after_the_read)
+
+    _run_to(_skewed_text_page(), page, sequence, FilterStage.DESKEW)
+
+    assert read(page).deskew_angle_deg == newer_angle

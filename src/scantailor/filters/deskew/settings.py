@@ -153,6 +153,28 @@ class Settings(BaseModel):
             update = _AUTO_ROTATION if part is Detection.ROTATION else _AUTO_OBLIQUE
             self.params[page_id] = current.model_copy(update=update)
 
+    def replace_params(self, page_id: PageId, expected: Params, params: Params) -> bool:
+        """Store computed parameters unless the page changed since they were read.
+
+        Processing runs on worker threads, so the user can change a page between
+        reading its parameters and storing what was computed from them; checking
+        and storing under one lock keeps that change.
+
+        Args:
+            page_id (PageId): The page the parameters were computed for.
+            expected (Params): The parameters the computation started from, as
+                ``get_params`` returned them.
+            params (Params): The computed parameters.
+
+        Returns:
+            bool: True if the params were stored, False if the page had changed.
+        """
+        with self._lock:
+            if (self.params.get(page_id) or self._fresh_params()) != expected:
+                return False
+            self.params[page_id] = params
+            return True
+
     def store_detection(
         self,
         page_id: PageId,
