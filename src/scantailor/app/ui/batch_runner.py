@@ -1,7 +1,7 @@
 """Runs a batch on a worker thread and reports progress as signals."""
 
 import threading
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 import shiboken6
@@ -32,6 +32,7 @@ class _BatchWorker(QtCore.QObject):
         dpi_overrides: DpiOverrides,
         file_labels: Mapping[Path, int] | None,
         end_stage: FilterStage,
+        worker_limit: Callable[[], int | None],
     ) -> None:
         super().__init__()
         self._arguments = (stages, pages, output_dir)
@@ -41,6 +42,7 @@ class _BatchWorker(QtCore.QObject):
         self._dpi_overrides = dpi_overrides
         self._file_labels = file_labels
         self._end_stage = end_stage
+        self._worker_limit = worker_limit
 
     def _on_event(self, event: BatchEvent) -> None:
         if isinstance(event, PageDetected):
@@ -65,6 +67,7 @@ class _BatchWorker(QtCore.QObject):
                     dpi_overrides=self._dpi_overrides,
                     file_labels=self._file_labels,
                     end_stage=self._end_stage,
+                    worker_limit=self._worker_limit,
                 )
             except Exception as error:
                 logger.exception("Batch processing failed")
@@ -102,6 +105,19 @@ class BatchRunner(QtCore.QObject):
         self._worker: _BatchWorker | None = None
         self._cancel = threading.Event()
         self._outcome: BatchResult | str | None = None
+        self._worker_limit: int | None = None
+
+    @property
+    def worker_limit(self) -> int | None:
+        """Pages processed at once, or None for one per worker process.
+
+        A running batch picks up a new value the next time it starts a page.
+        """
+        return self._worker_limit
+
+    @worker_limit.setter
+    def worker_limit(self, count: int | None) -> None:
+        self._worker_limit = count
 
     @property
     def is_running(self) -> bool:
@@ -151,6 +167,7 @@ class BatchRunner(QtCore.QObject):
             dpi_overrides or {},
             file_labels,
             end_stage,
+            lambda: self._worker_limit,
         )
         thread = QtCore.QThread(self)
         worker.moveToThread(thread)

@@ -2,6 +2,7 @@
 
 from PySide6 import QtCore, QtWidgets
 
+from scantailor.app.ui.panels.batch_processing import BatchProcessingLowerPanel
 from scantailor.app.ui.thumbnails.model import page_label
 from scantailor.core.batch import BatchResult, PageDetected, PageDone, ProgressEvent
 
@@ -11,12 +12,16 @@ class BatchProgressDialog(QtWidgets.QDialog):
 
     The dialog does not stop the work itself; it asks for it through
     ``stop_requested``. Closing it while the batch runs counts as a stop request.
+    Its system load slider stores the chosen page count in the settings, where
+    the next batch finds it.
 
     Signals:
         stop_requested: The user asked to stop the batch.
+        load_changed: The user chose how many pages run at once. Args: count (int).
     """
 
     stop_requested = QtCore.Signal()
+    load_changed = QtCore.Signal(int)
 
     def __init__(
         self,
@@ -48,9 +53,17 @@ class BatchProgressDialog(QtWidgets.QDialog):
         self._bar = QtWidgets.QProgressBar(self)
         self._bar.setRange(0, max(total, 1))
         self._results = QtWidgets.QListWidget(self)
+        self._panel = BatchProcessingLowerPanel(self)
+        self._panel.load_changed.connect(self.load_changed)
         self._button = QtWidgets.QPushButton(self.tr("Stop"), self)
         self._button.clicked.connect(self._on_button)
-        for widget in (self._status, self._bar, self._results, self._button):
+        for widget in (
+            self._status,
+            self._bar,
+            self._results,
+            self._panel,
+            self._button,
+        ):
             layout.addWidget(widget)
         self._update_status()
 
@@ -58,6 +71,20 @@ class BatchProgressDialog(QtWidgets.QDialog):
     def is_running(self) -> bool:
         """Whether the batch has not finished yet."""
         return self._running
+
+    @property
+    def load(self) -> int:
+        """Number of pages the system load slider lets run at once."""
+        return self._panel.get_load()
+
+    @property
+    def beep_when_finished(self) -> bool:
+        """Whether the user asked for a beep when the batch completes."""
+        return self._panel.is_beep_enabled()
+
+    @beep_when_finished.setter
+    def beep_when_finished(self, enabled: bool) -> None:
+        self._panel.set_beep_enabled(enabled)
 
     @property
     def reported(self) -> int:
