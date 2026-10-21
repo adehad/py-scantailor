@@ -142,3 +142,33 @@ class TestSettings:
 
         assert angles[page1] == 1.5
         assert angles[page2] == -2.5
+
+
+class TestReplaceParams:
+    def test_a_result_computed_from_the_fresh_params_is_stored(self):
+        settings = Settings()
+        page_id = make_page_id("test")
+        computed = Params(deskew_angle_deg=2.0, mode=AutoManualMode.MANUAL)
+
+        stored = settings.replace_params(
+            page_id, settings.get_params(page_id), computed
+        )
+
+        assert stored
+        assert settings.get_params(page_id) == computed
+
+    def test_a_result_computed_before_the_page_changed_is_dropped(self):
+        settings = Settings()
+        page_id = make_page_id("test")
+        started_from = settings.get_params(page_id)
+        chosen = Params(deskew_angle_deg=5.0, mode=AutoManualMode.MANUAL)
+        settings.set_params(page_id, chosen)
+
+        stored = settings.replace_params(
+            page_id,
+            started_from,
+            Params(deskew_angle_deg=2.0, mode=AutoManualMode.MANUAL),
+        )
+
+        assert not stored
+        assert settings.get_params(page_id) == chosen
