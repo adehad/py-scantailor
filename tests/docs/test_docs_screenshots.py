@@ -298,6 +298,7 @@ def test_manual_screenshots_capture_every_named_shot(
         lambda: manager.show_apply_dialog(FilterStage.PAGE_LAYOUT, "margins"),
     )
 
+    manager._select_stage_row(int(FilterStage.OUTPUT))
     manager.startBatchProcessing()
     pump_until(
         lambda: not manager.batch_runner.is_running, _BATCH_TIMEOUT_S, "the batch"

@@ -20,6 +20,7 @@ from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.dialogs.pdf_export import PdfExportDialog, PdfExportOptions
 from scantailor.app.ui.MainWindow import MainWindowManager
+from scantailor.core.stage_sequence import FilterStage
 from scantailor.core.text_layer import TextGeometry
 
 if TYPE_CHECKING:
@@ -331,6 +332,7 @@ def test_pdf_round_trip_through_a_real_batch_keeps_pages_and_text(
     source_pdf: Path,  # noqa: F811
 ):
     pdf_window.goFirstPage()
+    pdf_window._select_stage_row(int(FilterStage.OUTPUT))
     with qtbot.waitSignal(pdf_window.batch_runner.finished, timeout=240000):
         pdf_window.startBatchProcessing()
     assert pdf_window.last_batch_result is not None
@@ -355,6 +357,7 @@ def test_pages_batched_in_an_earlier_session_still_export_with_their_text(
     tmp_path: Path,
 ):
     pdf_window.goFirstPage()
+    pdf_window._select_stage_row(int(FilterStage.OUTPUT))
     with qtbot.waitSignal(pdf_window.batch_runner.finished, timeout=240000):
         pdf_window.startBatchProcessing()
     project_file = tmp_path / "book.ScanTailor"

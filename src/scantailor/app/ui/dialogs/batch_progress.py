@@ -18,17 +18,26 @@ class BatchProgressDialog(QtWidgets.QDialog):
 
     stop_requested = QtCore.Signal()
 
-    def __init__(self, total: int, parent: QtWidgets.QWidget | None = None) -> None:
+    def __init__(
+        self,
+        total: int,
+        parent: QtWidgets.QWidget | None = None,
+        *,
+        renders: bool = True,
+    ) -> None:
         """Build the dialog.
 
         Args:
             total (int): Number of pages in the batch.
             parent (QtWidgets.QWidget | None): Owner of the dialog.
+            renders (bool): False for a batch that stops before Output, which
+                only has the detecting phase.
         """
         super().__init__(parent)
         self.setWindowTitle(self.tr("Batch processing"))
         self.setModal(False)
         self._total = total
+        self._renders = renders
         self._running = True
         self._detected = 0
         self._rendered = 0
@@ -71,7 +80,9 @@ class BatchProgressDialog(QtWidgets.QDialog):
             event (PageDetected): The measured page.
         """
         self._detected += 1
-        if self._detected >= self._total:
+        if not self._renders:
+            self._bar.setValue(self._detected + self._results.count())
+        elif self._detected >= self._total:
             self._rendering = True
         self._update_status()
 
@@ -90,7 +101,9 @@ class BatchProgressDialog(QtWidgets.QDialog):
             line = f"{name}: {self.tr('failed')} ({event.error})"
         self._results.addItem(line)
         self._results.scrollToBottom()
-        self._bar.setValue(self._results.count())
+        self._bar.setValue(
+            self._results.count() + (0 if self._renders else self._detected)
+        )
         self._update_status()
 
     def finish(self, result: BatchResult) -> None:
@@ -100,9 +113,14 @@ class BatchProgressDialog(QtWidgets.QDialog):
             result (BatchResult): The finished batch.
         """
         self._running = False
-        summary = self.tr("Done: {written} written, {failed} failed").format(
-            written=len(result.written), failed=len(result.failed)
-        )
+        if self._renders:
+            summary = self.tr("Done: {written} written, {failed} failed").format(
+                written=len(result.written), failed=len(result.failed)
+            )
+        else:
+            summary = self.tr("Done: {processed} processed, {failed} failed").format(
+                processed=len(result.detected), failed=len(result.failed)
+            )
         if result.cancelled:
             summary += self.tr(", {count} not started").format(
                 count=len(result.cancelled)

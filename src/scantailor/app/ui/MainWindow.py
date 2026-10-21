@@ -375,6 +375,7 @@ class MainWindowManager:
         self.batch_runner.finished.connect(self._on_batch_finished)
         self.batch_runner.failed.connect(self._on_batch_failed)
         self.batch_dialog: BatchProgressDialog | None = None
+        self._batch_renders = True
         self.last_batch_result: BatchResult | None = None
         self.pdf_job = PdfJob(self.ui)
         self.pdf_job.progress.connect(self._on_pdf_progress)
@@ -1794,15 +1795,25 @@ class MainWindowManager:
         return saved if isinstance(saved, int) and saved > 0 else None
 
     def startBatchProcessing(self) -> None:
-        """Process every page in display order in the background."""
+        """Run every page, in display order, up to the selected stage.
+
+        Only a batch from Output renders and writes files, as upstream does.
+        """
         project = self.project
         if project is None or self.batch_runner.is_running:
             return
         self.focusButton.setChecked(True)
-        self._start_batch(self._batch_pages())
+        self._start_batch(self._batch_pages(), FilterStage(self.curFilter))
 
-    def _start_batch(self, pages: list[PageId]) -> None:
-        """Process ``pages`` in the background with a progress window."""
+    def _start_batch(
+        self, pages: list[PageId], end_stage: FilterStage = FilterStage.OUTPUT
+    ) -> None:
+        """Process ``pages`` up to ``end_stage`` in the background.
+
+        Args:
+            pages (list[PageId]): Pages to process, in order.
+            end_stage (FilterStage): Last stage to run; only Output writes files.
+        """
         project = self.project
         if project is None or self.batch_runner.is_running or not pages:
             return
@@ -1810,7 +1821,9 @@ class MainWindowManager:
         self._set_batch_ui(True)
         if self.batch_dialog is not None:
             self.batch_dialog.deleteLater()
-        dialog = BatchProgressDialog(len(pages), self.ui)
+        renders = end_stage == FilterStage.OUTPUT
+        self._batch_renders = renders
+        dialog = BatchProgressDialog(len(pages), self.ui, renders=renders)
         dialog.stop_requested.connect(self.stopBatchProcessing)
         self.batch_dialog = dialog
         dialog.show()
@@ -1822,6 +1835,7 @@ class MainWindowManager:
             max_workers=self._batch_worker_count(),
             dpi_overrides=self._dpi_overrides,
             file_labels=project.output_file_label_map(),
+            end_stage=end_stage,
         )
 
     def stopBatchProcessing(self) -> None:
@@ -1850,6 +1864,8 @@ class MainWindowManager:
     def _on_batch_detected(self, event: PageDetected) -> None:
         if self.batch_dialog is not None:
             self.batch_dialog.add_detected(event)
+        if not self._batch_renders:
+            self._invalidate_thumbnails(event.page)
 
     def _on_batch_progress(self, event: ProgressEvent) -> None:
         if self.batch_dialog is not None:
@@ -1875,7 +1891,7 @@ class MainWindowManager:
             self.batch_dialog.finish(result)
         if self.project is None:
             return
-        if result.written or result.failed:
+        if result.detected or result.written or result.failed:
             self.modified = True
         self._adopt_stored_page_counts(
             dict.fromkeys(page.image_id for page in (*result.written, *result.failed))

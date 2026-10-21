@@ -169,7 +169,9 @@ class TestBatchScope:
         window.thumbnails.set_order(order_index)
         window.goLastPage()
         started: list[list] = []
-        monkeypatch.setattr(window, "_start_batch", started.append)
+        monkeypatch.setattr(
+            window, "_start_batch", lambda pages, _stage: started.append(pages)
+        )
 
         window.startBatchProcessing()
 
@@ -181,7 +183,7 @@ class TestBatchScope:
     ):
         window = settled_window
         window.focusButton.setChecked(False)
-        monkeypatch.setattr(window, "_start_batch", lambda _pages: None)
+        monkeypatch.setattr(window, "_start_batch", lambda _pages, _stage: None)
 
         window.startBatchProcessing()
 
@@ -196,6 +198,7 @@ class TestBatchProcessing:
         self, qtbot: QtBot, project_window: MainWindowManager, tmp_path: pathlib.Path
     ):
         project_window.settings.setValue(_BATCH_THREADS_KEY, 1)
+        project_window._select_stage_row(int(FilterStage.OUTPUT))
         ticks: list[int] = []
         timer = QtCore.QTimer()
         timer.timeout.connect(lambda: ticks.append(1))
