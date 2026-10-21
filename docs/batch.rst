@@ -70,6 +70,7 @@ The batch owns the settings until it ends, so the program locks the parts that
 would change them:
 
 - the stage list and the stage options;
+- the page view, including zoom and scrolling;
 - the thumbnail right-click menu;
 - page navigation, including Go To Page;
 - inserting, removing and relinking pages, Fix DPI, reversing the spread order

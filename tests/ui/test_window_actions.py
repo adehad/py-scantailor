@@ -4,6 +4,7 @@ import pathlib
 import shutil
 import threading
 from collections.abc import Callable, Sequence
+from typing import cast
 
 import pytest
 from PySide6 import QtCore, QtWidgets
@@ -11,6 +12,7 @@ from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui import batch_runner, page_renderer
 from scantailor.app.ui.dialogs.apply_to import ApplyToDialog
+from scantailor.app.ui.image_views.select_content import SelectContentImageView
 from scantailor.app.ui.MainWindow import MainWindowManager
 from scantailor.core.batch import BatchResult, PageDone
 from scantailor.core.models import Dpi, ImageId, Margins, PageId, SubPage
@@ -57,6 +59,20 @@ def _answer_apply_dialog(
         modal.accept()
 
     QtCore.QTimer.singleShot(10, poll)
+
+
+def _drag_in_view(
+    qtbot: QtBot,
+    view: QtWidgets.QAbstractScrollArea,
+    start: QtCore.QPointF,
+    end: QtCore.QPointF,
+) -> None:
+    viewport = view.viewport()
+    left = QtCore.Qt.MouseButton.LeftButton
+    qtbot.mousePress(viewport, left, pos=start.toPoint())
+    for step in range(1, 5):
+        qtbot.mouseMove(viewport, (start + (end - start) * step / 4).toPoint())
+    qtbot.mouseRelease(viewport, left, pos=end.toPoint())
 
 
 def _measure_every_page(window: MainWindowManager) -> None:
@@ -219,11 +235,48 @@ class TestBatchProcessing:
             project_window.startBatchProcessing()
             assert not project_window.filterList.isEnabled()
             assert not project_window.filterOptions.isEnabled()
+            assert not project_window.imageViewFrame.isEnabled()
             assert project_window.processing_indicator.is_active
 
         assert project_window.filterList.isEnabled()
         assert project_window.filterOptions.isEnabled()
+        assert project_window.imageViewFrame.isEnabled()
         assert project_window.modified
+
+    def test_a_box_dragged_in_the_view_during_a_batch_is_not_taken(
+        self, qtbot: QtBot, settled_window: MainWindowManager, monkeypatch
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.SELECT_CONTENT)
+        window.renderer.wait_for_done()
+        qtbot.wait(50)
+        page = window.current_page
+        assert page is not None
+        stored_before = window.stages.select_content_filter.get_params(page)
+        view = cast(SelectContentImageView, window._panels.view)
+        view.set_content_rect(QtCore.QRectF(100, 200, 300, 400))
+        edits: list[QtCore.QRectF] = []
+        view.manual_content_rect_set.connect(edits.append)
+        batch_started = threading.Event()
+        release_batch = threading.Event()
+
+        def fake_run_batch(stages, pages, output_dir, **_kwargs):
+            batch_started.set()
+            release_batch.wait(10)
+            return BatchResult()
+
+        monkeypatch.setattr(batch_runner, "run_batch", fake_run_batch)
+
+        with qtbot.waitSignal(window.batch_runner.finished, timeout=20_000):
+            window.startBatchProcessing()
+            qtbot.waitUntil(batch_started.is_set, timeout=10_000)
+            edge = view.virtual_to_widget_point(QtCore.QPointF(100, 400))
+            _drag_in_view(qtbot, view, edge, edge + QtCore.QPointF(-12, 7))
+            release_batch.set()
+
+        assert edits == []
+        assert window.stages.select_content_filter.get_params(page) == stored_before
+        assert view.isEnabled()
 
     def test_batch_covers_every_page_even_when_started_from_the_second(
         self, qtbot: QtBot, project_window: MainWindowManager, monkeypatch

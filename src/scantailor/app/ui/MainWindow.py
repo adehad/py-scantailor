@@ -1835,7 +1835,7 @@ class MainWindowManager:
             self.batch_runner.wait()
 
     def _set_batch_ui(self, in_progress: bool) -> None:
-        """Lock the stage controls while the worker owns the settings.
+        """Lock the stage controls and page view while the worker owns the settings.
 
         Args:
             in_progress (bool): True when a batch starts, False when it ends.
@@ -1844,6 +1844,7 @@ class MainWindowManager:
         self.thumbnails.set_context_menu_enabled(not in_progress)
         self.filterList.setEnabled(not in_progress)
         self.filterOptions.setEnabled(not in_progress)
+        self.imageViewFrame.setEnabled(not in_progress)
         self.processing_indicator.set_active(in_progress)
 
     def _on_batch_detected(self, event: PageDetected) -> None:
