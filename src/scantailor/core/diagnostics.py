@@ -4,11 +4,13 @@ The window build has no console, so without a file sink every log line and
 uncaught exception is lost. ``configure_logging`` gives each process its own
 log file in the log folder, routes uncaught exceptions, unraisable exceptions,
 Python warnings and stdlib ``logging`` records into it, and points
-``faulthandler`` at a crash file beside it. ``DiagnosticsSession.end`` writes
-the clean-exit marker that the next start-up looks for.
+``faulthandler`` at a crash file beside it. Pool workers' lines reach the same
+sinks through ``core.worker_log``. ``DiagnosticsSession.end`` writes the
+clean-exit marker that the next start-up looks for.
 """
 
 import contextlib
+import copy
 import faulthandler
 import importlib
 import importlib.metadata
@@ -31,6 +33,7 @@ from PySide6 import QtCore
 
 from scantailor.__about__ import APP_NAME, __version__
 from scantailor.core.settings import ApplicationSettings
+from scantailor.core.worker_log import EXTRA_DEFAULTS, start_bridge
 
 type SessionKind = Literal["gui", "cli"]
 type ExceptHook = Callable[
@@ -42,9 +45,6 @@ LOG_FORMAT: Final = (
     "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <7} | {process.id} {thread.name: <14} | "
     "{extra[page]} | {extra[stage]: <14} | {name}:{line} | {message}"
 )
-# The format reads these keys, so a record logged without them would raise
-# KeyError in the formatter.
-EXTRA_DEFAULTS: Final = {"page": "-", "stage": "-"}
 SESSION_ENDED: Final = "session ended"
 
 # rotation with retention=1 keeps the live file and one rotated file of this
@@ -52,7 +52,9 @@ SESSION_ENDED: Final = "session ended"
 _ROTATION: Final = "10 MB"
 _KEEP_PER_KIND: Final = 10
 _FOLDER_BUDGET_BYTES: Final = 100 * 1024 * 1024
-_PRUNED_KINDS: Final = ("gui", "cli", "crash")
+# Crash files of each kind are kept apart, so the empty files of a terminated
+# pool cannot push out the crash dump of the window.
+_PRUNED_KINDS: Final = ("gui", "cli", "crash-gui", "crash-cli", "crash-worker")
 _SESSION_FILE: Final = re.compile(r"^(?P<kind>gui|cli)-\d{8}-\d{6}-(?P<pid>\d+)\.log$")
 _TAIL_BYTES: Final = 4096
 
@@ -119,11 +121,12 @@ def session_log_name(kind: SessionKind) -> str:
 def prune_logs(folder: Path) -> list[Path]:
     """Delete old log files so the folder stays within its budget.
 
-    Each of ``gui-*``, ``cli-*`` and ``crash-*`` keeps its newest 10 files, so a
-    script calling the CLI many times cannot push out the window log of the
-    session that crashed. Then the oldest ``*.log`` files go until the folder
-    holds at most 100 MB. A file another running instance holds open cannot be
-    deleted on Windows; it is skipped.
+    Each of ``gui-*``, ``cli-*``, ``crash-gui-*``, ``crash-cli-*`` and
+    ``crash-worker-*`` keeps its newest 10 files, so a script calling the CLI
+    many times cannot push out the window log of the session that crashed.
+    Then the oldest ``*.log`` files go until the folder holds at most 100 MB.
+    A file another running instance holds open cannot be deleted on Windows;
+    it is skipped.
 
     Args:
         folder (Path): The log folder.
@@ -307,13 +310,18 @@ class DiagnosticsSession:
     _previous_excepthook: ExceptHook | None = field(default=None, repr=False)
     _previous_unraisablehook: UnraisableHook | None = field(default=None, repr=False)
     _stdlib_bridge: logging.Handler | None = field(default=None, repr=False)
+    _stop_worker_bridge: Callable[[], None] | None = field(default=None, repr=False)
 
     def end(self) -> None:
         """Write the clean-exit marker and undo the process hooks.
 
-        The marker is the last line of the file, which tells the next start-up
-        this session did not crash. An empty crash file is deleted.
+        Lines pool workers sent before this are written first. The marker is
+        the last line of the file, which tells the next start-up this session
+        did not crash. An empty crash file is deleted.
         """
+        if self._stop_worker_bridge is not None:
+            self._stop_worker_bridge()
+            self._stop_worker_bridge = None
         logger.info(SESSION_ENDED)
         if self._file_sink is not None:
             logger.remove(self._file_sink)
@@ -367,6 +375,7 @@ def configure_logging(
     """
     logger.remove()
     logger.configure(extra=dict(EXTRA_DEFAULTS))
+    worker_logger = copy.deepcopy(logger)
     if sys.stderr is not None:
         logger.add(
             sys.stderr,
@@ -392,6 +401,8 @@ def configure_logging(
     if path is not None:
         _add_file_sink(session, path, kind)
     _install_hooks(session)
+    folder = None if session.log_file is None else session.log_file.parent
+    session._stop_worker_bridge = start_bridge(worker_logger, folder)
     for line in banner_lines(session.log_file):
         logger.info(line)
     if unclean is not None:

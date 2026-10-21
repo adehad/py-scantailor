@@ -53,6 +53,11 @@ from scantailor.core.stage_params import (
 )
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation
+from scantailor.core.worker_log import (
+    WorkerLogging,
+    start_worker_logging,
+    worker_logging,
+)
 from scantailor.filters.output.generator import applied_post_deskew_angle
 from scantailor.filters.output.params import DistortionModelSpec
 from scantailor.filters.output.params import Params as OutputParams
@@ -342,25 +347,13 @@ def configure_worker_threads() -> None:
     cv2.setNumThreads(1)
 
 
-def _quiet_worker_log() -> None:
-    """Keep a worker's per-page lines off the shared console.
-
-    A spawned worker starts with loguru's default DEBUG sink on the stderr it
-    shares with the parent, so every page would print its stage lines there.
-    Only warnings and errors reach it; the parent's log file gets none of a
-    worker's lines.
-    """
-    logger.remove()
-    logger.configure(extra={"page": "-", "stage": "-"})
-    if sys.stderr is not None:
-        logger.add(sys.stderr, level="WARNING", backtrace=False, diagnose=False)
-
-
 def _init_pool_worker(
-    extra: Callable[..., None] | None, extra_args: tuple[Any, ...]
+    worker_log: WorkerLogging | None,
+    extra: Callable[..., None] | None,
+    extra_args: tuple[Any, ...],
 ) -> None:
+    start_worker_logging(worker_log)
     configure_worker_threads()
-    _quiet_worker_log()
     if extra is not None:
         extra(*extra_args)
 
@@ -415,6 +408,8 @@ def spawn_pool(
 ) -> ProcessPoolExecutor:
     """Create a pool of spawned workers with the thread limits applied.
 
+    The workers log into the current diagnostics session, if there is one.
+
     Args:
         workers (int): Pool size.
         initializer (Callable[..., None] | None): Picklable callable run once in
@@ -428,7 +423,7 @@ def spawn_pool(
         max_workers=workers,
         mp_context=multiprocessing.get_context("spawn"),
         initializer=_init_pool_worker,
-        initargs=(initializer, initargs),
+        initargs=(worker_logging(), initializer, initargs),
     )
 
 
