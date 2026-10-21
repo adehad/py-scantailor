@@ -4,10 +4,14 @@ Batch processing
 .. screenshot:: batch_progress
    :alt: The Batch processing window after four pages were written
 
-The play button runs every page of the project through all six stages, from Fix
-Orientation to Output. It appears on the row of the selected stage in the stage
-list whenever a project is open and no batch is running. The selected row decides
-only where the button is. A batch always runs every stage.
+The play button runs every page of the project from Fix Orientation up to the
+stage whose row it sits on. It appears on the row of the selected stage in the
+stage list whenever a project is open and no batch is running.
+
+Only a batch from Output writes files. A batch from an earlier stage measures
+each page up to that stage and stores the results in the project, so you can
+batch to Select Content or Margins, check the thumbnails, fix the pages that came
+out wrong, then batch from Output to render everything.
 
 .. screenshot:: stage_play_button
    :alt: The stage list with the play button on the selected Select Content row
@@ -18,7 +22,8 @@ any sort order. It includes every page, not only the selected ones.
 Progress window
 ---------------
 
-A batch has two phases, and the Batch processing window shows both:
+A batch from Output has two phases, and the Batch processing window shows both.
+A batch from an earlier stage has only the first one:
 
 .. list-table::
    :header-rows: 1
@@ -27,12 +32,13 @@ A batch has two phases, and the Batch processing window shows both:
    * - Phase
      - What happens
    * - Detecting ``n/N``
-     - The batch measures the split, deskew, content box and margins of each page.
-       The results go into the project's settings, so the parameters of every
-       page are known before any page is written.
+     - The batch measures each page up to the selected stage, at most the split,
+       deskew, content box and margins. The results go into the project's
+       settings, so the parameters of every page are known before any page is
+       written.
    * - Rendering ``n/N``
-     - The batch renders each page and writes it as a TIFF file in the output
-       folder.
+     - Output only. The batch renders each page and writes it as a TIFF file in
+       the output folder.
 
 The window also has these parts:
 
@@ -52,8 +58,8 @@ The window also has these parts:
        **Stopping...**. When the batch ends, the button reads **Close**. Closing the
        window while the batch runs requests the same stop.
    * - Summary
-     - Shown at the end: pages written, pages failed and, after a stop, pages not
-       started.
+     - Shown at the end: pages written, or pages processed for a batch that stops
+       before Output, then pages failed and, after a stop, pages not started.
 
 How many pages run at once
 --------------------------

@@ -12,7 +12,7 @@ from scantailor.core.batch import BatchEvent, BatchResult, PageDetected, run_bat
 from scantailor.core.models import PageId
 from scantailor.core.page_source import DpiOverrides
 from scantailor.core.project import LayoutDirection
-from scantailor.core.stage_sequence import StageSequence
+from scantailor.core.stage_sequence import FilterStage, StageSequence
 
 
 class _BatchWorker(QtCore.QObject):
@@ -31,6 +31,7 @@ class _BatchWorker(QtCore.QObject):
         cancel: threading.Event,
         dpi_overrides: DpiOverrides,
         file_labels: Mapping[Path, int] | None,
+        end_stage: FilterStage,
     ) -> None:
         super().__init__()
         self._arguments = (stages, pages, output_dir)
@@ -39,6 +40,7 @@ class _BatchWorker(QtCore.QObject):
         self._cancel = cancel
         self._dpi_overrides = dpi_overrides
         self._file_labels = file_labels
+        self._end_stage = end_stage
 
     def _on_event(self, event: BatchEvent) -> None:
         if isinstance(event, PageDetected):
@@ -62,6 +64,7 @@ class _BatchWorker(QtCore.QObject):
                     cancel=self._cancel,
                     dpi_overrides=self._dpi_overrides,
                     file_labels=self._file_labels,
+                    end_stage=self._end_stage,
                 )
             except Exception as error:
                 logger.exception("Batch processing failed")
@@ -114,6 +117,7 @@ class BatchRunner(QtCore.QObject):
         max_workers: int | None = None,
         dpi_overrides: DpiOverrides | None = None,
         file_labels: Mapping[Path, int] | None = None,
+        end_stage: FilterStage = FilterStage.OUTPUT,
     ) -> None:
         """Start a batch on a new thread.
 
@@ -127,6 +131,7 @@ class BatchRunner(QtCore.QObject):
                 resolutions, taken on the calling thread.
             file_labels (Mapping[Path, int] | None): Stored output file labels of
                 the project's source files.
+            end_stage (FilterStage): Last stage to run; only Output writes files.
 
         Raises:
             RuntimeError: If a batch is already running.
@@ -145,6 +150,7 @@ class BatchRunner(QtCore.QObject):
             self._cancel,
             dpi_overrides or {},
             file_labels,
+            end_stage,
         )
         thread = QtCore.QThread(self)
         worker.moveToThread(thread)

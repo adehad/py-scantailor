@@ -56,12 +56,13 @@ def test_the_batch_summary_counts_outcomes_and_names_the_slowest_page() -> None:
         },
         failed={_page("d.tif"): "ValueError: bad"},
     )
+    result.detected = [*result.render_info]
     result.written = dict.fromkeys(result.render_info, Path("out.tif"))
 
     summary = batch._batch_summary(result, 377.0)
 
     assert summary == (
-        "3 written, 1 failed, 0 cancelled in 377.0 s "
+        "3 detected, 3 written, 1 failed, 0 cancelled in 377.0 s "
         "(median page 2.0 s, slowest b.tif 9.4 s)"
     )
 
@@ -101,7 +102,9 @@ def test_a_failed_page_is_logged_once_as_an_error_with_its_traceback(
     assert errors[0]["extra"] == {"page": "scan07.tif/left_page", "stage": "batch"}
     assert errors[0]["exception"].value is error
     end = [r for r in records_with_exceptions if r["message"].startswith("batch end")]
-    assert end[0]["message"].startswith("batch end: 0 written, 1 failed, 0 cancelled")
+    assert end[0]["message"].startswith(
+        "batch end: 0 detected, 0 written, 1 failed, 0 cancelled"
+    )
 
 
 class _PoolThatBreaks:

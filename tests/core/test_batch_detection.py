@@ -23,7 +23,7 @@ from scantailor.core.image_io import write_image
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 from scantailor.core.pipeline import PipelineOptions, fix_aggregate_page_size
 from scantailor.core.stage_params import collect_stage_params
-from scantailor.core.stage_sequence import StageSequence
+from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.page_split.layout_type import LayoutType
@@ -295,3 +295,55 @@ class TestPoolSize:
 
         with spawn_pool(pool_size(None)) as pool:
             assert pool._max_workers >= 1
+
+
+class TestBatchToAnEarlierStage:
+    def test_batch_to_deskew_measures_deskew_but_not_the_content_box(
+        self, tmp_path: Path, detected_sources: list[PageId]
+    ):
+        stages = StageSequence()
+
+        result = run_batch(
+            stages,
+            detected_sources,
+            tmp_path / "out",
+            max_workers=1,
+            end_stage=FilterStage.DESKEW,
+        )
+
+        assert result.detected == detected_sources
+        for page in detected_sources:
+            assert stages.deskew_filter.settings.is_params_set(page)
+            assert not stages.select_content_filter.settings.is_params_set(page)
+
+    def test_batch_to_margins_writes_no_files_and_reports_no_render(
+        self, tmp_path: Path, detected_sources: list[PageId]
+    ):
+        stages = StageSequence()
+        events = []
+
+        result = run_batch(
+            stages,
+            detected_sources,
+            tmp_path / "out",
+            max_workers=1,
+            on_progress=events.append,
+            end_stage=FilterStage.PAGE_LAYOUT,
+        )
+
+        assert not (tmp_path / "out").exists()
+        assert result.written == {}
+        assert sorted(result.detected, key=str) == sorted(detected_sources, key=str)
+        assert all(isinstance(event, PageDetected) for event in events)
+        for page in detected_sources:
+            assert stages.page_layout_filter.settings.is_params_set(page)
+
+    def test_batch_to_output_records_every_detected_page(
+        self, tmp_path: Path, detected_sources: list[PageId]
+    ):
+        result = run_batch(
+            StageSequence(), detected_sources, tmp_path / "out", max_workers=1
+        )
+
+        assert sorted(result.detected, key=str) == sorted(detected_sources, key=str)
+        assert set(result.written) == set(detected_sources)

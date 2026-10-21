@@ -1153,8 +1153,10 @@ def fix_aggregate_page_size(
 
     The final page size depends on the largest aligned page, which is only
     known once every page has been measured. Pixels from this pass are discarded.
+    Detection stops at ``options.end_stage`` when it comes before Margins.
     """
-    geometry_options = replace(options, end_stage=FilterStage.PAGE_LAYOUT)
+    end_stage = min(options.end_stage, FilterStage.PAGE_LAYOUT)
+    geometry_options = replace(options, end_stage=end_stage)
     for image, page_id in images:
         _run_stages(
             image,

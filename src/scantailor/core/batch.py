@@ -151,12 +151,14 @@ class BatchResult:
     """Outcome of a batch run.
 
     Attributes:
+        detected: Pages whose geometry was measured, in the order they finished.
         written: Output path of every page that finished.
         render_info: Geometry of every written page.
         failed: Error text of every page that failed.
         cancelled: Pages that were never started because of cancellation.
     """
 
+    detected: list[PageId] = field(default_factory=list)
     written: dict[PageId, Path] = field(default_factory=dict)
     render_info: dict[PageId, RenderInfo] = field(default_factory=dict)
     failed: dict[PageId, str] = field(default_factory=dict)
@@ -577,6 +579,7 @@ class _PhaseConfig:
     defaults: StageDefaultsData
     default_dpi: float
     tiff_compressions: TiffCompressions = field(default_factory=TiffCompressions)
+    end_stage: FilterStage = FilterStage.OUTPUT
 
 
 @dataclass(frozen=True)
@@ -611,7 +614,10 @@ def _detect_page(job: _PageJob) -> StageParamsData:
         stages = _worker_stages_for(job.config)
         overrides = {job.page.image_id: job.dpi_override} if job.dpi_override else None
         loaded = load_page(job.page.image_id, overrides)
-        options = PipelineOptions(dpi=loaded.horizontal_dpi(job.config.default_dpi))
+        options = PipelineOptions(
+            dpi=loaded.horizontal_dpi(job.config.default_dpi),
+            end_stage=job.config.end_stage,
+        )
         fix_aggregate_page_size([(loaded.pixels, job.page)], stages, options)
         return _dump_entries(collect_stage_params(stages, [job.page]))
 
@@ -626,8 +632,9 @@ def _detect_geometry(
     cancel: Event | None,
     report: Callable[[BatchEvent], None],
     result: BatchResult,
+    end_stage: FilterStage,
 ) -> list[PageId]:
-    """Detect every page's geometry on the pool and store it in ``stages``.
+    """Detect every page's geometry up to ``end_stage`` and store it in ``stages``.
 
     Pages that cannot be measured are reported as failed and dropped; pages
     never started because of cancellation go to ``result.cancelled``. The
@@ -643,6 +650,7 @@ def _detect_geometry(
         stage_params=_dump_entries(collect_stage_params(stages, list(pages))),
         defaults=collect_stage_defaults(stages),
         default_dpi=default_dpi,
+        end_stage=end_stage,
     )
     jobs = [
         _PageJob(page, config, dpi_override=overrides.get(page.image_id))
@@ -764,13 +772,15 @@ def run_batch(
     executor: ProcessPoolExecutor | None = None,
     tiff_compressions: TiffCompressions | None = None,
     file_labels: Mapping[Path, int] | None = None,
+    end_stage: FilterStage = FilterStage.OUTPUT,
 ) -> BatchResult:
-    """Process pages through the full pipeline and write them as TIFFs.
+    """Process pages through the pipeline up to ``end_stage``.
 
     Geometry detection runs per page on the worker pool and fills ``stages``
-    with each page's detected parameters. Rendering then reuses the same pool,
-    whose workers receive the effective parameters of every page, defaults
-    included, as JSON-compatible data.
+    with each page's detected parameters. When ``end_stage`` is Output,
+    rendering then reuses the same pool, whose workers receive the effective
+    parameters of every page, defaults included, as JSON-compatible data, and
+    write each page as a TIFF. A batch that ends earlier writes no files.
 
     Args:
         stages (StageSequence): Settings of the project; updated by detection.
@@ -798,6 +808,7 @@ def run_batch(
         file_labels (Mapping[pathlib.Path, int] | None):
             Stored output file labels of the
             sources, as in ``output_file_names``.
+        end_stage (FilterStage): Last stage to run. Only Output renders.
 
     Returns:
         BatchResult: Written, failed and never-started pages.
@@ -820,6 +831,8 @@ def run_batch(
                     stages.output_filter.settings.set_post_deskew_angle(
                         event.page, event.info.post_deskew_angle
                     )
+        elif isinstance(event, PageDetected):
+            result.detected.append(event.page)
         elif isinstance(event, PageFailed):
             result.failed[event.page] = event.error
         if on_progress is not None:
@@ -828,7 +841,12 @@ def run_batch(
     workers = pool_size(max_workers)
     started = time.perf_counter()
     with logger.contextualize(stage="batch"):
-        logger.info("batch start: {} pages, {} workers", len(pages), workers)
+        logger.info(
+            "batch start: {} pages to {}, {} workers",
+            len(pages),
+            end_stage.name.lower(),
+            workers,
+        )
     with ExitStack() as stack:
         pool = executor or stack.enter_context(spawn_pool(workers))
         ready = _detect_geometry(
@@ -841,48 +859,27 @@ def run_batch(
             cancel,
             report,
             result,
+            end_stage,
         )
-        names = output_file_names(pages, layout_direction, file_labels)
-        overrides = dpi_overrides or {}
-        config = _PhaseConfig(
-            token=uuid.uuid4().hex,
-            stage_params=collect_effective_stage_params(stages, ready),
-            defaults=collect_stage_defaults(stages),
-            default_dpi=default_dpi,
-            tiff_compressions=compressions,
-        )
-        jobs = [
-            _PageJob(
-                page,
-                config,
-                Path(output_dir) / names[page],
-                overrides.get(page.image_id),
+        if end_stage == FilterStage.OUTPUT:
+            _render_ready_pages(
+                ready,
+                _PhaseConfig(
+                    token=uuid.uuid4().hex,
+                    stage_params=collect_effective_stage_params(stages, ready),
+                    defaults=collect_stage_defaults(stages),
+                    default_dpi=default_dpi,
+                    tiff_compressions=compressions,
+                ),
+                output_file_names(pages, layout_direction, file_labels),
+                Path(output_dir),
+                dpi_overrides or {},
+                pool,
+                workers,
+                cancel,
+                report,
+                result,
             )
-            for page in ready
-        ]
-
-        def on_outcome(
-            job: _PageJob,
-            rendered: tuple[Path, RenderInfo] | None,
-            error: BaseException | None,
-        ) -> None:
-            if rendered is not None:
-                report(PageDone(job.page, *rendered))
-            else:
-                error = error or RuntimeError("no result")
-                _log_page_failure(job.page, "render", error)
-                report(PageFailed(job.page, _describe(error)))
-
-        unscheduled = run_pool(
-            _render_page,
-            jobs,
-            on_outcome,
-            max_workers=workers,
-            cancel=cancel,
-            executor=pool,
-            name_job=_job_page_name,
-        )
-    result.cancelled.extend(job.page for job in unscheduled)
     with logger.contextualize(stage="batch"):
         logger.info(
             "batch end: {}", _batch_summary(result, time.perf_counter() - started)
@@ -890,10 +887,69 @@ def run_batch(
     return result
 
 
+def _render_ready_pages(
+    ready: Sequence[PageId],
+    config: _PhaseConfig,
+    names: Mapping[PageId, str],
+    output_dir: Path,
+    dpi_overrides: DpiOverrides,
+    pool: ProcessPoolExecutor,
+    workers: int,
+    cancel: Event | None,
+    report: Callable[[BatchEvent], None],
+    result: BatchResult,
+) -> None:
+    """Render the measured pages on the pool and write each one as a TIFF.
+
+    Args:
+        ready (Sequence[PageId]): Pages to render, in project order.
+        config (_PhaseConfig): Plain-data settings handed to the workers.
+        names (Mapping[PageId, str]): Output file name of every page.
+        output_dir (pathlib.Path): Directory for the output files.
+        dpi_overrides (DpiOverrides): Project resolutions of the images.
+        pool (concurrent.futures.ProcessPoolExecutor): Workers to render on.
+        workers (int): Size of ``pool``.
+        cancel (threading.Event | None): Stops further pages from starting.
+        report (Callable[[BatchEvent], None]): Receives a ``PageDone`` or
+            ``PageFailed`` per attempted page.
+        result (BatchResult): Gets the pages never started.
+    """
+    jobs = [
+        _PageJob(
+            page, config, output_dir / names[page], dpi_overrides.get(page.image_id)
+        )
+        for page in ready
+    ]
+
+    def on_outcome(
+        job: _PageJob,
+        rendered: tuple[Path, RenderInfo] | None,
+        error: BaseException | None,
+    ) -> None:
+        if rendered is not None:
+            report(PageDone(job.page, *rendered))
+        else:
+            error = error or RuntimeError("no result")
+            _log_page_failure(job.page, "render", error)
+            report(PageFailed(job.page, _describe(error)))
+
+    unscheduled = run_pool(
+        _render_page,
+        jobs,
+        on_outcome,
+        max_workers=workers,
+        cancel=cancel,
+        executor=pool,
+        name_job=_job_page_name,
+    )
+    result.cancelled.extend(job.page for job in unscheduled)
+
+
 def _batch_summary(result: BatchResult, seconds: float) -> str:
     """Count a batch's outcomes and name its slowest page, for the log."""
     text = (
-        f"{len(result.written)} written, {len(result.failed)} failed, "
+        f"{len(result.detected)} detected, {len(result.written)} written, "
+        f"{len(result.failed)} failed, "
         f"{len(result.cancelled)} cancelled in {seconds:.1f} s"
     )
     timings = {page: info.seconds for page, info in result.render_info.items()}
