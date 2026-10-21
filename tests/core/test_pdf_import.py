@@ -10,6 +10,7 @@ import pytest
 from scantailor.core.image_io import load_image
 from scantailor.core.models import ImageId
 from scantailor.core.pdf_import import (
+    _name_pages,
     clear_rendered_pages,
     import_pdf,
     page_count,
@@ -205,3 +206,13 @@ def test_a_cancelled_range_keeps_the_pages_already_there(tmp_path):
         )
 
     assert {p.name: p.read_bytes() for p in rendered_pages(folder)} == before
+
+
+@pytest.mark.parametrize(
+    ("indices", "name"),
+    [((0,), "PDF page 1"), ((16, 17, 18), "PDF pages 17-19")],
+)
+def test_a_render_job_is_named_by_its_one_based_pages(
+    indices: tuple[int, ...], name: str
+) -> None:
+    assert _name_pages(indices) == name
