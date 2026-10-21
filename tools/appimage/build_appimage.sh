@@ -28,11 +28,13 @@ chmod +x "$work/appimagetool"
 
 appdir="$work/AppDir"
 mkdir -p "$appdir/usr/lib" "$appdir/usr/share/applications" "$appdir/usr/share/metainfo" \
-  "$appdir/usr/share/icons/hicolor/256x256/apps" "$appdir/usr/share/icons/hicolor/scalable/apps"
+  "$appdir/usr/share/icons/hicolor/256x256/apps" "$appdir/usr/share/icons/hicolor/scalable/apps" \
+  "$appdir/usr/share/mime/packages"
 cp -a "$bundle" "$appdir/usr/lib/ScanTailor"
 install -m 755 "$here/AppRun" "$appdir/AppRun"
 install -m 644 "$here/$app_id.desktop" "$appdir/$app_id.desktop"
 install -m 644 "$here/$app_id.desktop" "$appdir/usr/share/applications/$app_id.desktop"
+install -m 644 "$resources/unix/mime/scantailor-project.xml" "$appdir/usr/share/mime/packages/$app_id.xml"
 install -m 644 "$here/$app_id.appdata.xml" "$appdir/usr/share/metainfo/$app_id.appdata.xml"
 install -m 644 "$resources/ScanTailor.png" "$appdir/scantailor.png"
 install -m 644 "$resources/ScanTailor.png" "$appdir/usr/share/icons/hicolor/256x256/apps/scantailor.png"
