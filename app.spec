@@ -72,6 +72,15 @@ def _analyse(script: str) -> "Analysis":
     )
 
 
+def _without_video_backend(binaries: list) -> list:
+    """Drop OpenCV's ffmpeg plugin (30 MB on Windows).
+
+    OpenCV loads it only when a VideoCapture or VideoWriter opens a file, and
+    nothing in the application reads or writes video.
+    """
+    return [entry for entry in binaries if "opencv_videoio_ffmpeg" not in entry[0]]
+
+
 gui = _analyse("scantailor_gui.py")
 cli = _analyse("scantailor_cli.py")
 
@@ -97,10 +106,10 @@ cli_exe = EXE(
 # UPX stays off everywhere: it corrupts some Qt and Control Flow Guard DLLs.
 coll = COLLECT(
     gui_exe,
-    gui.binaries,
+    _without_video_backend(gui.binaries),
     gui.datas,
     cli_exe,
-    cli.binaries,
+    _without_video_backend(cli.binaries),
     cli.datas,
     upx=False,
     name="ScanTailor",
