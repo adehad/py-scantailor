@@ -64,6 +64,12 @@ def _touch(path: Path, mtime: float, text: str = "x\n") -> Path:
     return path
 
 
+@pytest.fixture
+def no_session_running(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Treat every test log as finished, whatever process holds its pid now."""
+    monkeypatch.setattr(diagnostics, "_is_live", lambda path: False)
+
+
 def _session_log(folder: Path, index: int, kind: str = "gui", text: str = "") -> Path:
     name = f"{kind}-20260101-{index:06d}-{1000 + index}.log"
     return _touch(folder / name, 1_000_000 + index, text or "a line\n")
@@ -208,6 +214,7 @@ class TestCleanExitMarker:
 
         assert not diagnostics.ended_cleanly(path)
 
+    @pytest.mark.usefixtures("no_session_running")
     def test_the_newest_finished_session_without_the_marker_is_reported(
         self, tmp_path: Path
     ):
@@ -216,6 +223,7 @@ class TestCleanExitMarker:
 
         assert diagnostics.previous_unclean_session(tmp_path, "gui") == crashed
 
+    @pytest.mark.usefixtures("no_session_running")
     def test_an_older_crash_is_not_reported_after_a_clean_session(self, tmp_path: Path):
         _session_log(tmp_path, 0, text="working\n")
         _session_log(tmp_path, 1, text=ENDED)
@@ -231,6 +239,7 @@ class TestCleanExitMarker:
 
         assert diagnostics.previous_unclean_session(tmp_path, "gui") == crashed
 
+    @pytest.mark.usefixtures("no_session_running")
     def test_own_log_rotated_files_and_other_kinds_are_ignored(self, tmp_path: Path):
         _session_log(tmp_path, 0, text=ENDED)
         own = _session_log(tmp_path, 1, text="working\n")
@@ -309,6 +318,7 @@ class TestConfigureLogging:
         assert "| scan03.tif |" in lines[-2]
         assert lines[-2].endswith("| sent by a worker")
 
+    @pytest.mark.usefixtures("no_session_running")
     def test_a_previous_unclean_session_is_named_at_start_up(
         self, log_folder: Path, restore_process_state: None
     ):
