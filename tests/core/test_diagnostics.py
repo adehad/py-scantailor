@@ -16,7 +16,7 @@ from loguru import logger
 from PySide6 import QtCore
 
 from scantailor.__about__ import APP_NAME
-from scantailor.core import diagnostics
+from scantailor.core import diagnostics, worker_log
 
 # Bound before the autouse no_process_diagnostics fixture replaces the module
 # attribute, so these tests exercise the real function.
@@ -148,6 +148,20 @@ class TestPruneLogs:
         assert window_log.exists()
         assert len(list(tmp_path.glob("cli-*.log"))) == 10
 
+    def test_worker_crash_files_do_not_evict_the_window_crash_file(
+        self, tmp_path: Path
+    ):
+        window_crash = _touch(tmp_path / "crash-gui-0.log", 1_000_000)
+        workers = [
+            _touch(tmp_path / f"crash-worker-{index}.log", 2_000_000 + index)
+            for index in range(16)
+        ]
+
+        deleted = diagnostics.prune_logs(tmp_path)
+
+        assert window_crash.exists()
+        assert sorted(deleted) == sorted(workers[:6])
+
     def test_oldest_files_go_until_the_folder_fits_its_budget(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ):
@@ -277,6 +291,23 @@ class TestConfigureLogging:
         assert session.log_file is not None
         assert diagnostics.ended_cleanly(session.log_file)
         assert not session.crash_file.exists()
+
+    def test_workers_log_into_the_session_until_it_ends(
+        self, log_folder: Path, restore_process_state: None
+    ):
+        session = configure_logging("gui", stderr_level="CRITICAL")
+        forwarded = worker_log.worker_logging()
+        assert forwarded is not None
+        assert forwarded.folder == log_folder
+
+        forwarded.logger.bind(page="scan03.tif").info("sent by a worker")
+        session.end()
+
+        assert worker_log.worker_logging() is None
+        assert session.log_file is not None
+        lines = session.log_file.read_text(encoding="utf-8").splitlines()
+        assert "| scan03.tif |" in lines[-2]
+        assert lines[-2].endswith("| sent by a worker")
 
     def test_a_previous_unclean_session_is_named_at_start_up(
         self, log_folder: Path, restore_process_state: None
