@@ -5,6 +5,7 @@ import pathlib
 from loguru import logger
 from PySide6 import QtCore, QtGui, QtWidgets
 
+from .__about__ import APP_NAME, __version__
 from .app._ui import resources_rc
 from .app.ui.MainWindow import MainWindowManager
 from .app.ui.theme import apply_theme
@@ -23,6 +24,18 @@ def setup_qcore():
 
 
 APP_ICON = ":/appicon.svg"
+ORGANIZATION_NAME = "ScanTailor"
+
+
+def set_application_identity() -> None:
+    """Name the organisation and application that QSettings files preferences under.
+
+    Without both names QSettings has nowhere to store values: writes are
+    dropped and every preference is back to its default on the next start.
+    """
+    QtCore.QCoreApplication.setOrganizationName(ORGANIZATION_NAME)
+    QtCore.QCoreApplication.setApplicationName(APP_NAME)
+    QtCore.QCoreApplication.setApplicationVersion(__version__)
 
 
 def set_window_icon(app: QtWidgets.QApplication) -> None:
@@ -73,6 +86,7 @@ def main() -> int:
     session = diagnostics.configure_logging("gui", stderr_level="INFO")
     restore_qt_handler = diagnostics.install_qt_message_handler()
     setup_qcore()
+    set_application_identity()
     app = QtWidgets.QApplication([])
     app.aboutToQuit.connect(restore_qt_handler)
     logger.info("Qt platform {}, style {}", app.platformName(), app.style().name())
