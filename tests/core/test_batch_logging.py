@@ -157,7 +157,7 @@ def test_a_broken_pool_names_the_running_pages_apart_from_those_never_started(
     assert died[0]["level"] == "ERROR"
     assert died[0]["message"] == (
         "worker process died; running: scan07.tif, scan08.tif/left_page; "
-        "3 pages not started"
+        "3 more not started"
     )
     assert died[0]["extra"]["stage"] == "batch"
 

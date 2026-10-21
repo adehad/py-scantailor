@@ -37,6 +37,7 @@ def map_pool_progress[Job, Result](
     *,
     cancel: Event | None = None,
     on_done: Callable[[int, Job, Result], None] | None = None,
+    name_job: Callable[[int, Job], str] | None = None,
 ) -> list[Result]:
     """Run ``function`` over ``jobs`` on a pool and return results in job order.
 
@@ -51,6 +52,10 @@ def map_pool_progress[Job, Result](
         cancel (threading.Event | None): Stops further jobs from being scheduled.
         on_done (Callable[[int, Any, Any], None] | None): Called from this
             thread with each finished job's position, the job and its result.
+        name_job (Callable[[int, Any], str] | None): Names a job from its
+            position and the job in the log line written when a worker process
+            dies; runs in this process. Jobs are named ``PDF page <n>``, counted
+            from 1, when None.
 
     Returns:
         list[Any]: One result per job, in job order.
@@ -78,6 +83,12 @@ def map_pool_progress[Job, Result](
         if on_done is not None:
             on_done(index, request[2], outcome[1])
 
+    def name_request(request: tuple[Callable[[Job], Result], int, Job]) -> str:
+        _, index, job = request
+        if name_job is None:
+            return f"PDF page {index + 1}"
+        return name_job(index, job)
+
     unscheduled = run_pool(
         _call_indexed,
         requests,
@@ -85,6 +96,7 @@ def map_pool_progress[Job, Result](
         max_workers=max_workers,
         cancel=cancel,
         executor=executor,
+        name_job=name_request,
     )
     if errors:
         raise errors[min(errors)]

@@ -132,6 +132,13 @@ def _split_into_jobs(
     ]
 
 
+def _name_pages(indices: tuple[int, ...]) -> str:
+    """Name a run of zero-based page indices as one-based PDF pages."""
+    if len(indices) == 1:
+        return f"PDF page {indices[0] + 1}"
+    return f"PDF pages {indices[0] + 1}-{indices[-1] + 1}"
+
+
 def _render_all(
     pdf_path: Path,
     staging: Path,
@@ -168,6 +175,7 @@ def _render_all(
         max_workers,
         cancel=cancel,
         on_done=lambda _index, _job, written: finish_pages(len(written)),
+        name_job=lambda _index, job: _name_pages(job.indices),
     )
     return [name for run in runs for name in run]
 
