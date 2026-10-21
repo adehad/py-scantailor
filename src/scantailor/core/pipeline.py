@@ -665,8 +665,11 @@ def _process_deskew(
 
     params = filter_.get_params(page_id)
     if detect and params.is_manual() and params.dependencies != dependencies:
-        params = params.model_copy(update={"dependencies": dependencies})
-        filter_.set_params(page_id, params)
+        recorded = params.model_copy(update={"dependencies": dependencies})
+        if filter_.settings.replace_params(page_id, params, recorded):
+            params = recorded
+        else:
+            params = filter_.get_params(page_id)
     state.apply_deskew(filter_, params)
     return {
         "skew_angle": params.deskew_angle_deg,
