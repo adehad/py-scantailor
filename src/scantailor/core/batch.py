@@ -482,14 +482,14 @@ def _broke_the_pool(future: Future[Any]) -> bool:
 
 
 def _log_broken_pool(running: Sequence[str], not_started: int) -> None:
-    """Name the pages a dead worker process took down with the pool.
+    """Name the jobs a dead worker process took down with the pool.
 
     Every running job fails with the same error, so only the crash file and the
-    last line a worker forwarded tell which page caused it.
+    last line a worker forwarded tell which job caused it.
     """
     text = (
         f"worker process died; running: {', '.join(running)}; "
-        f"{not_started} pages not started"
+        f"{not_started} more not started"
     )
     forwarded = worker_logging()
     if forwarded is not None and forwarded.folder is not None:
