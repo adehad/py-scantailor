@@ -5,8 +5,9 @@ from numpy.typing import NDArray
 
 _MIN_LEVEL = 2
 _MAX_LEVEL = 255
-# A level is kept when at least this share of the pixels has it in some channel,
-# which discards sensor noise at the ends of the range. Must stay below 1/256.
+# Share of the pixels each end of the range may drop as sensor noise. Counted
+# cumulatively, not per level: scanned ink is spread thinly over dozens of levels
+# and no single dark level would reach it.
 _NOISE_SHARE = 0.0005
 # Saturation-times-value below this (scaled by how strong the colour is) marks a
 # colour as gray.
@@ -127,10 +128,20 @@ def _normalize_palette(
     black_level: int,
     white_level: int,
 ) -> NDArray[np.int64]:
-    """Stretch the channel levels that carry at least a noise share of pixels.
+    """Stretch the channel range left after dropping a noise share at each end.
 
     Pure black and pure white are excluded from the stretch and kept as they are,
     but they count towards the range at the levels given for them.
+
+    Args:
+        palette (NDArray[np.int64]): (n, 3) distinct RGB colours, 0 to 255.
+        counts (NDArray[np.int64]): (n,) pixels of each colour.
+        pixel_count (int): Pixels in the image.
+        black_level (int): Level at which pure black pixels count.
+        white_level (int): Level at which pure white pixels count.
+
+    Returns:
+        NDArray[np.int64]: (n, 3) stretched colours, 0 to 255, in palette order.
     """
     is_black = ~palette.any(axis=1)
     is_white = (palette == 255).all(axis=1)
@@ -143,8 +154,11 @@ def _normalize_palette(
         )
     histogram[:, black_level] += counts[is_black].sum()
     histogram[:, white_level] += counts[is_white].sum()
-    occupied = np.flatnonzero((histogram / pixel_count >= _NOISE_SHARE).any(axis=0))
-    low, high = int(occupied[0]), int(occupied[-1])
+    share = histogram / pixel_count
+    at_or_below = np.cumsum(share, axis=1)
+    at_or_above = np.cumsum(share[:, ::-1], axis=1)[:, ::-1]
+    low = int(np.flatnonzero((at_or_below >= _NOISE_SHARE).any(axis=0))[0])
+    high = int(np.flatnonzero((at_or_above >= _NOISE_SHARE).any(axis=0))[-1])
 
     if high <= low:
         return palette.copy()
