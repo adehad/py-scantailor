@@ -54,21 +54,18 @@ def test_a_full_run_logs_one_info_line_per_stage_with_page_stage_and_time(
     assert info[1]["message"].startswith("auto: single-uncut")
 
 
-def test_a_render_after_the_geometry_pass_replays_earlier_stages_at_debug(
+def test_a_render_after_the_geometry_pass_does_not_repeat_earlier_stages(
     log_records: list[dict[str, Any]],
 ) -> None:
     process_batch([(_page_pixels(), _page())], StageSequence(), PipelineOptions())
 
-    replayed = [
-        record["extra"]["stage"] for record in _stage_lines(log_records, "DEBUG")
+    summaries = [
+        record["extra"]["stage"]
+        for record in log_records
+        if record["message"].endswith(" s")
     ]
-    assert replayed == [
-        "fix_orientation",
-        "page_split",
-        "deskew",
-        "select_content",
-        "page_layout",
-    ]
+    assert len(summaries) == len(set(summaries)) == len(FilterStage)
+    assert _stage_lines(log_records, "DEBUG") == []
 
 
 def test_a_view_of_one_stage_logs_only_that_stage_at_info(
