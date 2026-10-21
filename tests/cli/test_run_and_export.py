@@ -35,10 +35,12 @@ def test_tiff_export_before_run_has_nothing_to_copy(
 
 @pytest.mark.slow
 def test_run_writes_one_tiff_per_page_and_status_reports_them(
-    project_path: Path,
+    project_path: Path, log_messages: list[str]
 ) -> None:
     report = run_project(project_path, max_workers=1)
 
+    batch_lines = [line for line in log_messages if line.lower().startswith("batch")]
+    assert [line.split(":")[0] for line in batch_lines] == ["batch start", "batch end"]
     assert report.written == 2
     assert report.failed == {}
     assert report.cancelled == 0
