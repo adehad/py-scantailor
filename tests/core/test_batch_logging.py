@@ -77,7 +77,7 @@ def test_a_failed_page_is_logged_once_as_an_error_with_its_traceback(
     try:
         raise ValueError("content area exceeds the image")
     except ValueError as cause:
-        error = BrokenProcessPool("worker failed")
+        error = RuntimeError("worker failed")
         error.__cause__ = cause
 
     def failing_pool(function: Any, jobs: Any, on_outcome: Any, **kwargs: Any) -> list:
@@ -189,3 +189,33 @@ def test_a_pool_without_job_names_logs_no_line_when_it_breaks(
     assert not any(
         r["message"].startswith("worker process died") for r in records_with_exceptions
     )
+
+
+@pytest.mark.parametrize("phase", ["geometry pass", "render"])
+def test_pages_failed_by_a_broken_pool_log_one_line_each_and_no_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    records_with_exceptions: list[dict[str, Any]],
+    phase: str,
+) -> None:
+    pages = [_page(f"scan{index:02}.tif") for index in range(1, 6)]
+    if phase == "render":
+        monkeypatch.setattr(
+            batch, "_detect_geometry", lambda stages, pages, *args: list(pages)
+        )
+
+    result = run_batch(
+        StageSequence(),
+        pages,
+        tmp_path / "out",
+        max_workers=2,
+        executor=_PoolThatBreaks(2),  # type: ignore[arg-type]
+    )
+
+    assert set(result.failed) == set(pages)
+    errors = [r for r in records_with_exceptions if r["level"] == "ERROR"]
+    page_lines = [r for r in errors if r["message"].startswith(f"{phase} failed")]
+    assert len(page_lines) == len(pages)
+    assert all("BrokenProcessPool" in r["message"] for r in page_lines)
+    assert [r["message"] for r in errors if r["exception"] is not None] == []
+    assert sum(r["message"].startswith("worker process died;") for r in errors) == 1
