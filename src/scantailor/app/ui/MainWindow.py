@@ -81,6 +81,10 @@ from scantailor.app.ui.widgets.error_widget import ErrorWidget, load_failure_mes
 from scantailor.app.ui.widgets.processing_indicator import ProcessingIndicator
 from scantailor.app.ui.widgets.stage_list_view import StageListView
 from scantailor.app.ui.widgets.status_bar_panel import StatusBarPanel
+from scantailor.app.ui.window_geometry import (
+    restore_window_geometry,
+    save_window_geometry,
+)
 from scantailor.core import diagnostics, propagation
 from scantailor.core.batch import (
     BatchResult,
@@ -598,14 +602,12 @@ class MainWindowManager:
         # to a widget.
         self.ui.addActions(self._shortcut_actions())
 
-        self._close_guard = _CloseGuard(self._close_project_interactive, self.ui)
+        self._close_guard = _CloseGuard(self._accept_close, self.ui)
         self.ui.installEventFilter(self._close_guard)
         self._language_watcher = LanguageChangeWatcher(self._retranslate, self.ui)
         self.ui.installEventFilter(self._language_watcher)
 
-        # if self.settings.value("mainWindow/maximized") == False:
-        #    if not self.restoreGeometry(geom.toByteArray()):
-        #        pass
+        self._show_maximized = restore_window_geometry(self.ui, self.settings)
 
         # Additional setup (from C++ constructor)
         # self.setupThumbView()
@@ -3060,10 +3062,24 @@ class MainWindowManager:
 
     def quit(self, _clicked: bool = False) -> None:
         """Quit the application after offering to save unsaved changes."""
-        if self._close_project_interactive():
+        if self._accept_close():
             self.closing = True
             QtWidgets.QApplication.instance().quit()  # type: ignore[union-attr]
 
-    def show(self):
-        """Show the window."""
-        self.ui.show()
+    def _accept_close(self) -> bool:
+        """Close the project interactively and, unless cancelled, save the geometry.
+
+        Returns:
+            bool: True when the window may close.
+        """
+        if not self._close_project_interactive():
+            return False
+        save_window_geometry(self.ui, self.settings)
+        return True
+
+    def show(self) -> None:
+        """Show the window, maximised if it was maximised when it last closed."""
+        if self._show_maximized:
+            self.ui.showMaximized()
+        else:
+            self.ui.show()
