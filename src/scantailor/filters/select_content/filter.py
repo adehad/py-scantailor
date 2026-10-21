@@ -147,7 +147,8 @@ class Filter:
             image: Grayscale or color image.
             page_id: Page identifier.
             dpi: Image resolution.
-            store_result: Whether to store the result in settings.
+            store_result: Whether to store the result in settings, unless the
+                page's parameters changed while it was being detected.
             outside: Mask of the pixels that have no source pixel behind them
                 (corners exposed by a rotation); they are treated as shadow.
             page_box: Area of the page in pixels of ``image``.
@@ -157,6 +158,7 @@ class Filter:
         Returns:
             ContentDetectionResult with detected box and confidence.
         """
+        params = self.get_params(page_id)
         result = find_content_box(
             image,
             dpi=dpi,
@@ -166,11 +168,10 @@ class Filter:
         )
 
         if store_result:
-            params = self.get_params(page_id)
             new_params = params.with_content_box(
                 result.content_box, ContentDetectionMode.AUTO
             )
-            self.set_params(page_id, new_params)
+            self._settings.replace_params(page_id, params, new_params)
 
         return result
 
@@ -191,7 +192,8 @@ class Filter:
             image (numpy.ndarray of numpy.uint8): Grayscale or color image.
             page_id (PageId): Page identifier.
             dpi (float): Image resolution.
-            store_result (bool): Whether to store the result in settings.
+            store_result (bool): Whether to store the result in settings,
+                unless the page's parameters changed while it was being detected.
             outside (numpy.ndarray of numpy.bool | None): Pixels of ``image``
                 with no source pixel behind them, or a function making them;
                 they count as background around the paper.
@@ -214,7 +216,7 @@ class Filter:
 
         if store_result:
             new_params = params.with_page_box(page_box, PageDetectionMode.AUTO)
-            self.set_params(page_id, new_params)
+            self._settings.replace_params(page_id, params, new_params)
 
         return page_box
 
@@ -296,12 +298,15 @@ class Filter:
                 makes; required with a function, ignored with an array.
 
         Returns:
-            Updated parameters with detected/stored boxes.
+            Updated parameters with detected/stored boxes. When the page's
+            parameters changed while it was processed, they are kept and
+            returned instead of the result.
 
         Raises:
             ValueError: If ``image`` is a function and ``image_size`` is None.
         """
-        params = self.get_params(page_id)
+        started = self.get_params(page_id)
+        params = started
         if callable(image):
             if image_size is None:
                 msg = "image_size is required when image is a function"
@@ -316,17 +321,17 @@ class Filter:
         # Handle page detection
         if params.is_page_auto():
             if update_page:
-                self.detect_page(_made(image), page_id, dpi=dpi, outside=outside)
-                params = self.get_params(page_id)
+                page_box = self.detect_page(
+                    _made(image), page_id, dpi=dpi, store_result=False, outside=outside
+                )
+                params = params.with_page_box(page_box, PageDetectionMode.AUTO)
                 update_content = update_content or not _content_within_page(params)
         elif params.is_page_disabled():
             page_box = PageBox.from_image_size(w, h)
             params = params.with_page_box(page_box, PageDetectionMode.DISABLED)
-            self.set_params(page_id, params)
         elif to_new_view is not None and not params.page_box.is_empty():
             page_box = _mapped_page_box(params.page_box, to_new_view, w, h)
             params = params.with_page_box(page_box)
-            self.set_params(page_id, params)
 
         if (
             to_new_view is not None
@@ -340,20 +345,22 @@ class Filter:
         # Handle content detection
         if params.is_content_auto():
             if update_content:
-                self.detect_content(
+                result = self.detect_content(
                     _made(image),
                     page_id,
                     dpi=dpi,
+                    store_result=False,
                     outside=outside,
                     page_box=params.page_box.to_content_box(),
                     outside_key=outside_key,
                 )
-                params = self.get_params(page_id)
+                params = params.with_content_box(
+                    result.content_box, ContentDetectionMode.AUTO
+                )
         elif params.is_content_disabled():
             # Use page box as content
             content_box = params.page_box.to_content_box()
             params = params.with_content_box(content_box, ContentDetectionMode.DISABLED)
-            self.set_params(page_id, params)
 
         # Ensure content is within page
         params = params.ensure_content_within_page()
@@ -381,8 +388,9 @@ class Filter:
             }
         )
 
-        self.set_params(page_id, params)
-        return params
+        if self._settings.replace_params(page_id, started, params):
+            return params
+        return self.get_params(page_id)
 
     def set_manual_content(self, page_id: PageId, content_box: ContentBox) -> Params:
         """Set content box manually.
