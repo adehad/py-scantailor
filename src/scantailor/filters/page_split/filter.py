@@ -173,7 +173,8 @@ class Filter:
             image: The image to analyze (grayscale or color).
             page_id: The page ID to associate with the result.
             dpi: Image resolution in dots per inch.
-            store_result: If True, store the result in settings.
+            store_result: If True, store the result in settings, unless the
+                page's parameters changed while it was being detected.
             rotation_degrees: Orthogonal rotation already applied to ``image``;
                 recorded so a later rotation change invalidates the result.
             bw_threshold: Gray level below which a pixel is black, when the page
@@ -198,7 +199,7 @@ class Filter:
             new_params = params.with_auto_layout(result.layout).model_copy(
                 update={"dependencies": dependencies}
             )
-            self._settings.set_params(page_id, new_params)
+            self._settings.replace_params(page_id, params, new_params)
 
         return result
 
@@ -426,7 +427,8 @@ class Filter:
                 trim keeps; None when there is no trim.
 
         Returns:
-            The updated parameters.
+            The updated parameters. When the page's parameters changed while it
+            was processed, they are kept and returned instead of the result.
         """
         params = self.get_params(page_id)
         layout = params.page_layout
@@ -460,14 +462,15 @@ class Filter:
             new_layout = adapt_page_layout(layout, outline)
 
         new_type = new_layout.to_layout_type()
-        params = Params(
+        new_params = Params(
             layout_type=new_type,
             page_layout=new_layout,
             split_line_mode=params.split_line_mode,
             dependencies=current.model_copy(update={"layout_type": new_type}),
         )
-        self._settings.set_params(page_id, params)
-        return params
+        if self._settings.replace_params(page_id, params, new_params):
+            return new_params
+        return self.get_params(page_id)
 
     def _detect(
         self,
