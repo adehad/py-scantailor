@@ -124,6 +124,47 @@ class TestSettings:
         assert settings.get_params(page2).layout_type == LayoutType.SINGLE_PAGE_UNCUT
 
 
+class TestReplaceParams:
+    def test_a_result_computed_from_the_default_params_is_stored(self):
+        settings = Settings()
+        page_id = make_page_id()
+        detected = Params(layout_type=LayoutType.TWO_PAGES)
+
+        stored = settings.replace_params(
+            page_id, settings.get_params(page_id), detected
+        )
+
+        assert stored
+        assert settings.get_params(page_id) == detected
+
+    def test_a_result_computed_before_the_page_changed_is_dropped(self):
+        settings = Settings()
+        page_id = make_page_id()
+        started_from = settings.get_params(page_id)
+        chosen = Params(layout_type=LayoutType.SINGLE_PAGE_UNCUT)
+        settings.set_params(page_id, chosen)
+
+        stored = settings.replace_params(
+            page_id, started_from, Params(layout_type=LayoutType.TWO_PAGES)
+        )
+
+        assert not stored
+        assert settings.get_params(page_id) == chosen
+
+    def test_a_default_layout_type_changed_meanwhile_drops_the_result(self):
+        settings = Settings()
+        page_id = make_page_id()
+        started_from = settings.get_params(page_id)
+        settings.set_default_layout_type(LayoutType.PAGE_PLUS_OFFCUT)
+
+        stored = settings.replace_params(
+            page_id, started_from, Params(layout_type=LayoutType.TWO_PAGES)
+        )
+
+        assert not stored
+        assert not settings.is_params_set(page_id)
+
+
 class TestSettingsConcurrency:
     """Concurrent access must not lose writes or raise."""
 
