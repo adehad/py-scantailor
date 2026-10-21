@@ -6,8 +6,11 @@ operate in automatic mode (detecting it) or manual mode (using user-specified
 angles).
 """
 
+from dataclasses import replace
+
 import cv2
 import numpy as np
+from loguru import logger
 from numpy.typing import NDArray
 
 from scantailor.core.models import Dpi, PageId
@@ -204,12 +207,20 @@ class Filter:
         if not self.content_based:
             # The dark surround along the top is the edge to find; the shadow
             # cleanup erases it.
-            result = find_skew_from_top_edge(
-                binary, max_angle=max_angle, min_angle=self.DEFAULT_MIN_ANGLE
+            result = replace(
+                find_skew_from_top_edge(
+                    binary, max_angle=max_angle, min_angle=self.DEFAULT_MIN_ANGLE
+                ),
+                method="top edge",
             )
         if dpi is not None:
             binary = remove_horizontal_shadows(binary, dpi)
         if result is None or not result.is_confident():
+            if result is not None:
+                logger.debug(
+                    "top edge not confident ({:.2f}); using content skew",
+                    result.confidence,
+                )
             # Pages without a dark surround reaching the top have no usable edge.
             result = find_skew(
                 binary,

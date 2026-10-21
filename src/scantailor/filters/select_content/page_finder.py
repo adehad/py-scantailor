@@ -12,6 +12,7 @@ then looked for as long straight lines near the image border instead.
 
 import cv2
 import numpy as np
+from loguru import logger
 from numpy.typing import NDArray
 
 from scantailor.imageproc.binarize import (
@@ -105,6 +106,7 @@ def find_page_box(
     if rect is None or rect.is_empty:
         return None
     if rect == Rect(0, 0, scaled_w - 1, scaled_h - 1):
+        logger.debug("dark-bed finder found the whole image; line-edge fallback")
         return _find_line_edges(source, dpi)
 
     x_scale = w / scaled_w

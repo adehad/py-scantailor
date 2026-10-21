@@ -22,10 +22,12 @@ class SkewResult:
         confidence: Confidence score for the detection. Higher values
             indicate more reliable detection. A value >= 2.0 is considered
             good confidence.
+        method: Which detector measured the angle, for the log.
     """
 
     angle: float
     confidence: float
+    method: str = "content"
 
     GOOD_CONFIDENCE: float = 2.0
 

@@ -16,6 +16,7 @@ the oriented source image through the accumulated transformation, either to
 give a later stage something to detect on or to produce the result.
 """
 
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
 
@@ -30,6 +31,7 @@ from scantailor.core.page_geometry import (
     page_polygon,
     selection_rects,
 )
+from scantailor.core.stage_summary import summarize_stage
 from scantailor.core.transformation import (
     ImageTransformation,
     Rect,
@@ -64,6 +66,7 @@ from scantailor.filters.page_layout.page_rect import (
     rect_size_mm,
 )
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
+from scantailor.filters.page_split.page_layout import PageLayout
 from scantailor.imageproc.filters import bgr_to_gray
 
 from .stage_sequence import FilterStage, StageSequence
@@ -443,6 +446,7 @@ def _run_stages(
                 raise PipelineCancelled
 
             with logger.contextualize(stage=stage.name.lower()):
+                started = time.perf_counter()
                 if stage == FilterStage.OUTPUT:
                     stage_meta, generated, distortion_model, extras, dewarp_metrics = (
                         _process_output(state, page_id, sequence, options)
@@ -457,8 +461,17 @@ def _run_stages(
                     stage_meta = _process_stage(
                         state, page_id, sequence, stage, options, detect
                     )
-            if stage < options.start_stage:
-                continue
+                if stage < options.start_stage:
+                    continue
+                _log_stage(
+                    stage,
+                    stage_meta,
+                    dewarp_metrics,
+                    time.perf_counter() - started,
+                    level="INFO"
+                    if not render or stage == options.end_stage
+                    else "DEBUG",
+                )
             stages_completed.append(stage)
             if stage_meta:
                 metadata[stage.name] = stage_meta
@@ -478,6 +491,27 @@ def _run_stages(
         distortion_model=distortion_model,
         output_extras=extras,
         dewarp_metrics=dewarp_metrics,
+    )
+
+
+def _log_stage(
+    stage: FilterStage,
+    stage_meta: dict,
+    dewarp_metrics: DewarpMetrics | None,
+    seconds: float,
+    level: str,
+) -> None:
+    """Log what a stage settled on for the page in the current log context.
+
+    A run that renders only reports its last stage at INFO: the stages before it
+    were decided, and reported, by the geometry pass or the earlier view that
+    detected them, and repeating them would multiply the lines per page.
+    """
+    logger.log(
+        level,
+        "{}; {:.2f} s",
+        summarize_stage(stage, stage_meta, dewarp_metrics),
+        seconds,
     )
 
 
@@ -588,6 +622,9 @@ def _process_page_split(
 
     metadata["num_sub_pages"] = params.page_layout.num_sub_pages
     height, width = state.source.shape[:2]
+    metadata["page_layout"] = params.page_layout.layout_type.value
+    metadata["cutters_x"] = _cutters_x(params.page_layout)
+    metadata["image_width"] = width
     area = page_crop_area(
         params.page_layout, page_id.sub_page, (width, height), state.trim_area
     )
@@ -604,6 +641,16 @@ def _process_page_split(
     return metadata
 
 
+def _cutters_x(layout: PageLayout) -> list[tuple[float, float]]:
+    """Return the x of each cutter of a layout at its top and its bottom end."""
+    spans = []
+    for cutter in (layout.cutter1, layout.cutter2)[: layout.num_cutters]:
+        if cutter is not None:
+            top, bottom = sorted(cutter, key=lambda point: point[1])
+            spans.append((top[0], bottom[0]))
+    return spans
+
+
 def _process_deskew(
     state: _PageState,
     page_id: PageId,
@@ -617,8 +664,9 @@ def _process_deskew(
         sequence.fix_orientation_filter.get_rotation(page_id.image_id).degrees,
     )
 
+    skew = None
     if detect and filter_.needs_detection(page_id, dependencies):
-        filter_.detect_skew(
+        skew = filter_.detect_skew(
             state.view(), page_id, dependencies=dependencies, dpi=state.dpi
         )
 
@@ -631,6 +679,8 @@ def _process_deskew(
         "skew_angle": params.deskew_angle_deg,
         "oblique_angle": params.oblique_angle_deg,
         "is_manual": params.is_manual(),
+        "detected_by": None if skew is None else skew.method,
+        "confident": skew is None or skew.is_confident(),
     }
 
 
@@ -807,6 +857,7 @@ def _process_output(
         "despeckle_level": params.despeckle_level.value,
         "despeckle_strength": params.despeckle_strength,
         "binarization_method": params.binarization.method.value,
+        "dewarping_mode": params.dewarping.mode.value,
     }
 
     if options.detect_only:
