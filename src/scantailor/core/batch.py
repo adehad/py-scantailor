@@ -28,7 +28,7 @@ from numpy.typing import NDArray
 
 from scantailor.core.dewarp_spec import DewarpSpec
 from scantailor.core.image_io import tiff_compressions_in_use, write_image
-from scantailor.core.models import Dpi, PageId, SubPage
+from scantailor.core.models import Dpi, PageId, SubPage, page_name
 from scantailor.core.page_source import DpiOverrides, load_page
 from scantailor.core.pipeline import (
     PipelineOptions,
@@ -533,12 +533,13 @@ def _worker_stages_for(config: _PhaseConfig) -> StageSequence:
 
 def _detect_page(job: _PageJob) -> StageParamsData:
     """Detect one page's geometry in a worker; returns its parameters as data."""
-    stages = _worker_stages_for(job.config)
-    overrides = {job.page.image_id: job.dpi_override} if job.dpi_override else None
-    loaded = load_page(job.page.image_id, overrides)
-    options = PipelineOptions(dpi=loaded.horizontal_dpi(job.config.default_dpi))
-    fix_aggregate_page_size([(loaded.pixels, job.page)], stages, options)
-    return _dump_entries(collect_stage_params(stages, [job.page]))
+    with logger.contextualize(page=page_name(job.page)):
+        stages = _worker_stages_for(job.config)
+        overrides = {job.page.image_id: job.dpi_override} if job.dpi_override else None
+        loaded = load_page(job.page.image_id, overrides)
+        options = PipelineOptions(dpi=loaded.horizontal_dpi(job.config.default_dpi))
+        fix_aggregate_page_size([(loaded.pixels, job.page)], stages, options)
+        return _dump_entries(collect_stage_params(stages, [job.page]))
 
 
 def _detect_geometry(
@@ -613,41 +614,42 @@ def _as_writable(image: NDArray[np.uint8], is_binary: bool) -> NDArray:
 
 def _render_page(job: _PageJob) -> tuple[Path, RenderInfo]:
     """Render one page in a worker and write it; returns its path and geometry."""
-    if job.output_path is None:
-        raise ValueError("A render job needs an output path")
-    stages = _worker_stages_for(job.config)
-    overrides = {job.page.image_id: job.dpi_override} if job.dpi_override else None
-    loaded = load_page(job.page.image_id, overrides)
-    options = PipelineOptions(dpi=loaded.horizontal_dpi(job.config.default_dpi))
-    rendered = process_page(loaded.pixels, job.page, stages, options)
-    is_binary = bool(rendered.metadata.get("OUTPUT", {}).get("is_binary"))
-    dpi = rendered.dpi or (None if loaded.dpi.is_null() else loaded.dpi)
-    job.output_path.parent.mkdir(parents=True, exist_ok=True)
-    compressions = job.config.tiff_compressions
-    write_image(
-        job.output_path, _as_writable(rendered.image, is_binary), dpi, compressions
-    )
-    if rendered.split is not None:
-        with tiff_compressions_in_use(compressions):
-            write_split_images(
-                job.output_path.parent, job.output_path.name, rendered.split, dpi
-            )
-    if rendered.transformation is None or dpi is None:
-        raise RuntimeError("The pipeline returned no output geometry")
-    was_dewarped = bool(rendered.metadata.get("OUTPUT", {}).get("was_dewarped"))
-    info = RenderInfo(
-        rendered.transformation,
-        dpi,
-        was_dewarped,
-        rendered.distortion_model,
-        _dewarp_spec(rendered, stages.output_filter.get_params(job.page))
-        if was_dewarped
-        else None,
-        post_deskew_angle=_measured_post_deskew_angle(rendered)
-        if was_dewarped
-        else None,
-    )
-    return job.output_path, info
+    with logger.contextualize(page=page_name(job.page)):
+        if job.output_path is None:
+            raise ValueError("A render job needs an output path")
+        stages = _worker_stages_for(job.config)
+        overrides = {job.page.image_id: job.dpi_override} if job.dpi_override else None
+        loaded = load_page(job.page.image_id, overrides)
+        options = PipelineOptions(dpi=loaded.horizontal_dpi(job.config.default_dpi))
+        rendered = process_page(loaded.pixels, job.page, stages, options)
+        is_binary = bool(rendered.metadata.get("OUTPUT", {}).get("is_binary"))
+        dpi = rendered.dpi or (None if loaded.dpi.is_null() else loaded.dpi)
+        job.output_path.parent.mkdir(parents=True, exist_ok=True)
+        compressions = job.config.tiff_compressions
+        write_image(
+            job.output_path, _as_writable(rendered.image, is_binary), dpi, compressions
+        )
+        if rendered.split is not None:
+            with tiff_compressions_in_use(compressions):
+                write_split_images(
+                    job.output_path.parent, job.output_path.name, rendered.split, dpi
+                )
+        if rendered.transformation is None or dpi is None:
+            raise RuntimeError("The pipeline returned no output geometry")
+        was_dewarped = bool(rendered.metadata.get("OUTPUT", {}).get("was_dewarped"))
+        info = RenderInfo(
+            rendered.transformation,
+            dpi,
+            was_dewarped,
+            rendered.distortion_model,
+            _dewarp_spec(rendered, stages.output_filter.get_params(job.page))
+            if was_dewarped
+            else None,
+            post_deskew_angle=_measured_post_deskew_angle(rendered)
+            if was_dewarped
+            else None,
+        )
+        return job.output_path, info
 
 
 def _measured_post_deskew_angle(rendered: PipelineResult) -> float | None:

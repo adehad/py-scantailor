@@ -16,6 +16,7 @@ from scantailor.core.models import (
     OrthogonalRotation,
     PageId,
     SubPage,
+    page_name,
 )
 
 
@@ -408,3 +409,18 @@ class TestOrthogonalRotation:
         rot3 = OrthogonalRotation(degrees=180)
         assert rot1 == rot2
         assert rot1 != rot3
+
+
+def test_page_name_is_the_file_name_for_a_single_page_image() -> None:
+    assert page_name(PageId(image_id=ImageId(file_path=Path("dir/scan.tif")))) == (
+        "scan.tif"
+    )
+
+
+def test_page_name_marks_the_page_number_and_the_half_of_a_split_page() -> None:
+    image = ImageId(file_path=Path("scan.tif"), page=2)
+
+    assert page_name(PageId(image_id=image)) == "scan.tif#2"
+    assert page_name(PageId(image_id=image, sub_page=SubPage.LEFT_PAGE)) == (
+        "scan.tif#2/left_page"
+    )

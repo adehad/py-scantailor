@@ -115,6 +115,24 @@ class PageId(BaseModel, frozen=True):
         return self.sub_page < other.sub_page
 
 
+def page_name(page: PageId) -> str:
+    """Name a page for humans, logs and JSON, such as ``scan01.tif/left_page``.
+
+    Args:
+        page (PageId): The page to name.
+
+    Returns:
+        str: File name, then the page number in a multi-page file, then the
+            sub page when the image holds two pages.
+    """
+    name = page.image_id.file_path.name
+    if page.image_id.page:
+        name = f"{name}#{page.image_id.page}"
+    if page.sub_page == SubPage.SINGLE_PAGE:
+        return name
+    return f"{name}/{page.sub_page.name.lower()}"
+
+
 class Margins(BaseModel):
     """Margins around a page (in millimeters or other consistent units).
 

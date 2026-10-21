@@ -16,7 +16,7 @@ from scantailor.app.ui.source_cache import SourceCache
 from scantailor.app.ui.thumbnails.render_memo import ThumbnailMemo, reduced_copy
 from scantailor.core import pipeline
 from scantailor.core.image_io import ImageLoadError
-from scantailor.core.models import ImageId, PageId
+from scantailor.core.models import ImageId, PageId, page_name
 from scantailor.core.page_source import (
     FALLBACK_DPI,
     DpiOverrides,
@@ -478,7 +478,8 @@ class _RenderTask(QtCore.QRunnable):
         """Render on a pool thread and report unless cancelled."""
         try:
             if not self.cancelled.is_set():
-                self._render_and_report()
+                with logger.contextualize(page=page_name(self._page_id)):
+                    self._render_and_report()
         finally:
             finished = self._finished()
             if finished is not None:
@@ -504,7 +505,7 @@ class _RenderTask(QtCore.QRunnable):
             return
         except Exception as error:
             logger.opt(exception=not isinstance(error, ImageLoadError)).warning(
-                f"Cannot render {self._page_id}: {error}"
+                "Cannot render: {}", error
             )
             if not self.cancelled.is_set():
                 self._signals.failed.emit(self._generation, self._page_id, str(error))

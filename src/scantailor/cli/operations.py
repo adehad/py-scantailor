@@ -11,7 +11,6 @@ from scantailor.cli.errors import CliError, ExitCode
 from scantailor.cli.project_file import (
     load_project,
     output_directory_of,
-    page_name,
     save_project,
 )
 from scantailor.cli.reports import (
@@ -24,7 +23,7 @@ from scantailor.cli.reports import (
 )
 from scantailor.core.batch import output_file_names, run_batch
 from scantailor.core.image_io import list_image_pages
-from scantailor.core.models import PageId
+from scantailor.core.models import PageId, page_name
 from scantailor.core.page_source import dpi_overrides_of
 from scantailor.core.pdf_export import BilevelCodec, export_pdf
 from scantailor.core.project import Project

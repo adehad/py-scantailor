@@ -69,6 +69,30 @@ def log_messages() -> Iterator[list[str]]:
     logger.remove(handler_id)
 
 
+@pytest.fixture
+def log_records() -> Iterator[list[dict[str, Any]]]:
+    """Capture loguru records emitted during the test, from any thread.
+
+    Each entry has the record's ``level`` name, ``message`` and ``extra``, so a
+    test can check the page and stage context a line was logged under.
+    """
+    records: list[dict[str, Any]] = []
+
+    def keep(message: Any) -> None:
+        record = message.record
+        records.append(
+            {
+                "level": record["level"].name,
+                "message": record["message"],
+                "extra": dict(record["extra"]),
+            }
+        )
+
+    handler_id = logger.add(keep, level="DEBUG")
+    yield records
+    logger.remove(handler_id)
+
+
 @pytest.fixture(autouse=True)
 def isolated_application_settings(tmp_path: pathlib.Path) -> Iterator[pathlib.Path]:
     """Point ApplicationSettings at a per-test file, never the user's settings.json."""
