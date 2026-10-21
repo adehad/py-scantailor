@@ -1,12 +1,15 @@
 """Export output pages to a single PDF.
 
 Each page is placed at its physical size (pixels / dpi * 72 pt). Bilevel pages are
-stored losslessly as JBIG2 or CCITT G4, grey and colour pages as JPEG.
+stored losslessly as JBIG2 or CCITT G4. Grey and colour pages with at most 16
+distinct colours, such as posterized output, are stored losslessly as a palette
+image with deflate compression; other grey and colour pages as JPEG.
 """
 
 from __future__ import annotations
 
 import io
+import zlib
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
@@ -26,6 +29,9 @@ from scantailor.core.pdf_pool import PdfCancelled, map_pool_progress
 from scantailor.core.text_layer import TextLayer
 
 PDF_POINTS_PER_INCH = 72.0
+# PDF palette images index at 1, 2, 4 or 8 bits. Beyond 4 bits a scanned page is
+# continuous tone, where JPEG is the smaller choice.
+MAX_PALETTE_COLOURS = 16
 BilevelCodec = Literal["jbig2", "g4"]
 PageSource = NDArray[Any] | str | Path
 PageInput = tuple[PageSource, "float | tuple[float, float]"]
@@ -54,7 +60,8 @@ def export_pdf(
             0 and 255 is stored as bilevel. ``dpi`` is one number or ``(x, y)``.
         out_path (str | pathlib.Path): Destination PDF.
         bilevel_codec (str): ``"jbig2"`` or ``"g4"`` for bilevel pages.
-        colour_quality (int): JPEG quality, 1 to 100, for grey and colour pages.
+        colour_quality (int): JPEG quality, 1 to 100, for grey and colour pages
+            with more than ``MAX_PALETTE_COLOURS`` colours.
         text_layers (Sequence[scantailor.core.text_layer.TextLayer | None] | None):
             One entry per page, or
             ``None`` for no text.
@@ -213,13 +220,18 @@ class EncodedPage:
 
     Attributes:
         data (bytes): Image stream data in ``codec_filter``'s encoding.
-        codec_filter (str): ``JBIG2Decode``, ``CCITTFaxDecode`` or ``DCTDecode``.
+        codec_filter (str): ``JBIG2Decode``, ``CCITTFaxDecode``, ``DCTDecode`` or
+            ``FlateDecode``.
         width (int): Image width in pixels.
         height (int): Image height in pixels.
-        colour_space (str): ``DeviceGray`` or ``DeviceRGB``.
-        bits_per_component (int): 1 for bilevel images, otherwise 8.
+        colour_space (str): ``DeviceGray`` or ``DeviceRGB``; the base space of the
+            palette when ``palette`` is set.
+        bits_per_component (int): 1 for bilevel images, 1, 2 or 4 for palette
+            images, otherwise 8.
         page_width (float): Page width in points.
         page_height (float): Page height in points.
+        palette (bytes | None): Colours of a palette image, one byte per entry in
+            ``DeviceGray`` and three in ``DeviceRGB``; None for other images.
     """
 
     data: bytes
@@ -230,6 +242,7 @@ class EncodedPage:
     bits_per_component: int
     page_width: float
     page_height: float
+    palette: bytes | None = None
 
 
 def _encode_page(job: _EncodeJob) -> EncodedPage:
@@ -252,6 +265,22 @@ def _encode_page(job: _EncodeJob) -> EncodedPage:
         )
     if image.dtype != np.uint8:
         raise ValueError(f"Grey and colour pages must be uint8, got {image.dtype}")
+    colour_space = "DeviceGray" if image.ndim == 2 else "DeviceRGB"
+    indexed = _as_palette(image)
+    if indexed is not None:
+        palette, indices = indexed
+        bits = _palette_bits(len(palette))
+        return EncodedPage(
+            zlib.compress(_pack_indices(indices, bits).tobytes(), 9),
+            "FlateDecode",
+            width,
+            height,
+            colour_space,
+            bits,
+            page_width,
+            page_height,
+            palette.tobytes(),
+        )
     ok, encoded = cv2.imencode(
         ".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, int(job.quality)]
     )
@@ -262,11 +291,93 @@ def _encode_page(job: _EncodeJob) -> EncodedPage:
         "DCTDecode",
         width,
         height,
-        "DeviceGray" if image.ndim == 2 else "DeviceRGB",
+        colour_space,
         8,
         page_width,
         page_height,
     )
+
+
+def _as_palette(
+    image: NDArray[np.uint8],
+) -> tuple[NDArray[np.uint8], NDArray[np.uint8]] | None:
+    """Split an image into its colours and a per-pixel index into them.
+
+    Args:
+        image (NDArray[np.uint8]): 2-D grey or (H, W, 3) BGR image.
+
+    Returns:
+        tuple[NDArray[np.uint8], NDArray[np.uint8]] | None: The palette, grey
+        levels of shape (n,) or RGB rows of shape (n, 3), and an (H, W) uint8
+        index image; None when the image has more than ``MAX_PALETTE_COLOURS``
+        colours.
+    """
+    if image.ndim == 2:
+        levels = np.flatnonzero(np.bincount(image.ravel(), minlength=256))
+        if len(levels) > MAX_PALETTE_COLOURS:
+            return None
+        lookup = np.zeros(256, dtype=np.uint8)
+        lookup[levels] = np.arange(len(levels), dtype=np.uint8)
+        return levels.astype(np.uint8), lookup[image]
+    packed = (
+        (image[..., 2].astype(np.uint32) << 16)
+        | (image[..., 1].astype(np.uint32) << 8)
+        | image[..., 0]
+    )
+    # A photo page has thousands of colours, so a strided sample rejects it
+    # without sorting every pixel. Only pixels the sample missed are sorted.
+    colours = np.unique(packed.ravel()[::97])
+    if len(colours) > MAX_PALETTE_COLOURS:
+        return None
+    unseen = packed[~np.isin(packed, colours)]
+    if unseen.size:
+        colours = np.union1d(colours, unseen)
+        if len(colours) > MAX_PALETTE_COLOURS:
+            return None
+    indices = np.searchsorted(colours, packed).astype(np.uint8)
+    rgb = np.stack([colours >> 16, (colours >> 8) & 0xFF, colours & 0xFF], axis=1)
+    return rgb.astype(np.uint8), indices
+
+
+def _palette_bits(colour_count: int) -> int:
+    """Pick the smallest PDF index depth that holds the palette.
+
+    Args:
+        colour_count (int): Number of palette entries, 1 to ``MAX_PALETTE_COLOURS``.
+
+    Returns:
+        int: 1, 2 or 4 bits per pixel.
+
+    Raises:
+        ValueError: If the palette needs more than 4 bits.
+    """
+    for bits in (1, 2, 4):
+        if colour_count <= 1 << bits:
+            return bits
+    raise ValueError(f"Too many palette colours: {colour_count}")
+
+
+def _pack_indices(indices: NDArray[np.uint8], bits: int) -> NDArray[np.uint8]:
+    """Pack palette indices into rows of bytes, first pixel in the high bits.
+
+    Each row starts on a byte boundary, as PDF image data requires.
+
+    Args:
+        indices (NDArray[np.uint8]): (H, W) palette indices, each below
+            ``2 ** bits``.
+        bits (int): Bits per index: 1, 2 or 4.
+
+    Returns:
+        NDArray[np.uint8]: (H, ceil(W * bits / 8)) packed bytes.
+    """
+    per_byte = 8 // bits
+    height, width = indices.shape
+    padded = np.zeros((height, -(-width // per_byte) * per_byte), dtype=np.uint8)
+    padded[:, :width] = indices
+    packed = np.zeros((height, padded.shape[1] // per_byte), dtype=np.uint8)
+    for slot in range(per_byte):
+        packed |= padded[:, slot::per_byte] << (8 - bits * (slot + 1))
+    return packed
 
 
 def _add_page(pdf: pikepdf.Pdf, page: EncodedPage, text: TextLayer | None) -> None:
@@ -338,7 +449,19 @@ def _image_xobject(pdf: pikepdf.Pdf, page: EncodedPage) -> pikepdf.Stream:
     stream["/Subtype"] = pikepdf.Name.Image
     stream["/Width"] = page.width
     stream["/Height"] = page.height
-    stream["/ColorSpace"] = pikepdf.Name(f"/{page.colour_space}")
+    base = pikepdf.Name(f"/{page.colour_space}")
+    if page.palette is None:
+        stream["/ColorSpace"] = base
+    else:
+        channels = 1 if page.colour_space == "DeviceGray" else 3
+        stream["/ColorSpace"] = pikepdf.Array(
+            [
+                pikepdf.Name.Indexed,
+                base,
+                len(page.palette) // channels - 1,
+                pikepdf.String(page.palette),
+            ]
+        )
     stream["/BitsPerComponent"] = page.bits_per_component
     stream["/Filter"] = pikepdf.Name(f"/{page.codec_filter}")
     if page.codec_filter == "CCITTFaxDecode":
