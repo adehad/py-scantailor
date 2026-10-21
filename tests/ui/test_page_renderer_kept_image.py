@@ -126,14 +126,19 @@ def test_the_output_thumbnail_of_the_page_on_screen_reuses_its_render(
             ContentRect(width=500, height=700),
             ContentSize(width_mm=100, height_mm=150),
         )
-    # The first render can move the aggregate page size, which makes every
-    # thumbnail render again; the second one is what a revisit looks like.
-    for _ in range(2):
+    # A render, or the thumbnails of the other pages it sets off, can move the
+    # aggregate page size, which makes every thumbnail render again. Render
+    # until one leaves the thumbnails alone: that is what a revisit looks like.
+    for _ in range(4):
+        epoch = project_window._thumbnail_epoch
         with qtbot.waitSignal(
             project_window.renderer.render_done, timeout=RENDER_TIMEOUT_MS
         ):
             project_window._request_render()
         project_window.renderer.wait_for_done()
+        project_window.thumbnails.model.wait_for_idle(RENDER_TIMEOUT_MS)
+        if project_window._thumbnail_epoch == epoch:
+            break
     current = project_window._current_page
     assert current is not None
     pipeline_runs: list[PageId] = []

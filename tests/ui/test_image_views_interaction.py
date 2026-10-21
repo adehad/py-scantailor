@@ -269,8 +269,7 @@ def _handle_target(view: DeskewImageView, degrees: float) -> QtCore.QPointF:
     )
 
 
-def _angle_at_y(view: DeskewImageView, y: float) -> float:
-    arc = view.rotation_arc_square()
+def _angle_at_y(arc: QtCore.QRectF, y: float) -> float:
     return math.degrees(math.asin((y - arc.center().y()) / (arc.width() / 2)))
 
 
@@ -283,10 +282,13 @@ def test_dragging_a_deskew_handle_stores_a_manual_angle(
     assert isinstance(view, DeskewImageView)
     right = view.rotation_handles()[1]
     target = _handle_target(view, 2.0)
+    # The re-render rotates the page, and in a view whose height bounds the
+    # page the arc moves with it, so the angle is read off the arc dragged on.
+    arc = view.rotation_arc_square()
 
     travel = _drag_and_rerender(qtbot, project_window, view, right, target)
 
-    expected = _angle_at_y(view, right.y() + travel.y())
+    expected = _angle_at_y(arc, right.y() + travel.y())
 
     params = project_window.stages.deskew_filter.get_params(page)
     assert params.is_manual()

@@ -27,6 +27,11 @@ With no project open, the image area shows the welcome panel:
 The panel closes once a project is open. The **File** menu has the same commands,
 plus **Open Recent** for the same list.
 
+When you close the main window, ScanTailor remembers its size, its position and
+whether it was maximised, and opens the same way at the next start. If no screen
+shows the saved position any more, for example after you unplug a monitor, the
+window opens at its default size in the middle of the main screen.
+
 Creating a project
 ------------------
 

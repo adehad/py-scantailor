@@ -420,13 +420,13 @@ class TestThumbnailButtons:
         project_window.renderer.wait_for_done()
 
     def test_scrolling_the_current_page_out_of_view_stops_following_it(
-        self, project_window: MainWindow.MainWindowManager
+        self, project_window: MainWindow.MainWindowManager, qtbot: QtBot
     ):
         project_window.thumbColumnViewBtn.click()
         project_window.thumbnails.view.setFixedHeight(120)
         project_window.focusButton.setChecked(True)
         scroll_bar = project_window.thumbnails.view.verticalScrollBar()
-        assert scroll_bar.maximum() > 0
+        qtbot.wait_until(lambda: scroll_bar.maximum() > 0)
 
         scroll_bar.setValue(scroll_bar.maximum())
 
