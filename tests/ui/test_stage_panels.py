@@ -252,7 +252,7 @@ def test_switching_stage_cancels_a_pending_render(
     assert len(delivered) == 1
 
 
-def test_a_page_that_cannot_be_decoded_does_not_break_the_window(
+def test_a_page_that_cannot_be_decoded_is_logged_once_and_does_not_break_the_window(
     qtbot: QtBot, project_window: MainWindowManager, log_messages: list[str]
 ):
     project_window.pages()[0].image_id.file_path.write_bytes(b"not an image")
@@ -261,8 +261,11 @@ def test_a_page_that_cannot_be_decoded_does_not_break_the_window(
         project_window.renderer.render_failed, timeout=RENDER_TIMEOUT_MS
     ):
         project_window._request_render()
+    qtbot.wait(50)
 
-    assert any("could not be shown" in message for message in log_messages)
+    failures = [message for message in log_messages if "Cannot render" in message]
+    assert len(failures) == 1
+    assert not any("could not be shown" in message for message in log_messages)
 
 
 def test_an_unexpected_render_error_is_reported_as_a_failure(
