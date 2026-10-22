@@ -1,5 +1,6 @@
 """Folding line detection reproduces upstream's VertLineFinder."""
 
+import cv2
 import numpy as np
 import pytest
 from numpy.typing import NDArray
@@ -113,3 +114,20 @@ def test_a_short_dark_mark_is_not_a_line() -> None:
     pages.add_vertical_band(page, 300, 306, 45, y0=100, y1=170)
 
     assert find_lines(page, 300.0) == []
+
+
+@pytest.mark.parametrize("dpi", [100.0, 150.0, 200.0, 300.0])
+def test_letters_stacked_in_columns_are_not_a_folding_line_at_any_resolution(
+    dpi: float,
+) -> None:
+    assert find_lines(pages.spread_of_one_repeated_sentence(dpi), dpi) == []
+
+
+def test_a_thin_dark_line_is_found_in_a_100_dpi_scan() -> None:
+    page = cv2.resize(
+        pages.spread_with_folding_line(), (500, 333), interpolation=cv2.INTER_AREA
+    )
+
+    xs = [0.5 * (a[0] + b[0]) for a, b in find_lines(page, 100.0)]
+
+    assert any(abs(x - 773 / 3) < 4 for x in xs)

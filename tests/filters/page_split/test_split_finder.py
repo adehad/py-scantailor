@@ -57,6 +57,17 @@ class TestDetectSplit:
 
         assert at_150.get_split_line_x() == 375.0
 
+    @pytest.mark.parametrize("dpi", [100.0, 150.0, 200.0, 300.0])
+    def test_a_spread_repeating_one_sentence_splits_in_the_gutter_at_any_resolution(
+        self, dpi: float
+    ) -> None:
+        page = pages.spread_of_one_repeated_sentence(dpi)
+
+        x = detect_split(page, LayoutType.TWO_PAGES, dpi=dpi).layout.get_split_line_x()
+
+        assert x is not None
+        assert 0.43 < x / page.shape[1] < 0.56
+
     def test_a_threshold_can_be_given(self) -> None:
         page = pages.two_page_spread()
 
