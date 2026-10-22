@@ -373,6 +373,8 @@ class MainWindowManager:
         self._thumbnail_epoch = 0
         self._dpi_overrides: DpiOverrides = {}
         self._thumbnail_versions: dict[PageId, int] = {}
+        # Replaced, never changed in place, as thumbnail workers read it.
+        self._removed_halves: dict[ImageId, tuple[bool, bool]] = {}
         self.batch_runner = BatchRunner(self.ui)
         self.batch_runner.detected.connect(self._on_batch_detected)
         self.batch_runner.progress.connect(self._on_batch_progress)
@@ -640,30 +642,17 @@ class MainWindowManager:
 
         The render the user is waiting for goes first. When that render is of
         this page and stage with the same parameters, its image is shrunk
-        instead of running the pipeline again.
-
-        A Page Split thumbnail stands for the whole scan, so it shows the image
-        through Fix Orientation, as the Page Split view does. The render through
-        Page Split still runs first so that the layout is detected and stored,
-        as every other stage's thumbnails do for their stage; it is kept in the
-        thumbnail memo and leaves a shrunk source behind for the second render.
+        instead of running the pipeline again. A Page Split thumbnail stands
+        for the whole scan; ``render_thumbnail`` shows it as the Page Split view
+        does.
         """
         self.renderer.wait_until_idle()
         end_stage = FilterStage(int(stage))
-        if end_stage == FilterStage.PAGE_SPLIT:
-            self._render_thumbnail_through(page, FilterStage.PAGE_SPLIT)
-            return self._render_thumbnail_through(page, FilterStage.FIX_ORIENTATION)
         shown = self.renderer.rendered(
             page, end_stage, self._thumbnail_digest(page, stage)
         )
         if shown is not None:
             return shrink_to_thumbnail(shown, self.thumbnails.render_size)
-        return self._render_thumbnail_through(page, end_stage)
-
-    def _render_thumbnail_through(
-        self, page: PageId, end_stage: FilterStage
-    ) -> QtGui.QImage:
-        """Render a thumbnail of ``page`` up to ``end_stage`` on a worker thread."""
         return render_thumbnail(
             page,
             self.stages,
@@ -671,6 +660,7 @@ class MainWindowManager:
             self.thumbnails.render_size,
             self._dpi_overrides,
             self.renderer.sources,
+            removed_halves=self._removed_halves.get(page.image_id, (False, False)),
         )
 
     def _refresh_dpi_overrides(self) -> None:
@@ -701,7 +691,21 @@ class MainWindowManager:
         if stage and FilterStage(int(stage)).lists_images:
             pages = [PageId(image_id=page.image_id, sub_page=sub) for sub in SubPage]
         versions = (self._thumbnail_versions.get(each, 0) for each in pages)
-        return (self._thumbnail_epoch, *versions)
+        removed = self._removed_halves.get(page.image_id, (False, False))
+        return (self._thumbnail_epoch, removed, *versions)
+
+    def _list_pages_in_thumbnails(self, project: Project | None) -> None:
+        """Show a project's pages, noting which image halves were removed."""
+        self._removed_halves = (
+            {}
+            if project is None
+            else {
+                info.id: (info.left_half_removed, info.right_half_removed)
+                for info in project.images
+                if info.left_half_removed or info.right_half_removed
+            }
+        )
+        self.thumbnails.set_project(project)
 
     def _invalidate_thumbnails(self, page: PageId | None = None) -> None:
         """Make thumbnails render again after parameters changed.
@@ -1238,7 +1242,7 @@ class MainWindowManager:
         else:
             same_image = [page for page in pages if page.image_id == previous.image_id]
             target = (same_image or pages or [None])[0]
-        self.thumbnails.set_project(self.project)
+        self._list_pages_in_thumbnails(self.project)
         self._current_page = target
         if target is not None:
             self.thumbnails.set_current_page(target)
@@ -2872,7 +2876,7 @@ class MainWindowManager:
         self.stages = stages
         self._bind_thumbnail_stages()
         self._remember_aggregate_size()
-        self.thumbnails.set_project(project)
+        self._list_pages_in_thumbnails(project)
         self.projectFile = str(project_file) if project_file else ""
         if not project.pdf_sources:
             found = PdfSource.find(info.id.file_path for info in project.images)
@@ -3084,7 +3088,7 @@ class MainWindowManager:
         self._refresh_dpi_overrides()
         self.stages = StageSequence()
         self._bind_thumbnail_stages()
-        self.thumbnails.set_project(None)
+        self._list_pages_in_thumbnails(None)
         self.projectFile = ""
         self._render_info = {}
         self.current_page = None
