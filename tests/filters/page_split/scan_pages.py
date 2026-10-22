@@ -196,3 +196,35 @@ def single_page_with_right_edge_line(
     page = single_page(width, height)
     add_vertical_band(page, width - 84, width - 78, 45)
     return page
+
+
+def spread_of_one_repeated_sentence(dpi: float) -> NDArray[np.uint8]:
+    """Two 6 x 8 inch pages that repeat one sentence on every line, at ``dpi``.
+
+    Every line holds the same letters at the same places, so the letters stack
+    into columns down the page. The gutter runs from 0.43 to 0.56 of the width.
+
+    Args:
+        dpi (float): Resolution to scale the spread to from the 300 dpi drawing.
+
+    Returns:
+        NDArray[np.uint8]: The (H, W) gray spread.
+    """
+    page = blank(1800, 2400)
+    for baseline in range(300, 2100, 72):
+        cv2.putText(
+            page,
+            "The quick brown fox jumps over the lazy dog",
+            (225, baseline),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1.8,
+            20,
+            4,
+            cv2.LINE_AA,
+        )
+    spread = np.hstack([page, page])
+    factor = dpi / 300.0
+    size = (round(spread.shape[1] * factor), round(spread.shape[0] * factor))
+    return np.asarray(
+        cv2.resize(spread, size, interpolation=cv2.INTER_AREA), dtype=np.uint8
+    )

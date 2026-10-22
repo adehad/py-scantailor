@@ -1,9 +1,10 @@
 """Find long thin dark vertical lines, such as a book's folding line.
 
-The page is reduced to 100 dpi and a gray-level detector keeps dark features
-that are thin horizontally but tall. A Hough transform over a few degrees
-either side of vertical then votes for lines, and lines whose horizontal extents
-overlap are merged into one.
+The finder averages the page down to 100 dpi, with each working pixel covering
+at least 0.42 mm of the page at any scan resolution. A gray-level detector then
+keeps dark features that are thin horizontally but tall. A Hough transform over
+a few degrees either side of vertical votes for lines, and lines whose
+horizontal extents overlap are merged into one.
 """
 
 import math
@@ -24,6 +25,11 @@ _MAX_ANGLE = 7.0
 _ANGLE_STEP = 0.25
 _MARGIN_MM = 3.5
 _MM_PER_INCH = 25.4
+# Smallest averaging box when reducing to 100 dpi: 5 pixels at 300 dpi. A box
+# of 5 source pixels at any resolution would blur a 100 dpi scan over 5 working
+# pixels, which joins letters stacked down a column across the gaps between
+# lines into one long stroke.
+_SMOOTHING_MM = 5.0 / 300.0 * _MM_PER_INCH
 _WIDE_WINDOW = np.ones((1, 11), np.uint8)
 _TALL_WINDOW = np.ones((11, 1), np.uint8)
 _GAP_CLOSING_HEIGHT = 19
@@ -146,14 +152,26 @@ def _group_lines(hough_lines: list[HoughLine], height: int) -> list[_LineGroup]:
 
 
 def _reduce_to_working_dpi(gray: NDArray[np.uint8], dpi: float) -> NDArray[np.uint8]:
-    """Average the page down to 100 dpi, ignoring what lies outside it."""
+    """Average the page down to 100 dpi, ignoring what lies outside it.
+
+    The smallest averaging box is a fixed size on the page, not in source
+    pixels, so scans of one page at different resolutions are smoothed alike.
+
+    Args:
+        gray (numpy.ndarray of numpy.uint8): (H, W) gray page.
+        dpi (float): Resolution of ``gray``, the same on both axes.
+
+    Returns:
+        numpy.ndarray of numpy.uint8: The page at 100 dpi.
+    """
     scale = _WORKING_DPI / dpi
     height, width = gray.shape
     size = (
         max(1, _round_half_up(width * scale)),
         max(1, _round_half_up(height * scale)),
     )
-    return transform_scale_to_gray(gray, scale, size)
+    min_window = _SMOOTHING_MM / _MM_PER_INCH * dpi
+    return transform_scale_to_gray(gray, scale, size, min_window)
 
 
 def _round_half_up(value: float) -> int:
