@@ -82,6 +82,32 @@ A question mark marks a page that the shown stage has not processed. Its
 thumbnail is a guess until the stage runs. On the Output stage, a page counts as
 done once a batch has written it.
 
+What the thumbnails show
+------------------------
+
+Each thumbnail shows the page as the current stage leaves it, with that stage's
+result drawn over it in the colours of the stage's view.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Stage
+     - Drawn over the thumbnail
+   * - Split Pages
+     - The whole image, with each page tinted and the split lines drawn. A half
+       removed from the project is tinted red.
+   * - Deskew
+     - A grid, to judge whether the lines of text are level.
+   * - Select Content
+     - The content box, tinted, and the page box when page detection is on.
+   * - Margins
+     - The margins, tinted, around the outlined content. Purple with a dashed
+       border marks a page matched to the size of the others, blue a page left
+       at its own size.
+
+Fix Orientation and Output show the page alone.
+
 .. _pages-that-stand-out:
 
 Pages that stand out

@@ -8,6 +8,7 @@ from a button on the page.
 """
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal, cast
 
@@ -88,6 +89,84 @@ def _inscribed(line: QLineF, rect: QRectF) -> QLineF:
     return QLineF(top_x, rect.top(), bottom_x, rect.bottom())
 
 
+def outline_rect(layout: PageLayout) -> QRectF:
+    """Return the outline a page layout covers, in oriented image pixels."""
+    x, y, width, height = layout.outline
+    return QRectF(x, y, width, height)
+
+
+def layout_cutters(layout: PageLayout | None) -> list[QLineF]:
+    """Return the cutters of a layout from the top to the bottom of its outline.
+
+    Args:
+        layout (PageLayout | None): The layout; None has no cutters.
+
+    Returns:
+        list[QLineF]: The cutters in oriented image pixels, left one first; empty
+        for an uncut page.
+    """
+    if layout is None or layout.layout_type == PageLayoutType.SINGLE_PAGE_UNCUT:
+        return []
+    outline = outline_rect(layout)
+    stored = [layout.cutter1]
+    if layout.layout_type == PageLayoutType.SINGLE_PAGE_CUT:
+        stored.append(layout.cutter2)
+    lines = [
+        _inscribed(QLineF(QPointF(*line[0]), QPointF(*line[1])), outline)
+        for line in stored
+        if line is not None
+    ]
+    return sorted(lines, key=lambda line: line.x1() + line.x2())
+
+
+def region_polygons(
+    layout: PageLayout,
+    cutters: list[QLineF],
+    removed: Mapping[SubPage, bool],
+) -> list[tuple[QPolygonF, str]]:
+    """Return the regions a layout tints, with the view colour role of each.
+
+    Args:
+        layout (PageLayout): The layout, for its type and outline.
+        cutters (list[QLineF]): Its cutters as ``layout_cutters`` returns them,
+            or as the user is dragging them.
+        removed (Mapping[SubPage, bool]): Which halves of a two-page layout were
+            removed from the project; those get the offcut tint.
+
+    Returns:
+        list[tuple[QPolygonF, str]]: Polygons in oriented image pixels.
+    """
+    outline = outline_rect(layout)
+    top, bottom = outline.top(), outline.bottom()
+
+    def side(line: QLineF | None, x: float) -> tuple[QPointF, QPointF]:
+        """Return the top and bottom of a bounding line, or of an outline side."""
+        if line is None:
+            return QPointF(x, top), QPointF(x, bottom)
+        return line.p1(), line.p2()
+
+    def between(first: QLineF | None, second: QLineF | None) -> QPolygonF:
+        left = side(first, outline.left())
+        right = side(second, outline.right())
+        return QPolygonF([left[0], right[0], right[1], left[1]])
+
+    kind = layout.layout_type
+    if kind == PageLayoutType.SINGLE_PAGE_UNCUT or not cutters:
+        return [(QPolygonF(outline), "split_page_left")]
+    if kind == PageLayoutType.SINGLE_PAGE_CUT:
+        return [(between(*cutters[:2]), "split_page_left")]
+    return [
+        (
+            between(None, cutters[0]),
+            "split_offcut" if removed.get(SubPage.LEFT_PAGE) else "split_page_left",
+        ),
+        (
+            between(cutters[0], None),
+            "split_offcut" if removed.get(SubPage.RIGHT_PAGE) else "split_page_right",
+        ),
+    ]
+
+
 class PageSplitImageView(ImageViewBase):
     """Image view of the Page Split stage with draggable cutting lines.
 
@@ -158,23 +237,11 @@ class PageSplitImageView(ImageViewBase):
 
     @staticmethod
     def _outline_rect(layout: PageLayout) -> QRectF:
-        x, y, width, height = layout.outline
-        return QRectF(x, y, width, height)
+        return outline_rect(layout)
 
-    @classmethod
-    def _cutters_of(cls, layout: PageLayout | None) -> list[QLineF]:
-        if layout is None or layout.layout_type == PageLayoutType.SINGLE_PAGE_UNCUT:
-            return []
-        outline = cls._outline_rect(layout)
-        stored = [layout.cutter1]
-        if layout.layout_type == PageLayoutType.SINGLE_PAGE_CUT:
-            stored.append(layout.cutter2)
-        lines = [
-            _inscribed(QLineF(QPointF(*line[0]), QPointF(*line[1])), outline)
-            for line in stored
-            if line is not None
-        ]
-        return sorted(lines, key=lambda line: line.x1() + line.x2())
+    @staticmethod
+    def _cutters_of(layout: PageLayout | None) -> list[QLineF]:
+        return layout_cutters(layout)
 
     def _current_layout(self) -> PageLayout | None:
         layout = self._layout
@@ -319,40 +386,9 @@ class PageSplitImageView(ImageViewBase):
 
     def _region_polygons(self) -> list[tuple[QPolygonF, str]]:
         """Return the tinted page regions, in image pixels, with their colour role."""
-        layout = self._layout
-        if layout is None:
+        if self._layout is None:
             return []
-        outline = self._outline_rect(layout)
-        top, bottom = outline.top(), outline.bottom()
-
-        def side(line: QLineF | None, x: float) -> tuple[QPointF, QPointF]:
-            """Return the top and bottom of a bounding line, or of an outline side."""
-            if line is None:
-                return QPointF(x, top), QPointF(x, bottom)
-            return line.p1(), line.p2()
-
-        def between(first: QLineF | None, second: QLineF | None) -> QPolygonF:
-            left = side(first, outline.left())
-            right = side(second, outline.right())
-            return QPolygonF([left[0], right[0], right[1], left[1]])
-
-        kind = layout.layout_type
-        if kind == PageLayoutType.SINGLE_PAGE_UNCUT or not self._cutters:
-            return [(QPolygonF(outline), "split_page_left")]
-        if kind == PageLayoutType.SINGLE_PAGE_CUT:
-            return [(between(*self._cutters[:2]), "split_page_left")]
-        left_removed = self._removed[SubPage.LEFT_PAGE]
-        right_removed = self._removed[SubPage.RIGHT_PAGE]
-        return [
-            (
-                between(None, self._cutters[0]),
-                "split_offcut" if left_removed else "split_page_left",
-            ),
-            (
-                between(self._cutters[0], None),
-                "split_offcut" if right_removed else "split_page_right",
-            ),
-        ]
+        return region_polygons(self._layout, self._cutters, self._removed)
 
     def _unremove_button_rect(self, page: SubPage) -> QRectF | None:
         """Return the restore button of a removed half in widget coordinates."""

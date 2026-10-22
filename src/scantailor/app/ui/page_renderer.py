@@ -13,7 +13,12 @@ from numpy.typing import NDArray
 from PySide6 import QtCore, QtGui
 
 from scantailor.app.ui.source_cache import SourceCache
-from scantailor.app.ui.thumbnails.render_memo import ThumbnailMemo, reduced_copy
+from scantailor.app.ui.thumbnails.overlays import paint_stage_overlay, view_stage
+from scantailor.app.ui.thumbnails.render_memo import (
+    ReducedSource,
+    ThumbnailMemo,
+    reduced_copy,
+)
 from scantailor.core import pipeline
 from scantailor.core.image_io import ImageLoadError
 from scantailor.core.models import ImageId, PageId, page_name
@@ -58,6 +63,10 @@ _DETECTING_STAGES = (
     FilterStage.DESKEW,
     FilterStage.SELECT_CONTENT,
 )
+
+_SourceGeometry = tuple[tuple[int, int], float]
+"""Width and height of a decoded source before Fix Orientation, and its resolution."""
+
 
 # Keys name their content, so every window and project can share one memo.
 _SHARED_MEMO = ThumbnailMemo()
@@ -197,11 +206,14 @@ def render_thumbnail(
     dpi_overrides: DpiOverrides | None = None,
     sources: SourceCache | None = None,
     memo: ThumbnailMemo | None = None,
+    removed_halves: tuple[bool, bool] = (False, False),
 ) -> QtGui.QImage:
     """Render a page up to ``end_stage`` and shrink it to fit ``max_size``.
 
     Safe to call from worker threads. Stages may store what they detect in
-    ``sequence``, as any render does.
+    ``sequence``, as any render does. Before Output, the stage's result is
+    drawn over the picture (see ``thumbnails.overlays``); at Page Split the
+    picture is the whole image after Fix Orientation, not the page alone.
 
     Before Output, a thumbnail whose parameters are unchanged since it was last
     made is handed out again, and one whose detecting stages a full render has
@@ -219,6 +231,9 @@ def render_thumbnail(
             in it; a page decoded here is not added to it.
         memo (ThumbnailMemo | None): Where thumbnails, shrunk sources and
             settled parameters are kept; one shared by every caller when None.
+        removed_halves (tuple[bool, bool]): Whether the left and the right half
+            of the page's image were removed from the project; Page Split's
+            overlay tints them as off-cuts.
 
     Returns:
         QtGui.QImage: 8-bit gray or RGB888, possibly handed out before; do not
@@ -240,16 +255,16 @@ def render_thumbnail(
     memo = _SHARED_MEMO if memo is None else memo
     source_key = _source_key(page_id.image_id, dpi_overrides)
     before = _ParamDigests.of(page_id, sequence, end_stage, source_key)
-    image_key = (before.everything, max_size.width(), max_size.height())
+    image_key = (before.everything, max_size.width(), max_size.height(), removed_halves)
     thumbnail = memo.image(image_key)
     if thumbnail is not None:
         return thumbnail
-    thumbnail = _render_from_reduced_source(
+    rendered = _render_from_reduced_source(
         page_id, sequence, end_stage, max_size, memo, source_key, before
     )
-    from_full_size = thumbnail is None
-    if thumbnail is None:
-        thumbnail = _render_from_full_source(
+    from_full_size = rendered is None
+    if rendered is None:
+        rendered = _render_from_full_source(
             page_id,
             sequence,
             end_stage,
@@ -258,6 +273,11 @@ def render_thumbnail(
             memo,
             source_key,
         )
+    picture, (source_size, dpi) = rendered
+    oriented_size = _oriented(source_size, page_id, sequence)
+    thumbnail = paint_stage_overlay(
+        picture, end_stage, page_id, sequence, (oriented_size, dpi), removed_halves
+    )
     # Unchanged digests mean no stage detected and nobody edited meanwhile.
     if _ParamDigests.of(page_id, sequence, end_stage, source_key) == before:
         memo.keep_image(image_key, thumbnail)
@@ -275,24 +295,44 @@ def _render_from_reduced_source(
     memo: ThumbnailMemo,
     source_key: Hashable,
     digests: _ParamDigests,
-) -> QtGui.QImage | None:
+) -> tuple[QtGui.QImage, _SourceGeometry] | None:
     """Render from the kept shrunk source when no stage would detect.
 
     Returns:
-        QtGui.QImage | None: The thumbnail, or None when it needs the full-size
-            source.
+        tuple[QtGui.QImage, _SourceGeometry] | None: The thumbnail without its
+            overlay and the full-size source it stands for, or None when it
+            needs the full-size source.
     """
     reduced = memo.reduced_source(source_key)
     if reduced is None:
         return None
     if digests.detecting and not memo.is_settled(digests.detecting[-1]):
         return None
+    picture = _picture_from_reduced(
+        reduced, page_id, sequence, view_stage(end_stage), max_size
+    )
+    return None if picture is None else (picture, (reduced.full_size, reduced.dpi))
+
+
+def _picture_from_reduced(
+    reduced: ReducedSource,
+    page_id: PageId,
+    sequence: StageSequence,
+    stage: FilterStage,
+    max_size: QtCore.QSize,
+) -> QtGui.QImage | None:
+    """Render a stage's view from a shrunk source with the stored parameters.
+
+    Returns:
+        QtGui.QImage | None: The picture, or None when the shrunk source is too
+            coarse for ``max_size``.
+    """
     rendered = pipeline.render_from_reduced_source(
         reduced.pixels,
         reduced.full_size,
         page_id,
         sequence,
-        pipeline.PipelineOptions(end_stage=end_stage, dpi=reduced.dpi),
+        pipeline.PipelineOptions(end_stage=stage, dpi=reduced.dpi),
         (max_size.width() * _OVERSAMPLE, max_size.height() * _OVERSAMPLE),
     )
     if rendered is None:
@@ -309,12 +349,19 @@ def _render_from_full_source(
     origin: tuple[DpiOverrides | None, SourceCache | None],
     memo: ThumbnailMemo,
     source_key: Hashable,
-) -> QtGui.QImage:
-    """Render from the full-size source, keeping a shrunk copy of it."""
+) -> tuple[QtGui.QImage, _SourceGeometry]:
+    """Render from the full-size source, keeping a shrunk copy of it.
+
+    Returns:
+        tuple[QtGui.QImage, _SourceGeometry]: The thumbnail without its overlay
+            and the source it was rendered from.
+    """
     dpi_overrides, sources = origin
     longest_side = _REDUCED_SOURCE_FACTOR * max(max_size.width(), max_size.height())
+    decoded: list[LoadedPage] = []
 
     def keep_reduced(page: LoadedPage) -> None:
+        decoded.append(page)
         kept = memo.reduced_source(source_key)
         height, width = page.pixels.shape[:2]
         # A copy made for this size falls short of it by the rounding of its sides.
@@ -324,6 +371,7 @@ def _render_from_full_source(
         if reduced is not None:
             memo.keep_reduced_source(source_key, reduced)
 
+    shown_stage = view_stage(end_stage)
     image = render_page_with_model(
         page_id,
         sequence,
@@ -331,9 +379,38 @@ def _render_from_full_source(
         dpi_overrides,
         sources=sources,
         keep_source=False,
+        pixels=shown_stage == end_stage,
         on_source=keep_reduced,
     )[0]
-    return shrink_to_thumbnail(image, max_size)
+    page = decoded[-1]
+    height, width = page.pixels.shape[:2]
+    geometry = ((width, height), page.horizontal_dpi())
+    if shown_stage == end_stage:
+        return shrink_to_thumbnail(image, max_size), geometry
+    # The run only detected. The view shown stops before every detecting stage,
+    # so the shrunk copy just made can render it without waiting to be settled.
+    reduced = memo.reduced_source(source_key)
+    picture = (
+        None
+        if reduced is None
+        else _picture_from_reduced(reduced, page_id, sequence, shown_stage, max_size)
+    )
+    if picture is None:
+        options = pipeline.PipelineOptions(
+            end_stage=shown_stage, dpi=page.horizontal_dpi()
+        )
+        view = pipeline.process_page(page.pixels, page_id, sequence, options).image
+        picture = shrink_to_thumbnail(_bgr_to_rgb(view), max_size)
+    return picture, geometry
+
+
+def _oriented(
+    size: tuple[int, int], page_id: PageId, sequence: StageSequence
+) -> tuple[int, int]:
+    """Return a source size as Fix Orientation turns it."""
+    rotation = sequence.fix_orientation_filter.get_rotation(page_id.image_id)
+    width, height = size
+    return (height, width) if rotation.degrees % 180 else (width, height)
 
 
 def _source_key(image_id: ImageId, dpi_overrides: DpiOverrides | None) -> Hashable:
