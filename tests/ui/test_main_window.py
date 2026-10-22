@@ -308,6 +308,17 @@ class TestThumbnailButtons:
         assert project_window.current_page == pages[2]
         project_window.renderer.wait_for_done()
 
+    def test_going_to_the_next_page_turns_selection_mode_off(
+        self, project_window: MainWindow.MainWindowManager
+    ):
+        project_window.selectionModeBtn.setChecked(True)
+
+        project_window.goNextPage()
+
+        assert not project_window.selectionModeBtn.isChecked()
+        assert len(project_window.thumbnails.selected_pages()) == 1
+        project_window.renderer.wait_for_done()
+
     def test_go_to_button_opens_the_go_to_page_dialog(
         self,
         project_window: MainWindow.MainWindowManager,

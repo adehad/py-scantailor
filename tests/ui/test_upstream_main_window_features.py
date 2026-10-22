@@ -363,17 +363,17 @@ class TestRubberBandSelection:
 
         assert thumbnails.selected_pages() == [pages[0]]
 
-    def test_single_selection_mode_ignores_the_rubber_band(
+    def test_the_rubber_band_works_with_selection_mode_off(
         self, qtbot: QtBot, thumbnails: ThumbnailListWidget
     ) -> None:
-        thumbnails.set_multi_selection_enabled(False)
+        thumbnails.set_selection_mode_enabled(False)
         pages = thumbnails.pages()
         start = self._gutter(thumbnails, pages[0])
         end = thumbnails.item_rect(pages[2]).center()
 
         self._drag(qtbot, thumbnails, start, end)
 
-        assert thumbnails.selected_pages() == []
+        assert thumbnails.selected_pages() == pages[:3]
 
 
 class TestDefaultZoneCreationMode:

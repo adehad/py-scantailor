@@ -4,8 +4,9 @@ import threading
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QImage
+from PySide6.QtCore import QEvent, QPointF, Qt
+from PySide6.QtGui import QColor, QImage, QMouseEvent
+from PySide6.QtWidgets import QApplication
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.thumbnails import (
@@ -135,14 +136,182 @@ def test_ctrl_click_adds_single_pages(
     assert widget.selected_pages() == [pages[0], pages[2]]
 
 
-def test_single_selection_mode_ignores_ctrl(
+def test_ctrl_click_adds_pages_with_selection_mode_off(
     qtbot: QtBot, widget: ThumbnailListWidget
 ) -> None:
-    widget.set_multi_selection_enabled(False)
+    widget.set_selection_mode_enabled(False)
     pages = widget.pages()
     click(qtbot, widget, pages[0])
     click(qtbot, widget, pages[2], Qt.KeyboardModifier.ControlModifier)
-    assert widget.selected_pages() == [pages[2]]
+    assert widget.selected_pages() == [pages[0], pages[2]]
+
+
+def test_plain_click_selects_only_the_clicked_page_with_selection_mode_off(
+    qtbot: QtBot, widget: ThumbnailListWidget
+) -> None:
+    pages = widget.pages()
+    click(qtbot, widget, pages[0])
+    click(qtbot, widget, pages[2], Qt.KeyboardModifier.ControlModifier)
+    with qtbot.waitSignal(widget.selection_reset):
+        click(qtbot, widget, pages[3])
+    assert widget.selected_pages() == [pages[3]]
+
+
+def test_plain_click_adds_a_page_in_selection_mode(
+    qtbot: QtBot, widget: ThumbnailListWidget
+) -> None:
+    pages = widget.pages()
+    click(qtbot, widget, pages[0])
+    widget.set_selection_mode_enabled(True)
+    with qtbot.assertNotEmitted(widget.selection_reset):
+        click(qtbot, widget, pages[2])
+    assert widget.selected_pages() == [pages[0], pages[2]]
+    assert widget.current_page() == pages[2]
+
+
+def test_plain_click_removes_a_selected_page_in_selection_mode(
+    qtbot: QtBot, widget: ThumbnailListWidget
+) -> None:
+    pages = widget.pages()
+    click(qtbot, widget, pages[0])
+    widget.set_selection_mode_enabled(True)
+    click(qtbot, widget, pages[1])
+    click(qtbot, widget, pages[2])
+    click(qtbot, widget, pages[1])
+    assert widget.selected_pages() == [pages[0], pages[2]]
+    assert widget.current_page() == pages[2]
+
+
+def test_removing_the_current_page_makes_the_nearest_selected_page_current(
+    qtbot: QtBot, widget: ThumbnailListWidget
+) -> None:
+    pages = widget.pages()
+    click(qtbot, widget, pages[0])
+    widget.set_selection_mode_enabled(True)
+    click(qtbot, widget, pages[3])
+    click(qtbot, widget, pages[1])
+    with qtbot.waitSignal(widget.page_selected) as announced:
+        click(qtbot, widget, pages[1])
+    assert announced.args == [pages[0]]
+    assert widget.selected_pages() == [pages[0], pages[3]]
+
+
+def test_removing_the_current_page_prefers_the_selected_page_before_it_on_a_tie(
+    qtbot: QtBot, widget: ThumbnailListWidget
+) -> None:
+    pages = widget.pages()
+    click(qtbot, widget, pages[1])
+    widget.set_selection_mode_enabled(True)
+    click(qtbot, widget, pages[3])
+    click(qtbot, widget, pages[2])
+    click(qtbot, widget, pages[2])
+    assert widget.current_page() == pages[1]
+
+
+def test_the_last_selected_page_stays_selected_when_clicked_again(
+    qtbot: QtBot, widget: ThumbnailListWidget
+) -> None:
+    pages = widget.pages()
+    click(qtbot, widget, pages[1])
+    widget.set_selection_mode_enabled(True)
+    click(qtbot, widget, pages[1])
+    click(qtbot, widget, pages[1], Qt.KeyboardModifier.ControlModifier)
+    assert widget.selected_pages() == [pages[1]]
+    assert widget.current_page() == pages[1]
+
+
+def test_shift_click_extends_from_the_current_page_keeping_other_pages(
+    qtbot: QtBot, widget: ThumbnailListWidget
+) -> None:
+    pages = widget.pages()
+    click(qtbot, widget, pages[0])
+    click(qtbot, widget, pages[2], Qt.KeyboardModifier.ControlModifier)
+    click(qtbot, widget, pages[3], Qt.KeyboardModifier.ShiftModifier)
+    assert widget.selected_pages() == [pages[0], pages[2], pages[3]]
+    assert widget.current_page() == pages[3]
+
+
+def press_and_drag(
+    widget: ThumbnailListWidget,
+    start: PageId,
+    stops: list[PageId],
+    modifier: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier,
+) -> None:
+    """Press on one thumbnail, move over others in turn, then release.
+
+    Each point is taken just before its event, as pressing may scroll the list.
+    """
+    viewport = widget.view.viewport()
+    left = Qt.MouseButton.LeftButton
+    last = len(stops)
+    for step, page in enumerate([start, *stops]):
+        point = widget.item_rect(page).center()
+        kind = QEvent.Type.MouseButtonPress if step == 0 else QEvent.Type.MouseMove
+        events = [(kind, left)]
+        if step == last:
+            events.append((QEvent.Type.MouseButtonRelease, Qt.MouseButton.NoButton))
+        for event_kind, buttons in events:
+            QApplication.sendEvent(
+                viewport,
+                QMouseEvent(
+                    event_kind,
+                    QPointF(point),
+                    QPointF(viewport.mapToGlobal(point)),
+                    Qt.MouseButton.NoButton
+                    if event_kind == QEvent.Type.MouseMove
+                    else left,
+                    buttons,
+                    modifier,
+                ),
+            )
+
+
+def test_press_and_drag_selects_the_pages_in_between_with_selection_mode_off(
+    widget: ThumbnailListWidget,
+) -> None:
+    pages = widget.pages()
+    press_and_drag(widget, pages[0], [pages[2]])
+    assert widget.selected_pages() == pages[:3]
+    assert widget.current_page() == pages[0]
+
+
+def test_dragging_back_shrinks_the_dragged_range(
+    widget: ThumbnailListWidget,
+) -> None:
+    pages = widget.pages()
+    press_and_drag(widget, pages[0], [pages[3], pages[1]])
+    assert widget.selected_pages() == pages[:2]
+
+
+def test_press_and_drag_in_selection_mode_adds_to_the_selection(
+    qtbot: QtBot, widget: ThumbnailListWidget
+) -> None:
+    pages = widget.pages()
+    click(qtbot, widget, pages[3])
+    widget.set_selection_mode_enabled(True)
+    press_and_drag(widget, pages[0], [pages[1]])
+    assert widget.selected_pages() == [pages[0], pages[1], pages[3]]
+
+
+def test_dragging_from_a_removed_page_removes_the_range_but_keeps_one_page(
+    qtbot: QtBot, widget: ThumbnailListWidget
+) -> None:
+    pages = widget.pages()
+    click(qtbot, widget, pages[0])
+    for page in pages[1:]:
+        click(qtbot, widget, page, Qt.KeyboardModifier.ControlModifier)
+    press_and_drag(widget, pages[1], [pages[2]], Qt.KeyboardModifier.ControlModifier)
+    assert widget.selected_pages() == [pages[0], pages[3]]
+    press_and_drag(widget, pages[0], [pages[3]], Qt.KeyboardModifier.ControlModifier)
+    assert widget.selected_pages() == [pages[3]]
+
+
+def test_set_current_page_announces_a_selection_reset(
+    qtbot: QtBot, widget: ThumbnailListWidget
+) -> None:
+    with qtbot.waitSignal(widget.selection_reset):
+        widget.set_current_page(widget.pages()[2])
+    assert widget.selected_pages() == [widget.pages()[2]]
 
 
 def test_sort_by_width_reorders_increasing(
@@ -497,7 +666,6 @@ class TestImageList:
     ) -> ThumbnailListWidget:
         thumbnails = ThumbnailListWidget(renderer, spread_project, stage="2")
         qtbot.addWidget(thumbnails)
-        thumbnails.set_multi_selection_enabled(True)
         return thumbnails
 
     @staticmethod
