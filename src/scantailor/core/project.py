@@ -13,6 +13,7 @@ from enum import IntEnum
 from pathlib import Path
 from typing import Any, Literal
 
+from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
@@ -505,6 +506,41 @@ class Project(BaseModel):
             entry for entry in self.output_records if entry.page in survivors
         ]
         return doomed
+
+    def store_source_size(self, image_id: ImageId, width: int, height: int) -> bool:
+        """Record the size an image's file now decodes to.
+
+        The file may have been replaced since the project recorded it. The
+        resolution is left alone: a project resolution that differs from the
+        file's may be one the user fixed.
+
+        Args:
+            image_id (ImageId): The decoded image.
+            width (int): Width of the decoded pixels, before Fix Orientation.
+            height (int): Height of the decoded pixels.
+
+        Returns:
+            bool: True if the stored size changed; False when it already
+                matched or the image is not in the project.
+        """
+        info = next((i for i in self.images if i.id == image_id), None)
+        if info is None or (info.metadata.width, info.metadata.height) == (
+            width,
+            height,
+        ):
+            return False
+        logger.info(
+            "{} is now {}x{} pixels, not {}x{}; storing the new size",
+            image_id.file_path.name,
+            width,
+            height,
+            info.metadata.width,
+            info.metadata.height,
+        )
+        info.metadata = info.metadata.model_copy(
+            update={"width": width, "height": height}
+        )
+        return True
 
     def restore_removed_half(self, image_id: ImageId) -> list[PageId]:
         """Bring back the half of a split image that was removed.

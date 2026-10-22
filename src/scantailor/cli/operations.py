@@ -132,6 +132,8 @@ def run_project(project_path: Path, max_workers: int | None) -> BatchReport:
         output_records=project.output_record_map(),
     )
     project.set_output_records(result.output_records)
+    for image_id, (width, height) in result.source_sizes.items():
+        project.store_source_size(image_id, width, height)
     save_project(project, stages, project_path)
     return BatchReport(
         output_directory=absolute(out_dir),

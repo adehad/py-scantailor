@@ -12,6 +12,7 @@ from scantailor.cli.operations import (
     project_status,
     run_project,
 )
+from scantailor.core.project import Project
 
 
 def test_export_before_run_has_nothing_to_write(
@@ -78,3 +79,19 @@ def test_tiff_export_after_run_copies_the_processed_files(
         "page_01.tif",
         "page_02.tif",
     ]
+
+
+@pytest.mark.slow
+def test_run_saves_the_new_size_of_a_replaced_scan(project_path: Path) -> None:
+    project = Project.load(project_path)
+    first = project.images[0]
+    width, height = first.metadata.width, first.metadata.height
+    first.metadata = first.metadata.model_copy(
+        update={"width": width + 7, "height": height + 5}
+    )
+    project.save(project_path)
+
+    run_project(project_path, max_workers=1)
+
+    stored = Project.load(project_path).images[0].metadata
+    assert (stored.width, stored.height) == (width, height)

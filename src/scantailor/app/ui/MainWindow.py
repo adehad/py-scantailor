@@ -90,6 +90,7 @@ from scantailor.core import diagnostics, propagation
 from scantailor.core.batch import (
     BatchResult,
     PageDetected,
+    PageDone,
     ProgressEvent,
     RenderInfo,
     erase_output_files,
@@ -252,6 +253,17 @@ def _message_widget(text: str) -> QtWidgets.QLabel:
     return label
 
 
+class _SourceSizeRelay(QtCore.QObject):
+    """Carries source sizes measured on worker threads to the GUI thread.
+
+    Signals:
+        measured: Args: image_id (ImageId), width (int) and height (int) of
+            the decoded source.
+    """
+
+    measured = QtCore.Signal(object, int, int)
+
+
 class _CloseGuard(QtCore.QObject):
     """Event filter that lets the manager veto closing the window."""
 
@@ -389,6 +401,11 @@ class MainWindowManager:
         self.renderer.distortion_model_found.connect(self._on_distortion_model_found)
         self.renderer.output_extras_found.connect(self._on_output_extras_found)
         self.renderer.render_failed.connect(self._on_render_failed)
+        self._source_sizes = _SourceSizeRelay(self.ui)
+        # Queued, so the project is only changed on the GUI thread.
+        self._source_sizes.measured.connect(
+            self._on_source_decoded, QtCore.Qt.ConnectionType.QueuedConnection
+        )
         self._render_pending = False
         self._thumbnail_epoch = 0
         self._dpi_overrides: DpiOverrides = {}
@@ -681,6 +698,7 @@ class MainWindowManager:
             self._dpi_overrides,
             self.renderer.sources,
             removed_halves=self._removed_halves.get(page.image_id, (False, False)),
+            on_source_size=self._source_sizes.measured.emit,
         )
 
     def _refresh_dpi_overrides(self) -> None:
@@ -1524,10 +1542,6 @@ class MainWindowManager:
     def _on_source_decoded(self, image_id: ImageId, width: int, height: int) -> None:
         """Store the size of an image whose file now decodes to another size.
 
-        The file may have been replaced since the project recorded it. The
-        resolution is left alone: a project resolution that differs from the
-        file's may be one the user fixed.
-
         Args:
             image_id (ImageId): The decoded image.
             width (int): Width of the decoded pixels.
@@ -1535,23 +1549,8 @@ class MainWindowManager:
         """
         if self.project is None:
             return
-        info = next((i for i in self.project.images if i.id == image_id), None)
-        if info is None or (info.metadata.width, info.metadata.height) == (
-            width,
-            height,
-        ):
+        if not self.project.store_source_size(image_id, width, height):
             return
-        _LOG.info(
-            "{} is now {}x{} pixels, not {}x{}; storing the new size",
-            image_id.file_path.name,
-            width,
-            height,
-            info.metadata.width,
-            info.metadata.height,
-        )
-        info.metadata = info.metadata.model_copy(
-            update={"width": width, "height": height}
-        )
         self.modified = True
         self._show_source_image_info()
 
@@ -2072,12 +2071,18 @@ class MainWindowManager:
             QtWidgets.QApplication.beep()
 
     def _on_batch_detected(self, event: PageDetected) -> None:
+        if event.source_size is not None:
+            self._on_source_decoded(event.page.image_id, *event.source_size)
         if self.batch_dialog is not None:
             self.batch_dialog.add_detected(event)
         if not self._batch_renders:
             self._invalidate_thumbnails(event.page)
 
     def _on_batch_progress(self, event: ProgressEvent) -> None:
+        if isinstance(event, PageDone) and event.info is not None:
+            size = event.info.source_size
+            if size is not None:
+                self._on_source_decoded(event.page.image_id, *size)
         if self.batch_dialog is not None:
             self.batch_dialog.add_result(event)
         self._invalidate_thumbnails(event.page)
