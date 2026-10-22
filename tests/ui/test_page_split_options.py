@@ -295,7 +295,7 @@ class TestRefreshAfterRender:
         panels.set_page(page)
         spin_box = panels.options.findChild(QtWidgets.QDoubleSpinBox, "angleSpinBox")
         assert spin_box is not None
-        assert spin_box.value() == 0.0
+        assert spin_box.text() == "?"
 
         rendered = process_page(
             image,
@@ -305,8 +305,10 @@ class TestRefreshAfterRender:
         )
         panels.show_image(rendered.image)
 
+        # The text was turned counter-clockwise, so the correction turns it
+        # back clockwise, which the spin box shows as a negative angle.
         assert spin_box.value() == pytest.approx(
-            SKEW_DEGREES, abs=DETECTION_TOLERANCE_DEG
+            -SKEW_DEGREES, abs=DETECTION_TOLERANCE_DEG
         )
         assert not panels.options._manual_btn.isChecked()  # type: ignore[attr-defined]
 

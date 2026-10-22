@@ -30,14 +30,15 @@ from scantailor.app.ui.image_views.base import ImageViewBase
 from scantailor.app.ui.theme.fonts import small
 from scantailor.app.ui.theme.tokens import view_color
 from scantailor.core.transformation import ImageTransformation
-from scantailor.filters.deskew.params import MAX_OBLIQUE_DEG
+from scantailor.filters.deskew.params import MAX_OBLIQUE_DEG, shown_deskew_angle
 
 
 def format_angle(degrees: float) -> str:
     """Format an angle as the Deskew spin box shows it.
 
     Args:
-        degrees (float): Angle in degrees.
+        degrees (float): Angle in degrees, already in the sign the spin box
+            shows.
 
     Returns:
         str: Two decimals and a degree sign, rounded by Qt's number formatting so
@@ -383,7 +384,7 @@ class DeskewImageView(ImageViewBase):
         painter.drawText(
             QRectF(square.center().x() - 30, square.bottom() + 5, 60, 20),
             Qt.AlignmentFlag.AlignCenter,
-            format_angle(self._deskew_angle),
+            format_angle(shown_deskew_angle(self._deskew_angle)),
         )
         painter.restore()
 

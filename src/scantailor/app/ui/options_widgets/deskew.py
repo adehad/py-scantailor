@@ -21,19 +21,26 @@ from PySide6.QtWidgets import (
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 from scantailor.core.models import PageId
 from scantailor.filters.deskew.filter import Filter
-from scantailor.filters.deskew.params import MAX_OBLIQUE_DEG
+from scantailor.filters.deskew.params import (
+    MAX_OBLIQUE_DEG,
+    shown_deskew_angle,
+    stored_deskew_angle,
+)
 
 
 class OptionsWidget(QWidget):
     """Options widget for the Deskew filter.
 
     Provides controls to switch between auto and manual deskew modes,
-    a spin box to manually adjust the angle, the same for the oblique
-    correction, and an "Apply to..." button.
+    a spin box to adjust the angle, the same for the oblique correction,
+    and an "Apply to..." button. The spin box shows the rotation
+    counter-clockwise positive, the opposite sign of the stored angle, and
+    "?" until the page has one.
 
     Signals:
         angle_changed: Emitted when the deskew angle changes.
-            Args: page_id (PageId), angle_deg (float), is_manual (bool)
+            Args: page_id (PageId), angle_deg (float) as stored, clockwise
+            positive, is_manual (bool)
         oblique_changed: Emitted when the oblique angle or its mode changes.
             Args: page_id (PageId), angle_deg (float), is_manual (bool)
         auto_oblique_default_changed: Emitted when the "Automatic oblique
@@ -254,6 +261,7 @@ class OptionsWidget(QWidget):
             self._top_edge_check.setChecked(not self._filter.content_based)
             self._auto_oblique_check.setChecked(self._filter.auto_oblique_default)
             self._show_oblique_mode(self._filter.auto_oblique_default)
+            self._show_angle_unknown()
         finally:
             self._updating = False
 
@@ -279,12 +287,10 @@ class OptionsWidget(QWidget):
             self._auto_btn.setChecked(params.is_auto())
             self._manual_btn.setChecked(params.is_manual())
 
-            # Setting an equal value would rewrite the text the user is typing.
-            if self._angle_spinbox.value() != params.deskew_angle_deg:
-                self._angle_spinbox.setValue(params.deskew_angle_deg)
-
-            # Enable/disable spinbox based on mode
-            self._angle_spinbox.setEnabled(params.is_manual())
+            if self._filter.is_rotation_known(self._current_page_id):
+                self._show_angle(shown_deskew_angle(params.deskew_angle_deg))
+            else:
+                self._show_angle_unknown()
 
             self._top_edge_check.setChecked(not self._filter.content_based)
             self._auto_oblique_check.setChecked(self._filter.auto_oblique_default)
@@ -293,6 +299,28 @@ class OptionsWidget(QWidget):
                 self._oblique_spinbox.setValue(params.oblique_angle_deg)
         finally:
             self._updating = False
+
+    def _show_angle(self, shown_deg: float) -> None:
+        """Show an angle the user can edit, in Auto as well as in Manual.
+
+        Args:
+            shown_deg: The angle counter-clockwise positive.
+        """
+        spin_box = self._angle_spinbox
+        was_unknown = bool(spin_box.specialValueText())
+        spin_box.setSpecialValueText("")
+        # Setting an equal value would rewrite the text the user is typing.
+        if was_unknown or spin_box.value() != shown_deg:
+            spin_box.setValue(shown_deg)
+        spin_box.setEnabled(True)
+
+    def _show_angle_unknown(self) -> None:
+        """Show "?" in place of an angle that detection has not found yet."""
+        spin_box = self._angle_spinbox
+        # Qt shows the special value text while the value sits at the minimum.
+        spin_box.setSpecialValueText("?")
+        spin_box.setValue(spin_box.minimum())
+        spin_box.setEnabled(False)
 
     def _show_oblique_mode(self, auto: bool) -> None:
         self._oblique_auto_btn.setChecked(auto)
@@ -327,18 +355,16 @@ class OptionsWidget(QWidget):
         )
 
     def _on_angle_changed(self, value: float) -> None:
-        """Handle angle spinbox value change.
+        """Store an angle typed into the spin box; typing makes the page Manual.
 
         Args:
-            value: The new angle value in degrees.
+            value: The angle in degrees as shown, counter-clockwise positive.
         """
         if self._current_page_id is None or self._updating:
             return
 
-        params = self._filter.get_params(self._current_page_id)
-        # When manually editing, always use manual mode
-        new_params = params.with_manual_angle(value)
-        self._filter.settings.set_params(self._current_page_id, new_params)
+        angle = stored_deskew_angle(value)
+        self._filter.set_manual_angle(self._current_page_id, angle)
 
         # Update mode button if needed
         if not self._manual_btn.isChecked():
@@ -346,7 +372,7 @@ class OptionsWidget(QWidget):
             self._manual_btn.setChecked(True)
             self._updating = False
 
-        self.angle_changed.emit(self._current_page_id, value, True)
+        self.angle_changed.emit(self._current_page_id, angle, True)
 
     def _on_top_edge_toggled(self, checked: bool) -> None:
         """Choose the detection method, and detect the current page again if automatic.
@@ -434,22 +460,6 @@ class OptionsWidget(QWidget):
             self._updating = False
 
         self.oblique_changed.emit(self._current_page_id, value, True)
-
-    def set_angle(self, angle: float, is_manual: bool = False) -> None:
-        """Set the displayed angle (called from external sources like ImageView).
-
-        Args:
-            angle: The angle in degrees.
-            is_manual: Whether this is a manual setting.
-        """
-        self._updating = True
-        try:
-            self._angle_spinbox.setValue(angle)
-            self._manual_btn.setChecked(is_manual)
-            self._auto_btn.setChecked(not is_manual)
-            self._angle_spinbox.setEnabled(is_manual)
-        finally:
-            self._updating = False
 
     def set_oblique(self, angle: float, is_manual: bool = False) -> None:
         """Set the displayed oblique angle (called from external sources like the view).

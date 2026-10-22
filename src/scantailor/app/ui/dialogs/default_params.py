@@ -30,7 +30,11 @@ from scantailor.core.default_params_profiles import (
 )
 from scantailor.core.models import Dpi, Margins, OrthogonalRotation
 from scantailor.core.settings import ApplicationSettings, Units
-from scantailor.filters.deskew.params import AutoManualMode
+from scantailor.filters.deskew.params import (
+    AutoManualMode,
+    shown_deskew_angle,
+    stored_deskew_angle,
+)
 from scantailor.filters.output.binarization import (
     BinarizationMethod,
     ColorSegmenterOptions,
@@ -565,7 +569,7 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         self._check("deskewAutoBtn" if auto else "deskewManualBtn", True)
         angle = self._spin("angleSpinBox")
         angle.setEnabled(not auto)
-        angle.setValue(defaults.deskew_angle_deg)
+        angle.setValue(shown_deskew_angle(defaults.deskew_angle_deg))
         self._check("deskewAutoObliqueCB", defaults.auto_oblique)
 
     def _load_select_content(self, defaults: SelectContentDefaults) -> None:
@@ -740,7 +744,9 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         return DefaultParams(
             fix_orientation=FixOrientationDefaults(image_rotation=self._rotation),
             deskew=DeskewDefaults(
-                deskew_angle_deg=self._spin("angleSpinBox").value(),
+                deskew_angle_deg=stored_deskew_angle(
+                    self._spin("angleSpinBox").value()
+                ),
                 mode=AutoManualMode.AUTO
                 if self._checked("deskewAutoBtn")
                 else AutoManualMode.MANUAL,

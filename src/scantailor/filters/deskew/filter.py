@@ -292,6 +292,21 @@ class Filter:
             params.dependencies.is_null() or params.dependencies.matches(dependencies)
         )
 
+    def is_rotation_known(self, page_id: PageId) -> bool:
+        """Tell whether a page has a rotation to show, set by hand or detected.
+
+        Args:
+            page_id: The page to check.
+
+        Returns:
+            False for a page that detection has not reached yet, or whose
+            automatic rotation waits to be detected again.
+        """
+        if not self._settings.is_params_set(page_id):
+            return False
+        params = self._settings.get_params(page_id)
+        return not (params.is_auto() and params.redetect_rotation)
+
     def redetect_rotation(self, page_id: PageId) -> None:
         """Make the rotation automatic again; the oblique correction is kept.
 

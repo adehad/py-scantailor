@@ -150,3 +150,34 @@ class Params(BaseModel):
             New Params instance with MANUAL oblique mode.
         """
         return self.with_oblique(angle, AutoManualMode.MANUAL)
+
+
+def shown_deskew_angle(deskew_angle_deg: float) -> float:
+    """Convert a stored deskew angle to the one the user sees and types.
+
+    The stored angle turns clockwise for positive values because the image Y
+    axis points down. The user sees the usual geometric convention instead,
+    counter-clockwise positive, as ScanTailor Advanced shows it.
+
+    Args:
+        deskew_angle_deg (float): The angle as ``Params.deskew_angle_deg``
+            stores it.
+
+    Returns:
+        float: The same rotation, counter-clockwise positive.
+    """
+    # Subtracting from 0.0 keeps a zero angle unsigned, so it never reads "-0.00".
+    return 0.0 - deskew_angle_deg
+
+
+def stored_deskew_angle(shown_deg: float) -> float:
+    """Convert an angle the user typed to the one ``Params`` stores.
+
+    Args:
+        shown_deg (float): The angle as the user sees it, counter-clockwise
+            positive.
+
+    Returns:
+        float: The same rotation, clockwise positive.
+    """
+    return 0.0 - shown_deg
