@@ -114,7 +114,7 @@ class TestOptionsOfEachStage:
 
 
 class TestDeviationOrder:
-    def test_pages_furthest_from_the_mean_angle_come_first(
+    def test_pages_furthest_from_the_median_angle_come_first(
         self, qtbot, project, sequence, pages
     ):
         angles = [0.0, 5.0, 0.5, -4.0, 0.0]
@@ -126,8 +126,8 @@ class TestDeviationOrder:
 
         widget.set_order(1)
 
-        mean = sum(angles) / len(angles)
-        deviations = {page: abs(a - mean) for page, a in zip(pages, angles)}
+        median = sorted(angles)[len(angles) // 2]
+        deviations = {page: abs(a - median) for page, a in zip(pages, angles)}
         expected = sorted(pages, key=lambda page: -deviations[page])
         assert widget.pages() == expected
 
@@ -418,7 +418,7 @@ class TestDirection:
         assert widget.sort_reversed
 
     def test_reversing_flips_the_chosen_order(self, qtbot, project, sequence, pages):
-        for page, angle in zip(pages, (0.0, 5.0, 0.5, -4.0, 2.0)):
+        for page, angle in zip(pages, (0.0, 5.0, 0.5, -4.5, 2.0)):
             sequence.deskew_filter.settings.set_params(
                 page, DeskewParams(deskew_angle_deg=angle)
             )

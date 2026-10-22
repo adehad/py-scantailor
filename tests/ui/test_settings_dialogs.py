@@ -118,15 +118,6 @@ def window_lightness(app: QtWidgets.QApplication) -> int:
     return app.palette().window().color().lightness()
 
 
-UNWIRED = (
-    ("highlightDeviationCB", QtWidgets.QCheckBox),
-    ("deskewDeviationCoefSB", QtWidgets.QDoubleSpinBox),
-    ("deskewDeviationThresholdSB", QtWidgets.QDoubleSpinBox),
-    ("selectContentDeviationCoefSB", QtWidgets.QDoubleSpinBox),
-    ("selectContentDeviationThresholdSB", QtWidgets.QDoubleSpinBox),
-    ("marginsDeviationCoefSB", QtWidgets.QDoubleSpinBox),
-    ("marginsDeviationThresholdSB", QtWidgets.QDoubleSpinBox),
-)
 WIRED = (
     ("languageBox", QtWidgets.QComboBox),
     ("colorSchemeBox", QtWidgets.QComboBox),
@@ -141,6 +132,13 @@ WIRED = (
     ("tiffCompressionColorBox", QtWidgets.QComboBox),
     ("blackOnWhiteDetectionCB", QtWidgets.QCheckBox),
     ("blackOnWhiteDetectionAtOutputCB", QtWidgets.QCheckBox),
+    ("highlightDeviationCB", QtWidgets.QCheckBox),
+    ("deskewDeviationCoefSB", QtWidgets.QDoubleSpinBox),
+    ("deskewDeviationThresholdSB", QtWidgets.QDoubleSpinBox),
+    ("selectContentDeviationCoefSB", QtWidgets.QDoubleSpinBox),
+    ("selectContentDeviationThresholdSB", QtWidgets.QDoubleSpinBox),
+    ("marginsDeviationCoefSB", QtWidgets.QDoubleSpinBox),
+    ("marginsDeviationThresholdSB", QtWidgets.QDoubleSpinBox),
 )
 
 
@@ -190,8 +188,6 @@ class TestSettingsDialog:
         def drive(dlg: QtWidgets.QDialog) -> None:
             assert_shown(dlg, "enableOpenglCb")
             assert not find(dlg, QtWidgets.QCheckBox, "enableOpenglCb").isEnabled()
-            for name, kind in UNWIRED:
-                assert not find(dlg, kind, name).isEnabled(), name
             for name, kind in WIRED:
                 assert find(dlg, kind, name).isEnabled(), name
 
@@ -220,7 +216,7 @@ class TestSettingsDialog:
         assert saved.black_on_white_detection_output is False
         assert saved.polarity_detection.output is False
 
-    def test_disabled_options_keep_their_stored_values(
+    def test_accepting_without_edits_keeps_the_stored_values(
         self, qtbot: QtBot, config: pathlib.Path
     ) -> None:
         settings = ApplicationSettings(language="de", highlight_deviation=False)
@@ -231,6 +227,27 @@ class TestSettingsDialog:
 
         assert settings.language == "de"
         assert settings.highlight_deviation is False
+
+    def test_deviation_options_are_saved_on_accept(
+        self, qtbot: QtBot, config: pathlib.Path
+    ) -> None:
+        settings = ApplicationSettings()
+        dialog = SettingsDialog(settings)
+        qtbot.addWidget(dialog)
+
+        def drive(dlg: QtWidgets.QDialog) -> None:
+            find(dlg, QtWidgets.QCheckBox, "highlightDeviationCB").setChecked(False)
+            find(dlg, QtWidgets.QDoubleSpinBox, "deskewDeviationCoefSB").setValue(2.5)
+            find(dlg, QtWidgets.QDoubleSpinBox, "marginsDeviationThresholdSB").setValue(
+                4.0
+            )
+            accept(dlg)
+
+        exec_while(dialog, drive)
+
+        assert settings.highlight_deviation is False
+        assert settings.deskew_deviation.coefficient == pytest.approx(2.5)
+        assert settings.margins_deviation.threshold == pytest.approx(4.0)
 
     def test_units_offer_pixels_and_reach_the_provider_on_accept(
         self, qtbot: QtBot, config: pathlib.Path

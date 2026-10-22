@@ -87,12 +87,17 @@ greyed out. This build does not act on them, so they keep their stored values.
        have not set it yourself. Needs the option above.
      - Leave it on, so dark pages come out light on dark without setting each one.
    * - Highlight the thumbnails of pages with high deviation
-     - Greyed out here. The **Highlight deviation** button in the thumbnail column
-       works and stores the same setting.
-     - Use the button.
+     - Marks the thumbnails of pages that stand out from the others with a red
+       asterisk. The same as the **Highlight deviation** button in the thumbnail
+       column. See :ref:`pages-that-stand-out`.
+     - Leave on to find misdetected pages in a long book.
    * - Deskew, Select content and Margins: coefficient and threshold
-     - Greyed out. The values are stored but no stage reads them yet.
-     - Not available.
+     - How far a page must lie from the median of all pages to be marked at that
+       stage. The coefficient counts standard deviations. The threshold is a
+       percentage of the median. A page is marked only when it is further out
+       than both. See :ref:`pages-that-stand-out`.
+     - Raise the coefficient if too many pages are marked, lower it if an odd
+       page is missed.
 
 Default parameters
 ------------------

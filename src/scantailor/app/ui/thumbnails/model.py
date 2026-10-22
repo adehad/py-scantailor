@@ -28,6 +28,7 @@ ThumbnailRenderer = Callable[[PageId, str], QImage]
 PageRole = Qt.ItemDataRole.UserRole
 IsCurrentRole = Qt.ItemDataRole.UserRole + 1
 IncompleteRole = Qt.ItemDataRole.UserRole + 2
+DeviantRole = Qt.ItemDataRole.UserRole + 3
 
 IncompletenessProvider = Callable[[PageId, str], bool]
 """Tells whether a page has no usable result at a stage yet."""
@@ -46,6 +47,8 @@ class PageEntry:
         position (int): Index in the project's natural order.
         incomplete (bool): The page has no usable result at the shown stage; the
             list marks it with a question mark.
+        deviant (bool): The page's result stands out from the other pages'; the
+            list marks it with an asterisk.
     """
 
     page: PageId
@@ -53,6 +56,11 @@ class PageEntry:
     height: int
     position: int
     incomplete: bool = False
+    deviant: bool = False
+
+
+DeviantPagesProvider = Callable[[Sequence[PageEntry], str], frozenset[PageId]]
+"""Finds the pages whose result at a stage stands out among the listed pages."""
 
 
 @dataclass(frozen=True)
@@ -168,6 +176,9 @@ class ThumbnailModel(QAbstractListModel):
             the GUI thread whenever a thumbnail is requested.
         is_incomplete (IncompletenessProvider | None): Tells whether a page has
             no usable result at a stage. Evaluated on the GUI thread.
+        find_deviant (DeviantPagesProvider | None): Finds the pages that stand
+            out at a stage. Evaluated on the GUI thread whenever the incomplete
+            pages are looked at again.
         render_size (QSize | None): Rendered images are scaled to fit this, the
             resolution thumbnails are kept at; defaults to 160x160.
         thread_count (int): Worker threads.
@@ -183,6 +194,7 @@ class ThumbnailModel(QAbstractListModel):
         thread_count: int = 2,
         parent: QObject | None = None,
         is_incomplete: IncompletenessProvider | None = None,
+        find_deviant: DeviantPagesProvider | None = None,
     ) -> None:
         """Initialise; arguments are described on the class."""
         super().__init__(parent)
@@ -190,6 +202,7 @@ class ThumbnailModel(QAbstractListModel):
         self._cache = cache if cache is not None else ThumbnailCache()
         self._params_hash = params_hash
         self._is_incomplete = is_incomplete
+        self._find_deviant = find_deviant
         self._reversed = False
         self._render_size = render_size or QSize(160, 160)
         self._project: Project | None = None
@@ -296,6 +309,7 @@ class ThumbnailModel(QAbstractListModel):
             _entries_for(project, self._lists_images) if project is not None else []
         )
         self._mark_incomplete_pages()
+        self._mark_deviant_pages()
         self._sort_entries()
 
     def set_order(self, order: PageOrderOption, reverse: bool | None = None) -> None:
@@ -330,17 +344,31 @@ class ThumbnailModel(QAbstractListModel):
         self._is_incomplete = provider
         self.refresh()
 
-    def refresh(self, page: PageId | None = None) -> None:
-        """Look again at which pages are incomplete and keep the rows in order.
-
-        Rows move without a reset, so selection and current page stay.
+    def set_deviation_provider(self, provider: DeviantPagesProvider | None) -> None:
+        """Choose how the pages that stand out at the shown stage are found.
 
         Args:
-            page (PageId | None): The only page to look at again, or None for all.
+            provider (DeviantPagesProvider | None): The finder, or None to mark
+                no page.
         """
-        changed = self._mark_incomplete_pages(page)
-        for entry_page in changed:
+        self._find_deviant = provider
+        self.refresh()
+
+    def refresh(self, page: PageId | None = None) -> None:
+        """Look again at which pages are incomplete or deviant; keep rows in order.
+
+        Rows move without a reset, so selection and current page stay. No
+        thumbnail is rendered again.
+
+        Args:
+            page (PageId | None): The only page whose completeness to look at
+                again, or None for all. Deviation is always looked at for every
+                page, as one page's result moves the mean of all.
+        """
+        for entry_page in self._mark_incomplete_pages(page):
             self._emit_changed(entry_page, [IncompleteRole])
+        for entry_page in self._mark_deviant_pages():
+            self._emit_changed(entry_page, [DeviantRole])
         self._resort()
 
     def set_stage(self, stage: str, lists_images: bool = False) -> None:
@@ -363,6 +391,7 @@ class ThumbnailModel(QAbstractListModel):
             self.endResetModel()
         else:
             self._mark_incomplete_pages()
+            self._mark_deviant_pages()
             self._resort()
         self.invalidate()
 
@@ -433,6 +462,8 @@ class ThumbnailModel(QAbstractListModel):
             return self._current is not None and page == self._row_page(self._current)
         if role == IncompleteRole:
             return self._entries[index.row()].incomplete
+        if role == DeviantRole:
+            return self._entries[index.row()].deviant
         if role == Qt.ItemDataRole.DecorationRole:
             return self._thumbnail(page)
         return None
@@ -490,6 +521,18 @@ class ThumbnailModel(QAbstractListModel):
             incomplete = provider(entry.page, stage) if provider is not None else False
             if incomplete != entry.incomplete:
                 self._entries[row] = replace(entry, incomplete=incomplete)
+                changed.append(entry.page)
+        return changed
+
+    def _mark_deviant_pages(self) -> list[PageId]:
+        """Update the deviant flag of the entries; return the pages that changed."""
+        provider = self._find_deviant
+        deviant = provider(self._entries, self._stage) if provider else frozenset()
+        changed: list[PageId] = []
+        for row, entry in enumerate(self._entries):
+            flagged = entry.page in deviant
+            if flagged != entry.deviant:
+                self._entries[row] = replace(entry, deviant=flagged)
                 changed.append(entry.page)
         return changed
 

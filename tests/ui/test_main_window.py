@@ -407,7 +407,7 @@ class TestThumbnailButtons:
 
         assert manager.thumbColumnViewBtn.isChecked()
 
-    def test_deviation_button_stores_the_choice_and_redraws_thumbnails(
+    def test_deviation_button_stores_the_choice_without_rendering_thumbnails(
         self, project_window: MainWindow.MainWindowManager
     ):
         epoch = project_window._thumbnail_epoch
@@ -416,8 +416,19 @@ class TestThumbnailButtons:
         project_window.deviationHighlightingBtn.click()
 
         assert not ApplicationSettings.load().highlight_deviation
-        assert project_window._thumbnail_epoch == epoch + 1
+        assert project_window._thumbnail_epoch == epoch
         project_window.renderer.wait_for_done()
+
+    def test_the_settings_dialog_sets_the_deviation_button(
+        self, main_window: MainWindow.MainWindowManager
+    ):
+        settings = ApplicationSettings.get_instance()
+        main_window.deviationHighlightingBtn.setChecked(True)
+        settings.highlight_deviation = False
+
+        main_window._apply_thumbnail_settings(settings)
+
+        assert not main_window.deviationHighlightingBtn.isChecked()
 
     def test_scrolling_the_current_page_out_of_view_stops_following_it(
         self, project_window: MainWindow.MainWindowManager, qtbot: QtBot

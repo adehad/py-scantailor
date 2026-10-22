@@ -39,7 +39,8 @@ on to Deskew selects both pages of a selected scan.
    * - Single / multi column display
      - Switches the thumbnails between one column and several.
    * - Highlight deviation
-     - Marks the thumbnails of pages whose values lie far from the others.
+     - Marks the thumbnails of pages that stand out from the others. See
+       :ref:`pages-that-stand-out`.
    * - Magnify and diminish thumbnails
      - Change the thumbnail size in steps. Ctrl++ and Ctrl+- do the same.
 
@@ -60,14 +61,14 @@ Each stage offers its own orders. The first order is always the project order.
      - Order by split type. Pages of one type stay in project order among
        themselves.
    * - Deskew
-     - Order by decreasing deviation of the deskew angle from the mean. The pages
+     - Order by decreasing deviation of the deskew angle from the median. The pages
        that differ most come first.
    * - Select Content
      - Order by increasing width, by increasing height, or by decreasing deviation
-       of the content size from the mean.
+       of the content size from the median.
    * - Margins
      - Order by increasing width, by increasing height, or by decreasing deviation
-       of the hard margins from the mean.
+       of the hard margins from the median.
    * - Output
      - Order by completeness. Pages the batch has not written come last.
 
@@ -80,6 +81,43 @@ deviation orders.
 A question mark marks a page that the shown stage has not processed. Its
 thumbnail is a guess until the stage runs. On the Output stage, a page counts as
 done once a batch has written it.
+
+.. _pages-that-stand-out:
+
+Pages that stand out
+--------------------
+
+On Deskew, Select Content and Margins, a red asterisk marks a page whose result
+lies far from the other pages'. A wrong detection usually shows up this way, so
+after a batch you can look at the marked pages first. Order by decreasing
+deviation puts them at the top.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Stage
+     - What is compared
+   * - Deskew
+     - The deskew angle.
+   * - Select Content
+     - The diagonal of the content box. A page whose content box is empty is
+       always marked.
+   * - Margins
+     - The diagonal of the hard margins: left plus right against top plus bottom.
+
+Only pages the stage has processed take part, and nothing is marked while fewer
+than three have. A page is marked when its value is further from the median of
+all pages than both of these:
+
+- the stage's coefficient times the spread of the values, measured so that one
+  bad page does not widen it;
+- the stage's threshold, a percentage of the median.
+
+On values that vary normally, the spread equals the standard deviation, so a
+coefficient of 2 marks about one page in twenty. Both settings are in
+**Tools > Settings**. The **Highlight deviation** button turns the marks off and
+on without redrawing the thumbnails.
 
 .. _selecting-several-pages:
 

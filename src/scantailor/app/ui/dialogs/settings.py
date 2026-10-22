@@ -40,17 +40,6 @@ _OPENGL_UNAVAILABLE = cast(
 )
 # C++ derives the thumbnail height from the width with this aspect ratio.
 _THUMBNAIL_ASPECT = 16.0 / 25.0
-# Options that nothing in the application reads yet; they stay visible but cannot
-# be edited, and keep the stored value.
-_UNWIRED_WIDGETS = (
-    "highlightDeviationCB",
-    "deskewDeviationCoefSB",
-    "deskewDeviationThresholdSB",
-    "selectContentDeviationCoefSB",
-    "selectContentDeviationThresholdSB",
-    "marginsDeviationCoefSB",
-    "marginsDeviationThresholdSB",
-)
 
 
 def available_languages() -> list[str]:
@@ -105,7 +94,6 @@ class SettingsDialog(QtWidgets.QDialog):
         self._setup_widgets()
         self._populate_combo_boxes()
         self._load_settings()
-        self._disable_unwired_options()
         self._connect_signals()
 
     def _setup_widgets(self) -> None:
@@ -267,10 +255,6 @@ class SettingsDialog(QtWidgets.QDialog):
                 settings.margins_deviation,
             ),
         ]
-
-    def _disable_unwired_options(self) -> None:
-        for name in _UNWIRED_WIDGETS:
-            get_cwidget(self.ui, QtWidgets.QWidget, name).setEnabled(False)
 
     @staticmethod
     def _select_data(box: QtWidgets.QComboBox, data: object) -> None:
