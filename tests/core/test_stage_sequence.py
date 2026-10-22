@@ -21,6 +21,12 @@ class TestFilterStage:
         """There are exactly 6 stages."""
         assert len(FilterStage) == 6
 
+    def test_only_the_stages_before_the_split_list_whole_images(self) -> None:
+        """Fix Orientation and Page Split show one thumbnail per scan."""
+        listing_images = [stage for stage in FilterStage if stage.lists_images]
+
+        assert listing_images == [FilterStage.FIX_ORIENTATION, FilterStage.PAGE_SPLIT]
+
 
 class TestStageSequence:
     """Tests for StageSequence class."""

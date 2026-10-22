@@ -106,7 +106,7 @@ from scantailor.core.default_params_profiles import (
 )
 from scantailor.core.filename_ordering import sort_smart
 from scantailor.core.image_io import ImageLoadError, list_image_pages
-from scantailor.core.models import Dpi, ImageId, PageId
+from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 from scantailor.core.page_source import DpiOverrides, dpi_overrides_of
 from scantailor.core.pipeline import OutputExtras
 from scantailor.core.project import ImageInfo, ImageMetadata, LayoutDirection, Project
@@ -641,14 +641,29 @@ class MainWindowManager:
         The render the user is waiting for goes first. When that render is of
         this page and stage with the same parameters, its image is shrunk
         instead of running the pipeline again.
+
+        A Page Split thumbnail stands for the whole scan, so it shows the image
+        through Fix Orientation, as the Page Split view does. The render through
+        Page Split still runs first so that the layout is detected and stored,
+        as every other stage's thumbnails do for their stage; it is kept in the
+        thumbnail memo and leaves a shrunk source behind for the second render.
         """
         self.renderer.wait_until_idle()
         end_stage = FilterStage(int(stage))
+        if end_stage == FilterStage.PAGE_SPLIT:
+            self._render_thumbnail_through(page, FilterStage.PAGE_SPLIT)
+            return self._render_thumbnail_through(page, FilterStage.FIX_ORIENTATION)
         shown = self.renderer.rendered(
             page, end_stage, self._thumbnail_digest(page, stage)
         )
         if shown is not None:
             return shrink_to_thumbnail(shown, self.thumbnails.render_size)
+        return self._render_thumbnail_through(page, end_stage)
+
+    def _render_thumbnail_through(
+        self, page: PageId, end_stage: FilterStage
+    ) -> QtGui.QImage:
+        """Render a thumbnail of ``page`` up to ``end_stage`` on a worker thread."""
         return render_thumbnail(
             page,
             self.stages,
@@ -668,9 +683,25 @@ class MainWindowManager:
             self._show_source_image_info()
         self._show_source_dpi()
 
-    def _thumbnail_digest(self, page: PageId, _stage: str) -> Hashable:
-        """Return what identifies the parameters a page's thumbnail was made with."""
-        return (self._thumbnail_epoch, self._thumbnail_versions.get(page, 0))
+    def _thumbnail_digest(self, page: PageId, stage: str) -> Hashable:
+        """Return what identifies the parameters a page's thumbnail was made with.
+
+        Where the list shows images, one thumbnail stands for all pages of its
+        image, so an edit to any of them makes it stale.
+
+        Args:
+            page (PageId): The page the thumbnail is drawn for.
+            stage (str): The ``FilterStage`` value as a decimal string, as the
+                thumbnail model passes it, or "" when no stage is selected.
+
+        Returns:
+            Hashable: Changes whenever the thumbnail must render again.
+        """
+        pages = [page]
+        if stage and FilterStage(int(stage)).lists_images:
+            pages = [PageId(image_id=page.image_id, sub_page=sub) for sub in SubPage]
+        versions = (self._thumbnail_versions.get(each, 0) for each in pages)
+        return (self._thumbnail_epoch, *versions)
 
     def _invalidate_thumbnails(self, page: PageId | None = None) -> None:
         """Make thumbnails render again after parameters changed.
@@ -1054,7 +1085,7 @@ class MainWindowManager:
             self._propagate_between_stages(previous, stage)
         if stage > FilterStage.PAGE_SPLIT and self.project is not None:
             self._adopt_stored_page_counts([info.id for info in self.project.images])
-        self.thumbnails.set_stage(str(int(stage)))
+        self.thumbnails.set_stage(str(int(stage)), stage.lists_images)
         panels = StagePanels(stage, self.stages, self.ui)
         panels.set_source_cache(self.renderer.sources)
         panels.set_dpi_overrides(self._dpi_overrides)
@@ -1336,11 +1367,11 @@ class MainWindowManager:
     def _update_status_bar(self) -> None:
         """Show the position, name and source DPI of the current page."""
         page = self._current_page
-        displayed = self.thumbnails.pages()
-        if page is None or page not in displayed:
+        row = self._display_position()
+        if page is None or row < 0:
             self.status_panel.clear()
             return
-        self.status_panel.update_page(displayed.index(page) + 1, len(displayed), page)
+        self.status_panel.update_page(row + 1, len(self.thumbnails.pages()), page)
         self._show_source_dpi()
 
     def _show_source_dpi(self) -> None:
@@ -1502,11 +1533,23 @@ class MainWindowManager:
     def page_selected(self, page: PageId) -> None:
         """Make ``page`` current, e.g. when picked in the thumbnails.
 
+        Picking the thumbnail of the current page's image, where the list shows
+        images, keeps that page current.
+
         Args:
             page (PageId): A page of the open project; others are ignored.
         """
-        if page in self.pages():
-            self.current_page = page
+        if page not in self.pages() or self._is_shown_as_current(page):
+            return
+        self.current_page = page
+
+    def _is_shown_as_current(self, page: PageId) -> bool:
+        """Whether ``page`` has the thumbnail of the current page."""
+        current = self._current_page
+        if current is None:
+            return False
+        row = self.thumbnails.model.row_of(page)
+        return row >= 0 and row == self.thumbnails.model.row_of(current)
 
     def _select_stage_row(self, row: int) -> None:
         """Select a stage in the filter list.
@@ -1643,16 +1686,21 @@ class MainWindowManager:
             bool: True if settings were copied to at least one other page.
         """
         page = self._current_page
-        if page is None or self.batch_runner.is_running:
+        if page is None or self.batch_runner.is_running or self.project is None:
             return False
+        scope_pages = self._scope_pages(stage)
+        if stage.lists_images:
+            page = next(
+                (each for each in scope_pages if each.image_id == page.image_id), page
+            )
         if stage == FilterStage.PAGE_SPLIT:
-            return self._show_split_mode_dialog(page)
+            return self._show_split_mode_dialog(page, scope_pages)
         margins = stage == FilterStage.PAGE_LAYOUT and part == "margins"
         options = MARGIN_SIDE_OPTIONS if margins else _APPLY_OPTIONS.get(stage, {})
         dialog_class = self._apply_dialog_class(stage, part)
         dialog = dialog_class(
             page,
-            self.pages(),
+            scope_pages,
             self.selectedPages(),
             self.ui,
             title=self._apply_dialog_title(stage, part),
@@ -1680,6 +1728,18 @@ class MainWindowManager:
         )
         return True
 
+    def _scope_pages(self, stage: FilterStage) -> list[PageId]:
+        """Return what an apply scope of ``stage`` counts: images or pages.
+
+        "Every other page" at a stage that works on whole images steps through
+        images, so both halves of a spread count as one.
+        """
+        if self.project is None:
+            return []
+        if stage.lists_images:
+            return self.project.get_image_pages()
+        return self.project.get_pages()
+
     @staticmethod
     def _apply_dialog_class(stage: FilterStage, part: str) -> type[ApplyToDialog]:
         """Return the apply dialog class for a stage and settings part.
@@ -1696,14 +1756,16 @@ class MainWindowManager:
             return _OUTPUT_GROUP_DIALOGS.get(ApplyGroup(part), ApplyColorsDialog)
         return _APPLY_DIALOGS.get(stage, ApplyToDialog)
 
-    def _show_split_mode_dialog(self, page: PageId) -> bool:
+    def _show_split_mode_dialog(self, page: PageId, scope_pages: list[PageId]) -> bool:
         """Ask how pages are split and which pages get that, then apply it.
 
         Unlike the other apply dialogs the current page is a target too, because
         this is also where its own layout type is chosen.
 
         Args:
-            page (PageId): The current page.
+            page (PageId): The first page of the current image.
+            scope_pages (list[PageId]): The first page of every image, which
+                the scopes count.
 
         Returns:
             bool: True if the choice was applied to at least one page.
@@ -1714,7 +1776,7 @@ class MainWindowManager:
         dialog = SplitModeDialog(
             self.ui,
             page,
-            self.pages(),
+            scope_pages,
             self.selectedPages(),
             params.layout_type,
             params.page_layout.to_layout_type(),
@@ -1732,7 +1794,7 @@ class MainWindowManager:
         targets, layout_type, apply_cut = chosen[0]
         self.apply_to_pages(
             FilterStage.PAGE_SPLIT,
-            [candidate for candidate in self.pages() if candidate in targets],
+            [candidate for candidate in scope_pages if candidate in targets],
             layout_type=layout_type,
             apply_cut=apply_cut,
         )
@@ -1824,7 +1886,8 @@ class MainWindowManager:
 
     def _batch_pages(self) -> list[PageId]:
         """Return every page in display order, whichever order is chosen."""
-        return self.thumbnails.pages()
+        model = self.thumbnails.model
+        return [page for shown in model.pages() for page in model.pages_of_row(shown)]
 
     def startBatchProcessing(self) -> None:
         """Run every page, in display order, up to the selected stage.
@@ -2332,7 +2395,8 @@ class MainWindowManager:
 
     def _go_to_page(self, page: PageId) -> None:
         """Make ``page`` current, scrolling the list to it only while Focus is on."""
-        self.current_page = page
+        if not self._is_shown_as_current(page):
+            self.current_page = page
 
     def _go_to_page_index(self, index: int) -> None:
         """Make the displayed page at ``index`` current, clamping to the valid range.
@@ -2375,14 +2439,7 @@ class MainWindowManager:
     def _display_position(self) -> int:
         """Return the row of the current page in the thumbnail list, or -1."""
         current = self._current_page
-        return next(
-            (
-                row
-                for row, page in enumerate(self.thumbnails.pages())
-                if page == current
-            ),
-            -1,
-        )
+        return -1 if current is None else self.thumbnails.model.row_of(current)
 
     def _go_to_adjacent_selected_page(self, step: int) -> None:
         """Make the nearest selected page before or after the current one current.
@@ -2429,7 +2486,7 @@ class MainWindowManager:
             len(pages),
             1,
         )
-        if accepted and pages[number - 1] != self._current_page:
+        if accepted and number - 1 != self._display_position():
             self._go_to_page(pages[number - 1])
 
     def openUserGuide(self) -> None:

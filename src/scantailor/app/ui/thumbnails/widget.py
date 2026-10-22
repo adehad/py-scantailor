@@ -597,7 +597,15 @@ class ThumbnailListWidget(QWidget):
         return menu
 
     def _request_removal(self) -> None:
-        self.remove_pages_requested.emit(self.selected_pages())
+        self.remove_pages_requested.emit(self._selected_project_pages())
+
+    def _selected_project_pages(self) -> list[PageId]:
+        """Return every page the selected rows stand for, in display order."""
+        return [
+            page
+            for selected in self.selected_pages()
+            for page in self._model.pages_of_row(selected)
+        ]
 
     def _on_context_menu_requested(self, position: QPoint) -> None:
         if not self._context_menu_enabled:
@@ -618,13 +626,30 @@ class ThumbnailListWidget(QWidget):
     def _show_menu(self, menu: QMenu, global_position: QPoint) -> None:
         menu.exec(global_position)
 
-    def set_stage(self, stage: str) -> None:
+    def set_stage(self, stage: str, lists_images: bool = False) -> None:
         """Show previews for a different stage.
+
+        The current page and the selection carry over when the list switches
+        between pages and images: an image is selected when any of its pages
+        was, and selecting an image selects all its pages.
 
         Args:
             stage (str): Stage key passed to the renderer.
+            lists_images (bool): Show one thumbnail per image instead of one per
+                page, as for the stages that work on whole images.
         """
-        self._model.set_stage(stage)
+        if lists_images == self._model.lists_images:
+            self._model.set_stage(stage, lists_images)
+        else:
+            selected = self._selected_project_pages()
+            current = self._model.current_page
+            self._restoring = True
+            try:
+                self._model.set_stage(stage, lists_images)
+                self._restore(selected, current)
+            finally:
+                self._restoring = False
+            self.selection_changed.emit(self.selected_pages())
         if self._stage_orders is not None:
             self.set_orders(self._stage_orders(stage))
 
@@ -637,11 +662,14 @@ class ThumbnailListWidget(QWidget):
         self._model.invalidate(page)
 
     def pages(self) -> list[PageId]:
-        """Return the pages in display order."""
+        """Return the page of each thumbnail in display order.
+
+        Where the list shows images, each is the first page of its image.
+        """
         return self._model.pages()
 
     def selected_pages(self) -> list[PageId]:
-        """Return the selected pages in display order."""
+        """Return the page of each selected thumbnail in display order."""
         rows = sorted(
             index.row() for index in self._view.selectionModel().selectedRows()
         )
@@ -654,6 +682,9 @@ class ThumbnailListWidget(QWidget):
 
     def set_current_page(self, page: PageId) -> None:
         """Make a page current and select only it.
+
+        Where the list shows images, the page's image becomes current and the
+        page itself is remembered, so it is current again once pages are shown.
 
         Scrolls it into view only while following the current page. Emits
         ``page_selected`` if the current page changes.
@@ -671,6 +702,7 @@ class ThumbnailListWidget(QWidget):
             self._view.setCurrentIndex(self._model.index(row))
         finally:
             self._view.setAutoScroll(True)
+        self._model.set_current_page(page)
         if self._follow_current:
             self.scroll_to_current()
 
@@ -836,6 +868,7 @@ class ThumbnailListWidget(QWidget):
                 selection.SelectionFlag.Select,
             )
         if current is not None and self._model.row_of(current) >= 0:
+            self._model.set_current_page(current)
             selection.setCurrentIndex(
                 self._model.index(self._model.row_of(current)),
                 selection.SelectionFlag.NoUpdate,
@@ -843,6 +876,11 @@ class ThumbnailListWidget(QWidget):
 
     def _on_current_changed(self, current: QModelIndex, previous: QModelIndex) -> None:
         page = current.data(PageRole) if current.isValid() else None
+        shown = self._model.current_page
+        if page is not None and shown is not None:
+            if self._model.row_of(shown) == current.row():
+                # The row stands for the image of the remembered page.
+                return
         self._model.set_current_page(page)
         if page is None or self._restoring:
             return

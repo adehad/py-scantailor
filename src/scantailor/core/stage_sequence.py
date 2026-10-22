@@ -28,6 +28,15 @@ class FilterStage(IntEnum):
     PAGE_LAYOUT = 4
     OUTPUT = 5
 
+    @property
+    def lists_images(self) -> bool:
+        """Whether the page list shows one entry per image at this stage.
+
+        Fix Orientation and Page Split work on whole images, so a two-page
+        spread is one entry there and one per page at the later stages.
+        """
+        return self in (FilterStage.FIX_ORIENTATION, FilterStage.PAGE_SPLIT)
+
 
 @runtime_checkable
 class FilterProtocol(Protocol):

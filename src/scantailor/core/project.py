@@ -320,6 +320,15 @@ class Project(BaseModel):
         """
         return [page for info in self.images for page in self._pages_of_image(info)]
 
+    def get_image_pages(self) -> list[PageId]:
+        """Get one page per image, for the stages that work on whole images.
+
+        Returns:
+            list[PageId]: The first page of each image, in display order. It
+                stands for the whole image, so a two-page spread appears once.
+        """
+        return [self._pages_of_image(info)[0] for info in self.images]
+
     def _pages_of_image(self, image_info: ImageInfo) -> list[PageId]:
         """List the pages one image contributes, in display order."""
         if image_info.num_sub_pages == 1:

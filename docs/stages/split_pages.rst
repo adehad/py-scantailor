@@ -102,8 +102,8 @@ Removed halves
 When one half of a split image was removed from the project, the view shows that
 half tinted red with a button on it. Click the button to bring the half back. While
 the pointer is over the button, the status bar says what it does. The restored page
-comes back with the settings of its image, and the thumbnail list shows both halves
-again.
+comes back with the settings of its image, and from Deskew on the thumbnail list
+shows both halves again.
 
 Layouts and project files
 =========================

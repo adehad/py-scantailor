@@ -369,3 +369,30 @@ class TestEraseOutputFiles:
         pages = project.get_pages()
 
         assert erase_output_files([single("a.png")], tmp_path / "nope", pages) == []
+
+
+class TestImagePages:
+    def test_a_two_page_image_is_listed_once_by_its_left_page(
+        self, project: Project
+    ) -> None:
+        assert project.get_image_pages() == [
+            single("a.png"),
+            half("b.png", SubPage.LEFT_PAGE),
+            single("c.png"),
+        ]
+
+    def test_right_to_left_reading_lists_a_spread_by_its_right_page(
+        self, project: Project
+    ) -> None:
+        project.layout_direction = "RTL"
+
+        assert project.get_image_pages()[1] == half("b.png", SubPage.RIGHT_PAGE)
+
+    def test_an_image_with_a_removed_half_is_listed_by_the_half_that_stays(
+        self, project: Project
+    ) -> None:
+        project.images[1] = ImageInfo(
+            id=ImageId(file_path=Path("b.png")), num_sub_pages=1, left_half_removed=True
+        )
+
+        assert project.get_image_pages()[1] == half("b.png", SubPage.RIGHT_PAGE)
