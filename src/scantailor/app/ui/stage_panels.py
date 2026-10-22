@@ -298,6 +298,9 @@ class StagePanels(QtCore.QObject):
             removed half back. Args: page (PageId) of the removed half.
         source_failed: The current page's source image could not be decoded.
             Args: image_id (ImageId) of that image.
+        source_decoded: The current page's source image was decoded. Args:
+            image_id (ImageId), width (int) and height (int) of the decoded
+            pixels, before Fix Orientation.
     """
 
     settings_changed = QtCore.Signal()
@@ -305,6 +308,7 @@ class StagePanels(QtCore.QObject):
     cursor_moved = QtCore.Signal(object)
     unremove_page_requested = QtCore.Signal(object)
     source_failed = QtCore.Signal(object)
+    source_decoded = QtCore.Signal(object, int, int)
 
     def __init__(
         self,
@@ -619,6 +623,8 @@ class StagePanels(QtCore.QObject):
         self, image_id: ImageId, pixels: NDArray[np.uint8], dpi: Dpi
     ) -> None:
         self._source = _Source(image_id, pixels, dpi)
+        height, width = pixels.shape[:2]
+        self.source_decoded.emit(image_id, width, height)
         if isinstance(
             self.options, page_layout.OptionsWidget | select_content.OptionsWidget
         ):
