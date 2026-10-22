@@ -131,7 +131,7 @@ def _read_params(element: ET.Element) -> Params:
             left=attr_float(margins, "left"),
             right=attr_float(margins, "right"),
         ),
-        alignment=_read_alignment(child(element, "alignment")),
+        alignment=read_alignment(child(element, "alignment")),
         content_rect=ContentRect(
             x=content_x, y=content_y, width=content_w, height=content_h
         ),
@@ -141,7 +141,7 @@ def _read_params(element: ET.Element) -> Params:
     )
 
 
-def _read_alignment(element: ET.Element | None) -> Alignment:
+def read_alignment(element: ET.Element | None) -> Alignment:
     """Read an ``<alignment>`` element; unknown names mean centred, as in C++."""
     return Alignment(
         vertical=_VERTICAL.get(attr_text(element, "vert"), VerticalAlignment.VCENTER),

@@ -174,3 +174,19 @@ When you press OK, the selected profile becomes the one new projects use. Edits 
 a saved profile apply to new projects at once, but the stored profile changes
 only when you press Save. See :mod:`scantailor.core.default_params` and
 :mod:`scantailor.core.default_params_profiles`.
+
+Importing a ScanTailor Advanced profile
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Import...** reads a profile saved by ScanTailor Advanced, a ``.stp`` or
+``.xml`` file. ScanTailor Advanced keeps them in the ``profiles`` folder of its
+application data folder, or of its ``config`` folder in a portable install. The
+dialog saves the profile under the file's name and selects it, so you can check
+it before pressing OK. If a profile of that name exists, the dialog asks before
+replacing it.
+
+The import clamps values outside the ranges this program accepts, such as a
+deskew angle beyond 45 degrees. ScanTailor Advanced does not save the Wolf
+upper bound typed in its dialog, so a profile it wrote holds the default, 254.
+Set the bound again after the import if you changed it there. See
+:mod:`scantailor.core.xml_profile_import`.

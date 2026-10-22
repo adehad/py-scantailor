@@ -30,6 +30,7 @@ from scantailor.core.default_params_profiles import (
 )
 from scantailor.core.models import Dpi, Margins, OrthogonalRotation
 from scantailor.core.settings import ApplicationSettings, Units
+from scantailor.core.xml_profile_import import read_xml_profile
 from scantailor.filters.deskew.params import (
     AutoManualMode,
     shown_deskew_angle,
@@ -236,6 +237,9 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         )
         w(QtWidgets.QPushButton, "profileDeleteButton").clicked.connect(
             self._delete_profile
+        )
+        w(QtWidgets.QPushButton, "profileImportButton").clicked.connect(
+            self._choose_profile_to_import
         )
 
         w(QtWidgets.QToolButton, "rotateLeftBtn").clicked.connect(
@@ -451,6 +455,69 @@ class DefaultParamsDialog(QtWidgets.QDialog):
         box.setCurrentIndex(self._custom_profile_index)
         box.blockSignals(False)
         self._on_profile_changed(self._custom_profile_index)
+
+    def _choose_profile_to_import(self) -> None:
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            self.tr("Import Profile"),
+            str(Path.home()),
+            self.tr("ScanTailor Advanced profiles (*.stp *.xml)"),
+        )
+        if path:
+            self.import_profile(Path(path))
+
+    def import_profile(self, path: Path) -> bool:
+        """Save a profile file of the C++ ScanTailor Advanced as a profile and show it.
+
+        The profile is named after the file. A profile of the same name, whatever
+        its case, is replaced only once the user agrees.
+
+        Args:
+            path (Path): The ``.stp`` or ``.xml`` file.
+
+        Returns:
+            bool: True if the profile was saved and is now selected.
+        """
+        try:
+            params = read_xml_profile(path)
+            name = validate_profile_name(path.stem)
+        except ProfileError as error:
+            logger.warning("{}", error)
+            QtWidgets.QMessageBox.critical(
+                self,
+                self.tr("Error"),
+                self.tr("Error importing the profile.") + f"\n{error}",
+            )
+            return False
+        existing = {saved.casefold() for saved in self._store.names()}
+        if name.casefold() in existing and not self._confirm_replace(name):
+            return False
+        try:
+            self._store.write(name, params)
+        except ProfileError as error:
+            logger.warning("{}", error)
+            QtWidgets.QMessageBox.critical(
+                self, self.tr("Error"), self.tr("Error saving the profile.")
+            )
+            return False
+        self._fill_profile_box()
+        box = self._profile_box()
+        index = box.findData(
+            name, QtCore.Qt.ItemDataRole.UserRole, QtCore.Qt.MatchFlag.MatchFixedString
+        )
+        box.blockSignals(True)
+        box.setCurrentIndex(index)
+        box.blockSignals(False)
+        self._on_profile_changed(index)
+        return True
+
+    def _confirm_replace(self, name: str) -> bool:
+        answer = QtWidgets.QMessageBox.question(
+            self,
+            self.tr("Import Profile"),
+            self.tr("A profile named {name} exists. Replace it?").format(name=name),
+        )
+        return answer == QtWidgets.QMessageBox.StandardButton.Yes
 
     def _commit(self) -> None:
         name = self._profile_box().currentData()

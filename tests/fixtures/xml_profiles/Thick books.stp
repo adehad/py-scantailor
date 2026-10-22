@@ -1,0 +1,30 @@
+<profile version="3">
+  <default-params units="cm">
+    <fix-orientation-params>
+      <imageRotation degrees="270"/>
+    </fix-orientation-params>
+    <deskew-params deskewAngleDeg="1.5" autoOblique="1" mode="manual"/>
+    <page-split-params layoutType="two-pages"/>
+    <select-content-params pageDetectMode="manual" contentDetectEnabled="0" fineTuneCorners="1">
+      <pageRectSize width="148" height="210"/>
+    </select-content-params>
+    <page-layout-params autoMargins="0">
+      <hardMargins top="4" bottom="6" left="12" right="8"/>
+      <alignment vert="top" null="0" hor="left"/>
+    </page-layout-params>
+    <output-params despeckleLevel="2" depthPerception="2.5">
+      <dpi vertical="400" horizontal="400"/>
+      <colorParams colorMode="mixed">
+        <color-or-grayscale fillOffcut="1" fillOutsidePageBox="0" fillMargins="1" normalizeIlluminationColor="0" wienerWinSize="5" fillingColor="white" wienerCoef="0">
+          <posterization-options normalizationEnabled="0" enabled="1" forceBlackAndWhite="1" level="6"/>
+        </color-or-grayscale>
+        <bw thresholdAdj="-10" savitzkyGolaySmoothing="1" morphologicalSmoothing="1" normalizeIlluminationBW="1" windowSize="120" sauvolaCoef="0.34" wolfLowerBound="12" wolfUpperBound="254" wolfCoef="0.3" binarizationMethod="wolf">
+          <color-segmenter-options enabled="0" noiseReduction="7" redThresholdAdjustment="0" greenThresholdAdjustment="0" blueThresholdAdjustment="0"/>
+        </bw>
+      </colorParams>
+      <splittingOptions splitOutput="1" splittingMode="color" originalBackground="0"/>
+      <pictureShapeOptions pictureShape="rectangular" sensitivity="80" higherSearchSensitivity="1"/>
+      <dewarpingOptions mode="auto" postDeskew="1" postDeskewAngle="0"/>
+    </output-params>
+  </default-params>
+</profile>
