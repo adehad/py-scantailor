@@ -4,7 +4,7 @@ Provides UI controls for configuring content and page box detection.
 """
 
 from PySide6 import QtCore
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QSizeF, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QDoubleSpinBox,
@@ -432,18 +432,27 @@ class OptionsWidget(QWidget):
         self._show_page_size()
 
     def _show_page_size(self) -> None:
-        """Show the current page box size in the current unit."""
+        """Show the stored page box size in the current unit."""
         if self._current_page_id is None:
             return
         page_box = self._filter.get_params(self._current_page_id).page_box
+        self.show_page_box_size(QSizeF(page_box.width, page_box.height))
+
+    def show_page_box_size(self, size: QSizeF) -> None:
+        """Show a page box size in the width and height boxes, storing nothing.
+
+        Args:
+            size (QSizeF): The size in pixels, for example of a box still being
+                dragged in the view.
+        """
         units = self._units_provider.units
         decimals, step = spin_box_precision(units)
         horizontal, vertical = self._dpi
         was_updating, self._updating = self._updating, True
         try:
             for spin, pixels, dpi in (
-                (self._width_spinbox, page_box.width, horizontal),
-                (self._height_spinbox, page_box.height, vertical),
+                (self._width_spinbox, size.width(), horizontal),
+                (self._height_spinbox, size.height(), vertical),
             ):
                 spin.setDecimals(decimals)
                 spin.setSingleStep(step)

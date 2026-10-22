@@ -17,6 +17,7 @@ from PySide6.QtCore import (
     QCoreApplication,
     QPointF,
     QRectF,
+    QSizeF,
     Qt,
     Signal,
 )
@@ -82,10 +83,14 @@ class SelectContentImageView(ImageViewBase):
         manual_content_rect_set: The user changed the content box. Args:
             rect (QRectF); empty when the box was removed.
         manual_page_rect_set: The user changed the page box. Args: rect (QRectF).
+        page_rect_size_changed: The page box changed size during a drag, its own
+            or the content box's, which it grows to hold. Args: size (QSizeF).
+            ``manual_page_rect_set`` still follows when the drag ends.
     """
 
     manual_content_rect_set = Signal(QRectF)
     manual_page_rect_set = Signal(QRectF)
+    page_rect_size_changed = Signal(QSizeF)
 
     default_status_tip = cast(
         str,
@@ -468,11 +473,14 @@ class SelectContentImageView(ImageViewBase):
             if kind == BoxKind.PAGE:
                 new_rect = new_rect.united(self._rects[BoxKind.CONTENT])
             if new_rect != rect:
+                page_size = self._rects[BoxKind.PAGE].size()
                 self._rects[kind] = new_rect
                 if kind == BoxKind.CONTENT:
                     self._describe_content_in_page()
                 self._drag_moved = True
                 self.update()
+                if self._rects[BoxKind.PAGE].size() != page_size:
+                    self.page_rect_size_changed.emit(self._rects[BoxKind.PAGE].size())
             event.accept()
             return
 

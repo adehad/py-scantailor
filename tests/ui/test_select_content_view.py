@@ -130,6 +130,61 @@ class TestMinimumBoxSize:
         assert resized.args[0].width() * view.zoom_level == pytest.approx(10)
 
 
+class TestLivePageBoxSize:
+    @staticmethod
+    def _sizes(view: SelectContentImageView) -> list[QtCore.QSizeF]:
+        sizes: list[QtCore.QSizeF] = []
+        view.page_rect_size_changed.connect(sizes.append)
+        return sizes
+
+    def test_dragging_a_page_box_corner_reports_each_size_before_release(
+        self, qtbot, view
+    ):
+        view.set_page_rect_enabled(True)
+        view.set_page_rect(QtCore.QRectF(50, 150, 500, 600))
+        sizes = self._sizes(view)
+        released: list[QtCore.QSizeF] = []
+        view.manual_page_rect_set.connect(
+            lambda rect: released.append(QtCore.QSizeF(sizes[-1]))
+        )
+        corner = view.virtual_to_widget_point(QtCore.QPointF(550, 750))
+
+        _drag(qtbot, view, corner, corner + QtCore.QPointF(-40, -20))
+
+        assert len(sizes) >= 2
+        assert sizes[-1].width() < 500
+        assert sizes[-1].height() < 600
+        assert released == [sizes[-1]]
+
+    def test_moving_a_page_box_reports_no_size(self, qtbot, view):
+        view.set_page_rect_enabled(True)
+        view.set_page_rect(QtCore.QRectF(0, 0, 590, 790))
+        sizes = self._sizes(view)
+        inside = view.virtual_to_widget_point(QtCore.QPointF(50, 100))
+        viewport = view.viewport()
+        assert viewport is not None
+        qtbot.mousePress(viewport, LEFT, SHIFT, inside.toPoint())
+        qtbot.mouseMove(viewport, (inside + QtCore.QPointF(3, 3)).toPoint())
+        qtbot.mouseRelease(
+            viewport, LEFT, SHIFT, (inside + QtCore.QPointF(3, 3)).toPoint()
+        )
+
+        assert sizes == []
+
+    def test_a_content_box_that_pushes_the_page_box_reports_its_new_size(
+        self, qtbot, view
+    ):
+        view.set_page_rect_enabled(True)
+        view.set_page_rect(CONTENT)
+        sizes = self._sizes(view)
+        corner = view.virtual_to_widget_point(CONTENT.bottomRight())
+
+        _drag(qtbot, view, corner, corner + QtCore.QPointF(20, 20))
+
+        assert sizes
+        assert sizes[-1].width() > CONTENT.width()
+
+
 class TestDoubleClickOnContent:
     def test_a_click_outside_the_box_grows_it_to_include_the_content(self, qtbot, view):
         view.set_content_mask_provider(lambda: _mask((420, 300, 500, 340)))
