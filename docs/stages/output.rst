@@ -250,7 +250,8 @@ The output view has five tabs. **Ctrl+1** to **Ctrl+5** switch between them.
      - The finished output image.
    * - **Picture Zones**
      - Ctrl+2
-     - The page with the picture zones drawn over it.
+     - The page with the picture zones drawn over it. Picture zones apply only in
+       Mixed mode, so in the other modes the tab says so and edits nothing.
    * - **Fill Zones**
      - Ctrl+3
      - The output image, with the fill zones drawn over it.

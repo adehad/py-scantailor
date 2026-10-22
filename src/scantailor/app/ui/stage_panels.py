@@ -99,6 +99,13 @@ _VIEW_CLASSES: dict[FilterStage, type[ImageViewBase]] = {
 # Layer a newly drawn picture zone gets; it adds the zone to the picture mask.
 _NEW_PICTURE_LAYER = PictureLayer.PAINTER2
 
+_PICTURE_ZONES_NEED_MIXED = cast(
+    str,
+    QtCore.QT_TRANSLATE_NOOP(
+        "output::Task::UiUpdater",
+        "Picture zones are only available in Mixed mode.",
+    ),
+)
 _NO_DESPECKLING = cast(
     str,
     QtCore.QT_TRANSLATE_NOOP(
@@ -963,6 +970,14 @@ class StagePanels(QtCore.QObject):
             for spec in params.fill_zones
         ]
         view.set_zones(zones)
+        view.set_tab_message(
+            ImageViewTab.PICTURE_ZONES,
+            None
+            if params.color_mode == ColorMode.MIXED
+            else QtCore.QCoreApplication.translate(
+                "output::Task::UiUpdater", _PICTURE_ZONES_NEED_MIXED
+            ),
+        )
         self._feed_output_tabs(view, params, xform, scale)
 
     def _content_box_in_view(
