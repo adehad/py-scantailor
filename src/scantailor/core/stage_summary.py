@@ -11,6 +11,7 @@ from typing import Any
 
 from scantailor.core.stage_sequence import FilterStage
 from scantailor.dewarping.auto_model import DewarpMetrics
+from scantailor.filters.deskew.params import shown_deskew_angle
 
 Metadata = Mapping[str, Any]
 
@@ -74,8 +75,10 @@ def _deskew(metadata: Metadata) -> str:
         source = detected_by
     else:
         source = f"{detected_by}, not confident"
+    # The sign the Deskew panel shows, so a log line matches what the user sees.
+    rotation = shown_deskew_angle(metadata.get("skew_angle", 0.0))
     return (
-        f"{_mode(metadata)}: correction {metadata.get('skew_angle', 0.0):.2f} deg, "
+        f"{_mode(metadata)}: correction {rotation:.2f} deg, "
         f"oblique {metadata.get('oblique_angle', 0.0):.2f} deg ({source})"
     )
 

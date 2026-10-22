@@ -125,7 +125,7 @@ def test_changing_the_deskew_angle_updates_params_and_marks_project_modified(
         spin_box.setValue(1.5)
 
     params = project_window.stages.deskew_filter.get_params(page)
-    assert params.deskew_angle_deg == pytest.approx(1.5)
+    assert params.deskew_angle_deg == pytest.approx(-1.5)
     assert params.is_manual()
     assert project_window.modified
 
@@ -173,7 +173,7 @@ def test_options_widget_follows_the_current_page(
 
     project_window.goNextPage()
 
-    assert spin_box.value() == pytest.approx(3.0)
+    assert spin_box.value() == pytest.approx(-3.0)
     project_window.renderer.wait_for_done()
 
 

@@ -18,6 +18,12 @@ from the text lines, with the code in :mod:`scantailor.imageproc.skew_finder`.
      - Detects the rotation from the lines of text on the page.
    * - **Manual**
      - Sets the rotation with the spin box, or by dragging the handles on the dial.
+   * - Angle spin box
+     - The rotation that straightens the page, in degrees. Positive turns the page
+       counter-clockwise and negative turns it clockwise. Typing a value or dragging
+       a handle switches the page to **Manual**, also while it is on **Auto**. It
+       shows **?** until the page has an angle, which is before ScanTailor first
+       processes it and while **Auto** detects it again.
    * - **Apply To ...**
      - Copies the angle to other pages. A page set to **Auto** is copied as **Auto**,
        so each page detects its own angle.
@@ -114,5 +120,8 @@ Projects
 ========
 
 ScanTailor Advanced projects store the oblique angle and mode with each page, next
-to the rotation. A project saved before the oblique correction existed opens with
+to the rotation. The project file stores the rotation with the opposite sign to the
+spin box, clockwise positive, as ScanTailor Advanced does, so a page reads the same
+angle in both programs. The **Default Parameters** dialog and the log line for each
+page show the angle with the same sign as the spin box. A project saved before the oblique correction existed opens with
 no oblique correction on any page.

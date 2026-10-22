@@ -307,10 +307,10 @@ def test_a_deskew_drag_updates_the_options_widget_spin_box(
 
     stored = project_window.stages.deskew_filter.get_params(page).deskew_angle_deg
     assert stored != 0
-    assert _spin_box(project_window).value() == pytest.approx(stored, abs=0.01)
+    assert _spin_box(project_window).value() == pytest.approx(-stored, abs=0.01)
 
 
-def test_the_deskew_view_follows_the_options_spin_box(
+def test_the_deskew_view_follows_the_options_spin_box_with_the_stored_sign(
     qtbot: QtBot, project_window: MainWindowManager
 ):
     _pin_geometry(project_window, project_window.current_page, angle=0.0)
@@ -321,7 +321,7 @@ def test_the_deskew_view_follows_the_options_spin_box(
     ):
         _spin_box(project_window).setValue(2.5)
 
-    assert view.deskew_angle == pytest.approx(2.5)
+    assert view.deskew_angle == pytest.approx(-2.5)
 
 
 # Select Content

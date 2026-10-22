@@ -82,14 +82,14 @@ def test_a_view_of_one_stage_logs_only_that_stage_at_info(
     assert [record["extra"]["stage"] for record in info] == ["deskew"]
 
 
-def test_a_manual_angle_is_reported_as_manual_and_stored() -> None:
+def test_a_manual_angle_is_reported_as_manual_stored_and_counter_clockwise() -> None:
     line = summarize_stage(
         FilterStage.DESKEW,
         {"skew_angle": 1.2, "oblique_angle": 0.0, "is_manual": True},
         None,
     )
 
-    assert line == "manual: correction 1.20 deg, oblique 0.00 deg (stored)"
+    assert line == "manual: correction -1.20 deg, oblique 0.00 deg (stored)"
 
 
 def test_a_weak_detection_says_it_was_not_confident() -> None:

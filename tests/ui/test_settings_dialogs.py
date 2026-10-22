@@ -476,7 +476,7 @@ class TestDefaultParamsDialog:
         assert store.names() == ["Thick books"]
         saved = store.read("Thick books")
         assert saved.deskew.mode is AutoManualMode.MANUAL
-        assert saved.deskew.deskew_angle_deg == 2.5
+        assert saved.deskew.deskew_angle_deg == -2.5
         assert saved.output.color_mode is ColorMode.MIXED
         assert saved.fix_orientation.image_rotation.degrees == 90
 

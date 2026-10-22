@@ -301,7 +301,7 @@ class TestUpstreamUiReports:
         assert filter_.get_params(_page()).mode is AUTO
         assert _button(widget, "autoBtn").isChecked()
         assert not _button(widget, "manualBtn").isChecked()
-        assert _spin(widget, "angleSpinBox").value() == pytest.approx(-0.5)
+        assert _spin(widget, "angleSpinBox").value() == pytest.approx(0.5)
 
     def test_issue_170_auto_deskew_does_not_touch_the_oblique(
         self, widget: OptionsWidget, filter_: Filter
