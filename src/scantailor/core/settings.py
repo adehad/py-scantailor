@@ -87,6 +87,27 @@ class TiffCompressions:
 
 
 @dataclass(frozen=True)
+class BlackOnWhiteDetection:
+    """Where a page's polarity is measured, as plain data for worker processes.
+
+    Args:
+        enabled (bool): Deskew and Select Content measure whether a page has
+            light content on a dark background, and invert such a page before
+            detecting on it.
+        at_output (bool): Output takes the measured polarity too, for pages whose
+            polarity was not set by hand. Only counts when ``enabled``.
+    """
+
+    enabled: bool = True
+    at_output: bool = True
+
+    @property
+    def output(self) -> bool:
+        """Whether Output takes the measured polarity."""
+        return self.enabled and self.at_output
+
+
+@dataclass(frozen=True)
 class ThumbnailSize:
     """Thumbnail dimensions."""
 
@@ -292,6 +313,18 @@ class ApplicationSettings(BaseModel):
         """
         return TiffCompressions(
             bw=self.tiff_bw_compression, color=self.tiff_color_compression
+        )
+
+    @property
+    def polarity_detection(self) -> BlackOnWhiteDetection:
+        """Get both black-on-white detection choices as one picklable value.
+
+        Returns:
+            BlackOnWhiteDetection: Whether detection and Output measure polarity.
+        """
+        return BlackOnWhiteDetection(
+            enabled=self.black_on_white_detection,
+            at_output=self.black_on_white_detection_output,
         )
 
     @property

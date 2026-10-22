@@ -119,8 +119,6 @@ def window_lightness(app: QtWidgets.QApplication) -> int:
 
 
 UNWIRED = (
-    ("blackOnWhiteDetectionCB", QtWidgets.QCheckBox),
-    ("blackOnWhiteDetectionAtOutputCB", QtWidgets.QCheckBox),
     ("highlightDeviationCB", QtWidgets.QCheckBox),
     ("deskewDeviationCoefSB", QtWidgets.QDoubleSpinBox),
     ("deskewDeviationThresholdSB", QtWidgets.QDoubleSpinBox),
@@ -141,6 +139,8 @@ WIRED = (
     ("cancelingSelectionQuestionCB", QtWidgets.QCheckBox),
     ("tiffCompressionBWBox", QtWidgets.QComboBox),
     ("tiffCompressionColorBox", QtWidgets.QComboBox),
+    ("blackOnWhiteDetectionCB", QtWidgets.QCheckBox),
+    ("blackOnWhiteDetectionAtOutputCB", QtWidgets.QCheckBox),
 )
 
 
@@ -197,19 +197,39 @@ class TestSettingsDialog:
 
         exec_while(dialog, drive)
 
+    def test_unticking_black_on_white_detection_disables_it_at_output_and_saves_both(
+        self, qtbot: QtBot, config: pathlib.Path
+    ) -> None:
+        settings = ApplicationSettings()
+        dialog = SettingsDialog(settings)
+        qtbot.addWidget(dialog)
+
+        def drive(dlg: QtWidgets.QDialog) -> None:
+            at_output = find(
+                dlg, QtWidgets.QCheckBox, "blackOnWhiteDetectionAtOutputCB"
+            )
+            at_output.click()
+            find(dlg, QtWidgets.QCheckBox, "blackOnWhiteDetectionCB").click()
+            assert not at_output.isEnabled()
+            accept(dlg)
+
+        exec_while(dialog, drive)
+
+        saved = ApplicationSettings.load()
+        assert saved.black_on_white_detection is False
+        assert saved.black_on_white_detection_output is False
+        assert saved.polarity_detection.output is False
+
     def test_disabled_options_keep_their_stored_values(
         self, qtbot: QtBot, config: pathlib.Path
     ) -> None:
-        settings = ApplicationSettings(
-            language="de", black_on_white_detection=False, highlight_deviation=False
-        )
+        settings = ApplicationSettings(language="de", highlight_deviation=False)
         dialog = SettingsDialog(settings)
         qtbot.addWidget(dialog)
 
         exec_while(dialog, accept)
 
         assert settings.language == "de"
-        assert settings.black_on_white_detection is False
         assert settings.highlight_deviation is False
 
     def test_units_offer_pixels_and_reach_the_provider_on_accept(

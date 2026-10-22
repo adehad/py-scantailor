@@ -75,11 +75,17 @@ greyed out. This build does not act on them, so they keep their stored values.
        JPEG is lossy. The others keep every pixel.
      - LZW or Deflate for lossless files. JPEG only to save space.
    * - Auto detect light content on dark background
-     - Greyed out in this version.
-     - Not available.
+     - Deskew and Select Content check whether a page has light text on a dark
+       background, and invert such a page before they detect on it. A page counts
+       as light on dark when most of its area is darker than its own threshold;
+       when a dark surround tips that count, only the areas with text are counted.
+       On by default.
+     - Leave it on. Turn it off only if a page with a large dark picture is taken
+       for a dark page.
    * - Use auto detection at the output stage
-     - Greyed out in this version.
-     - Not available.
+     - Output also sets **Black on white mode** from the page, for pages where you
+       have not set it yourself. Needs the option above.
+     - Leave it on, so dark pages come out light on dark without setting each one.
    * - Highlight the thumbnails of pages with high deviation
      - Greyed out here. The **Highlight deviation** button in the thumbnail column
        works and stores the same setting.

@@ -2241,6 +2241,11 @@ Processá-las agora? Exporte o PDF novamente após concluir o processamento.</tr
         <translation>Aplicar a percepção de profundidade</translation>
     </message>
     <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="94"/>
+        <source>Apply Processing Settings</source>
+        <translation>Aplicar Configurações de Processamento</translation>
+    </message>
+    <message>
         <location filename="../app/ui/dialogs/apply_to.py" line="93"/>
         <source>Apply Deskew</source>
         <extracomment>Machine draft, pending native review.</extracomment>
@@ -4607,8 +4612,9 @@ Desmarcado: texto branco em fundo preto</translation>
         <translation>Desfoque Seletivo (Despeckle)</translation>
     </message>
     <message>
+        <location filename="../app/ui/options_widgets/output.py" line="1068"/>
         <source>Processing</source>
-        <translation type="vanished">Em processamento</translation>
+        <translation>Em processamento</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/output.py" line="1223"/>

@@ -46,7 +46,11 @@ from scantailor.core.project import (
     StageParamsEntry,
     assign_output_file_labels,
 )
-from scantailor.core.settings import ApplicationSettings, TiffCompressions
+from scantailor.core.settings import (
+    ApplicationSettings,
+    BlackOnWhiteDetection,
+    TiffCompressions,
+)
 from scantailor.core.stage_params import (
     apply_stage_defaults,
     apply_stage_params,
@@ -107,6 +111,8 @@ class RenderInfo:
             dewarped.
         auto_picture_zones: The auto picture zones the worker settled, to be
             stored in the page's parameters; None when they stayed.
+        black_on_white: The polarity Output worked in, which the worker may
+            have measured; None when the pipeline did not report it.
         seconds: Wall time the worker spent loading, rendering and writing
             the page.
     """
@@ -118,6 +124,7 @@ class RenderInfo:
     dewarp: DewarpSpec | None = None
     post_deskew_angle: float | None = None
     auto_picture_zones: AutoPictureZones | None = None
+    black_on_white: bool | None = None
     seconds: float = 0.0
 
 
@@ -578,6 +585,9 @@ class _PhaseConfig:
     default_dpi: float
     tiff_compressions: TiffCompressions = field(default_factory=TiffCompressions)
     end_stage: FilterStage = FilterStage.OUTPUT
+    black_on_white_detection: BlackOnWhiteDetection = field(
+        default_factory=BlackOnWhiteDetection
+    )
 
 
 @dataclass(frozen=True)
@@ -615,6 +625,7 @@ def _detect_page(job: _PageJob) -> StageParamsData:
         options = PipelineOptions(
             dpi=loaded.horizontal_dpi(job.config.default_dpi),
             end_stage=job.config.end_stage,
+            black_on_white_detection=job.config.black_on_white_detection,
         )
         fix_aggregate_page_size([(loaded.pixels, job.page)], stages, options)
         return _dump_entries(collect_stage_params(stages, [job.page]))
@@ -632,6 +643,7 @@ def _detect_geometry(
     report: Callable[[BatchEvent], None],
     result: BatchResult,
     end_stage: FilterStage,
+    black_on_white_detection: BlackOnWhiteDetection,
 ) -> list[PageId]:
     """Detect every page's geometry up to ``end_stage`` and store it in ``stages``.
 
@@ -650,6 +662,7 @@ def _detect_geometry(
         defaults=collect_stage_defaults(stages),
         default_dpi=default_dpi,
         end_stage=end_stage,
+        black_on_white_detection=black_on_white_detection,
     )
     jobs = [
         _PageJob(page, config, dpi_override=overrides.get(page.image_id))
@@ -709,7 +722,10 @@ def _render_page(job: _PageJob) -> tuple[Path, RenderInfo, tuple[Path, ...]]:
         stages = _worker_stages_for(job.config)
         overrides = {job.page.image_id: job.dpi_override} if job.dpi_override else None
         loaded = load_page(job.page.image_id, overrides)
-        options = PipelineOptions(dpi=loaded.horizontal_dpi(job.config.default_dpi))
+        options = PipelineOptions(
+            dpi=loaded.horizontal_dpi(job.config.default_dpi),
+            black_on_white_detection=job.config.black_on_white_detection,
+        )
         rendered = process_page(loaded.pixels, job.page, stages, options)
         is_binary = bool(rendered.metadata.get("OUTPUT", {}).get("is_binary"))
         dpi = rendered.dpi or (None if loaded.dpi.is_null() else loaded.dpi)
@@ -739,6 +755,7 @@ def _render_page(job: _PageJob) -> tuple[Path, RenderInfo, tuple[Path, ...]]:
             if was_dewarped
             else None,
             auto_picture_zones=rendered.auto_picture_zones,
+            black_on_white=rendered.metadata.get("OUTPUT", {}).get("black_on_white"),
             seconds=time.perf_counter() - started,
         )
         return job.output_path, info, tuple(written)
@@ -782,6 +799,7 @@ def run_batch(
     end_stage: FilterStage = FilterStage.OUTPUT,
     worker_limit: Callable[[], int | None] | None = None,
     output_records: Mapping[PageId, PageOutputRecord] | None = None,
+    black_on_white_detection: BlackOnWhiteDetection | None = None,
 ) -> BatchResult:
     """Process pages through the pipeline up to ``end_stage``.
 
@@ -828,6 +846,10 @@ def run_batch(
         output_records (Mapping[PageId, PageOutputRecord] | None): Records of
             an earlier batch, as stored in ``Project.output_records``; every
             page is rendered when None.
+        black_on_white_detection (BlackOnWhiteDetection | None): Whether the
+            workers measure each page's polarity, handed to them as plain
+            data; the application settings as they are when the batch starts
+            when None.
 
     Returns:
         BatchResult: Written, failed and never-started pages.
@@ -835,6 +857,10 @@ def run_batch(
     result = BatchResult()
     compressions = (
         tiff_compressions or ApplicationSettings.get_instance().tiff_compressions
+    )
+    polarity = (
+        black_on_white_detection
+        or ApplicationSettings.get_instance().polarity_detection
     )
 
     # Every hash comes after geometry detection, and nothing later changes the
@@ -874,6 +900,10 @@ def run_batch(
                     stages.output_filter.settings.replace_auto_picture_zones(
                         event.page, event.info.auto_picture_zones
                     )
+                if event.info.black_on_white is not None:
+                    stages.output_filter.settings.set_detected_black_on_white(
+                        event.page, event.info.black_on_white
+                    )
             if not event.reused:
                 _record_output(result, event, params_hash(event.page), out_dir)
         elif isinstance(event, PageDetected):
@@ -906,6 +936,7 @@ def run_batch(
             report,
             result,
             end_stage,
+            polarity,
         )
         if end_stage == FilterStage.OUTPUT:
             names = output_file_names(pages, layout_direction, file_labels)
@@ -920,6 +951,7 @@ def run_batch(
                     defaults=collect_stage_defaults(stages),
                     default_dpi=default_dpi,
                     tiff_compressions=compressions,
+                    black_on_white_detection=polarity,
                 ),
                 names,
                 out_dir,

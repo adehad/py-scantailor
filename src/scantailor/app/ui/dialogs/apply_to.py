@@ -89,6 +89,10 @@ OUTPUT_GROUP_TITLES: dict[ApplyGroup, str] = {
     ApplyGroup.DEPTH_PERCEPTION: cast(
         str, QtCore.QT_TRANSLATE_NOOP("MainWindowManager", "Apply Depth Perception")
     ),
+    ApplyGroup.PROCESSING: cast(
+        str,
+        QtCore.QT_TRANSLATE_NOOP("MainWindowManager", "Apply Processing Settings"),
+    ),
 }
 DESKEW_TITLE = cast(str, QtCore.QT_TRANSLATE_NOOP("MainWindowManager", "Apply Deskew"))
 # Which parts of the Deskew settings are copied, as option key to label.

@@ -41,10 +41,6 @@ Mode
        tab shows the mask of what is kept as a picture.
      - Books with text and pictures on the same page, such as a textbook with plates.
 
-**Black on white mode** sets the polarity of the black and white result. It is on by
-default, which gives black text on a white background. Turn it off for white text on
-a black background.
-
 Options
 =======
 
@@ -222,6 +218,20 @@ The **Show guides** item of the context menu of the output view draws a dashed
 cross through the centre of the view, for judging the alignment of the output.
 **Show grid** draws a line every 10 mm through the centre of the page, as in
 :doc:`margins`; the dewarping tab does not show it. Both choices are remembered.
+
+Processing
+==========
+
+**Black on white mode** tells Output which way round the page is. Ticked, the page
+has dark text on light paper. Unticked, it has light text on a dark background. Output
+then inverts the page, processes it as dark on light and inverts the result back, so
+the output keeps the light text on black.
+
+With **Use auto detection at the output stage** on in :doc:`../settings`, Output sets
+the box itself from the page each time it renders the page. Once you tick or untick
+the box, or copy it to a page with its **Apply to ...** button, that page keeps your
+choice and detection no longer changes it. **Apply to ...** in this panel copies only
+this box, and the one in the Mode panel leaves it as it is.
 
 Zones
 =====

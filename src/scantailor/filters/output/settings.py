@@ -113,6 +113,33 @@ class Settings:
             self._params[page_id] = updated
             return True
 
+    def set_detected_black_on_white(
+        self, page_id: PageId, black_on_white: bool
+    ) -> bool:
+        """Take a measured polarity unless the user chose the page's polarity.
+
+        A page without stored parameters gets the defaults with the polarity,
+        when the polarity differs from the default's.
+
+        Args:
+            page_id (PageId): The page.
+            black_on_white (bool): True when the page has dark content on a
+                light background.
+
+        Returns:
+            bool: True if the stored parameters changed.
+        """
+        current = self.get_params(page_id)
+        with self._lock:
+            stored = self._params.get(page_id, current)
+            if (
+                stored.black_on_white_set_manually
+                or stored.black_on_white == black_on_white
+            ):
+                return False
+            self._params[page_id] = stored.with_black_on_white(black_on_white)
+            return True
+
     def is_params_set(self, page_id: PageId) -> bool:
         """Check if parameters have been explicitly set for a page.
 

@@ -18,9 +18,10 @@ from scantailor.app.ui.MainWindow import MainWindowManager
 from scantailor.core.batch import BatchResult, PageDone
 from scantailor.core.models import Dpi, ImageId, Margins, PageId, SubPage
 from scantailor.core.project import ImageMetadata
-from scantailor.core.propagation import ApplyScope
+from scantailor.core.propagation import ApplyScope, select_pages
 from scantailor.core.settings import ApplicationSettings
 from scantailor.core.stage_sequence import FilterStage
+from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.dewarping_options import DewarpingMode
 from scantailor.filters.output.params import ApplyGroup, DistortionModelSpec
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
@@ -626,6 +627,69 @@ class TestApplyTo:
         after = output.get_params(target)
         assert after.output_dpi == Dpi.uniform(400)
         assert after.with_output_dpi(target_before.output_dpi) == target_before
+
+    @pytest.mark.parametrize(
+        "scope", [ApplyScope.ALL_PAGES, ApplyScope.THIS_PAGE_EVERY_OTHER]
+    )
+    def test_processing_button_copies_only_the_polarity_as_chosen_by_hand(
+        self, settled_window: MainWindowManager, scope: ApplyScope
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.OUTPUT)
+        pages = window.pages()
+        current = window.current_page
+        assert current is not None
+        output = window.stages.output_filter
+        output.set_params(
+            current,
+            output.get_params(current)
+            .with_black_on_white(False)
+            .with_color_mode(ColorMode.MIXED),
+        )
+        before = {page: output.get_params(page) for page in pages}
+        button = window.filterOptions.findChild(
+            QtWidgets.QPushButton, "apply_processing_btn"
+        )
+        assert button is not None
+
+        _answer_apply_dialog(scope)
+        button.click()
+
+        targets = set(select_pages(scope, current, pages)) - {current}
+        assert targets
+        for page in pages:
+            after = output.get_params(page)
+            if page in targets:
+                assert after.black_on_white is False
+                assert after.black_on_white_set_manually
+                assert after.color_mode == before[page].color_mode
+            elif page != current:
+                assert after == before[page]
+
+    def test_colour_button_leaves_the_polarity_of_other_pages(
+        self, settled_window: MainWindowManager
+    ):
+        window = settled_window
+        _switch_stage(window, FilterStage.OUTPUT)
+        current = window.current_page
+        assert current is not None
+        output = window.stages.output_filter
+        output.set_params(
+            current,
+            output.get_params(current)
+            .with_manual_black_on_white(False)
+            .with_color_mode(ColorMode.MIXED),
+        )
+
+        _answer_apply_dialog(ApplyScope.ALL_PAGES)
+        window.show_apply_dialog(FilterStage.OUTPUT, part=ApplyGroup.COLOR_MODE.value)
+
+        for page in window.pages():
+            if page != current:
+                after = output.get_params(page)
+                assert after.color_mode == ColorMode.MIXED
+                assert after.black_on_white is True
+                assert not after.black_on_white_set_manually
 
     def test_applying_refreshes_the_thumbnails_of_all_pages(
         self, settled_window: MainWindowManager

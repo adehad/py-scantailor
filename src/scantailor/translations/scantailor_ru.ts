@@ -2259,6 +2259,11 @@ Process them now? Export the PDF again once processing is done.</source>
         <translation>Применить восприятие глубины</translation>
     </message>
     <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="94"/>
+        <source>Apply Processing Settings</source>
+        <translation>Применить настройки обработки</translation>
+    </message>
+    <message>
         <location filename="../app/ui/dialogs/apply_to.py" line="93"/>
         <source>Apply Deskew</source>
         <extracomment>Machine draft, pending native review.</extracomment>
@@ -4589,8 +4594,9 @@ Unchecked: white text on black background</source>
         <translation>Удалить пятна</translation>
     </message>
     <message>
+        <location filename="../app/ui/options_widgets/output.py" line="1068"/>
         <source>Processing</source>
-        <translation type="vanished">Обработка</translation>
+        <translation>Обработка</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/output.py" line="1223"/>

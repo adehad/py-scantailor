@@ -110,10 +110,36 @@ class TestControlsWriteParams:
 
         assert bw.changed == [PAGE]
 
-    def test_white_margins_checkbox_sets_black_on_white(self, bw: _Widget):
+    def test_black_on_white_checkbox_records_the_choice_as_made_by_hand(
+        self, bw: _Widget
+    ):
         bw.set_check("blackOnWhiteCB", False)
 
         assert bw.params.black_on_white is False
+        assert bw.params.black_on_white_set_manually is True
+        assert bw.changed == [PAGE]
+
+    def test_black_on_white_sits_in_the_processing_group_with_its_own_apply(
+        self, bw: _Widget, qtbot: QtBot
+    ):
+        group = bw.find(QtWidgets.QGroupBox, "processingOptionsPanel")
+        assert group.findChild(QtWidgets.QCheckBox, "blackOnWhiteCB") is not None
+        assert bw.shown("processingOptionsPanel")
+
+        with qtbot.waitSignal(bw.widget.apply_group_requested) as blocker:
+            bw.click(QtWidgets.QPushButton, "apply_processing_btn")
+
+        assert blocker.args == [ApplyGroup.PROCESSING]
+        assert OUTPUT_GROUP_TITLES[ApplyGroup.PROCESSING] == "Apply Processing Settings"
+
+    def test_showing_a_measured_polarity_does_not_mark_it_as_chosen(self, bw: _Widget):
+        bw.filter.set_params(PAGE, bw.params.with_black_on_white(False))
+
+        bw.widget.show_black_on_white()
+
+        assert not bw.find(QtWidgets.QCheckBox, "blackOnWhiteCB").isChecked()
+        assert bw.params.black_on_white_set_manually is False
+        assert bw.changed == []
 
     @pytest.mark.parametrize(
         ("name", "field"),

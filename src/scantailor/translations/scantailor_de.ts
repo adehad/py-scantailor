@@ -2264,6 +2264,11 @@ Jetzt verarbeiten? Exportieren Sie das PDF nach Abschluss der Verarbeitung erneu
         <translation>Tiefenwahrnehmung anwenden</translation>
     </message>
     <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="94"/>
+        <source>Apply Processing Settings</source>
+        <translation>Verarbeitungseinstellungen anwenden</translation>
+    </message>
+    <message>
         <location filename="../app/ui/dialogs/apply_to.py" line="93"/>
         <source>Apply Deskew</source>
         <extracomment>Machine draft, pending native review.</extracomment>
@@ -4643,8 +4648,9 @@ Deaktiviert: weißer Text auf schwarzem Hintergrund</translation>
         <translation>Flecken entfernen</translation>
     </message>
     <message>
+        <location filename="../app/ui/options_widgets/output.py" line="1068"/>
         <source>Processing</source>
-        <translation type="vanished">Verarbeitung</translation>
+        <translation>Verarbeitung</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/output.py" line="1223"/>

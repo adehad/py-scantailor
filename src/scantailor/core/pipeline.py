@@ -24,12 +24,14 @@ import numpy as np
 from loguru import logger
 from numpy.typing import NDArray
 
+from scantailor.core.black_on_white_estimator import is_black_on_white
 from scantailor.core.models import Dpi, PageId, SubPage, page_name
 from scantailor.core.page_geometry import (
     page_crop_area,
     page_polygon,
     selection_rects,
 )
+from scantailor.core.settings import BlackOnWhiteDetection
 from scantailor.core.stage_summary import summarize_stage
 from scantailor.core.transformation import (
     ImageTransformation,
@@ -158,6 +160,9 @@ class PipelineOptions:
         render_image: False when a run that ends before Output is only wanted
             for its parameters and transformation; ``PipelineResult.image`` is
             then the source instead of a resampled view.
+        black_on_white_detection: Whether Deskew and Select Content invert a
+            page of light content on a dark background before detecting on it,
+            and whether Output takes that polarity.
     """
 
     start_stage: FilterStage = FilterStage.FIX_ORIENTATION
@@ -168,6 +173,9 @@ class PipelineOptions:
     keep_output_extras: bool = False
     should_cancel: Callable[[], bool] | None = None
     render_image: bool = True
+    black_on_white_detection: BlackOnWhiteDetection = field(
+        default_factory=BlackOnWhiteDetection
+    )
 
 
 class _PageState:
@@ -180,6 +188,7 @@ class _PageState:
     def __init__(self, source: NDArray[np.uint8], dpi: float) -> None:
         self._dpi = Dpi.uniform(max(2, round(dpi)))
         self._view: NDArray[np.uint8] | None = None
+        self._black_on_white: bool | None = None
         self.source = source
         self.xform = self._new_transformation(source)
         # Content rectangle in source coordinates, set by the page layout stage;
@@ -204,12 +213,29 @@ class _PageState:
         self.content_polygon_source = None
         self.trim_area = None
         self._view = None
+        self._black_on_white = None
 
     def view(self) -> NDArray[np.uint8]:
         """Return the source resampled through the current transformation."""
         if self._view is None:
             self._view = render_transformed(self.source, self.xform)
         return self._view
+
+    def is_black_on_white(self) -> bool:
+        """Tell whether the page inside the pre-crop area has dark content on light."""
+        if self._black_on_white is None:
+            self._black_on_white = is_black_on_white(self.source, self.xform)
+        return self._black_on_white
+
+    def detection_view(self, detection: BlackOnWhiteDetection) -> NDArray[np.uint8]:
+        """Return ``view``, inverted when it shows light content on a dark page.
+
+        The source is inverted before it is resampled, so the area with no
+        source pixel stays white, as it is in ``view``.
+        """
+        if not detection.enabled or self.is_black_on_white():
+            return self.view()
+        return render_transformed(255 - self.source, self.xform)
 
     def view_size(self) -> tuple[int, int]:
         """Return the (width, height) of ``view`` without resampling."""
@@ -223,6 +249,7 @@ class _PageState:
         """Crop to a polygon given in source coordinates."""
         self.xform.set_pre_crop_area(area)
         self._view = None
+        self._black_on_white = None
 
     def apply_deskew(self, filter_: DeskewFilter, params: DeskewParams) -> None:
         """Rotate by the deskew angle, then shear by the oblique angle."""
@@ -538,7 +565,7 @@ def _process_stage(
     if stage == FilterStage.PAGE_SPLIT:
         return _process_page_split(state, page_id, sequence, options, detect)
     if stage == FilterStage.DESKEW:
-        return _process_deskew(state, page_id, sequence, detect)
+        return _process_deskew(state, page_id, sequence, options, detect)
     if stage == FilterStage.SELECT_CONTENT:
         return _process_select_content(state, page_id, sequence, options, detect)
     return _process_page_layout(state, page_id, sequence, options)
@@ -652,6 +679,7 @@ def _process_deskew(
     state: _PageState,
     page_id: PageId,
     sequence: StageSequence,
+    options: PipelineOptions,
     detect: bool,
 ) -> dict:
     """Process the Deskew stage, rotating by the correction angle."""
@@ -664,7 +692,10 @@ def _process_deskew(
     skew = None
     if detect and filter_.needs_detection(page_id, dependencies):
         skew = filter_.detect_skew(
-            state.view(), page_id, dependencies=dependencies, dpi=state.dpi
+            state.detection_view(options.black_on_white_detection),
+            page_id,
+            dependencies=dependencies,
+            dpi=state.dpi,
         )
 
     params = filter_.get_params(page_id)
@@ -724,7 +755,7 @@ def _process_select_content(
     filter_ = sequence.select_content_filter
     if detect:
         params = filter_.process(
-            state.view,
+            lambda: state.detection_view(options.black_on_white_detection),
             page_id,
             dpi=options.dpi,
             outside=lambda: _outside_source_mask(state),
@@ -853,9 +884,10 @@ def _process_output(
     """
     from scantailor.filters.output.generator import generate_output
 
-    params = sequence.output_filter.get_params(page_id)
+    params = _settled_polarity(state, page_id, sequence, options)
 
     metadata: dict = {
+        "black_on_white": params.black_on_white,
         "color_mode": params.color_mode.value,
         "despeckle_level": params.despeckle_level.value,
         "despeckle_strength": params.despeckle_strength,
@@ -943,6 +975,23 @@ def _process_output(
         found.metrics,
         auto_zones,
     )
+
+
+def _settled_polarity(
+    state: _PageState,
+    page_id: PageId,
+    sequence: StageSequence,
+    options: PipelineOptions,
+) -> Params:
+    """Return the page's output parameters with the polarity Output works in.
+
+    When Output takes the measured polarity and the user has not chosen one,
+    a measured polarity that differs from the stored one is stored.
+    """
+    settings = sequence.output_filter.settings
+    if options.black_on_white_detection.output and not options.detect_only:
+        settings.set_detected_black_on_white(page_id, state.is_black_on_white())
+    return settings.get_params(page_id)
 
 
 def _mask_on_page(

@@ -2220,6 +2220,11 @@ Przetworzyć je teraz? Po zakończeniu przetwarzania wyeksportuj PDF ponownie.</
         <translation>Zastosuj percepcję głębi</translation>
     </message>
     <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="94"/>
+        <source>Apply Processing Settings</source>
+        <translation>Zastosuj ustawienia przetwarzania</translation>
+    </message>
+    <message>
         <location filename="../app/ui/dialogs/apply_to.py" line="93"/>
         <source>Apply Deskew</source>
         <extracomment>Machine draft, pending native review.</extracomment>
@@ -4570,8 +4575,9 @@ Niezaznaczone: biały tekst na czarnym tle</translation>
         <translation>Usuń plamy</translation>
     </message>
     <message>
+        <location filename="../app/ui/options_widgets/output.py" line="1068"/>
         <source>Processing</source>
-        <translation type="vanished">Przetwarzanie</translation>
+        <translation>Przetwarzanie</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/output.py" line="1223"/>

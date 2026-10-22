@@ -638,6 +638,21 @@ class TestOutput:
         assert binarization.method is method
         assert (binarization.edge_div_kep, binarization.edge_div_kbd) == (kep, kbd)
 
+    @pytest.mark.parametrize("flag", ["0", "1"])
+    def test_polarity_set_by_hand_is_read_from_the_processing_params(
+        self, tmp_path: Path, flag: str
+    ):
+        project_file = _fixture(tmp_path, "split_and_mixed")
+        text = project_file.read_text(encoding="utf-8").replace(
+            'blackOnWhiteSetManually="0"', f'blackOnWhiteSetManually="{flag}"'
+        )
+
+        project = import_xml_project(project_file, text).project
+        params = _params(project, "output", OutputParams)[_page(project, 2)]
+
+        assert not params.black_on_white
+        assert params.black_on_white_set_manually is (flag == "1")
+
     def test_colour_page_keeps_filling_posterization_and_wiener_options(
         self, tmp_path: Path
     ):

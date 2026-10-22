@@ -409,6 +409,7 @@ class OptionsWidget(QWidget):
         self._build_posterization_group(layout)
         self._build_picture_shape_group(layout)
         self._build_despeckle_group(layout)
+        self._build_processing_group(layout)
         self._build_dewarping_group(layout)
         self._build_depth_group(layout)
         self._set_tooltips()
@@ -477,19 +478,6 @@ class OptionsWidget(QWidget):
         self._mixed_btn.setIcon(icon("colour-mode-mixed"))
         self._bw_btn.setChecked(True)
         mode_layout.addLayout(mode_btn_layout)
-
-        bow_layout = QHBoxLayout()
-        bow_layout.addItem(_spacer())
-        self._black_on_white_check = _check_box(
-            "blackOnWhiteCB",
-            QtCore.QCoreApplication.translate(
-                "output::OptionsWidget", "Black on white mode"
-            ),
-        )
-        self._black_on_white_check.setChecked(True)
-        bow_layout.addWidget(self._black_on_white_check)
-        bow_layout.addItem(_spacer())
-        mode_layout.addLayout(bow_layout)
 
         self._apply_buttons[ApplyGroup.COLOR_MODE] = _apply_button(
             mode_layout, ApplyGroup.COLOR_MODE
@@ -1075,6 +1063,32 @@ class OptionsWidget(QWidget):
         )
         layout.addWidget(self._despeckle_group)
 
+    def _build_processing_group(self, layout: QVBoxLayout) -> None:
+        self._processing_group = CollapsibleGroupBox(
+            QtCore.QCoreApplication.translate("output::OptionsWidget", "Processing"),
+            self,
+        )
+        self._processing_group.setObjectName("processingOptionsPanel")
+        processing_layout = QVBoxLayout(self._processing_group)
+
+        bow_layout = QHBoxLayout()
+        bow_layout.addItem(_spacer())
+        self._black_on_white_check = _check_box(
+            "blackOnWhiteCB",
+            QtCore.QCoreApplication.translate(
+                "output::OptionsWidget", "Black on white mode"
+            ),
+        )
+        self._black_on_white_check.setChecked(True)
+        bow_layout.addWidget(self._black_on_white_check)
+        bow_layout.addItem(_spacer())
+        processing_layout.addLayout(bow_layout)
+
+        self._apply_buttons[ApplyGroup.PROCESSING] = _apply_button(
+            processing_layout, ApplyGroup.PROCESSING
+        )
+        layout.addWidget(self._processing_group)
+
     def _build_dewarping_group(self, layout: QVBoxLayout) -> None:
         self._dewarping_group = CollapsibleGroupBox(
             QtCore.QCoreApplication.translate("output::OptionsWidget", "Dewarping"),
@@ -1619,7 +1633,7 @@ class OptionsWidget(QWidget):
         self._dpi_spinbox.valueChanged.connect(self._on_dpi_changed)
 
         self._mode_button_group.buttonClicked.connect(self._on_color_mode_changed)
-        self._black_on_white_check.toggled.connect(self._on_black_on_white_changed)
+        self._black_on_white_check.clicked.connect(self._on_black_on_white_changed)
 
         self._fill_margins_check.toggled.connect(
             lambda on: self._edit_color_common(fill_margins=on)
@@ -1796,6 +1810,17 @@ class OptionsWidget(QWidget):
         """
         self._dewarp_metrics = metrics
         self._show_dewarp_metrics()
+
+    def show_black_on_white(self) -> None:
+        """Show the current page's polarity, which a render may have measured."""
+        if self._current_page_id is None:
+            return
+        params = self._filter.get_params(self._current_page_id)
+        self._updating = True
+        try:
+            self._black_on_white_check.setChecked(params.black_on_white)
+        finally:
+            self._updating = False
 
     def set_distortion_model(self, model: DistortionModelSpec) -> None:
         """Store a manually edited distortion model for the current page.
@@ -2082,7 +2107,7 @@ class OptionsWidget(QWidget):
             self._edit_picture_shape(refresh=True, shape=PictureShape(value))
 
     def _on_black_on_white_changed(self, checked: bool) -> None:
-        self._edit(lambda p: p.with_black_on_white(checked))
+        self._edit(lambda p: p.with_manual_black_on_white(checked))
 
     def _on_equalize_changed(self, checked: bool) -> None:
         def change(params: Params) -> Params:
