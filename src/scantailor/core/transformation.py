@@ -787,7 +787,6 @@ def warp_area_averaged(
 
     An output pixel that covers at most one source pixel along both axes skips
     the filter, so 1:1 and enlarging warps are plain ``cv2.warpAffine``.
-    ``tests/core/test_area_averaging.py`` holds the comparisons with upstream.
 
     Args:
         image (numpy.ndarray of numpy.uint8): Source, (H, W) or (H, W, C) with
