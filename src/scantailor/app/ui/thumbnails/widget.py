@@ -1,5 +1,6 @@
 """Standalone page thumbnail list with sort order and selection handling."""
 
+import math
 from collections.abc import Callable, Hashable, Sequence
 from pathlib import Path
 from typing import Any, cast
@@ -8,10 +9,12 @@ from PySide6 import QtCore
 from PySide6.QtCore import (
     QEvent,
     QItemSelectionModel,
+    QLineF,
     QModelIndex,
     QObject,
     QPersistentModelIndex,
     QPoint,
+    QPointF,
     QRect,
     QRectF,
     QSize,
@@ -44,7 +47,10 @@ from scantailor.app.ui.icons import icon
 from scantailor.app.ui.theme.fonts import small
 from scantailor.app.ui.theme.tokens import view_color
 from scantailor.app.ui.thumbnails.cache import ThumbnailCache
+from scantailor.app.ui.thumbnails.deviation import deviation_provider
 from scantailor.app.ui.thumbnails.model import (
+    DeviantPagesProvider,
+    DeviantRole,
     IncompletenessProvider,
     IncompleteRole,
     IsCurrentRole,
@@ -74,6 +80,9 @@ _CAPTION_LEADING = 4
 _QUESTION_MARK_FILL = 0.9
 _QUESTION_MARK_ALPHA = 160
 _QUESTION_MARK_PEN = 2
+# The deviation asterisk spans this fraction of the picture's shorter side.
+_ASTERISK_SPAN = 0.25
+_ASTERISK_SPOKES = 3
 
 
 def _question_mark() -> QPainterPath:
@@ -190,6 +199,8 @@ class ThumbnailDelegate(QStyledItemDelegate):
             painter.drawImage(target, image)
         if index.data(IncompleteRole):
             self._paint_question_mark(painter, picture_area)
+        elif index.data(DeviantRole):
+            self._paint_asterisk(painter, picture_area)
 
         # The caption lies below the inset selection fill, on the plain background.
         painter.setPen(palette.text().color())
@@ -219,6 +230,21 @@ class ThumbnailDelegate(QStyledItemDelegate):
                 _FRAME_RADIUS,
                 _FRAME_RADIUS,
             )
+        painter.restore()
+
+    @staticmethod
+    def _paint_asterisk(painter: QPainter, area: QRect) -> None:
+        """Draw the mark that says the page stands out from the other pages."""
+        radius = min(area.width(), area.height()) * _ASTERISK_SPAN / 2
+        center = QRectF(area).center()
+        pen = QPen(view_color("deviant_mark"), max(2.0, radius / 3.5))
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.save()
+        painter.setPen(pen)
+        for spoke in range(_ASTERISK_SPOKES):
+            angle = math.pi / 2 + spoke * math.pi / _ASTERISK_SPOKES
+            offset = QPointF(radius * math.cos(angle), radius * math.sin(angle))
+            painter.drawLine(QLineF(center - offset, center + offset))
         painter.restore()
 
     @staticmethod
@@ -788,13 +814,26 @@ class ThumbnailListWidget(QWidget):
         """
         self._model.set_incompleteness_provider(provider)
 
+    def set_deviation_provider(self, provider: DeviantPagesProvider | None) -> None:
+        """Choose how the pages that stand out at the shown stage are found.
+
+        Args:
+            provider (DeviantPagesProvider | None): The finder; None marks no page.
+        """
+        self._model.set_deviation_provider(provider)
+
+    def refresh_marks(self) -> None:
+        """Look again at which pages are incomplete or deviant, rendering nothing."""
+        self._model.refresh()
+
     def bind_stage_sequence(self, sequence: StageSequence) -> None:
-        """Take the sort options and incomplete pages from a project's stages.
+        """Take the sort options and the marked pages from a project's stages.
 
         Args:
             sequence (StageSequence): The stages, whose settings are only read.
         """
         self.set_incompleteness_provider(completeness_provider(sequence))
+        self.set_deviation_provider(deviation_provider(sequence))
         self.set_stage_orders_provider(stage_orders_provider(sequence))
 
     @property

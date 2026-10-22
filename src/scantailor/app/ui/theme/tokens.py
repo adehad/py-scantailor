@@ -66,6 +66,8 @@ class ViewColors:
         indicator_scrim (str): Disc behind the orientation indicator.
         indicator_glyph (str): Orientation indicator arrow.
         indicator_label (str): Orientation indicator angle text.
+        deviant_mark (str): Asterisk on the thumbnail of a page that stands out
+            from the others.
     """
 
     split_line: str
@@ -102,6 +104,7 @@ class ViewColors:
     indicator_scrim: str
     indicator_glyph: str
     indicator_label: str
+    deviant_mark: str
 
 
 @dataclasses.dataclass(frozen=True)
@@ -223,6 +226,7 @@ LIGHT = Tokens(
         indicator_scrim="rgba(0, 0, 0, 140)",
         indicator_glyph="#ffffff",
         indicator_label="rgba(42, 38, 32, 220)",
+        deviant_mark="rgba(221, 0, 0, 204)",
     ),
 )
 
@@ -286,6 +290,7 @@ DARK = Tokens(
         indicator_scrim="rgba(0, 0, 0, 160)",
         indicator_glyph="#ffffff",
         indicator_label="rgba(232, 236, 244, 230)",
+        deviant_mark="rgba(255, 70, 60, 220)",
     ),
 )
 

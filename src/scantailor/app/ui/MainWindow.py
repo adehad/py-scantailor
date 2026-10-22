@@ -827,7 +827,7 @@ class MainWindowManager:
         settings = ApplicationSettings.get_instance()
         settings.highlight_deviation = highlighted
         settings.save()
-        self._invalidate_thumbnails()
+        self.thumbnails.refresh_marks()
 
     def scale_thumbnails(self, direction: int) -> None:
         """Make the thumbnails larger or smaller by one step.
@@ -857,6 +857,8 @@ class MainWindowManager:
         """Take the thumbnail options of ``settings`` into the list and its buttons."""
         self.thumbnails.apply_settings(settings)
         self.thumbColumnViewBtn.setChecked(settings.single_column_thumbnail_display)
+        self.deviationHighlightingBtn.setChecked(settings.highlight_deviation)
+        self.thumbnails.refresh_marks()
 
     def _wire_units_menu(self) -> None:
         """Bind the Units menu to the shared unit and the stored setting."""

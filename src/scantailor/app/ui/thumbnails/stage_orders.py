@@ -9,6 +9,14 @@ stage holds no result for it yet.
 import math
 from collections.abc import Callable, Sequence
 
+from scantailor.app.ui.thumbnails.deviation import (
+    PageValue,
+    content_diagonal,
+    content_size,
+    deskew_angle,
+    distances_from_median,
+    hard_margins_diagonal,
+)
 from scantailor.app.ui.thumbnails.model import (
     PageEntry,
     PageOrderOption,
@@ -114,19 +122,19 @@ def stage_page_orders(
         case FilterStage.DESKEW:
             return [
                 natural_order(),
-                _order_by_deviation(sequence, _deskew_angle),
+                _order_by_deviation(sequence, deskew_angle),
             ]
         case FilterStage.SELECT_CONTENT:
             return [
                 natural_order(),
-                *_size_orders(sequence, _content_size),
-                _order_by_deviation(sequence, _content_diagonal),
+                *_size_orders(sequence, content_size),
+                _order_by_deviation(sequence, content_diagonal, unknown_deviates=True),
             ]
         case FilterStage.PAGE_LAYOUT:
             return [
                 natural_order(),
                 *_size_orders(sequence, _layout_size),
-                _order_by_deviation(sequence, _hard_margins_diagonal),
+                _order_by_deviation(sequence, hard_margins_diagonal),
             ]
         case FilterStage.OUTPUT:
             return [natural_order(), _order_by_completeness()]
@@ -172,13 +180,17 @@ def _size_orders(
 
 def _order_by_deviation(
     sequence: StageSequence,
-    value: Callable[[StageSequence, PageId], float],
+    value: PageValue,
+    unknown_deviates: bool = False,
 ) -> PageOrderOption:
-    """Order pages by how far their value lies from the mean, the largest first.
+    """Order pages by their distance from the median, the largest first.
 
-    Pages whose value is unknown, and incomplete pages, go to the back.
+    The distance is the one the deviation marks use, so marked pages come
+    first. Pages without a value come first when the stage marks them, and
+    last otherwise; incomplete pages go to the back.
     """
     deviations: dict[PageId, float] = {}
+    unknown = math.inf if unknown_deviates else _UNKNOWN_DEVIATION
 
     def prepare(entries: Sequence[PageEntry]) -> None:
         values = {
@@ -186,36 +198,15 @@ def _order_by_deviation(
             for entry in entries
             if not entry.incomplete
         }
-        known = [v for v in values.values() if not math.isnan(v)]
         deviations.clear()
-        if len(values) < 2 or not known:
-            deviations.update({page: 0.0 for page in values})
-            return
-        mean = sum(known) / len(known)
-        for page, page_value in values.items():
-            deviations[page] = (
-                _UNKNOWN_DEVIATION if math.isnan(page_value) else abs(page_value - mean)
-            )
+        for page, distance in distances_from_median(values).items():
+            deviations[page] = unknown if math.isnan(distance) else distance
 
     def key(entry: PageEntry) -> tuple[bool, float]:
         deviation = deviations.get(entry.page, _UNKNOWN_DEVIATION)
         return entry.incomplete, -deviation
 
     return PageOrderOption("Order by decreasing deviation", key, prepare)
-
-
-def _deskew_angle(sequence: StageSequence, page: PageId) -> float:
-    return sequence.deskew_filter.get_params(page).deskew_angle_deg
-
-
-def _content_size(sequence: StageSequence, page: PageId) -> tuple[float, float] | None:
-    size = sequence.select_content_filter.get_params(page).content_size_mm
-    return None if size.is_empty() else (size.width_mm, size.height_mm)
-
-
-def _content_diagonal(sequence: StageSequence, page: PageId) -> float:
-    size = _content_size(sequence, page)
-    return math.nan if size is None else math.hypot(*size)
 
 
 def _layout_size(sequence: StageSequence, page: PageId) -> tuple[float, float] | None:
@@ -227,8 +218,3 @@ def _layout_size(sequence: StageSequence, page: PageId) -> tuple[float, float] |
         params.content_size_mm.width_mm + margins.left + margins.right,
         params.content_size_mm.height_mm + margins.top + margins.bottom,
     )
-
-
-def _hard_margins_diagonal(sequence: StageSequence, page: PageId) -> float:
-    margins = sequence.page_layout_filter.get_params(page).hard_margins_mm
-    return math.hypot(margins.left + margins.right, margins.top + margins.bottom)
