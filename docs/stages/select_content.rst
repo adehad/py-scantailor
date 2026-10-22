@@ -23,7 +23,11 @@ page box.
        Margins stage takes the page size from it.
 
 Each box has three modes. In **Manual** mode, drag the edges of the box in the
-image. **Apply to ...** copies the setting to other pages.
+image. **Apply to ...** copies the setting to other pages. On a page whose image
+is a different size, a copied manual page box keeps its distance from the centre
+of the image, and a copied manual content box keeps its distance from the centre
+of that page's page box. ScanTailor cuts a page box that would run off the image
+down to the image.
 
 .. list-table::
    :header-rows: 1

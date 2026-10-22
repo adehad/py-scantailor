@@ -6,7 +6,7 @@ boxes flow from Select Content into the Page Layout sizes that Output needs.
 The ``apply_*`` functions implement "Apply to..." for each stage.
 """
 
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from enum import Enum, auto
 from typing import Any
 
@@ -15,6 +15,7 @@ import numpy as np
 from scantailor.core.batch import DEFAULT_DPI
 from scantailor.core.default_params import DefaultParams
 from scantailor.core.models import ImageId, OrthogonalRotation, PageId, SubPage
+from scantailor.core.page_geometry import build_transformation
 from scantailor.core.pipeline import PipelineOptions, fix_aggregate_page_size
 from scantailor.core.project import ImageInfo, ImageMetadata, Project
 from scantailor.core.stage_sequence import FilterStage, StageSequence
@@ -28,7 +29,9 @@ from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.page_split.page_layout_adapter import (
     correct_page_layout_type,
 )
+from scantailor.filters.select_content.content_box import ContentBox, PageBox
 from scantailor.filters.select_content.dependencies import Dependencies
+from scantailor.filters.select_content.params import Params as SelectContentParams
 
 
 class ApplyScope(Enum):
@@ -400,6 +403,65 @@ def apply_deskew(
     )
 
 
+def _polygon_bounds(points: Sequence[Sequence[float]]) -> ContentBox:
+    xs = [float(point[0]) for point in points]
+    ys = [float(point[1]) for point in points]
+    return ContentBox.from_ltrb(min(xs), min(ys), max(xs), max(ys))
+
+
+def _select_content_image(
+    stages: StageSequence,
+    page: PageId,
+    params: SelectContentParams,
+    metadata_of: Mapping[ImageId, ImageMetadata],
+) -> ContentBox:
+    """Bounds of the image Select Content shows for a page; empty if unknown.
+
+    A page Select Content has processed recorded its outline. For any other
+    page the outline is worked out from the image size the project stores and
+    the page's Fix Orientation, Page Split and Deskew settings, the same
+    transformation the pipeline builds.
+    """
+    if params.dependencies.rotated_page_outline:
+        return _polygon_bounds(params.dependencies.rotated_page_outline)
+    metadata = metadata_of.get(page.image_id)
+    if metadata is None or not (metadata.width and metadata.height):
+        return ContentBox()
+    rotation = stages.fix_orientation_filter.get_rotation(page.image_id)
+    oriented = rotation.rotate_dimensions(metadata.width, metadata.height)
+    dpi = metadata.dpi if metadata.is_dpi_ok() else DEFAULT_DPI
+    xform = build_transformation(
+        stages, page, (int(oriented[0]), int(oriented[1])), dpi, FilterStage.DESKEW
+    )
+    return _polygon_bounds(xform.resulting_pre_crop_area.tolist())
+
+
+def _centre_shift(source: ContentBox, target: ContentBox) -> tuple[float, float]:
+    """How far the centre of ``target`` lies from that of ``source``."""
+    return target.center_x - source.center_x, target.center_y - source.center_y
+
+
+def _shifted(box: ContentBox, shift: tuple[float, float]) -> ContentBox:
+    return box.model_copy(update={"x": box.x + shift[0], "y": box.y + shift[1]})
+
+
+def _page_box_for_target(
+    box: PageBox, source_image: ContentBox, target_image: ContentBox
+) -> PageBox:
+    """Centre a copied page box on the target image as it was on the source's.
+
+    The box is then clipped to the target image, or becomes the whole image
+    when it misses it. Unchanged when either image is unknown.
+    """
+    if source_image.is_empty() or target_image.is_empty():
+        return box
+    moved = _shifted(box.to_content_box(), _centre_shift(source_image, target_image))
+    clipped = moved.intersection(target_image)
+    if clipped.is_empty():
+        clipped = target_image
+    return PageBox(**clipped.model_dump())
+
+
 def apply_select_content(
     stages: StageSequence,
     source: PageId,
@@ -407,6 +469,7 @@ def apply_select_content(
     *,
     apply_content_box: bool = True,
     apply_page_box: bool = True,
+    project: Project | None = None,
 ) -> None:
     """Copy the source page's content and page detection settings.
 
@@ -414,27 +477,58 @@ def apply_select_content(
     off. Cached dependencies are reset so detection runs again where it is
     automatic.
 
+    Copied manual boxes are placed by centres, so they stay put on images of
+    the source's size. A manual page box keeps its offset from the centre of
+    the image and is clipped to it. A manual content box keeps its offset
+    from the centre of the target's page box: the copied one, the whole image
+    when page detection is off, or else the box the target last had. Without
+    the project, a target Select Content has not processed has no known image
+    size and keeps the source's coordinates.
+
     Args:
         stages (StageSequence): The stages whose settings are updated.
         source (PageId): The page whose settings are copied.
         targets (Iterable[PageId]): Pages that receive them.
         apply_content_box (bool): Copy a manually set content box.
         apply_page_box (bool): Copy a manually set page box.
+        project (Project | None): Supplies the image sizes of targets Select
+            Content has not processed.
     """
     settings = stages.select_content_filter.settings
-    template = settings.get_params(source).model_copy(
-        update={"dependencies": Dependencies()}
+    metadata_of = (
+        {} if project is None else {info.id: info.metadata for info in project.images}
     )
+    original = settings.get_params(source)
+    source_image = _select_content_image(stages, source, original, metadata_of)
+    template = original.model_copy(update={"dependencies": Dependencies()})
     for page in targets:
         if page == source:
             continue
         params = template
-        if settings.is_params_set(page):
-            old = settings.get_params(page)
-            if params.is_page_manual() and not apply_page_box:
-                params = params.model_copy(update={"page_box": old.page_box})
-            if params.is_content_manual() and not apply_content_box:
-                params = params.model_copy(update={"content_box": old.content_box})
+        known = settings.is_params_set(page)
+        old = settings.get_params(page)
+        target_image = _select_content_image(stages, page, old, metadata_of)
+        if params.is_page_manual() and apply_page_box:
+            params = params.with_page_box(
+                _page_box_for_target(params.page_box, source_image, target_image)
+            )
+        elif params.is_page_disabled() and not target_image.is_empty():
+            params = params.with_page_box(PageBox(**target_image.model_dump()))
+        elif not old.page_box.is_empty():
+            params = params.with_page_box(old.page_box)
+        if params.is_content_manual() and not apply_content_box:
+            if known:
+                params = params.with_content_box(old.content_box)
+        elif (
+            params.is_content_manual()
+            and not original.page_box.is_empty()
+            and not params.page_box.is_empty()
+        ):
+            shift = _centre_shift(
+                original.page_box.to_content_box(),
+                params.page_box.to_content_box(),
+            )
+            params = params.with_content_box(_shifted(params.content_box, shift))
         settings.set_params(page, params)
 
 

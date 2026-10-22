@@ -1922,6 +1922,7 @@ class MainWindowManager:
                     targets,
                     apply_content_box=content_box,
                     apply_page_box=page_box,
+                    project=self.project,
                 )
             case FilterStage.PAGE_LAYOUT if part == "alignment":
                 propagation.apply_alignment(stages, source, targets)
