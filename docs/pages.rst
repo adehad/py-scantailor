@@ -35,7 +35,8 @@ on to Deskew selects both pages of a selected scan.
    * - Navigate through selected pages only
      - Limits the previous and next page buttons to the selected pages.
    * - Multi page selection mode
-     - Lets you select several pages. See :ref:`selecting-several-pages`.
+     - Makes a plain click add or remove a page. See
+       :ref:`selecting-several-pages`.
    * - Single / multi column display
      - Switches the thumbnails between one column and several.
    * - Highlight deviation
@@ -150,21 +151,31 @@ on without redrawing the thumbnails.
 Selecting several pages
 -----------------------
 
-Turn on the multi page selection button. Then:
-
 .. list-table::
    :header-rows: 1
    :widths: 30 70
 
    * - Action
      - What it selects
+   * - Click
+     - Only that page. With the multi page selection button on, a click adds or
+       removes one page, as Ctrl+click does.
    * - Ctrl+click
-     - Adds or removes one page.
+     - Adds or removes one page. The last selected page stays selected.
    * - Shift+click
-     - Selects a range of pages.
+     - Adds every page from the current page to the clicked one.
+   * - Drag from a page
+     - Selects every page the rectangle from the press to the pointer touches,
+       as a click on the first page would. When that click removes the page, the
+       drag removes the pages it touches instead.
    * - Ctrl+drag over empty space
      - Adds every page the rectangle touches. The selection grows and is never
        replaced.
+
+Removing the current page from the selection makes the nearest selected page
+current, looking before it first. Going to another page with the navigation
+buttons or keys selects only that page and turns the multi page selection button
+off.
 
 Insert, remove and add pages
 ----------------------------

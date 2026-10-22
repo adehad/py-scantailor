@@ -4,7 +4,7 @@ import pathlib
 import shutil
 import threading
 from collections.abc import Callable, Sequence
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from PySide6 import QtCore, QtWidgets
@@ -1117,26 +1117,17 @@ class TestThumbnailControls:
 
         assert main_window.thumbnails.order_combo.currentIndex() == 2
 
-    def test_selection_mode_button_toggles_multi_selection(
+    def test_selection_mode_button_makes_a_plain_click_toggle_pages(
         self, main_window: MainWindowManager
     ):
-        view = main_window.thumbnails.view
-        assert (
-            view.selectionMode()
-            == QtWidgets.QAbstractItemView.SelectionMode.SingleSelection
-        )
+        view = cast(Any, main_window.thumbnails.view)
+        assert not view.toggle_on_click
 
         main_window.selectionModeBtn.setChecked(True)
-        assert (
-            view.selectionMode()
-            == QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection
-        )
+        assert view.toggle_on_click
 
         main_window.selectionModeBtn.setChecked(False)
-        assert (
-            view.selectionMode()
-            == QtWidgets.QAbstractItemView.SelectionMode.SingleSelection
-        )
+        assert not view.toggle_on_click
 
     def test_focus_button_decides_whether_the_list_follows_the_current_page(
         self, settled_window: MainWindowManager, monkeypatch: pytest.MonkeyPatch

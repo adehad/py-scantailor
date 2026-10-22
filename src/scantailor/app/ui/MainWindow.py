@@ -738,10 +738,13 @@ class MainWindowManager:
         self.pauseSortingBtn.toggled.connect(self._on_pause_sorting_toggled)
         self.focusButton.toggled.connect(self._on_focus_toggled)
         self.selectionModeBtn.toggled.connect(
-            self.thumbnails.set_multi_selection_enabled
+            self.thumbnails.set_selection_mode_enabled
+        )
+        self.thumbnails.selection_reset.connect(
+            lambda: self.selectionModeBtn.setChecked(False)
         )
         self.thumbnails.set_follow_current(self.focusButton.isChecked())
-        self.thumbnails.set_multi_selection_enabled(self.selectionModeBtn.isChecked())
+        self.thumbnails.set_selection_mode_enabled(self.selectionModeBtn.isChecked())
 
         settings = ApplicationSettings.get_instance()
         self.thumbColumnViewBtn.setChecked(settings.single_column_thumbnail_display)

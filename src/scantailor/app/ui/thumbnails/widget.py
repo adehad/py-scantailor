@@ -2,6 +2,7 @@
 
 import math
 from collections.abc import Callable, Hashable, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
@@ -273,8 +274,7 @@ class _RubberBandSelector(QObject):
     """Selects every thumbnail a Ctrl+drag over empty space touches.
 
     Dragging over a thumbnail is left to the view, so Ctrl+click keeps toggling
-    single pages. The selection is extended, never replaced. Only active while the
-    view allows extended selection.
+    single pages. The selection is extended, never replaced.
 
     Args:
         view (QListView): The view whose viewport is watched.
@@ -318,8 +318,6 @@ class _RubberBandSelector(QObject):
         starts_here = (
             mouse.button() == Qt.MouseButton.LeftButton
             and bool(mouse.modifiers() & Qt.KeyboardModifier.ControlModifier)
-            and view.selectionMode()
-            == QAbstractItemView.SelectionMode.ExtendedSelection
             and not view.indexAt(position).isValid()
         )
         if not starts_here:
@@ -362,6 +360,182 @@ class _RubberBandSelector(QObject):
             )
 
 
+@dataclass
+class _DragSelection:
+    """A press-and-drag over the thumbnails in progress.
+
+    Attributes:
+        adds: True when the rectangle selects what it touches, False when it
+            deselects.
+        before: Rows selected when the drag began; a row the rectangle stops
+            covering returns to this state.
+        touched: Rows the rectangle covered at the last move.
+    """
+
+    adds: bool
+    before: set[int]
+    touched: set[int] = field(default_factory=set)
+
+
+class _ThumbnailView(QListView):
+    """List view whose left clicks select thumbnails as upstream's sequence does.
+
+    A plain click selects only the clicked thumbnail, Ctrl+click adds or removes
+    one, and Shift+click adds every thumbnail between the current one and the
+    clicked one. With ``toggle_on_click`` set, a plain click acts as Ctrl+click.
+    The last selected thumbnail cannot be removed; removing the current one makes
+    the nearest selected thumbnail current, the one before it first.
+
+    Dragging on from the press adds every thumbnail the rectangle from the press
+    point to the cursor touches, or removes them when the press removed the
+    pressed thumbnail. The rectangle replaces its own earlier extent, so moving
+    back shrinks it, and it never removes the last selected thumbnail.
+
+    These clicks bypass Qt's own press handling. Right clicks, keys and the
+    empty area keep Qt's behaviour.
+
+    Signals:
+        selection_reset (): A plain click replaced the selection with one
+            thumbnail.
+    """
+
+    selection_reset = Signal()
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        """Initialise; arguments are described on the class."""
+        super().__init__(parent)
+        self._drag: _DragSelection | None = None
+        self._press_point = QPoint()
+        self.toggle_on_click = False
+        self._press_handled = False
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        index = self.indexAt(event.position().toPoint())
+        if event.button() != Qt.MouseButton.LeftButton or not index.isValid():
+            super().mousePressEvent(event)
+            return
+        self._press_handled = True
+        self._drag = None
+        self._press_point = event.position().toPoint() + self._scroll_offset()
+        event.accept()
+        modifiers = event.modifiers()
+        shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+        # As in Qt's own press handling, the clicked thumbnail must not scroll
+        # away from under the pointer; a drag from it would start elsewhere.
+        auto_scroll = self.hasAutoScroll()
+        self.setAutoScroll(False)
+        try:
+            if modifiers & Qt.KeyboardModifier.ControlModifier or (
+                self.toggle_on_click and not shift
+            ):
+                self._toggle(index)
+            elif shift:
+                self._extend_to(index)
+            else:
+                self._select_only(index)
+        finally:
+            self.setAutoScroll(auto_scroll)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if self._press_handled and event.buttons() & Qt.MouseButton.LeftButton:
+            event.accept()
+            if self._drag is not None:
+                self._drag_to(event.position().toPoint())
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        if self._press_handled and event.button() == Qt.MouseButton.LeftButton:
+            self._press_handled = False
+            self._drag = None
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def _scroll_offset(self) -> QPoint:
+        return QPoint(self.horizontalOffset(), self.verticalOffset())
+
+    def _begin_drag(self, adds: bool) -> None:
+        rows = {index.row() for index in self.selectionModel().selectedRows()}
+        self._drag = _DragSelection(adds=adds, before=rows)
+
+    def _drag_to(self, position: QPoint) -> None:
+        drag = self._drag
+        assert drag is not None
+        area = QRect(self._press_point - self._scroll_offset(), position).normalized()
+        model = self.model()
+        selection = self.selectionModel()
+        touched = {
+            row
+            for row in range(model.rowCount())
+            if self.visualRect(model.index(row, 0)).intersects(area)
+        }
+        if not drag.adds and not drag.before - touched:
+            return
+        flags = QItemSelectionModel.SelectionFlag
+        for row in drag.touched - touched:
+            selection.select(
+                model.index(row, 0),
+                flags.Select if row in drag.before else flags.Deselect,
+            )
+        for row in touched - drag.touched:
+            selection.select(
+                model.index(row, 0), flags.Select if drag.adds else flags.Deselect
+            )
+        drag.touched = touched
+
+    def _select_only(self, index: QModelIndex) -> None:
+        self.selectionModel().setCurrentIndex(
+            index, QItemSelectionModel.SelectionFlag.ClearAndSelect
+        )
+        self._begin_drag(adds=True)
+        self.selection_reset.emit()
+
+    def _toggle(self, index: QModelIndex) -> None:
+        selection = self.selectionModel()
+        flags = QItemSelectionModel.SelectionFlag
+        if not selection.isSelected(index):
+            selection.setCurrentIndex(index, flags.Select)
+            self._begin_drag(adds=True)
+            return
+        if len(selection.selectedRows()) < 2:
+            selection.setCurrentIndex(index, flags.NoUpdate)
+            self._begin_drag(adds=True)
+            return
+        was_current = index == selection.currentIndex()
+        selection.select(index, flags.Deselect)
+        self._begin_drag(adds=False)
+        if was_current:
+            selection.setCurrentIndex(
+                self._nearest_selected(index.row()), flags.NoUpdate
+            )
+
+    def _nearest_selected(self, row: int) -> QModelIndex:
+        """Return the selected row closest to ``row``, looking before it first."""
+        model = self.model()
+        selection = self.selectionModel()
+        for distance in range(1, model.rowCount()):
+            for candidate in (row - distance, row + distance):
+                index = model.index(candidate, 0)
+                if index.isValid() and selection.isSelected(index):
+                    return index
+        return QModelIndex()
+
+    def _extend_to(self, index: QModelIndex) -> None:
+        selection = self.selectionModel()
+        current = selection.currentIndex()
+        if not current.isValid():
+            self._select_only(index)
+            return
+        first, last = sorted((current.row(), index.row()))
+        model = self.model()
+        for row in range(first, last + 1):
+            selection.select(
+                model.index(row, 0), QItemSelectionModel.SelectionFlag.Select
+            )
+        selection.setCurrentIndex(index, QItemSelectionModel.SelectionFlag.NoUpdate)
+
+
 class ThumbnailListWidget(QWidget):
     """Scrollable list of page thumbnails.
 
@@ -399,6 +573,8 @@ class ThumbnailListWidget(QWidget):
         insert_here_requested (): "Insert here ..." was chosen in the empty area.
         orders_changed (): The sort options were replaced, as the shown stage
             has others.
+        selection_reset (): The selection was replaced with the one current
+            page, by a plain click or by ``set_current_page``.
     """
 
     page_selected = Signal(object)
@@ -408,6 +584,7 @@ class ThumbnailListWidget(QWidget):
     remove_pages_requested = Signal(object)
     insert_here_requested = Signal()
     orders_changed = Signal()
+    selection_reset = Signal()
 
     def __init__(
         self,
@@ -454,7 +631,8 @@ class ThumbnailListWidget(QWidget):
         for order in self._orders:
             self._order_combo.addItem(order.name)
 
-        self._view = QListView(self)
+        self._view = _ThumbnailView(self)
+        self._view.selection_reset.connect(self.selection_reset)
         self._view.setModel(self._model)
         self._delegate = ThumbnailDelegate(size, self._view)
         self._view.setItemDelegate(self._delegate)
@@ -713,7 +891,7 @@ class ThumbnailListWidget(QWidget):
         page itself is remembered, so it is current again once pages are shown.
 
         Scrolls it into view only while following the current page. Emits
-        ``page_selected`` if the current page changes.
+        ``page_selected`` if the current page changes, and ``selection_reset``.
 
         Args:
             page (PageId): The page to make current.
@@ -725,12 +903,17 @@ class ThumbnailListWidget(QWidget):
         # the follow setting may decide that for programmatic navigation.
         self._view.setAutoScroll(False)
         try:
-            self._view.setCurrentIndex(self._model.index(row))
+            # QListView.setCurrentIndex would read the keyboard modifiers held
+            # right now and extend the selection while Ctrl or Shift is down.
+            self._view.selectionModel().setCurrentIndex(
+                self._model.index(row), QItemSelectionModel.SelectionFlag.ClearAndSelect
+            )
         finally:
             self._view.setAutoScroll(True)
         self._model.set_current_page(page)
         if self._follow_current:
             self.scroll_to_current()
+        self.selection_reset.emit()
 
     def scroll_to_current(self) -> None:
         """Scroll so the current page is visible."""
@@ -749,18 +932,14 @@ class ThumbnailListWidget(QWidget):
         """
         self._follow_current = enabled
 
-    def set_multi_selection_enabled(self, enabled: bool) -> None:
-        """Allow ctrl and shift multi-selection, or restrict to a single page.
+    def set_selection_mode_enabled(self, enabled: bool) -> None:
+        """Make a plain click add or remove a page, as Ctrl+click does.
 
         Args:
-            enabled (bool): True for extended selection, False for single.
+            enabled (bool): True to toggle pages with a plain click, False for a
+                plain click to select only the clicked page.
         """
-        mode = (
-            QAbstractItemView.SelectionMode.ExtendedSelection
-            if enabled
-            else QAbstractItemView.SelectionMode.SingleSelection
-        )
-        self._view.setSelectionMode(mode)
+        self._view.toggle_on_click = enabled
 
     def set_order(self, index: int) -> None:
         """Choose a sort order by its position in the combo box.
