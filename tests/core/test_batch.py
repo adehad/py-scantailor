@@ -14,6 +14,7 @@ from PIL import Image
 from scantailor.core import batch
 from scantailor.core.batch import (
     BatchResult,
+    PageDetected,
     PageDone,
     PageFailed,
     output_file_names,
@@ -280,6 +281,21 @@ class TestRunBatch:
                     (OUTPUT_DPI, OUTPUT_DPI), abs=1
                 )
                 assert image.size[0] > 0 and image.size[1] > 0
+
+    def test_detection_and_render_report_each_source_size_as_decoded(
+        self, tmp_path: Path, sources: list[PageId], stages: StageSequence
+    ):
+        events = []
+
+        run_batch(
+            stages, sources, tmp_path / "out", max_workers=2, on_progress=events.append
+        )
+
+        detected = [e for e in events if isinstance(e, PageDetected)]
+        done = [e for e in events if isinstance(e, PageDone)]
+        assert len(detected) == len(done) == len(sources)
+        assert {e.source_size for e in detected} == {(300, 400)}
+        assert {e.info.source_size for e in done if e.info is not None} == {(300, 400)}
 
     def test_outputs_share_one_page_size(
         self, tmp_path: Path, sources: list[PageId], stages: StageSequence

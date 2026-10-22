@@ -65,6 +65,9 @@ _DETECTING_STAGES = (
     FilterStage.SELECT_CONTENT,
 )
 
+SourceSizeReport = Callable[[ImageId, int, int], None]
+"""Receives an image and the width and height its source file decoded to."""
+
 _SourceGeometry = tuple[tuple[int, int], Dpi]
 """Width and height of a decoded source before Fix Orientation, and its resolution."""
 
@@ -211,6 +214,7 @@ def render_thumbnail(
     sources: SourceCache | None = None,
     memo: ThumbnailMemo | None = None,
     removed_halves: tuple[bool, bool] = (False, False),
+    on_source_size: SourceSizeReport | None = None,
 ) -> QtGui.QImage:
     """Render a page up to ``end_stage`` and shrink it to fit ``max_size``.
 
@@ -238,6 +242,10 @@ def render_thumbnail(
         removed_halves (tuple[bool, bool]): Whether the left and the right half
             of the page's image were removed from the project; Page Split's
             overlay tints them as off-cuts.
+        on_source_size (SourceSizeReport | None): Called on this thread with
+            the width and height of the source the thumbnail was made from,
+            before Fix Orientation. Not called when a kept thumbnail is handed
+            out again.
 
     Returns:
         QtGui.QImage: 8-bit gray or RGB888, possibly handed out before; do not
@@ -246,7 +254,13 @@ def render_thumbnail(
     Raises:
         ImageLoadError: If the source image cannot be decoded.
     """
+    report = on_source_size or (lambda _image_id, _width, _height: None)
     if end_stage >= FilterStage.OUTPUT:
+
+        def report_decoded(page: LoadedPage) -> None:
+            height, width = page.pixels.shape[:2]
+            report(page_id.image_id, width, height)
+
         image = render_page_with_model(
             page_id,
             sequence,
@@ -254,6 +268,7 @@ def render_thumbnail(
             dpi_overrides,
             sources=sources,
             keep_source=False,
+            on_source=report_decoded,
         )[0]
         return shrink_to_thumbnail(image, max_size)
     memo = _SHARED_MEMO if memo is None else memo
@@ -278,6 +293,7 @@ def render_thumbnail(
             source_key,
         )
     picture, (source_size, dpi) = rendered
+    report(page_id.image_id, *source_size)
     oriented_size = _oriented(source_size, page_id, sequence)
     thumbnail = paint_stage_overlay(
         picture, end_stage, page_id, sequence, (oriented_size, dpi), removed_halves

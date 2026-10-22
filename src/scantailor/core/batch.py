@@ -31,7 +31,7 @@ from numpy.typing import NDArray
 
 from scantailor.core.dewarp_spec import DewarpSpec
 from scantailor.core.image_io import tiff_compressions_in_use, write_image
-from scantailor.core.models import Dpi, PageId, SubPage, page_name
+from scantailor.core.models import Dpi, ImageId, PageId, SubPage, page_name
 from scantailor.core.output_reuse import build_record, is_reusable, output_params_hash
 from scantailor.core.page_source import DpiOverrides, load_page
 from scantailor.core.pipeline import (
@@ -88,9 +88,12 @@ class PageDetected:
 
     Attributes:
         page: The measured page.
+        source_size: Width and height of the source image the worker decoded,
+            before Fix Orientation; None when not reported.
     """
 
     page: PageId
+    source_size: tuple[int, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -115,6 +118,8 @@ class RenderInfo:
             have measured; None when the pipeline did not report it.
         seconds: Wall time the worker spent loading, rendering and writing
             the page.
+        source_size: Width and height of the source image the worker decoded,
+            before Fix Orientation; None when not reported.
     """
 
     transformation: ImageTransformation
@@ -126,6 +131,7 @@ class RenderInfo:
     auto_picture_zones: AutoPictureZones | None = None
     black_on_white: bool | None = None
     seconds: float = 0.0
+    source_size: tuple[int, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -179,6 +185,9 @@ class BatchResult:
             from, to store in the project for the next batch.
         failed: Error text of every page that failed.
         cancelled: Pages that were never started because of cancellation.
+        source_sizes: Width and height each worker decoded an image's source
+            to, before Fix Orientation, for images whose file may have been
+            replaced since the project recorded its size.
     """
 
     detected: list[PageId] = field(default_factory=list)
@@ -188,6 +197,7 @@ class BatchResult:
     output_records: dict[PageId, PageOutputRecord] = field(default_factory=dict)
     failed: dict[PageId, str] = field(default_factory=dict)
     cancelled: list[PageId] = field(default_factory=list)
+    source_sizes: dict[ImageId, tuple[int, int]] = field(default_factory=dict)
 
 
 def output_file_names(
@@ -616,8 +626,18 @@ def _worker_stages_for(config: _PhaseConfig) -> StageSequence:
     return _worker_stages
 
 
-def _detect_page(job: _PageJob) -> StageParamsData:
-    """Detect one page's geometry in a worker; returns its parameters as data."""
+def _source_size(pixels: NDArray) -> tuple[int, int]:
+    height, width = pixels.shape[:2]
+    return width, height
+
+
+def _detect_page(job: _PageJob) -> tuple[StageParamsData, tuple[int, int]]:
+    """Detect one page's geometry in a worker.
+
+    Returns:
+        tuple[StageParamsData, tuple[int, int]]: The page's parameters as data,
+            and the width and height of its decoded source.
+    """
     with logger.contextualize(page=page_name(job.page)):
         stages = _worker_stages_for(job.config)
         overrides = {job.page.image_id: job.dpi_override} if job.dpi_override else None
@@ -628,7 +648,8 @@ def _detect_page(job: _PageJob) -> StageParamsData:
             black_on_white_detection=job.config.black_on_white_detection,
         )
         fix_aggregate_page_size([(loaded.pixels, job.page)], stages, options)
-        return _dump_entries(collect_stage_params(stages, [job.page]))
+        params = _dump_entries(collect_stage_params(stages, [job.page]))
+        return params, _source_size(loaded.pixels)
 
 
 def _detect_geometry(
@@ -671,16 +692,19 @@ def _detect_geometry(
     detected: set[PageId] = set()
 
     def on_outcome(
-        job: _PageJob, params: StageParamsData | None, error: BaseException | None
+        job: _PageJob,
+        outcome: tuple[StageParamsData, tuple[int, int]] | None,
+        error: BaseException | None,
     ) -> None:
-        if params is None:
+        if outcome is None:
             error = error or RuntimeError("no result")
             _log_page_failure(job.page, "geometry pass", error)
             report(PageFailed(job.page, _describe(error)))
             return
+        params, source_size = outcome
         apply_stage_params(stages, _load_entries(params))
         detected.add(job.page)
-        report(PageDetected(job.page))
+        report(PageDetected(job.page, source_size))
 
     unscheduled = run_pool(
         _detect_page,
@@ -757,6 +781,7 @@ def _render_page(job: _PageJob) -> tuple[Path, RenderInfo, tuple[Path, ...]]:
             auto_picture_zones=rendered.auto_picture_zones,
             black_on_white=rendered.metadata.get("OUTPUT", {}).get("black_on_white"),
             seconds=time.perf_counter() - started,
+            source_size=_source_size(loaded.pixels),
         )
         return job.output_path, info, tuple(written)
 
@@ -888,6 +913,8 @@ def run_batch(
                 result.reused.append(event.page)
             if event.info is not None:
                 result.render_info[event.page] = event.info
+                if event.info.source_size is not None:
+                    result.source_sizes[event.page.image_id] = event.info.source_size
                 if event.info.distortion_model is not None:
                     stages.output_filter.store_distortion_model(
                         event.page, event.info.distortion_model
@@ -908,6 +935,8 @@ def run_batch(
                 _record_output(result, event, params_hash(event.page), out_dir)
         elif isinstance(event, PageDetected):
             result.detected.append(event.page)
+            if event.source_size is not None:
+                result.source_sizes[event.page.image_id] = event.source_size
         elif isinstance(event, PageFailed):
             result.failed[event.page] = event.error
         if on_progress is not None:

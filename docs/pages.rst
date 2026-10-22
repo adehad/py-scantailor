@@ -301,8 +301,11 @@ Replaced files
 ~~~~~~~~~~~~~~
 
 You can replace a scan with another file of the same name, for example a rescan.
-When you next go to one of its pages, the project takes the new image's size in
-pixels and is marked as changed, so save it to keep the size. The resolution stays
-as the project holds it, since it may be one you set with Fix DPI.
+When ScanTailor next reads the file, the project takes the new image's size in
+pixels and is marked as changed, so save it to keep the size. ScanTailor reads
+the file when you go to one of its pages, when it draws the page's thumbnail and
+when a batch runs. ``scantailor-cli run`` reads it too, and saves the project
+when it finishes. The resolution stays as the project holds it, since it may be
+one you set with Fix DPI.
 
 See :mod:`scantailor.core.relinker`.

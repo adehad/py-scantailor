@@ -860,3 +860,35 @@ class TestMostCommonDpi:
 
     def test_an_empty_project_has_no_most_common_resolution(self):
         assert Project().most_common_dpi() is None
+
+
+class TestStoreSourceSize:
+    """A replaced file's decoded size is recorded; its resolution is kept."""
+
+    @staticmethod
+    def _project() -> tuple[Project, ImageId]:
+        project = Project()
+        image_id = ImageId(file_path=Path("scan.tif"))
+        project.add_image(
+            image_id, ImageMetadata(width=100, height=200, dpi=Dpi.uniform(150))
+        )
+        return project, image_id
+
+    def test_a_new_size_is_stored_and_the_resolution_kept(self) -> None:
+        project, image_id = self._project()
+
+        assert project.store_source_size(image_id, 300, 400)
+
+        metadata = project.images[0].metadata
+        assert (metadata.width, metadata.height) == (300, 400)
+        assert metadata.dpi == Dpi.uniform(150)
+
+    def test_the_same_size_reports_no_change(self) -> None:
+        project, image_id = self._project()
+
+        assert not project.store_source_size(image_id, 100, 200)
+
+    def test_an_image_outside_the_project_reports_no_change(self) -> None:
+        project, _image_id = self._project()
+
+        assert not project.store_source_size(ImageId(file_path=Path("x.tif")), 1, 1)
