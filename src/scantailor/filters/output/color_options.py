@@ -4,6 +4,8 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .binarization import MAX_WINDOW_SIZE, MIN_WINDOW_SIZE
+
 
 class FillingColor(Enum):
     """Colour used for the margins outside the content area.
@@ -62,5 +64,5 @@ class ColorCommonOptions(BaseModel):
     normalize_illumination: bool = False
     filling_color: FillingColor = FillingColor.BACKGROUND
     wiener_coef: float = Field(default=0.0, ge=0.0, le=1.0)
-    wiener_window_size: int = Field(default=5, ge=3)
+    wiener_window_size: int = Field(default=5, ge=MIN_WINDOW_SIZE, le=MAX_WINDOW_SIZE)
     posterization: PosterizationOptions = Field(default_factory=PosterizationOptions)

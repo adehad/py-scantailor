@@ -10,8 +10,8 @@ and the choices below.
 Output resolution
 =================
 
-**DPI** sets the resolution of the output images. The output size in pixels is the
-page size at that DPI, so a higher value makes larger files.
+**DPI** sets the resolution of the output images, from 72 to 1200. The output size
+in pixels is the page size at that DPI, so a higher value makes larger files.
 
 When the DPI is lower than the scan's, each output pixel is the average of all the
 scan pixels it covers. Thin lines stay continuous and printed halftone pictures do not
@@ -100,6 +100,22 @@ found. The threshold adjustment or coefficient sets how far it moves.
 Local methods take the window size and the threshold adjustment. A positive
 adjustment turns more pixels black. Compare the methods on a sample page in the
 Output view before you run the batch.
+
+The numeric controls take the ranges ScanTailor Advanced uses, with one difference
+noted in the table.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 30
+
+   * - Control
+     - Range
+   * - Window size, Wiener window
+     - 3 to 9999 pixels. A window larger than the page covers the whole page.
+   * - Binarization coefficient, Edge weight, Blur weight
+     - 0 to 9.99. ScanTailor Advanced starts at 0.01.
+   * - Wiener coefficient
+     - 0 to 1
 
 .. screenshot:: stage6_output_edge_methods
    :alt: Binarization with the EdgePlus method, showing its window size and coefficient
