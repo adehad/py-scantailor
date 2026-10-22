@@ -370,12 +370,51 @@ def _has_gray_palette(image: Image.Image) -> bool:
     )
 
 
+def _float_to_gray(samples: NDArray[np.float32]) -> NDArray[np.uint8]:
+    """Scale floating-point grey samples to 8 bits.
+
+    Samples within 0 to 1 map 0 to black and 1 to white. Any other range is
+    stretched from its lowest to its highest finite sample, since such a file
+    carries no scale of its own. NaN counts as the lowest sample, infinities as
+    the ends of the range.
+
+    The scaling works in place, so the peak memory is ``samples`` plus a byte
+    per pixel for the finite mask and another for the result.
+
+    Args:
+        samples (NDArray[np.float32]): 2-D grey samples, overwritten.
+
+    Returns:
+        NDArray[np.uint8]: The page, 2-D.
+    """
+    finite = np.isfinite(samples)
+    low = float(samples.min(where=finite, initial=np.inf))
+    high = float(samples.max(where=finite, initial=-np.inf))
+    del finite
+    if not low <= high:
+        low = high = 0.0
+    if 0.0 <= low and high <= 1.0:
+        low, high = 0.0, 1.0
+    np.nan_to_num(samples, copy=False, nan=low, posinf=high, neginf=low)
+    if high <= low:
+        return np.zeros(samples.shape, dtype=np.uint8)
+    # Scaling before the shift keeps a range near the float32 limits finite.
+    scale = 255.0 / (high - low)
+    samples *= scale
+    samples -= low * scale
+    np.rint(samples, out=samples)
+    np.clip(samples, 0, 255, out=samples)
+    return samples.astype(np.uint8)
+
+
 def _to_array(image: Image.Image) -> NDArray[np.uint8]:
     mode = image.mode
     if mode in ("I;16", "I;16L", "I;16B", "I"):
         # Mode I is signed 32-bit; negative samples would wrap as unsigned.
         samples = np.clip(np.asarray(image, dtype=np.int64), 0, _MAX_SAMPLE_16)
         return ((samples * 255 + 32767) // _MAX_SAMPLE_16).astype(np.uint8)
+    if mode == "F":
+        return _float_to_gray(np.array(image, dtype=np.float32))
     if mode in ("1", "L", "LA"):
         return np.asarray(image.convert("L"), dtype=np.uint8)
     if mode in ("P", "PA") and _has_gray_palette(image):

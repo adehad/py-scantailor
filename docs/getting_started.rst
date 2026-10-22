@@ -89,9 +89,12 @@ To make a project:
 #. Tick the right to left box if the book reads that way.
 #. Press OK.
 
-A multi-page TIFF adds each of its pages to the project. If some files cannot be
-read, a status window lists them with the files that loaded. You can continue
-without the failed files or cancel the whole import.
+A multi-page TIFF adds each of its pages to the project. A grey TIFF with 32-bit
+floating-point samples loads with 0 as black and 1 as white. When its samples
+go beyond 0 to 1, its darkest sample becomes black and its lightest white.
+
+If some files cannot be read, a status window lists them with the files that
+loaded. You can continue without the failed files or cancel the whole import.
 
 If an image has no usable resolution, or the Fix DPIs box is ticked, the Fix DPI
 dialog opens before the program creates the project. See :ref:`fix-dpi`.
