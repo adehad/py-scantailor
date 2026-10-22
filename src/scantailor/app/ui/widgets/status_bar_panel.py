@@ -5,15 +5,22 @@ from pathlib import PurePath
 
 from PySide6 import QtCore, QtWidgets
 
+from scantailor.app.ui.icons import icon
 from scantailor.app.ui.theme.fonts import tabular
 from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.core.models import Dpi, PageId, SubPage
-from scantailor.core.settings import Units
+from scantailor.core.settings import Units, ZoneCreationMode
 from scantailor.core.units import convert_length, units_suffix
 
 _MAX_FILE_NAME_LENGTH = 15
 _KEPT_FILE_NAME_TAIL = 13
 _KEPT_SPLIT_FILE_NAME_TAIL = 11
+_ZONE_MODE_ICON_SIZE = 16
+_ZONE_MODE_GLYPHS = {
+    ZoneCreationMode.POLYGONAL: "zone-polygon",
+    ZoneCreationMode.LASSO: "lasso",
+    ZoneCreationMode.RECTANGULAR: "square-dashed",
+}
 
 
 def _number(value: float) -> str:
@@ -34,7 +41,7 @@ def _short_file_name(page: PageId) -> str:
 
 
 class StatusBarPanel(QtWidgets.QWidget):
-    """Page number, name, size, source DPI and cursor position of the current view.
+    """Zone creation mode, cursor position, size, source DPI, page number and name.
 
     Sizes and positions arrive in pixels and are shown in the unit of the
     ``UnitsProvider``, which the panel follows. The source DPI is the one the
@@ -59,10 +66,16 @@ class StatusBarPanel(QtWidgets.QWidget):
         self._size_px: QtCore.QSizeF | None = None
         self._cursor_px: QtCore.QPointF | None = None
         self._dpi = 0.0
+        self._zone_mode: ZoneCreationMode | None = None
         self._fields: list[tuple[QtWidgets.QFrame, QtWidgets.QLabel]] = []
 
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        self.zone_mode_label = self._add_field(
+            layout,
+            self.tr("Zone creation mode."),
+            self.tr("The type of a new zone created."),
+        )
         self.mouse_pos_label = self._add_field(
             layout,
             self.tr("Mouse position."),
@@ -107,13 +120,44 @@ class StatusBarPanel(QtWidgets.QWidget):
         return label
 
     def clear(self) -> None:
-        """Forget the page, the size and the cursor position."""
+        """Forget the page, the size and the cursor position.
+
+        The zone creation mode stays; it belongs to the view, which reports it
+        with ``set_zone_creation_mode``.
+        """
         self._size_px = None
         self._cursor_px = None
         self._dpi = 0.0
         for _, label in self._fields:
             label.clear()
+        self._show_zone_mode()
+
+    def set_zone_creation_mode(self, mode: ZoneCreationMode | None) -> None:
+        """Show the icon of the way new zones are drawn.
+
+        Args:
+            mode (ZoneCreationMode | None): The mode, or None to hide the field
+                while the view draws no zones.
+        """
+        self._zone_mode = mode
+        self._show_zone_mode()
+
+    def _show_zone_mode(self) -> None:
+        if self._zone_mode is None:
+            self.zone_mode_label.clear()
+        else:
+            self.zone_mode_label.setPixmap(
+                icon(_ZONE_MODE_GLYPHS[self._zone_mode]).pixmap(
+                    _ZONE_MODE_ICON_SIZE, _ZONE_MODE_ICON_SIZE
+                )
+            )
         self._sync_visibility()
+
+    def changeEvent(self, event: QtCore.QEvent) -> None:
+        """Redraw the zone mode icon in the new palette's ink."""
+        super().changeEvent(event)
+        if event.type() == QtCore.QEvent.Type.PaletteChange:
+            self._show_zone_mode()
 
     def update_page(self, number: int, count: int, page: PageId) -> None:
         """Show which page is current.
@@ -222,7 +266,7 @@ class StatusBarPanel(QtWidgets.QWidget):
     def _sync_visibility(self) -> None:
         anything_before = False
         for separator, label in self._fields:
-            shown = bool(label.text())
+            shown = bool(label.text()) or not label.pixmap().isNull()
             label.setVisible(shown)
             separator.setVisible(shown and anything_before)
             anything_before = anything_before or shown

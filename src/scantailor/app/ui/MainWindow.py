@@ -1106,6 +1106,10 @@ class MainWindowManager:
         panels.other_page_edited.connect(self._on_other_page_edited)
         panels.page_size_changed.connect(self.status_panel.set_page_size)
         panels.cursor_moved.connect(self.status_panel.set_cursor_position)
+        panels.zone_creation_mode_changed.connect(
+            self.status_panel.set_zone_creation_mode
+        )
+        self.status_panel.set_zone_creation_mode(panels.zone_creation_mode())
         self._connect_apply_requests(panels)
         if panels.stage == FilterStage.PAGE_SPLIT:
             cast(Any, panels.options).page_count_requested.connect(
@@ -1352,6 +1356,7 @@ class MainWindowManager:
         self._cancel_render()
         self.status_panel.set_page_size(None, 0.0)
         self.status_panel.set_cursor_position(None)
+        self.status_panel.set_zone_creation_mode(None)
         for widget, layout in (
             (panels.options, self.optionsFrameLayout),
             (panels.view, self.imageFrameLayout),

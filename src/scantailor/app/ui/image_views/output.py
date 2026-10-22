@@ -330,11 +330,14 @@ class OutputImageView(ImageViewBase):
         tab_changed: Another tab was chosen (ImageViewTab).
         distortion_model_changed: The user reshaped a page edge in the dewarping
             tab (DistortionModelSpec).
+        zone_creation_mode_changed: ``shown_creation_mode`` changed, with the
+            mode or the tab (ZoneCreationMode | None).
     """
 
     zones_changed = Signal()
     tab_changed = Signal(ImageViewTab)
     distortion_model_changed = Signal(object)
+    zone_creation_mode_changed = Signal(object)
 
     SHOW_GUIDES_KEY = "output/showGuides"
 
@@ -596,6 +599,7 @@ class OutputImageView(ImageViewBase):
             self._show_tab_image(None)
             self._update_mask_pulse()
             self.update()
+            self.zone_creation_mode_changed.emit(self.shown_creation_mode())
 
     def tabs(self) -> list[ImageViewTab]:
         """Return the tabs shown, left to right; empty without a tab bar.
@@ -652,6 +656,7 @@ class OutputImageView(ImageViewBase):
         self._update_mask_pulse()
         self.update()
         self.tab_changed.emit(tab)
+        self.zone_creation_mode_changed.emit(self.shown_creation_mode())
 
     def _leave_interactions(self) -> None:
         self.cancel_zone_creation()
@@ -898,6 +903,17 @@ class OutputImageView(ImageViewBase):
         """
         return self._creation_mode
 
+    def shown_creation_mode(self) -> ZoneCreationMode | None:
+        """Return the creation mode while the shown tab draws zones.
+
+        Returns:
+            ZoneCreationMode | None: The mode on a zone tab or without tabs, None
+            on any other tab.
+        """
+        if self._tabs and self._tab not in _ZONE_TAB_KINDS:
+            return None
+        return self._creation_mode
+
     def set_creation_mode(self, mode: ZoneCreationMode) -> None:
         """Choose how new zones are drawn and make it the application default.
 
@@ -916,6 +932,7 @@ class OutputImageView(ImageViewBase):
         settings = ApplicationSettings.get_instance()
         settings.default_zone_creation_mode = mode
         settings.save()
+        self.zone_creation_mode_changed.emit(self.shown_creation_mode())
 
     def start_zone_creation(self, kind: ZoneKind) -> None:
         """Start collecting the corners of a new zone.

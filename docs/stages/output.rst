@@ -268,7 +268,8 @@ A zone tab shows and edits one kind of zone. Click anywhere that is not a corner
 or an edge to start a zone. The **Z**, **X** and **C** keys switch between the three
 ways of drawing a zone. A view starts in the way set by **Default zone creation
 mode** in :doc:`../settings`. Pressing one of the keys also makes that way the
-default.
+default. While a zone tab is shown, the left end of the status bar shows the icon
+of the current way.
 
 .. list-table::
    :header-rows: 1

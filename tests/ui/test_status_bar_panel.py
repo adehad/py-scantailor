@@ -9,7 +9,7 @@ from pytestqt.qtbot import QtBot
 from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.app.ui.widgets.status_bar_panel import StatusBarPanel
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
-from scantailor.core.settings import Units
+from scantailor.core.settings import Units, ZoneCreationMode
 
 LONG_NAME = "abcdefghijklmnopqrstuvwxyz.png"
 
@@ -173,7 +173,7 @@ class TestSeparators:
         panel.update_page(1, 3, page("scan.png"))
 
         visible = [separator.isVisible() for separator, _label in panel._fields]
-        assert visible == [False, False, False, False, True]
+        assert visible == [False, False, False, False, False, True]
 
 
 class TestSourceDpi:
@@ -223,3 +223,37 @@ class TestSourceDpi:
         panel.clear()
 
         assert panel.source_dpi_label.text() == ""
+
+
+class TestZoneCreationMode:
+    def test_a_mode_shows_an_icon_first_in_the_panel(
+        self, panel: StatusBarPanel
+    ) -> None:
+        panel.update_page(1, 3, page("scan.png"))
+
+        panel.set_zone_creation_mode(ZoneCreationMode.LASSO)
+
+        assert panel._fields[0][1] is panel.zone_mode_label
+        assert panel.zone_mode_label.isVisible()
+        assert not panel.zone_mode_label.pixmap().isNull()
+        assert [s.isVisible() for s, _ in panel._fields][-1]
+
+    def test_each_mode_has_its_own_icon(self, panel: StatusBarPanel) -> None:
+        images = set()
+        for mode in ZoneCreationMode:
+            panel.set_zone_creation_mode(mode)
+            image = panel.zone_mode_label.pixmap().toImage()
+            images.add(bytes(image.constBits()))
+
+        assert len(images) == len(ZoneCreationMode)
+
+    def test_no_mode_hides_the_field(self, panel: StatusBarPanel) -> None:
+        panel.set_zone_creation_mode(ZoneCreationMode.POLYGONAL)
+
+        panel.set_zone_creation_mode(None)
+
+        assert not panel.zone_mode_label.isVisible()
+
+    def test_the_field_keeps_upstreams_tips(self, panel: StatusBarPanel) -> None:
+        assert panel.zone_mode_label.toolTip() == "Zone creation mode."
+        assert panel.zone_mode_label.statusTip() == "The type of a new zone created."

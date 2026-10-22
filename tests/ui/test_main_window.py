@@ -8,6 +8,7 @@ from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui import MainWindow
 from scantailor.app.ui.dialogs.about import AboutDialog
+from scantailor.app.ui.image_views.output import ImageViewTab, OutputImageView
 from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.core import diagnostics
 from scantailor.core.models import Dpi, Margins
@@ -354,6 +355,23 @@ class TestThumbnailButtons:
 
         assert project_window.sortOptions.currentIndex() == 2
         assert project_window.thumbnails.order_combo.currentIndex() == 2
+        project_window.renderer.wait_for_done()
+
+    def test_the_status_bar_shows_the_zone_mode_only_on_a_zone_tab(
+        self, project_window: MainWindow.MainWindowManager
+    ):
+        label = project_window.status_panel.zone_mode_label
+        project_window.actionSwitchFilter6.trigger()
+        assert project_window._panels is not None
+        view = project_window._panels.view
+        assert isinstance(view, OutputImageView)
+        assert label.pixmap().isNull()
+
+        view.set_current_tab(ImageViewTab.FILL_ZONES)
+        assert not label.pixmap().isNull()
+
+        project_window.actionSwitchFilter5.trigger()
+        assert label.pixmap().isNull()
         project_window.renderer.wait_for_done()
 
     def test_go_to_button_opens_the_go_to_page_dialog(
