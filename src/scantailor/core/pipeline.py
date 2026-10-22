@@ -20,7 +20,6 @@ import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field, replace
 
-import cv2
 import numpy as np
 from loguru import logger
 from numpy.typing import NDArray
@@ -37,6 +36,7 @@ from scantailor.core.transformation import (
     Rect,
     _whiten_outside,
     render_transformed,
+    warp_area_averaged,
 )
 from scantailor.core.zones import Zone, ZoneSpline
 from scantailor.dewarping.auto_model import DewarpMetrics, detect_distortion_model
@@ -385,16 +385,8 @@ def _resample_reduced(
         [[source_scale[0], 0.0, -0.5], [0.0, source_scale[1], -0.5], [0.0, 0.0, 1.0]]
     )
     dst_to_src = full_to_reduced @ xform.transform_back @ result_to_view
-    result = np.asarray(
-        cv2.warpAffine(
-            np.ascontiguousarray(source),
-            dst_to_src[:2],
-            (out_width, out_height),
-            flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP,
-            borderMode=cv2.BORDER_CONSTANT,
-            borderValue=(255, 255, 255, 255),
-        ),
-        dtype=np.uint8,
+    result = warp_area_averaged(
+        np.ascontiguousarray(source), dst_to_src, (out_width, out_height)
     )
     if result.ndim < source.ndim:
         result = result.reshape(out_height, out_width, 1)
