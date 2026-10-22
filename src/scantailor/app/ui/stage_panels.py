@@ -62,7 +62,7 @@ from scantailor.core.page_geometry import (
 )
 from scantailor.core.page_source import DpiOverrides, load_page
 from scantailor.core.pipeline import OutputExtras
-from scantailor.core.settings import ApplicationSettings
+from scantailor.core.settings import ApplicationSettings, ZoneCreationMode
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation, Rect
 from scantailor.core.zones import (
@@ -303,6 +303,9 @@ class StagePanels(QtCore.QObject):
         source_decoded: The current page's source image was decoded. Args:
             image_id (ImageId), width (int) and height (int) of the decoded
             pixels, before Fix Orientation.
+        zone_creation_mode_changed: The Output view starts or stops drawing
+            zones, or draws them another way. Args: mode (ZoneCreationMode |
+            None), None when the shown tab draws no zones.
     """
 
     settings_changed = QtCore.Signal()
@@ -312,6 +315,7 @@ class StagePanels(QtCore.QObject):
     unremove_page_requested = QtCore.Signal(object)
     source_failed = QtCore.Signal(object)
     source_decoded = QtCore.Signal(object, int, int)
+    zone_creation_mode_changed = QtCore.Signal(object)
 
     def __init__(
         self,
@@ -489,12 +493,23 @@ class StagePanels(QtCore.QObject):
             view.zones_changed.connect(self._on_zones_changed)
             view.distortion_model_changed.connect(self._on_distortion_model_edited)
             view.tab_changed.connect(self._on_output_tab_changed)
+            view.zone_creation_mode_changed.connect(self.zone_creation_mode_changed)
             if isinstance(self.options, output.OptionsWidget):
                 self.options.despeckle_level_changed.connect(view.set_despeckle_level)
                 self.options.depth_perception_changed.connect(
                     self._on_depth_perception_changed
                 )
             view.set_tabs(list(ImageViewTab))
+
+    def zone_creation_mode(self) -> ZoneCreationMode | None:
+        """Return how the view draws new zones on the shown tab.
+
+        Returns:
+            ZoneCreationMode | None: None for a view or tab that draws no zones.
+        """
+        if isinstance(self.view, OutputImageView):
+            return self.view.shown_creation_mode()
+        return None
 
     def _keep_page_layout_state_in_settings(self, state: PageLayoutState) -> None:
         """Load the guides from the Page Layout settings and write changes back."""

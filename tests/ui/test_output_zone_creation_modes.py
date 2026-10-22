@@ -5,7 +5,7 @@ import pytest
 from PySide6 import QtCore, QtGui
 from pytestqt.qtbot import QtBot
 
-from scantailor.app.ui.image_views.output import OutputImageView, ZoneKind
+from scantailor.app.ui.image_views.output import ImageViewTab, OutputImageView, ZoneKind
 from scantailor.core.models import Dpi
 from scantailor.core.settings import ApplicationSettings, ZoneCreationMode
 from scantailor.core.transformation import ImageTransformation
@@ -169,3 +169,42 @@ def test_changing_the_mode_drops_the_zone_being_drawn(
     assert _corners(view) == pytest.approx(
         [(100, 100), (300, 100), (300, 300), (100, 300)], abs=3
     )
+
+
+class TestShownCreationMode:
+    def test_without_tabs_the_mode_is_shown(self, view: OutputImageView) -> None:
+        view.set_creation_mode(ZoneCreationMode.LASSO)
+
+        assert view.shown_creation_mode() is ZoneCreationMode.LASSO
+
+    def test_a_tab_without_zones_shows_no_mode(
+        self, qtbot: QtBot, view: OutputImageView
+    ) -> None:
+        with qtbot.waitSignal(view.zone_creation_mode_changed) as changed:
+            view.set_tabs(list(ImageViewTab))
+
+        assert changed.args == [None]
+        assert view.shown_creation_mode() is None
+
+    def test_entering_a_zone_tab_announces_the_mode(
+        self, qtbot: QtBot, view: OutputImageView
+    ) -> None:
+        view.set_tabs(list(ImageViewTab))
+        view.set_creation_mode(ZoneCreationMode.RECTANGULAR)
+
+        with qtbot.waitSignal(view.zone_creation_mode_changed) as changed:
+            view.set_current_tab(ImageViewTab.FILL_ZONES)
+
+        assert changed.args == [ZoneCreationMode.RECTANGULAR]
+
+    def test_the_mode_keys_announce_the_new_mode_on_a_zone_tab(
+        self, qtbot: QtBot, view: OutputImageView
+    ) -> None:
+        view.set_tabs(list(ImageViewTab), ImageViewTab.PICTURE_ZONES)
+        view.set_creation_mode(ZoneCreationMode.POLYGONAL)
+        view.setFocus()
+
+        with qtbot.waitSignal(view.zone_creation_mode_changed) as changed:
+            qtbot.keyClick(view, QtCore.Qt.Key.Key_X)
+
+        assert changed.args == [ZoneCreationMode.LASSO]
