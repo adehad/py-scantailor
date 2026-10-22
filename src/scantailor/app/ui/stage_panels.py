@@ -555,6 +555,7 @@ class StagePanels(QtCore.QObject):
         if isinstance(self.options, output.OptionsWidget):
             self.options.set_dewarp_metrics(metrics)
             self.options.show_black_on_white()
+            self.options.show_dewarping_status()
         if isinstance(self.view, OutputImageView):
             self.view.set_dewarp_note(None if metrics is None else metrics.describe())
 

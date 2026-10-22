@@ -391,6 +391,12 @@ and only if the value changed.
 .. screenshot:: stage6_tab_dewarping
    :alt: The Dewarping tab with the distortion grid
 
+After **Manual** or **Marginal** dewarping, the program rotates the page once
+more to remove the skew left in the dewarped text, unless **Post-deskew** is off.
+The **Dewarping** panel shows that skew under the mode buttons, for example
+"Manual (deskew: 0.42°)", or "Manual (deskew disabled)". Each render of the page
+measures it again.
+
 Automatic dewarping
 -------------------
 
