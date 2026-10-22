@@ -21,7 +21,7 @@ from scantailor.app.ui.thumbnails.render_memo import (
 )
 from scantailor.core import pipeline
 from scantailor.core.image_io import ImageLoadError
-from scantailor.core.models import ImageId, PageId, page_name
+from scantailor.core.models import Dpi, ImageId, PageId, page_name
 from scantailor.core.page_source import (
     FALLBACK_DPI,
     DpiOverrides,
@@ -64,7 +64,7 @@ _DETECTING_STAGES = (
     FilterStage.SELECT_CONTENT,
 )
 
-_SourceGeometry = tuple[tuple[int, int], float]
+_SourceGeometry = tuple[tuple[int, int], Dpi]
 """Width and height of a decoded source before Fix Orientation, and its resolution."""
 
 
@@ -177,7 +177,7 @@ def render_page_with_model(
         on_source(page)
     options = pipeline.PipelineOptions(
         end_stage=end_stage,
-        dpi=page.horizontal_dpi(),
+        dpi=page.resolution(),
         keep_output_extras=on_extras is not None,
         should_cancel=should_cancel,
         render_image=pixels,
@@ -367,7 +367,7 @@ def _render_from_full_source(
         # A copy made for this size falls short of it by the rounding of its sides.
         if kept is not None and kept.scale * max(width, height) >= longest_side - 1:
             return
-        reduced = reduced_copy(page.pixels, page.horizontal_dpi(), longest_side)
+        reduced = reduced_copy(page.pixels, page.resolution(), longest_side)
         if reduced is not None:
             memo.keep_reduced_source(source_key, reduced)
 
@@ -384,7 +384,7 @@ def _render_from_full_source(
     )[0]
     page = decoded[-1]
     height, width = page.pixels.shape[:2]
-    geometry = ((width, height), page.horizontal_dpi())
+    geometry = ((width, height), page.resolution())
     if shown_stage == end_stage:
         return shrink_to_thumbnail(image, max_size), geometry
     # The run only detected. The view shown stops before every detecting stage,
@@ -396,9 +396,7 @@ def _render_from_full_source(
         else _picture_from_reduced(reduced, page_id, sequence, shown_stage, max_size)
     )
     if picture is None:
-        options = pipeline.PipelineOptions(
-            end_stage=shown_stage, dpi=page.horizontal_dpi()
-        )
+        options = pipeline.PipelineOptions(end_stage=shown_stage, dpi=page.resolution())
         view = pipeline.process_page(page.pixels, page_id, sequence, options).image
         picture = shrink_to_thumbnail(_bgr_to_rgb(view), max_size)
     return picture, geometry

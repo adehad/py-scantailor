@@ -325,6 +325,31 @@ class PageLayout(BaseModel):
             cutter2=cutter2,
         )
 
+    def scaled(self, x_scale: float, y_scale: float) -> PageLayout:
+        """Return the layout in pixels ``x_scale`` and ``y_scale`` times as many.
+
+        Args:
+            x_scale (float): Factor on every x coordinate.
+            y_scale (float): Factor on every y coordinate.
+
+        Returns:
+            PageLayout: The same layout over the resized image.
+        """
+
+        def scale_line(line: Line | None) -> Line | None:
+            if line is None:
+                return None
+            (x1, y1), (x2, y2) = line
+            return ((x1 * x_scale, y1 * y_scale), (x2 * x_scale, y2 * y_scale))
+
+        x, y, width, height = self.outline
+        return PageLayout(
+            outline=(x * x_scale, y * y_scale, width * x_scale, height * y_scale),
+            layout_type=self.layout_type,
+            cutter1=scale_line(self.cutter1),
+            cutter2=scale_line(self.cutter2),
+        )
+
     def with_split_line(self, split_x: float) -> PageLayout:
         """Create a new layout with a different split line position.
 

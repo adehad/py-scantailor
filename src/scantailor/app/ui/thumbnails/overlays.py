@@ -19,7 +19,7 @@ from PySide6.QtGui import QColor, QImage, QPainter, QPen, QTransform
 from scantailor.app.ui.image_views.base import matrix_to_qtransform
 from scantailor.app.ui.image_views.page_split import layout_cutters, region_polygons
 from scantailor.app.ui.theme.tokens import LIGHT, qcolor
-from scantailor.core.models import PageId, SubPage
+from scantailor.core.models import Dpi, PageId, SubPage
 from scantailor.core.page_geometry import build_transformation, content_rect_of
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation
@@ -61,7 +61,7 @@ def paint_stage_overlay(
     stage: FilterStage,
     page_id: PageId,
     sequence: StageSequence,
-    source: tuple[tuple[int, int], float],
+    source: tuple[tuple[int, int], Dpi],
     removed_halves: tuple[bool, bool] = (False, False),
 ) -> QImage:
     """Return a copy of a thumbnail with the stage's result drawn over it.
@@ -74,8 +74,9 @@ def paint_stage_overlay(
         stage (FilterStage): The stage shown.
         page_id (PageId): The page.
         sequence (StageSequence): Stages holding the page's parameters.
-        source (tuple[tuple[int, int], float]): Width and height of the source
-            after Fix Orientation, and its resolution, as the render used them.
+        source (tuple[tuple[int, int], Dpi]): Width and height of the source
+            after Fix Orientation, and the resolution it was decoded with, as
+            the render used them.
         removed_halves (tuple[bool, bool]): Whether the left and the right half
             of the page's image were removed from the project.
 

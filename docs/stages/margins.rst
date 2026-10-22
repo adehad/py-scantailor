@@ -7,8 +7,9 @@
 Sets the white space around the content. ScanTailor stores the margins in
 millimetres, and the spin boxes show them in the unit chosen under **Units** in
 :doc:`../settings`. The units are millimetres, which is the default, centimetres,
-inches and pixels. A pixel margin depends on the source DPI, so a value in
-millimetres or inches means the same on a page of any resolution. The conversion is
+inches and pixels. A pixel margin depends on the source DPI, the smaller of the two
+when they differ (see :ref:`fix-dpi`), so a value in millimetres or inches means the
+same on a page of any resolution. The conversion is
 in :mod:`scantailor.filters.page_layout.params`.
 
 .. list-table::

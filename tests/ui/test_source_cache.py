@@ -116,8 +116,8 @@ def test_a_project_resolution_gets_its_own_decode(tmp_path: Path) -> None:
     unfixed = cache.load(image)
     fixed = cache.load(image, {image: Dpi.uniform(FIXED_DPI)})
 
-    assert unfixed.horizontal_dpi() == FILE_DPI
-    assert fixed.horizontal_dpi() == FIXED_DPI
+    assert unfixed.resolution() == Dpi.uniform(FILE_DPI)
+    assert fixed.resolution() == Dpi.uniform(FIXED_DPI)
     assert cache.peek(image, {image: Dpi.uniform(FIXED_DPI)}) is fixed
 
 

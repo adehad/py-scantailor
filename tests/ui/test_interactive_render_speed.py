@@ -61,14 +61,14 @@ def _best_of(runs: int, work: Callable[[], object]) -> float:
 def _batch_detection(page: PageId) -> None:
     """What a batch worker does to find a page's geometry."""
     loaded = load_page(page.image_id)
-    options = pipeline.PipelineOptions(dpi=loaded.horizontal_dpi())
+    options = pipeline.PipelineOptions(dpi=loaded.resolution())
     pipeline.fix_aggregate_page_size([(loaded.pixels, page)], StageSequence(), options)
 
 
 def _batch_render(page: PageId) -> None:
     """What a batch worker does to produce a page's output, before writing it."""
     loaded = load_page(page.image_id)
-    options = pipeline.PipelineOptions(dpi=loaded.horizontal_dpi())
+    options = pipeline.PipelineOptions(dpi=loaded.resolution())
     pipeline.process_page(loaded.pixels, page, StageSequence(), options)
 
 
