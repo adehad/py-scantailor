@@ -23,7 +23,7 @@ from scantailor.core.stage_sequence import StageSequence
 from scantailor.filters.page_layout.params import ContentSize
 
 # Bump when a change to rendering makes earlier output files stale.
-RECORD_FORMAT = 1
+RECORD_FORMAT = 2
 
 # Stage-wide values that only steer the interactive view, never a page's pixels.
 _VIEW_ONLY_DEFAULTS = frozenset({"page_layout_middle_rect_shown", "page_layout_guides"})

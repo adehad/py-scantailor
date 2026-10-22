@@ -710,11 +710,12 @@ def render_transformed(
 ) -> NDArray[np.uint8]:
     """Resample an image through a transformation in a single pass.
 
-    Every step of ImageTransformation is affine, so one cv2.warpAffine call
-    covers pre-crop, deskew rotation and post-crop. Areas of the result with no
-    source pixels, or outside the pre-crop area, are white. Translation-only
-    transforms by whole pixels are served by slicing, which keeps pixel values
-    exact.
+    Every step of ImageTransformation is affine, so one warp covers pre-crop,
+    deskew rotation, post-crop and the scale to output DPI; see
+    ``warp_area_averaged`` for how a reduction averages source pixels. Areas of
+    the result with no source pixels, or outside the pre-crop area, are white.
+    Translation-only transforms by whole pixels are served by slicing, which
+    keeps pixel values exact.
 
     Args:
         image (numpy.ndarray of numpy.uint8): Source image, (H, W) or (H, W, C) with at
@@ -750,17 +751,7 @@ def render_transformed(
     if window is not None:
         result = window
     else:
-        result = np.asarray(
-            cv2.warpAffine(
-                image,
-                dst_to_src[:2],
-                (out_width, out_height),
-                flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP,
-                borderMode=cv2.BORDER_CONSTANT,
-                borderValue=(_WHITE,) * 4,
-            ),
-            dtype=np.uint8,
-        )
+        result = warp_area_averaged(image, dst_to_src, (out_width, out_height))
 
     if result.ndim < image.ndim:
         # cv2.warpAffine drops a trailing singleton channel axis.
@@ -769,6 +760,218 @@ def render_transformed(
     crop_area = transformation.resulting_pre_crop_area - [rect.x, rect.y]
     _whiten_outside(result, crop_area)
     return result
+
+
+def warp_area_averaged(
+    image: NDArray[np.uint8],
+    dst_to_src: NDArray[np.float64],
+    size: tuple[int, int],
+) -> NDArray[np.uint8]:
+    """Warp an image bilinearly, averaging every source pixel an output pixel covers.
+
+    This is upstream's transformGeneric in two OpenCV calls. A separable filter
+    sized to the source area of one output pixel runs over the part of the
+    source the warp reads, then one bilinear ``cv2.warpAffine`` samples the
+    filtered image. ``_box_taps`` sizes the filter so the two steps together
+    average as much as upstream's box does.
+
+    An output pixel that covers at most one source pixel along both axes skips
+    the filter, so 1:1 and enlarging warps are plain ``cv2.warpAffine``.
+    ``tests/core/test_area_averaging.py`` holds the comparisons with upstream.
+
+    Args:
+        image (numpy.ndarray of numpy.uint8): Source, (H, W) or (H, W, C) with
+            at most 4 channels. Only read.
+        dst_to_src (numpy.ndarray of numpy.float64): 3x3 affine matrix taking
+            output pixel centres to source pixel centres, both with OpenCV's
+            convention that pixel (0, 0) is centred on (0, 0).
+        size (tuple[int, int]): Output width and height.
+
+    Returns:
+        numpy.ndarray of numpy.uint8: The warped image. Points that map outside
+        the source are white. cv2.warpAffine drops a trailing singleton channel
+        axis, so an (H, W, 1) input comes back as (H, W).
+    """
+    taps_x, taps_y = (_box_taps(width) for width in _source_footprint(dst_to_src))
+    if taps_x is None and taps_y is None:
+        return _warp_bilinear(image, dst_to_src, size)
+    taps_x = taps_x or _SINGLE_TAP
+    taps_y = taps_y or _SINGLE_TAP
+    margin = max(len(taps_x.weights), len(taps_y.weights)) + 2
+    window = _sampled_window(image.shape[:2], dst_to_src, size, margin)
+    if window is None:
+        return _warp_bilinear(image, dst_to_src, size)
+    left, top, right, bottom = window
+    # ddepth -1 makes OpenCV round and saturate to uint8 itself, so the
+    # conversion only states the dtype and copies nothing.
+    filtered = np.asarray(
+        cv2.sepFilter2D(
+            image[top:bottom, left:right],
+            -1,
+            taps_x.weights,
+            taps_y.weights,
+            anchor=(taps_x.anchor, taps_y.anchor),
+            borderType=cv2.BORDER_REPLICATE,
+        ),
+        dtype=np.uint8,
+    )
+    in_filtered = _then(
+        dst_to_src,
+        _translation_matrix(-left - taps_x.centre, -top - taps_y.centre),
+    )
+    return _warp_bilinear(filtered, in_filtered, size)
+
+
+@dataclass(frozen=True)
+class _BoxTaps:
+    """One axis of a box filter sampled on the pixel grid.
+
+    Filtered pixel ``j`` holds the box centred on source position
+    ``j + centre``; ``anchor`` is the index of the tap at offset zero.
+    """
+
+    weights: NDArray[np.float32]
+    anchor: int
+    centre: float
+
+
+_SINGLE_TAP = _BoxTaps(np.ones(1, dtype=np.float32), 0, 0.0)
+# Upstream measures the box in 1/32 pixel units and rounds it to a whole unit.
+_BOX_UNITS_PER_PIXEL = 32
+_NEGLIGIBLE_WEIGHT = 1e-9
+
+
+def _source_footprint(dst_to_src: NDArray[np.float64]) -> tuple[float, float]:
+    """Return the width and height of the source box one output pixel covers.
+
+    As upstream's calcSrcUnitSize does, this maps the midpoints of an output
+    pixel's edges rather than its corners, so a rotation without scaling keeps
+    the box within one source pixel.
+    """
+    edge_midpoints = np.array([[0.5, 1.0, 0.5, 0.0], [0.0, 0.5, 1.0, 0.5]])
+    mapped = dst_to_src[:2, :2] @ edge_midpoints
+    width, height = np.ptp(mapped, axis=1)
+    return float(width), float(height)
+
+
+def _box_taps(width: float) -> _BoxTaps | None:
+    """Return the filter taps that stand in for a box ``width`` source pixels wide.
+
+    The taps are matched by variance, not shape, because the bilinear warp that
+    follows them blurs too. Upstream's box over pixel cells has the variance of
+    a ``width`` box convolved with a one pixel box. The bilinear step adds a one
+    pixel tent. So the taps supply the difference, ``(width**2 - 1) / 12``.
+
+    The taps sit centred on a pixel when the nearest whole width is odd and on
+    a pixel edge when it is even, rounding halves down, so a whole width gives
+    exactly the plain box.
+
+    Args:
+        width (float): Source pixels one output pixel covers along this axis.
+
+    Returns:
+        _BoxTaps | None: None when the box covers at most one pixel.
+    """
+    units = round(width * _BOX_UNITS_PER_PIXEL)
+    if units <= _BOX_UNITS_PER_PIXEL:
+        return None
+    width = units / _BOX_UNITS_PER_PIXEL
+    centre = 0.5 if math.ceil(width - 0.5) % 2 == 0 else 0.0
+    return _variance_matched_taps((width * width - 1) / 12, centre)
+
+
+def _variance_matched_taps(variance: float, centre: float) -> _BoxTaps:
+    """Return symmetric taps of whole weights plus one fractional outer pair.
+
+    The taps grow outwards from the centre one pair at a time, each pair with
+    weight 1, until a further whole pair would overshoot ``variance``. The last
+    pair then gets the fractional weight that lands on ``variance`` exactly.
+
+    Args:
+        variance (float): Variance to reach, in square source pixels. A
+            ``centre`` of 0.5 cannot go below 0.25, its two middle taps alone.
+        centre (float): 0.0 for taps centred on a pixel, 0.5 for taps centred
+            on the edge between two.
+
+    Returns:
+        _BoxTaps: Normalised taps, as close to ``variance`` as the lattice allows.
+    """
+    distances = [0.5] if centre else [0.0]
+    weights = [1.0]
+    total, moment = (2.0, 0.5) if centre else (1.0, 0.0)
+    while variance * total - moment > _NEGLIGIBLE_WEIGHT:
+        distance = distances[-1] + 1
+        if moment + 2 * distance**2 <= variance * (total + 2):
+            weight = 1.0
+        else:
+            weight = (variance * total - moment) / (2 * distance**2 - 2 * variance)
+        distances.append(distance)
+        weights.append(weight)
+        total += 2 * weight
+        moment += 2 * weight * distance**2
+    outer_first = np.array(weights[::-1], dtype=np.float64)
+    mirrored = outer_first[::-1] if centre else outer_first[-2::-1]
+    taps = np.concatenate([outer_first, mirrored])
+    return _BoxTaps(
+        (taps / taps.sum()).astype(np.float32), len(outer_first) - 1, centre
+    )
+
+
+def _sampled_window(
+    shape: tuple[int, ...],
+    dst_to_src: NDArray[np.float64],
+    size: tuple[int, int],
+    margin: int,
+) -> tuple[int, int, int, int] | None:
+    """Return the (left, top, right, bottom) source window a warp reads.
+
+    Filtering only this window skips source pixels no output pixel reaches,
+    such as the facing page of a split scan. ``margin`` must cover the filter's
+    reach plus the bilinear neighbour, so that the clamping at a window edge
+    inside the image never shows in the result.
+
+    Args:
+        shape (tuple[int, ...]): Source height and width.
+        dst_to_src (numpy.ndarray of numpy.float64): Output pixel centres to
+            source pixel centres.
+        size (tuple[int, int]): Output width and height.
+        margin (int): Source pixels added on every side.
+
+    Returns:
+        tuple[int, int, int, int] | None: The window clipped to the image, or
+        None when nothing of it lies inside.
+    """
+    width, height = size
+    corners = np.array(
+        [[0, width - 1, width - 1, 0], [0, 0, height - 1, height - 1], [1, 1, 1, 1]],
+        dtype=np.float64,
+    )
+    mapped = (dst_to_src @ corners)[:2]
+    low = np.floor(mapped.min(axis=1)).astype(int) - margin
+    high = np.ceil(mapped.max(axis=1)).astype(int) + margin + 1
+    image_height, image_width = shape[0], shape[1]
+    left, top = max(int(low[0]), 0), max(int(low[1]), 0)
+    right, bottom = min(int(high[0]), image_width), min(int(high[1]), image_height)
+    if left >= right or top >= bottom:
+        return None
+    return left, top, right, bottom
+
+
+def _warp_bilinear(
+    image: NDArray[np.uint8], dst_to_src: NDArray[np.float64], size: tuple[int, int]
+) -> NDArray[np.uint8]:
+    """Sample ``image`` bilinearly where each output pixel maps; white outside."""
+    return np.asarray(
+        cv2.warpAffine(
+            image,
+            dst_to_src[:2],
+            size,
+            flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=(_WHITE,) * 4,
+        ),
+        dtype=np.uint8,
+    )
 
 
 def _whiten_outside(image: NDArray[np.uint8], area: NDArray[np.float64]) -> None:

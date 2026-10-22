@@ -13,6 +13,11 @@ Output resolution
 **DPI** sets the resolution of the output images. The output size in pixels is the
 page size at that DPI, so a higher value makes larger files.
 
+When the DPI is lower than the scan's, each output pixel is the average of all the
+scan pixels it covers. Thin lines stay continuous and printed halftone pictures do not
+form moire patterns, at the cost of slightly softer edges before binarization. At the
+scan's own DPI or higher, each output pixel blends the four scan pixels nearest to it.
+
 Mode
 ====
 
