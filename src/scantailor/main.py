@@ -12,6 +12,7 @@ from .app._ui import resources_rc
 from .app.ui.MainWindow import MainWindowManager
 from .app.ui.theme import apply_theme
 from .core import diagnostics
+from .core.portable import use_portable_qsettings
 from .core.settings import ApplicationSettings
 from .translations import TRANSLATIONS_DIR, load_translation, locale_for_language
 
@@ -187,6 +188,7 @@ def main() -> int:
     restore_qt_handler = diagnostics.install_qt_message_handler()
     setup_qcore()
     set_application_identity()
+    use_portable_qsettings()
     app = QtWidgets.QApplication(sys.argv)
     file_open_handler = FileOpenHandler(app)
     app.installEventFilter(file_open_handler)

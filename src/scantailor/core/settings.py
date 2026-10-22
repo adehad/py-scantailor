@@ -13,6 +13,8 @@ from typing import ClassVar, Self
 from loguru import logger
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
+from scantailor.core.portable import portable_folder
+
 
 class Units(StrEnum):
     """Measurement units."""
@@ -227,10 +229,15 @@ class ApplicationSettings(BaseModel):
         """Get the path to the settings file.
 
         Returns:
-            Path to the settings JSON file.
+            Path to the settings JSON file: the one set with ``set_config_path``,
+                else ``settings.json`` in the portable folder when the program is
+                portable, else the platform's per-user location.
         """
         if cls._config_path is not None:
             return cls._config_path
+        portable = portable_folder()
+        if portable is not None:
+            return portable / "settings.json"
 
         # Use platform-appropriate config directory
         import sys
