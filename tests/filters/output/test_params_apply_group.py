@@ -26,13 +26,13 @@ _GROUP_FIELDS = {
         "color_mode",
         "color_common",
         "picture_shape",
-        "black_on_white",
     },
     ApplyGroup.SPLITTING: {"splitting"},
     ApplyGroup.BINARIZATION: {"binarization"},
     ApplyGroup.DESPECKLE: {"despeckle_level"},
     ApplyGroup.DEWARPING: {"dewarping"},
     ApplyGroup.DEPTH_PERCEPTION: {"depth_perception"},
+    ApplyGroup.PROCESSING: {"black_on_white", "black_on_white_set_manually"},
 }
 
 
@@ -42,7 +42,7 @@ def _source() -> Params:
     return (
         base.with_output_dpi(Dpi.uniform(300))
         .with_color_mode(ColorMode.MIXED)
-        .with_black_on_white(False)
+        .with_manual_black_on_white(False)
         .with_color_common(ColorCommonOptions(fill_offcut=False))
         .with_picture_shape(PictureShapeOptions(shape=PictureShape.OFF))
         .with_despeckle_level(DespeckleLevel.AGGRESSIVE)
@@ -68,10 +68,19 @@ def test_colour_mode_group_keeps_the_target_zones_and_distortion_model():
     merged = _target().with_group_from(_source(), ApplyGroup.COLOR_MODE)
 
     assert merged.color_mode == ColorMode.MIXED
-    assert merged.black_on_white is False
+    assert merged.black_on_white is True
     assert merged.picture_zones == (_PICTURE,)
     assert merged.fill_zones == (_FILL,)
     assert merged.distortion_model == _MODEL
+
+
+def test_processing_group_copies_a_detected_polarity_as_chosen_by_hand():
+    detected = Params().with_black_on_white(False)
+
+    merged = _target().with_group_from(detected, ApplyGroup.PROCESSING)
+
+    assert merged.black_on_white is False
+    assert merged.black_on_white_set_manually is True
 
 
 def test_despeckle_group_changes_only_the_despeckle_level():

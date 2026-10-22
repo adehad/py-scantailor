@@ -43,6 +43,7 @@ from scantailor.app.ui.options_widgets import (
 )
 from scantailor.app.ui.source_cache import SourceCache
 from scantailor.app.ui.widgets.help_icon import install_help_icons
+from scantailor.core.black_on_white_estimator import is_black_on_white
 from scantailor.core.content_mask import ContentMask, compute_content_mask
 from scantailor.core.image_io import ImageLoadError
 from scantailor.core.models import (
@@ -59,6 +60,7 @@ from scantailor.core.page_geometry import (
 )
 from scantailor.core.page_source import DpiOverrides, load_page
 from scantailor.core.pipeline import OutputExtras
+from scantailor.core.settings import ApplicationSettings
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation, Rect
 from scantailor.core.zones import (
@@ -521,6 +523,7 @@ class StagePanels(QtCore.QObject):
         metrics = extras.dewarp_metrics
         if isinstance(self.options, output.OptionsWidget):
             self.options.set_dewarp_metrics(metrics)
+            self.options.show_black_on_white()
         if isinstance(self.view, OutputImageView):
             self.view.set_dewarp_note(None if metrics is None else metrics.describe())
 
@@ -818,7 +821,11 @@ class StagePanels(QtCore.QObject):
             cached = panels._content_mask
             if cached is None or cached[0] != key:
                 oriented = rotate_orthogonal(source.pixels, rotation)
-                cached = (key, compute_content_mask(oriented, xform))
+                detection = ApplicationSettings.get_instance().polarity_detection
+                black_on_white = not detection.enabled or is_black_on_white(
+                    oriented, xform
+                )
+                cached = (key, compute_content_mask(oriented, xform, black_on_white))
                 panels._content_mask = cached
             return cached[1]
 

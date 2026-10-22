@@ -87,8 +87,9 @@ def read_output(
     """Read the per-page settings of the ``<output>`` element.
 
     C++ keeps the zones beside the parameters; here they are part of the
-    parameters. Of the page's ``<processing-params>`` only ``autoZonesFound`` is
-    read, so that auto picture zones the project already has are kept rather
+    parameters, and so is the ``blackOnWhiteSetManually`` flag of the page's
+    ``<processing-params>``. Of the rest of that element only ``autoZonesFound``
+    is read, so that auto picture zones the project already has are kept rather
     than detected again. ``<output-params>`` (a record of the files a previous
     run wrote, used by the C++ cache) has no counterpart in the port and is
     not read.
@@ -116,6 +117,9 @@ def read_output(
                     "fill_zones": tuple(fill_zones),
                     "auto_picture_zones_shape": _auto_zones_shape(
                         child(element, "processing-params"), params
+                    ),
+                    "black_on_white_set_manually": attr_flag(
+                        child(element, "processing-params"), "blackOnWhiteSetManually"
                     ),
                 }
             )

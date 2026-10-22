@@ -89,7 +89,7 @@ class ContentMask:
 
 
 def compute_content_mask(
-    pixels: NDArray[np.uint8], xform: ImageTransformation
+    pixels: NDArray[np.uint8], xform: ImageTransformation, black_on_white: bool = True
 ) -> ContentMask:
     """Find the content of a page.
 
@@ -97,30 +97,82 @@ def compute_content_mask(
         pixels (NDArray[np.uint8]): The image ``xform`` starts from, gray or BGR.
         xform (ImageTransformation): Maps the image to the page; the mask covers
             its resulting area and ignores what its pre-crop area leaves out.
+        black_on_white (bool): False for a page of light content on a dark
+            background, which is inverted before its content is looked for.
 
     Returns:
         ContentMask: The mask, null when the page area is empty.
     """
+    page = render_page_at_dpi(pixels, xform, MASK_DPI, black_on_white=black_on_white)
+    if page is None:
+        return ContentMask()
+    ink = binarize_wolf(
+        page.gray, _WOLF_WINDOW, k=_WOLF_K, lower_bound=_WOLF_LOWER_BOUND
+    )
+    ink[~page.inside] = 255
+    kept = despeckle(ink, MASK_DPI, _DESPECKLE_LEVEL)
+    return ContentMask(kept == 0, page.to_page)
+
+
+@dataclass(frozen=True, eq=False)
+class LowResolutionPage:
+    """A page resampled to a fixed resolution in gray.
+
+    Attributes:
+        gray: The page; white where it has no source pixel.
+        inside: True where the page lies inside the transformation's pre-crop
+            area.
+        to_page: 3x3 matrix, column-vector convention, from the coordinates of
+            the source image to pixels of ``gray``.
+    """
+
+    gray: NDArray[np.uint8]
+    inside: NDArray[np.bool_]
+    to_page: NDArray[np.float64]
+
+
+def render_page_at_dpi(
+    pixels: NDArray[np.uint8],
+    xform: ImageTransformation,
+    dpi: int,
+    *,
+    black_on_white: bool = True,
+) -> LowResolutionPage | None:
+    """Resample the page an image transformation describes, at ``dpi``.
+
+    Args:
+        pixels (NDArray[np.uint8]): The image ``xform`` starts from, gray or BGR.
+            Not modified.
+        xform (ImageTransformation): Maps the image to the page. Not modified.
+        dpi (int): Resolution of the result.
+        black_on_white (bool): False inverts the image before resampling, so
+            that the area with no source pixel stays white.
+
+    Returns:
+        LowResolutionPage | None: The page, or None when its area is empty.
+    """
     scaled = copy.deepcopy(xform)
-    scaled.pre_scale_to_dpi(Dpi.uniform(MASK_DPI))
+    scaled.pre_scale_to_dpi(Dpi.uniform(dpi))
     rect = scaled.resulting_rect
     width, height = round(rect.width), round(rect.height)
     if width <= 0 or height <= 0:
-        return ContentMask()
+        return None
 
-    to_content = np.eye(3)
-    to_content[0, 2], to_content[1, 2] = -rect.x, -rect.y
-    to_content = to_content @ scaled.transform
+    to_page = np.eye(3)
+    to_page[0, 2], to_page[1, 2] = -rect.x, -rect.y
+    to_page = to_page @ scaled.transform
 
     gray = (
         cv2.cvtColor(pixels, cv2.COLOR_BGR2GRAY)
         if pixels.ndim == 3 and pixels.shape[2] == 3
         else np.ascontiguousarray(pixels)
     )
+    if not black_on_white:
+        gray = cv2.bitwise_not(gray)
     page = np.asarray(
         cv2.warpAffine(
             gray,
-            to_content[:2],
+            to_page[:2],
             (width, height),
             flags=cv2.INTER_LINEAR,
             borderMode=cv2.BORDER_CONSTANT,
@@ -128,11 +180,8 @@ def compute_content_mask(
         ),
         dtype=np.uint8,
     )
-    ink = binarize_wolf(page, _WOLF_WINDOW, k=_WOLF_K, lower_bound=_WOLF_LOWER_BOUND)
     inside = _inside_pre_crop_area(scaled, rect.x, rect.y, (height, width))
-    ink[~inside] = 255
-    kept = despeckle(ink, MASK_DPI, _DESPECKLE_LEVEL)
-    return ContentMask(kept == 0, to_content)
+    return LowResolutionPage(page, inside, to_page)
 
 
 def _inside_pre_crop_area(

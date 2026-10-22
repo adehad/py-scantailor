@@ -2379,6 +2379,11 @@ Process them now? Export the PDF again once processing is done.</source>
         <translation>깊이 인식 적용</translation>
     </message>
     <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="94"/>
+        <source>Apply Processing Settings</source>
+        <translation>적용 작업 설정</translation>
+    </message>
+    <message>
         <location filename="../app/ui/dialogs/apply_to.py" line="93"/>
         <source>Apply Deskew</source>
         <extracomment>Machine draft, pending native review.</extracomment>
@@ -5580,8 +5585,9 @@ Unchecked: white text on black background</source>
         <translation>얼룩 제거</translation>
     </message>
     <message>
+        <location filename="../app/ui/options_widgets/output.py" line="1068"/>
         <source>Processing</source>
-        <translation type="obsolete">작업</translation>
+        <translation>작업</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/output.py" line="1223"/>

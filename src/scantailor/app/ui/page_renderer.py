@@ -24,6 +24,7 @@ from scantailor.core.page_source import (
     load_page,
 )
 from scantailor.core.pipeline import OutputExtras
+from scantailor.core.settings import ApplicationSettings
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.output.params import DistortionModelSpec
 
@@ -171,6 +172,7 @@ def render_page_with_model(
         keep_output_extras=on_extras is not None,
         should_cancel=should_cancel,
         render_image=pixels,
+        black_on_white_detection=ApplicationSettings.get_instance().polarity_detection,
     )
     result = pipeline.process_page(page.pixels, page_id, sequence, options)
     if on_extras is not None and result.output_extras is not None:

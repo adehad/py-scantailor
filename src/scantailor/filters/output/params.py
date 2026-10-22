@@ -41,6 +41,7 @@ class ApplyGroup(Enum):
     DESPECKLE = "despeckle"
     DEWARPING = "dewarping"
     DEPTH_PERCEPTION = "depth_perception"
+    PROCESSING = "processing"
 
 
 # Zones, the manual distortion model and every other per-page geometry are
@@ -51,13 +52,13 @@ _GROUP_FIELDS: dict[ApplyGroup, tuple[str, ...]] = {
         "color_mode",
         "color_common",
         "picture_shape",
-        "black_on_white",
     ),
     ApplyGroup.SPLITTING: ("splitting",),
     ApplyGroup.BINARIZATION: ("binarization",),
     ApplyGroup.DESPECKLE: ("despeckle_level", "despeckle_factor"),
     ApplyGroup.DEWARPING: ("dewarping", "dewarp_min_span_percent"),
     ApplyGroup.DEPTH_PERCEPTION: ("depth_perception",),
+    ApplyGroup.PROCESSING: ("black_on_white",),
 }
 
 
@@ -156,7 +157,12 @@ class Params(BaseModel):
             step; the nearest step when ``despeckle_factor`` is set.
         despeckle_factor: Noise removal strength as C++ stores it, 0 for off
             and 0.5 to 3.5 otherwise; None when the named level says it.
-        black_on_white: True for black text on white background.
+        black_on_white: True for dark content on a light background. Output
+            inverts a page set to False before processing it and inverts the
+            result back.
+        black_on_white_set_manually: True once the user chose
+            ``black_on_white`` for the page, here or with "Apply to...";
+            detection at Output then no longer changes it.
         dewarping: Dewarping options for curved page correction.
         dewarp_min_span_percent: Automatic dewarping refuses a model whose
             top and bottom curves lie closer together than this share of the
@@ -190,6 +196,7 @@ class Params(BaseModel):
         default=None, ge=0.0, le=MAX_DESPECKLE_FACTOR
     )
     black_on_white: bool = True
+    black_on_white_set_manually: bool = False
     dewarping: DewarpingOptions = Field(default_factory=DewarpingOptions)
     dewarp_min_span_percent: int = Field(default=DEFAULT_MIN_SPAN_PERCENT, ge=0, le=100)
     color_common: ColorCommonOptions = Field(default_factory=ColorCommonOptions)
@@ -245,6 +252,22 @@ class Params(BaseModel):
             return {**data, "despeckle_level": level}
         return data
 
+    @model_validator(mode="before")
+    @classmethod
+    def _stored_white_on_black_was_chosen(cls, data: object) -> object:
+        """Treat a light-on-dark polarity stored without the manual flag as chosen.
+
+        Parameters written before detection reached Output could only hold
+        False because the user unticked the box, so detection must keep it.
+        """
+        if (
+            isinstance(data, dict)
+            and data.get("black_on_white") is False
+            and "black_on_white_set_manually" not in data
+        ):
+            return {**data, "black_on_white_set_manually": True}
+        return data
+
     @property
     def despeckle_strength(self) -> float:
         """Strength despeckling runs at, whether set by a step or a factor."""
@@ -283,6 +306,15 @@ class Params(BaseModel):
     def with_black_on_white(self, black_on_white: bool) -> Self:
         """Create a copy with different black_on_white setting."""
         return self.model_copy(update={"black_on_white": black_on_white})
+
+    def with_manual_black_on_white(self, black_on_white: bool) -> Self:
+        """Create a copy with a polarity the user chose, which detection keeps."""
+        return self.model_copy(
+            update={
+                "black_on_white": black_on_white,
+                "black_on_white_set_manually": True,
+            }
+        )
 
     def with_dewarping(self, options: DewarpingOptions) -> Self:
         """Create a copy with different dewarping options."""
@@ -362,6 +394,8 @@ class Params(BaseModel):
         update = {name: getattr(source, name) for name in _GROUP_FIELDS[group]}
         if group is ApplyGroup.DPI:
             update = self._dpi_update(source.output_dpi)
+        elif group is ApplyGroup.PROCESSING:
+            update["black_on_white_set_manually"] = True
         return self.model_copy(update=update)
 
     def needs_binarization(self) -> bool:

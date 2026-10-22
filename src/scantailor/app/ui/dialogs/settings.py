@@ -43,8 +43,6 @@ _THUMBNAIL_ASPECT = 16.0 / 25.0
 # Options that nothing in the application reads yet; they stay visible but cannot
 # be edited, and keep the stored value.
 _UNWIRED_WIDGETS = (
-    "blackOnWhiteDetectionCB",
-    "blackOnWhiteDetectionAtOutputCB",
     "highlightDeviationCB",
     "deskewDeviationCoefSB",
     "deskewDeviationThresholdSB",
@@ -285,7 +283,7 @@ class SettingsDialog(QtWidgets.QDialog):
         """Connect widget signals."""
         self._button_box.accepted.connect(self._save_and_accept)
         self._button_box.rejected.connect(self.reject)
-        self._black_on_white_cb.clicked.connect(
+        self._black_on_white_cb.toggled.connect(
             self._black_on_white_output_cb.setEnabled
         )
         self._color_scheme_box.currentIndexChanged.connect(self._preview_appearance)

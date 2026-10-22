@@ -356,9 +356,9 @@ class TestContentMask:
         calls: list[int] = []
         original = stage_panels.compute_content_mask
 
-        def counting(pixels, xform):
+        def counting(pixels, xform, black_on_white=True):
             calls.append(1)
-            return original(pixels, xform)
+            return original(pixels, xform, black_on_white)
 
         monkeypatch.setattr(stage_panels, "compute_content_mask", counting)
         panels = _panels(FilterStage.SELECT_CONTENT)

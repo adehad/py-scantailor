@@ -2219,6 +2219,11 @@ Les traiter maintenant? Exportez à nouveau le PDF une fois le traitement termin
         <translation>Appliquer la perception de la profondeur</translation>
     </message>
     <message>
+        <location filename="../app/ui/dialogs/apply_to.py" line="94"/>
+        <source>Apply Processing Settings</source>
+        <translation>Appliquer les paramètres de traitement</translation>
+    </message>
+    <message>
         <location filename="../app/ui/dialogs/apply_to.py" line="93"/>
         <source>Apply Deskew</source>
         <extracomment>Machine draft, pending native review.</extracomment>
@@ -4562,8 +4567,9 @@ Non coché: texte blanc sur fond noir</translation>
         <translation>Détacher</translation>
     </message>
     <message>
+        <location filename="../app/ui/options_widgets/output.py" line="1068"/>
         <source>Processing</source>
-        <translation type="vanished">Traitement</translation>
+        <translation>Traitement</translation>
     </message>
     <message>
         <location filename="../app/ui/options_widgets/output.py" line="1223"/>

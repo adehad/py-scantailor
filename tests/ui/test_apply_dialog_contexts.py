@@ -225,6 +225,12 @@ def test_german_catalogue_translates_deskew_option_under_deskew_class(
             ApplyColorsDialog,
             id="colour",
         ),
+        pytest.param(
+            FilterStage.OUTPUT,
+            ApplyGroup.PROCESSING.value,
+            ApplyColorsDialog,
+            id="processing",
+        ),
     ],
 )
 def test_main_window_picks_the_dialog_class_for_each_stage_and_group(
