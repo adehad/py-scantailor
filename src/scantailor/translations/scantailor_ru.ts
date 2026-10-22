@@ -1638,13 +1638,15 @@
 <context>
     <name>LoadFileTask</name>
     <message>
+        <location filename="../app/ui/widgets/error_widget.py" line="77"/>
         <source>The following file could not be loaded:
 %1</source>
-        <translation type="vanished">Файл не загрузился:%1</translation>
+        <translation>Файл не загрузился:%1</translation>
     </message>
     <message>
+        <location filename="../app/ui/widgets/error_widget.py" line="81"/>
         <source>The following file doesn&apos;t exist:&lt;br&gt;%1&lt;br&gt;&lt;br&gt;Use the &lt;a href=&quot;#relink&quot;&gt;Relinking Tool&lt;/a&gt; to locate it.</source>
-        <translation type="vanished">Следующий файл не существует:&lt;br&gt;%1&lt;br&gt;&lt;br&gt;Используйте &lt;a href=&quot;#relink&quot;&gt;Relinking Tool&lt;/a&gt; чтобы найти его.</translation>
+        <translation>Следующий файл не существует:&lt;br&gt;%1&lt;br&gt;&lt;br&gt;Используйте &lt;a href=&quot;#relink&quot;&gt;Relinking Tool&lt;/a&gt; чтобы найти его.</translation>
     </message>
 </context>
 <context>

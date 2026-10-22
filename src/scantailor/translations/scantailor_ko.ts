@@ -1750,14 +1750,16 @@
 <context>
     <name>LoadFileTask</name>
     <message>
+        <location filename="../app/ui/widgets/error_widget.py" line="77"/>
         <source>The following file could not be loaded:
 %1</source>
-        <translation type="vanished">이 파일을 로드할 수 없습니다:
+        <translation>이 파일을 로드할 수 없습니다:
 %1</translation>
     </message>
     <message>
+        <location filename="../app/ui/widgets/error_widget.py" line="81"/>
         <source>The following file doesn&apos;t exist:&lt;br&gt;%1&lt;br&gt;&lt;br&gt;Use the &lt;a href=&quot;#relink&quot;&gt;Relinking Tool&lt;/a&gt; to locate it.</source>
-        <translation type="vanished">이 파일들은 존재하지 않습니다:&lt;br&gt;%1&lt;br&gt;&lt;br&gt; &lt;a href=&quot;#relink&quot;&gt;재 링크 도구&lt;/a&gt; 로 다시 위치시키세요.</translation>
+        <translation>이 파일들은 존재하지 않습니다:&lt;br&gt;%1&lt;br&gt;&lt;br&gt; &lt;a href=&quot;#relink&quot;&gt;재 링크 도구&lt;/a&gt; 로 다시 위치시키세요.</translation>
     </message>
 </context>
 <context>

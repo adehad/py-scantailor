@@ -185,4 +185,26 @@ Relinking one folder also relinks every listed folder below it. Press OK to appl
 the changes. The project is then marked as changed, so save it to keep the new
 paths.
 
+Pages that cannot be loaded
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When the input file of the current page cannot be read, a warning takes the
+place of the page and its options, at every stage. It names the file.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Cause
+     - What the warning offers
+   * - The file is missing, for example after it was moved or renamed
+     - A **Relinking Tool** link that opens the Relinking dialog. Once you relink
+       the folder, the page loads.
+   * - The file exists but cannot be decoded, for example a damaged or
+       unsupported file
+     - No link, since relinking cannot help. Replace the file, or remove the page
+       from the project.
+
+Going to a page that loads shows its view again.
+
 See :mod:`scantailor.core.relinker`.
