@@ -157,6 +157,7 @@ QGroupBox QGroupBox::title {{
     left: 0; top: {(nested_header - line) // 2}px; color: {t.text_dim};
 }}
 QLabel {{ background: transparent; }}
+QLabel#outputTabMessage {{ background: {t.viewport}; }}
 QFrame[frameShape="4"] {{
     background: {t.field_border}; border: none; max-height: 1px;
 }}

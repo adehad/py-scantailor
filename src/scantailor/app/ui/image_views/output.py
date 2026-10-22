@@ -529,12 +529,16 @@ class OutputImageView(ImageViewBase):
     def set_tab_message(self, tab: ImageViewTab, text: str | None) -> None:
         """Show a message in place of a tab's image, or take it away.
 
+        While its message shows, a zone tab neither creates nor edits zones.
+
         Args:
             tab (ImageViewTab): The tab.
             text (str | None): The message; None shows the image again.
         """
         if text:
             self._tab_messages[tab] = text
+            if tab == self._tab and self._creating is not None:
+                self.cancel_zone_creation()
         else:
             self._tab_messages.pop(tab, None)
         self._update_message()
@@ -1152,6 +1156,8 @@ class OutputImageView(ImageViewBase):
     def _active_kinds(self) -> frozenset[ZoneKind]:
         if self._tab is None:
             return frozenset(ZoneKind)
+        if self._tab in self._tab_messages:
+            return frozenset()
         kind = _ZONE_TAB_KINDS.get(self._tab)
         return frozenset() if kind is None else frozenset({kind})
 

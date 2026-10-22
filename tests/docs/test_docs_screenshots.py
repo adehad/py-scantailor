@@ -365,6 +365,8 @@ def test_manual_screenshots_capture_every_named_shot(
     manager.current_page = page_named(manager, PICTURES)
     add_sample_zones(manager)
     visit_stage(6)
+    options_child(QtWidgets.QAbstractButton, "mixedBtn").click()
+    finish_render()
     view = output_view()
     for tab_name, shot in (
         ("PICTURE_ZONES", "stage6_tab_picture_zones"),
@@ -409,9 +411,6 @@ def test_manual_screenshots_capture_every_named_shot(
     pump(0.5)
     save(manager.ui, "status_tip")
 
-    options_child(QtWidgets.QAbstractButton, "mixedBtn").click()
-    finish_render()
-    view = output_view()
     view.set_current_tab(ImageViewTab.PICTURE_ZONES)
     pump(1.0)
     save(manager.ui, "stage6_tab_picture_mask")

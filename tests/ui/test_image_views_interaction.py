@@ -25,6 +25,7 @@ from scantailor.core.models import OrthogonalRotation, PageId
 from scantailor.core.page_geometry import build_transformation
 from scantailor.core.stage_sequence import FilterStage
 from scantailor.core.zones import PictureLayer
+from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.select_content.content_box import ContentBox
 
@@ -501,6 +502,12 @@ def _pin_all_pages(window: MainWindowManager) -> None:
 
 def _open_output_view(qtbot: QtBot, window: MainWindowManager) -> OutputImageView:
     _pin_all_pages(window)
+    # The Picture Zones tab edits zones only on a Mixed page.
+    output = window.stages.output_filter
+    for page in window.pages():
+        output.set_params(
+            page, output.get_params(page).with_color_mode(ColorMode.MIXED)
+        )
     view = _open_stage(
         qtbot,
         window,

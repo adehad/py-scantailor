@@ -8,6 +8,7 @@ from scantailor.app.ui.image_views.base import ImageViewBase
 from scantailor.app.ui.image_views.output import ImageViewTab, OutputImageView
 from scantailor.app.ui.MainWindow import MainWindowManager
 from scantailor.core.stage_sequence import FilterStage
+from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.select_content.content_box import ContentBox
 
@@ -114,6 +115,12 @@ def test_turning_the_page_repaints_the_fix_orientation_view(
 def test_switching_an_output_tab_repaints_the_view(
     qtbot: QtBot, settled_window: MainWindowManager, tab: ImageViewTab
 ):
+    # Outside Mixed mode the Picture Zones tab shows a message instead of the page.
+    output = settled_window.stages.output_filter
+    for page in settled_window.pages():
+        output.set_params(
+            page, output.get_params(page).with_color_mode(ColorMode.MIXED)
+        )
     view = _open_stage(qtbot, settled_window, FilterStage.OUTPUT)
     assert isinstance(view, OutputImageView)
     if view.current_tab() == tab:
