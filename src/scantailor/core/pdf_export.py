@@ -27,6 +27,7 @@ from PIL import Image
 from scantailor.core.pdf_outline import carry_outline_and_labels
 from scantailor.core.pdf_pool import PdfCancelled, map_pool_progress
 from scantailor.core.text_layer import TextLayer
+from scantailor.imageproc.posterizer import to_indexed
 
 PDF_POINTS_PER_INCH = 72.0
 # PDF palette images index at 1, 2, 4 or 8 bits. Beyond 4 bits a scanned page is
@@ -266,7 +267,7 @@ def _encode_page(job: _EncodeJob) -> EncodedPage:
     if image.dtype != np.uint8:
         raise ValueError(f"Grey and colour pages must be uint8, got {image.dtype}")
     colour_space = "DeviceGray" if image.ndim == 2 else "DeviceRGB"
-    indexed = _as_palette(image)
+    indexed = to_indexed(image, MAX_PALETTE_COLOURS)
     if indexed is not None:
         palette, indices = indexed
         bits = _palette_bits(len(palette))
@@ -296,47 +297,6 @@ def _encode_page(job: _EncodeJob) -> EncodedPage:
         page_width,
         page_height,
     )
-
-
-def _as_palette(
-    image: NDArray[np.uint8],
-) -> tuple[NDArray[np.uint8], NDArray[np.uint8]] | None:
-    """Split an image into its colours and a per-pixel index into them.
-
-    Args:
-        image (NDArray[np.uint8]): 2-D grey or (H, W, 3) BGR image.
-
-    Returns:
-        tuple[NDArray[np.uint8], NDArray[np.uint8]] | None: The palette, grey
-        levels of shape (n,) or RGB rows of shape (n, 3), and an (H, W) uint8
-        index image; None when the image has more than ``MAX_PALETTE_COLOURS``
-        colours.
-    """
-    if image.ndim == 2:
-        levels = np.flatnonzero(np.bincount(image.ravel(), minlength=256))
-        if len(levels) > MAX_PALETTE_COLOURS:
-            return None
-        lookup = np.zeros(256, dtype=np.uint8)
-        lookup[levels] = np.arange(len(levels), dtype=np.uint8)
-        return levels.astype(np.uint8), lookup[image]
-    packed = (
-        (image[..., 2].astype(np.uint32) << 16)
-        | (image[..., 1].astype(np.uint32) << 8)
-        | image[..., 0]
-    )
-    # A photo page has thousands of colours, so a strided sample rejects it
-    # without sorting every pixel. Only pixels the sample missed are sorted.
-    colours = np.unique(packed.ravel()[::97])
-    if len(colours) > MAX_PALETTE_COLOURS:
-        return None
-    unseen = packed[~np.isin(packed, colours)]
-    if unseen.size:
-        colours = np.union1d(colours, unseen)
-        if len(colours) > MAX_PALETTE_COLOURS:
-            return None
-    indices = np.searchsorted(colours, packed).astype(np.uint8)
-    rgb = np.stack([colours >> 16, (colours >> 8) & 0xFF, colours & 0xFF], axis=1)
-    return rgb.astype(np.uint8), indices
 
 
 def _palette_bits(colour_count: int) -> int:
