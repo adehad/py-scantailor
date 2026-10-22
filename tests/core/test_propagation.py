@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from scantailor.core.models import (
@@ -12,6 +13,7 @@ from scantailor.core.models import (
     PageId,
     SubPage,
 )
+from scantailor.core.pipeline import PipelineOptions, process_page
 from scantailor.core.project import ImageMetadata, Project
 from scantailor.core.propagation import (
     ApplyScope,
@@ -27,7 +29,7 @@ from scantailor.core.propagation import (
     propagate_page_orientations,
     select_pages,
 )
-from scantailor.core.stage_sequence import StageSequence
+from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.deskew.dependencies import Dependencies as DeskewDependencies
 from scantailor.filters.deskew.params import Params as DeskewParams
 from scantailor.filters.fix_orientation.image_trim import ImageTrim
@@ -49,6 +51,9 @@ from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.page_split.page_layout import PageLayout
 from scantailor.filters.page_split.params import Params as SplitParams
 from scantailor.filters.select_content.content_box import ContentBox, PageBox
+from scantailor.filters.select_content.dependencies import (
+    Dependencies as SelectContentDependencies,
+)
 from scantailor.filters.select_content.params import Params as SelectContentParams
 
 DPI = Dpi.uniform(300)
@@ -351,6 +356,26 @@ class TestCheckEverythingDefined:
         assert settings.check_everything_defined([measured, other], ignore=other)
 
 
+def _processed_on_image(
+    params: SelectContentParams, width: float, height: float
+) -> SelectContentParams:
+    """Params as Select Content leaves them on an image of the given size."""
+    outline = [(0.0, 0.0), (width, 0.0), (width, height), (0.0, height)]
+    return params.model_copy(
+        update={"dependencies": SelectContentDependencies(rotated_page_outline=outline)}
+    )
+
+
+def _manual_boxes_on_800_by_1000() -> SelectContentParams:
+    return _processed_on_image(
+        SelectContentParams()
+        .with_manual_page(PageBox(x=100, y=100, width=600, height=800))
+        .with_manual_content(ContentBox(x=200, y=200, width=400, height=600)),
+        800,
+        1000,
+    )
+
+
 class TestApplyFunctions:
     """Copying one page's settings to others."""
 
@@ -439,6 +464,201 @@ class TestApplyFunctions:
         params = stages.select_content_filter.get_params(target)
         assert params.content_box == old_box
         assert params.is_content_manual()
+
+    def test_select_content_centres_copied_manual_boxes_on_a_larger_image(self):
+        stages = StageSequence()
+        source, target = _pages(2)
+        settings = stages.select_content_filter.settings
+        settings.set_params(source, _manual_boxes_on_800_by_1000())
+        settings.set_params(
+            target, _processed_on_image(SelectContentParams(), 1000, 1100)
+        )
+
+        apply_select_content(stages, source, [target])
+
+        params = settings.get_params(target)
+        assert params.page_box == PageBox(x=200, y=150, width=600, height=800)
+        assert params.content_box == ContentBox(x=300, y=250, width=400, height=600)
+
+    def test_select_content_keeps_coordinates_on_an_image_of_the_same_size(self):
+        stages = StageSequence()
+        source, target = _pages(2)
+        settings = stages.select_content_filter.settings
+        settings.set_params(source, _manual_boxes_on_800_by_1000())
+        settings.set_params(
+            target, _processed_on_image(SelectContentParams(), 800, 1000)
+        )
+
+        apply_select_content(stages, source, [target])
+
+        params = settings.get_params(target)
+        assert params.page_box == PageBox(x=100, y=100, width=600, height=800)
+        assert params.content_box == ContentBox(x=200, y=200, width=400, height=600)
+
+    def test_select_content_clips_a_centred_page_box_to_a_smaller_image(self):
+        stages = StageSequence()
+        source, target = _pages(2)
+        settings = stages.select_content_filter.settings
+        settings.set_params(source, _manual_boxes_on_800_by_1000())
+        settings.set_params(
+            target, _processed_on_image(SelectContentParams(), 500, 1000)
+        )
+
+        apply_select_content(stages, source, [target])
+
+        assert settings.get_params(target).page_box == PageBox(
+            x=0, y=100, width=500, height=800
+        )
+
+    def test_select_content_to_all_pages_centres_boxes_on_an_unprocessed_larger_image(
+        self,
+    ):
+        project = _project((800, 1000), (1000, 1100))
+        stages = StageSequence()
+        pages = project.get_pages()
+        settings = stages.select_content_filter.settings
+        settings.set_params(pages[0], _manual_boxes_on_800_by_1000())
+
+        targets = select_pages(ApplyScope.ALL_PAGES, pages[0], pages)
+        apply_select_content(stages, pages[0], targets, project=project)
+
+        params = settings.get_params(pages[1])
+        assert params.page_box == PageBox(x=200, y=150, width=600, height=800)
+        assert params.content_box == ContentBox(x=300, y=250, width=400, height=600)
+
+    def test_select_content_measures_an_unprocessed_image_as_it_is_turned(self):
+        project = _project((800, 1000), (1100, 1000))
+        stages = StageSequence()
+        pages = project.get_pages()
+        stages.fix_orientation_filter.settings.apply_rotation(
+            pages[1].image_id, OrthogonalRotation(degrees=90)
+        )
+        settings = stages.select_content_filter.settings
+        settings.set_params(pages[0], _manual_boxes_on_800_by_1000())
+
+        apply_select_content(stages, pages[0], [pages[1]], project=project)
+
+        assert settings.get_params(pages[1]).page_box == PageBox(
+            x=200, y=150, width=600, height=800
+        )
+
+    def test_select_content_centres_alike_on_processed_and_unprocessed_pages(self):
+        # Turned, deskewed and stored at unequal DPI, so the outline Select
+        # Content records goes through every step of the transformation.
+        unequal = Dpi(horizontal=300, vertical=150)
+        project = Project()
+        project.add_image(
+            ImageId(file_path=Path("/scans/source.png")),
+            ImageMetadata(width=800, height=1000, dpi=DPI),
+        )
+        for name in ("processed", "unprocessed"):
+            project.add_image(
+                ImageId(file_path=Path(f"/scans/{name}.png")),
+                ImageMetadata(width=1100, height=500, dpi=unequal),
+            )
+        source, processed, unprocessed = project.get_pages()
+        stages = StageSequence()
+        for page in (processed, unprocessed):
+            stages.fix_orientation_filter.settings.apply_rotation(
+                page.image_id, OrthogonalRotation(degrees=90)
+            )
+            stages.deskew_filter.set_params(page, DeskewParams().with_manual_angle(4.0))
+        process_page(
+            np.full((500, 1100), 235, dtype=np.uint8),
+            processed,
+            stages,
+            PipelineOptions(end_stage=FilterStage.SELECT_CONTENT, dpi=unequal),
+        )
+        settings = stages.select_content_filter.settings
+        assert settings.get_params(processed).dependencies.rotated_page_outline
+        settings.set_params(source, _manual_boxes_on_800_by_1000())
+
+        apply_select_content(stages, source, [processed, unprocessed], project=project)
+
+        done, fallback = (
+            settings.get_params(processed),
+            settings.get_params(unprocessed),
+        )
+        assert done.page_box.to_tuple() == pytest.approx(fallback.page_box.to_tuple())
+        assert done.content_box.to_tuple() == pytest.approx(
+            fallback.content_box.to_tuple()
+        )
+        assert done.page_box != _manual_boxes_on_800_by_1000().page_box
+
+    def test_select_content_keeps_coordinates_on_a_page_never_processed(self):
+        stages = StageSequence()
+        source, target = _pages(2)
+        settings = stages.select_content_filter.settings
+        settings.set_params(source, _manual_boxes_on_800_by_1000())
+
+        apply_select_content(stages, source, [target])
+
+        params = settings.get_params(target)
+        assert params.page_box == PageBox(x=100, y=100, width=600, height=800)
+        assert params.content_box == ContentBox(x=200, y=200, width=400, height=600)
+
+    def test_select_content_centres_a_content_box_on_the_whole_image_without_a_page_box(
+        self,
+    ):
+        stages = StageSequence()
+        source, target = _pages(2)
+        settings = stages.select_content_filter.settings
+        settings.set_params(
+            source,
+            _processed_on_image(
+                SelectContentParams(page_box=PageBox(width=800, height=1000))
+                .with_disabled_page()
+                .with_manual_content(ContentBox(x=200, y=200, width=400, height=600)),
+                800,
+                1000,
+            ),
+        )
+        settings.set_params(
+            target, _processed_on_image(SelectContentParams(), 600, 1200)
+        )
+
+        apply_select_content(stages, source, [target])
+
+        params = settings.get_params(target)
+        assert params.page_box == PageBox(width=600, height=1200)
+        assert params.content_box == ContentBox(x=100, y=300, width=400, height=600)
+
+    def test_select_content_centres_a_content_box_on_the_page_box_the_target_keeps(
+        self,
+    ):
+        stages = StageSequence()
+        source, target = _pages(2)
+        settings = stages.select_content_filter.settings
+        settings.set_params(source, _manual_boxes_on_800_by_1000())
+        own_page = PageBox(x=50, y=0, width=800, height=1000)
+        settings.set_params(
+            target,
+            _processed_on_image(
+                SelectContentParams().with_manual_page(own_page), 900, 1000
+            ),
+        )
+
+        apply_select_content(stages, source, [target], apply_page_box=False)
+
+        params = settings.get_params(target)
+        assert params.page_box == own_page
+        assert params.content_box == ContentBox(x=250, y=200, width=400, height=600)
+
+    def test_select_content_keeps_a_content_box_in_place_without_a_source_page_box(
+        self,
+    ):
+        stages = StageSequence()
+        source, target = _pages(2)
+        settings = stages.select_content_filter.settings
+        box = ContentBox(x=200, y=200, width=400, height=600)
+        settings.set_params(source, SelectContentParams().with_manual_content(box))
+        settings.set_params(
+            target, _processed_on_image(SelectContentParams(), 600, 1200)
+        )
+
+        apply_select_content(stages, source, [target])
+
+        assert settings.get_params(target).content_box == box
 
     def test_select_content_skips_the_source_page(self):
         stages = StageSequence()
