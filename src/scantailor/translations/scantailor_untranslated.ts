@@ -654,11 +654,13 @@
 <context>
     <name>LoadFileTask</name>
     <message>
+        <location filename="../app/ui/widgets/error_widget.py" line="77"/>
         <source>The following file could not be loaded:
 %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../app/ui/widgets/error_widget.py" line="81"/>
         <source>The following file doesn&apos;t exist:&lt;br&gt;%1&lt;br&gt;&lt;br&gt;Use the &lt;a href=&quot;#relink&quot;&gt;Relinking Tool&lt;/a&gt; to locate it.</source>
         <translation type="unfinished"></translation>
     </message>

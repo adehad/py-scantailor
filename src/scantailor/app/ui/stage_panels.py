@@ -292,12 +292,15 @@ class StagePanels(QtCore.QObject):
             in pixels from the page's top left corner, None when it left the view.
         unremove_page_requested: The user asked in the Page Split view for a
             removed half back. Args: page (PageId) of the removed half.
+        source_failed: The current page's source image could not be decoded.
+            Args: image_id (ImageId) of that image.
     """
 
     settings_changed = QtCore.Signal()
     page_size_changed = QtCore.Signal(object, float)
     cursor_moved = QtCore.Signal(object)
     unremove_page_requested = QtCore.Signal(object)
+    source_failed = QtCore.Signal(object)
 
     def __init__(
         self,
@@ -624,10 +627,10 @@ class StagePanels(QtCore.QObject):
     def _on_source_failed(
         self, generation: int, image_id: ImageId, message: str
     ) -> None:
-        if generation == self._source_generation:
-            logger.warning(
-                f"Source image {image_id.file_path} cannot be shown: {message}"
-            )
+        if generation != self._source_generation or not self._widgets_alive():
+            return
+        logger.warning(f"Source image {image_id.file_path} cannot be shown: {message}")
+        self.source_failed.emit(image_id)
 
     def _current(self) -> tuple[PageId, _Source] | None:
         """Return the page and its source once both are available."""

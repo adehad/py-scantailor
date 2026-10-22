@@ -77,6 +77,7 @@ from scantailor.app.ui.thumbnails import ThumbnailListWidget
 from scantailor.app.ui.thumbnails.stage_orders import is_page_incomplete
 from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.app.ui.utils import get_cwidget
+from scantailor.app.ui.widgets.error_widget import ErrorWidget, load_failure_message
 from scantailor.app.ui.widgets.processing_indicator import ProcessingIndicator
 from scantailor.app.ui.widgets.stage_list_view import StageListView
 from scantailor.app.ui.widgets.status_bar_panel import StatusBarPanel
@@ -356,6 +357,7 @@ class MainWindowManager:
         self.stages = StageSequence()
         self._current_page: PageId | None = None
         self._panels: StagePanels | None = None
+        self._failed_image: ImageId | None = None
         self._thumbnail_widget: QWidget | None = None
         self._welcome_widget: QWidget | None = None
         self.renderer = PageRenderer(self.ui)
@@ -529,6 +531,11 @@ class MainWindowManager:
         self.imageFrameLayout = QStackedLayout(self.imageViewFrame)
         self.not_ready_widget = _message_widget("")
         self.imageFrameLayout.addWidget(self.not_ready_widget)
+        self.load_error_widget = ErrorWidget()
+        self.load_error_widget.link_activated.connect(
+            lambda _link: self.showRelinkingDialog()
+        )
+        self.imageFrameLayout.addWidget(self.load_error_widget)
         self._translate_own_text()
         self.processing_indicator = ProcessingIndicator()
         self.units_provider = UnitsProvider.get_instance()
@@ -1051,6 +1058,7 @@ class MainWindowManager:
         panels.set_dpi_overrides(self._dpi_overrides)
         panels.set_removed_pages_provider(self._removed_halves_of)
         panels.unremove_page_requested.connect(self._on_unremove_page_requested)
+        panels.source_failed.connect(self._on_source_failed)
         panels.settings_changed.connect(self._on_settings_edited)
         panels.page_size_changed.connect(self.status_panel.set_page_size)
         panels.cursor_moved.connect(self.status_panel.set_cursor_position)
@@ -1294,6 +1302,7 @@ class MainWindowManager:
     def _discard_panels(self) -> None:
         """Remove the widgets of the stage that is being left."""
         panels, self._panels = self._panels, None
+        self._failed_image = None
         if panels is None:
             return
         self._cancel_render()
@@ -1315,6 +1324,9 @@ class MainWindowManager:
         panels = self._panels
         if panels is None:
             return
+        if self._failed_image is not None:
+            self._failed_image = None
+            self._show_not_ready(False)
         panels.set_page(self._current_page)
         self._show_source_image_info()
         self._request_render()
@@ -1388,14 +1400,37 @@ class MainWindowManager:
         )
 
     def _show_not_ready(self, not_ready: bool) -> None:
-        """Swap the stage's options and view for the not-ready message, or undo it."""
+        """Swap the stage's options and view for the not-ready message, or undo it.
+
+        A page whose source image failed to load keeps its error panel either way.
+        """
         panels = self._panels
         if panels is None:
             return
-        panels.options.setVisible(not not_ready)
-        self.imageFrameLayout.setCurrentWidget(
-            self.not_ready_widget if not_ready else panels.view
-        )
+        failed = self._failed_image is not None
+        panels.options.setVisible(not (not_ready or failed))
+        if failed:
+            widget: QWidget = self.load_error_widget
+        elif not_ready:
+            widget = self.not_ready_widget
+        else:
+            widget = panels.view
+        self.imageFrameLayout.setCurrentWidget(widget)
+
+    def _on_source_failed(self, image_id: ImageId) -> None:
+        """Show the load error panel in place of the current page's view."""
+        page = self._current_page
+        if page is None or page.image_id != image_id:
+            return
+        self._failed_image = image_id
+        self._show_load_error_message()
+        self._show_not_ready(False)
+
+    def _show_load_error_message(self) -> None:
+        if self._failed_image is not None:
+            self.load_error_widget.set_message(
+                *load_failure_message(self._failed_image.file_path)
+            )
 
     def _on_settings_edited(self) -> None:
         """React to an edit made in the options widget."""
@@ -1539,6 +1574,7 @@ class MainWindowManager:
         retranslate_ui(self.ui, _MAIN_WINDOW_UI)
         self._translate_own_text()
         self._update_window_title()
+        self._show_load_error_message()
         if self._welcome_widget is not None:
             self._update_welcome_panel()
 

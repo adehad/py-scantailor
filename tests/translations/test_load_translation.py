@@ -6,6 +6,7 @@ import pathlib
 import pytest
 from PySide6 import QtCore, QtWidgets
 
+from scantailor.app.ui.widgets.error_widget import load_failure_message
 from scantailor.translations import load_translation
 
 _ABOUT_CONTEXT = "AboutDialog"
@@ -117,3 +118,18 @@ def test_translator_stays_active_after_garbage_collection(
     gc.collect()
 
     assert qapp.translate(_ABOUT_CONTEXT, _ABOUT_SOURCE) == "\u00dcber"
+
+
+def test_load_error_panel_takes_upstream_translation_of_its_message(
+    qapp: QtWidgets.QApplication,
+    compiled_qm_dir: pathlib.Path,
+    removed_translators: None,
+    tmp_path: pathlib.Path,
+) -> None:
+    """The error panel's text keeps upstream's context, so its translations load."""
+    load_translation(qapp, QtCore.QLocale("de"), compiled_qm_dir)
+
+    text, _format = load_failure_message(tmp_path / "missing.png")
+
+    assert text.startswith("Die folgende Datei existiert nicht:<br>")
+    assert 'href="#relink"' in text
