@@ -1098,6 +1098,7 @@ class MainWindowManager:
         panels.set_removed_pages_provider(self._removed_halves_of)
         panels.unremove_page_requested.connect(self._on_unremove_page_requested)
         panels.source_failed.connect(self._on_source_failed)
+        panels.source_decoded.connect(self._on_source_decoded)
         panels.settings_changed.connect(self._on_settings_edited)
         panels.page_size_changed.connect(self.status_panel.set_page_size)
         panels.cursor_moved.connect(self.status_panel.set_cursor_position)
@@ -1464,6 +1465,40 @@ class MainWindowManager:
         self._failed_image = image_id
         self._show_load_error_message()
         self._show_not_ready(False)
+
+    def _on_source_decoded(self, image_id: ImageId, width: int, height: int) -> None:
+        """Store the size of an image whose file now decodes to another size.
+
+        The file may have been replaced since the project recorded it. The
+        resolution is left alone: a project resolution that differs from the
+        file's may be one the user fixed.
+
+        Args:
+            image_id (ImageId): The decoded image.
+            width (int): Width of the decoded pixels.
+            height (int): Height of the decoded pixels.
+        """
+        if self.project is None:
+            return
+        info = next((i for i in self.project.images if i.id == image_id), None)
+        if info is None or (info.metadata.width, info.metadata.height) == (
+            width,
+            height,
+        ):
+            return
+        _LOG.info(
+            "{} is now {}x{} pixels, not {}x{}; storing the new size",
+            image_id.file_path.name,
+            width,
+            height,
+            info.metadata.width,
+            info.metadata.height,
+        )
+        info.metadata = info.metadata.model_copy(
+            update={"width": width, "height": height}
+        )
+        self.modified = True
+        self._show_source_image_info()
 
     def _show_load_error_message(self) -> None:
         if self._failed_image is not None:

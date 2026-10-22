@@ -278,4 +278,12 @@ place of the page and its options, at every stage. It names the file.
 
 Going to a page that loads shows its view again.
 
+Replaced files
+~~~~~~~~~~~~~~
+
+You can replace a scan with another file of the same name, for example a rescan.
+When you next go to one of its pages, the project takes the new image's size in
+pixels and is marked as changed, so save it to keep the size. The resolution stays
+as the project holds it, since it may be one you set with Fix DPI.
+
 See :mod:`scantailor.core.relinker`.
