@@ -39,15 +39,21 @@ def _write_scans(
 
 
 def _files_dialog_factory(
-    input_dir: pathlib.Path, names: list[str], output_dir: pathlib.Path
+    input_dir: pathlib.Path,
+    names: list[str],
+    output_dir: pathlib.Path,
+    *,
+    force_fix_dpi: bool = False,
 ) -> Callable[[QtWidgets.QWidget], ProjectFilesDialog]:
     def build(parent: QtWidgets.QWidget) -> ProjectFilesDialog:
-        return ProjectFilesDialog(
+        dialog = ProjectFilesDialog(
             input_dir=input_dir,
             output_dir=output_dir,
             project_files=names,
             parent=parent,
         )
+        dialog._force_fix_dpi_cb.setChecked(force_fix_dpi)
+        return dialog
 
     return build
 
@@ -201,6 +207,73 @@ def test_images_with_good_dpi_do_not_open_the_dialog(
 
     assert created == []
     assert main_window.project is not None
+
+
+def test_fix_dpis_even_if_they_look_ok_opens_the_dialog_for_good_dpis(
+    main_window: MainWindowManager,
+    fix_dpi: FixDpiDriver,
+    respond_to_modal: Callable[..., None],
+    tmp_path: pathlib.Path,
+):
+    names = ["a.png", "b.png"]
+    _write_scans(tmp_path / "raw", names, dpi=300)
+    fix_dpi.schedule(600, tab=1)
+
+    _new_project(
+        main_window,
+        _files_dialog_factory(
+            tmp_path / "raw", names, tmp_path / "out", force_fix_dpi=True
+        ),
+        respond_to_modal,
+    )
+
+    assert fix_dpi.listed == [names]
+    assert fix_dpi.ok_enabled_before_apply == [True]
+    assert main_window.project is not None
+    assert [info.metadata.dpi for info in main_window.project.images] == [
+        Dpi.uniform(600)
+    ] * 2
+
+
+def test_cancelling_a_forced_fix_dpi_dialog_abandons_the_new_project(
+    main_window: MainWindowManager,
+    fix_dpi: FixDpiDriver,
+    respond_to_modal: Callable[..., None],
+    tmp_path: pathlib.Path,
+):
+    _write_scans(tmp_path / "raw", ["a.png"], dpi=300)
+    fix_dpi.schedule(None, accept=False)
+
+    _new_project(
+        main_window,
+        _files_dialog_factory(
+            tmp_path / "raw", ["a.png"], tmp_path / "out", force_fix_dpi=True
+        ),
+        respond_to_modal,
+    )
+
+    assert len(fix_dpi.dialogs) == 1
+    assert main_window.project is None
+
+
+def test_adding_files_with_good_dpi_asks_when_fixing_is_forced(
+    project_window: MainWindowManager,
+    fix_dpi: FixDpiDriver,
+    respond_to_modal: Callable[..., None],
+    tmp_path: pathlib.Path,
+):
+    extra = _write_scans(tmp_path / "extra", ["new.png"], dpi=300)
+    project_window.project_files_dialog_factory = _files_dialog_factory(
+        extra[0].parent, ["new.png"], tmp_path / "out", force_fix_dpi=True
+    )
+    respond_to_modal(accept=True)
+    fix_dpi.schedule(400, tab=1)
+
+    project_window.actionAddFiles.trigger()
+
+    assert fix_dpi.listed == [["new.png"]]
+    assert project_window.project is not None
+    assert project_window.project.images[-1].metadata.dpi == Dpi.uniform(400)
 
 
 def test_cancelling_the_fix_dpi_dialog_abandons_the_new_project(

@@ -2652,7 +2652,7 @@ class MainWindowManager:
             return
         pages = self._read_pages(files)
         if pages is not None:
-            pages = self._fix_dpi_of_new_pages(pages)
+            pages = self._fix_dpi_of_new_pages(pages, force=dialog.is_force_fix_dpi())
         if pages is None:
             return
         project = Project(
@@ -2720,7 +2720,7 @@ class MainWindowManager:
         ]
         pages = self._read_pages(paths)
         if pages:
-            pages = self._fix_dpi_of_new_pages(pages)
+            pages = self._fix_dpi_of_new_pages(pages, force=dialog.is_force_fix_dpi())
         if not pages:
             return
         infos = [ImageInfo(id=image_id, metadata=meta) for image_id, meta in pages]
@@ -2829,17 +2829,21 @@ class MainWindowManager:
             return None
         return pages
 
-    def _fix_dpi_of_new_pages(self, pages: PageMetadata) -> PageMetadata | None:
+    def _fix_dpi_of_new_pages(
+        self, pages: PageMetadata, *, force: bool = False
+    ) -> PageMetadata | None:
         """Ask for the DPI of new images when any has an undefined one.
 
         Args:
             pages (PageMetadata): Metadata read from the image files.
+            force (bool): Ask even when every image has a defined DPI, as the
+                files dialog's "Fix DPIs, even if they look OK" box requests.
 
         Returns:
             PageMetadata | None: The pages with the chosen DPI applied, or None
                 when the user cancelled.
         """
-        if all(metadata.is_dpi_ok() for _, metadata in pages):
+        if not force and all(metadata.is_dpi_ok() for _, metadata in pages):
             return pages
         infos = [ImageInfo(id=image_id, metadata=meta) for image_id, meta in pages]
         dialog = self.fix_dpi_dialog_factory(infos, self.ui)
