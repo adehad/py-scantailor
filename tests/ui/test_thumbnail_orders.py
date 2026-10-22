@@ -530,3 +530,55 @@ class TestStageSwitch:
         widget.set_stage("2")
         assert widget.order_names()[0] == "Natural order"
         assert len(widget.order_names()) == 3
+
+
+class TestOrderRememberedPerStage:
+    def test_coming_back_to_a_stage_restores_its_chosen_order(
+        self, qtbot, project, sequence
+    ):
+        widget = _widget(qtbot, project, sequence, FilterStage.SELECT_CONTENT)
+        widget.set_order(2)
+
+        widget.set_stage(str(int(FilterStage.DESKEW)))
+        widget.set_stage(str(int(FilterStage.SELECT_CONTENT)))
+
+        assert widget.order_combo.currentIndex() == 2
+
+    def test_each_stage_keeps_its_own_choice(self, qtbot, project, sequence):
+        widget = _widget(qtbot, project, sequence, FilterStage.SELECT_CONTENT)
+        widget.set_order(2)
+
+        widget.set_stage(str(int(FilterStage.PAGE_LAYOUT)))
+        assert widget.order_combo.currentIndex() == 0
+        widget.set_order(1)
+        widget.set_stage(str(int(FilterStage.SELECT_CONTENT)))
+        assert widget.order_combo.currentIndex() == 2
+        widget.set_stage(str(int(FilterStage.PAGE_LAYOUT)))
+        assert widget.order_combo.currentIndex() == 1
+
+    def test_the_restored_order_sorts_the_pages(self, qtbot, project, sequence, pages):
+        for page, angle in zip(pages, (0.0, 5.0, 0.5, -4.5, 2.0), strict=True):
+            sequence.deskew_filter.settings.set_params(
+                page, DeskewParams(deskew_angle_deg=angle)
+            )
+        widget = _widget(qtbot, project, sequence, FilterStage.DESKEW)
+        widget.set_order(1)
+        sorted_pages = widget.pages()
+
+        widget.set_stage(str(int(FilterStage.OUTPUT)))
+        widget.set_stage(str(int(FilterStage.DESKEW)))
+
+        assert widget.pages() == sorted_pages
+        assert sorted_pages != pages
+
+    def test_a_new_stage_sequence_starts_every_stage_on_its_first_order(
+        self, qtbot, project, sequence
+    ):
+        widget = _widget(qtbot, project, sequence, FilterStage.SELECT_CONTENT)
+        widget.set_order(2)
+
+        widget.bind_stage_sequence(StageSequence())
+        widget.set_stage(str(int(FilterStage.DESKEW)))
+        widget.set_stage(str(int(FilterStage.SELECT_CONTENT)))
+
+        assert widget.order_combo.currentIndex() == 0

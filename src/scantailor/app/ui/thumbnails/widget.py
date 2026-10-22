@@ -628,6 +628,8 @@ class ThumbnailListWidget(QWidget):
         ]
         self._orders = list(self._default_orders)
         self._stage_orders: Callable[[str], Sequence[PageOrderOption]] | None = None
+        # Position of the sort option last chosen at each stage key.
+        self._chosen_orders: dict[str, int] = {}
         self._restoring = False
         self._sorting_paused = False
         self._follow_current = True
@@ -863,7 +865,9 @@ class ThumbnailListWidget(QWidget):
                 self._restoring = False
             self.selection_changed.emit(self.selected_pages())
         if self._stage_orders is not None:
-            self.set_orders(self._stage_orders(stage))
+            self.set_orders(
+                self._stage_orders(stage), self._chosen_orders.get(stage, 0)
+            )
 
     def invalidate(self, page: PageId | None = None) -> None:
         """Refresh previews after stage parameters changed.
@@ -1014,18 +1018,24 @@ class ThumbnailListWidget(QWidget):
         """Return the names of the sort options on offer, in order."""
         return [order.name for order in self._orders]
 
-    def set_orders(self, orders: Sequence[PageOrderOption] | None) -> None:
-        """Replace the sort options and go back to the first of them.
+    def set_orders(
+        self, orders: Sequence[PageOrderOption] | None, chosen: int = 0
+    ) -> None:
+        """Replace the sort options and choose one of them.
 
         Args:
             orders (Sequence[PageOrderOption] | None): The options; None for the
                 built-in ones. Empty leaves the pages in natural order.
+            chosen (int): Position of the option to choose; the first one when
+                out of range.
         """
         self._orders = list(self._default_orders if orders is None else orders)
         self._order_combo.blockSignals(True)
         self._order_combo.clear()
         for order in self._orders:
             self._order_combo.addItem(order.name)
+        if 0 <= chosen < len(self._orders):
+            self._order_combo.setCurrentIndex(chosen)
         self._order_combo.blockSignals(False)
         self._apply_order()
         self.orders_changed.emit()
@@ -1035,12 +1045,16 @@ class ThumbnailListWidget(QWidget):
     ) -> None:
         """Offer the sort options of whichever stage is shown.
 
+        Each stage starts on its first option, and the options chosen at each
+        stage before are forgotten.
+
         Args:
             provider (Callable[[str], Sequence[PageOrderOption]] | None): Returns
                 the options of a stage key; None goes back to the same options
                 for every stage.
         """
         self._stage_orders = provider
+        self._chosen_orders.clear()
         self.set_orders(None if provider is None else provider(self._model.stage))
 
     def set_incompleteness_provider(
@@ -1120,6 +1134,7 @@ class ThumbnailListWidget(QWidget):
         return self._view.visualRect(self._model.index(self._model.row_of(page)))
 
     def _on_order_chosen(self, option_index: int) -> None:
+        self._chosen_orders[self._model.stage] = option_index
         self._apply_order()
 
     def _current_order(self) -> PageOrderOption:
