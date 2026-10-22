@@ -10,7 +10,7 @@ from scantailor.core.models import Dpi, PageId
 
 from .color_mode import ColorMode
 from .despeckle import DespeckleLevel
-from .params import Params
+from .params import AutoPictureZones, Params
 
 
 class Settings:
@@ -81,6 +81,36 @@ class Settings:
             self._params[page_id] = stored.with_dewarping(
                 stored.dewarping.model_copy(update={"post_deskew_angle": angle})
             )
+            return True
+
+    def replace_auto_picture_zones(
+        self, page_id: PageId, found: AutoPictureZones
+    ) -> bool:
+        """Store the auto picture zones a render settled for a page.
+
+        A page whose picture shape options changed while it rendered is left
+        alone: its next render detects for the new options.
+
+        Args:
+            page_id (PageId): The page.
+            found (AutoPictureZones): The zones and the options of the render.
+
+        Returns:
+            bool: True if the stored parameters changed.
+        """
+        with self._lock:
+            stored = self._params.get(page_id)
+            current = stored or Params(
+                output_dpi=self._default_dpi,
+                color_mode=self._default_color_mode,
+                despeckle_level=self._default_despeckle,
+            )
+            if current.picture_shape != found.picture_shape:
+                return False
+            updated = current.with_auto_picture_zones(found)
+            if updated == stored:
+                return False
+            self._params[page_id] = updated
             return True
 
     def is_params_set(self, page_id: PageId) -> bool:

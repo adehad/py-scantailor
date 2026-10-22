@@ -38,7 +38,7 @@ from scantailor.core.transformation import (
     render_transformed,
     warp_area_averaged,
 )
-from scantailor.core.zones import Zone, ZoneSpline
+from scantailor.core.zones import PictureZoneProperties, Zone, ZoneSpline
 from scantailor.dewarping.auto_model import DewarpMetrics, detect_distortion_model
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
 from scantailor.dewarping.distortion_model import Curve, DistortionModel
@@ -53,6 +53,7 @@ from scantailor.filters.deskew.params import Params as DeskewParams
 from scantailor.filters.output.dewarping_options import DewarpingMode
 from scantailor.filters.output.generator import DewarperSource, OutputResult
 from scantailor.filters.output.params import (
+    AutoPictureZones,
     DistortionModelSpec,
     FillZoneSpec,
     Params,
@@ -120,6 +121,9 @@ class PipelineResult:
         dewarp_metrics: What automatic dewarping found on the page, whether or
             not it built a model; None unless the output stage dewarped the
             page automatically.
+        auto_picture_zones: The auto picture zones the output stage settled
+            for the page, already stored in its parameters; None when they
+            stayed as they were.
     """
 
     image: NDArray[np.uint8]
@@ -132,6 +136,7 @@ class PipelineResult:
     distortion_model: DistortionModelSpec | None = None
     output_extras: OutputExtras | None = None
     dewarp_metrics: DewarpMetrics | None = None
+    auto_picture_zones: AutoPictureZones | None = None
 
 
 @dataclass
@@ -428,6 +433,7 @@ def _run_stages(
     distortion_model: DistortionModelSpec | None = None
     extras: OutputExtras | None = None
     dewarp_metrics: DewarpMetrics | None = None
+    auto_zones: AutoPictureZones | None = None
 
     with logger.contextualize(page=page_name(page_id)):
         for stage in FilterStage:
@@ -440,9 +446,14 @@ def _run_stages(
             with logger.contextualize(stage=stage.name.lower()):
                 started = time.perf_counter()
                 if stage == FilterStage.OUTPUT:
-                    stage_meta, generated, distortion_model, extras, dewarp_metrics = (
-                        _process_output(state, page_id, sequence, options)
-                    )
+                    (
+                        stage_meta,
+                        generated,
+                        distortion_model,
+                        extras,
+                        dewarp_metrics,
+                        auto_zones,
+                    ) = _process_output(state, page_id, sequence, options)
                     if generated is not None:
                         output_image = generated.image
                         split = generated.split
@@ -478,6 +489,7 @@ def _run_stages(
         distortion_model=distortion_model,
         output_extras=extras,
         dewarp_metrics=dewarp_metrics,
+        auto_picture_zones=auto_zones,
     )
 
 
@@ -823,18 +835,21 @@ def _process_output(
     DistortionModelSpec | None,
     OutputExtras | None,
     DewarpMetrics | None,
+    AutoPictureZones | None,
 ]:
     """Process the Output stage.
 
     The view is resampled once, at the output resolution, through the
     accumulated transformation. Content, page outline and zones are mapped into
-    that view's pixels.
+    that view's pixels. Auto picture zones the render settles are stored in the
+    page's parameters.
 
     Returns:
         Tuple of (stage metadata, generated output or None in detect-only mode,
         the distortion model automatic or marginal dewarping built or None,
         the pictures for the view's tabs or None unless the options ask, what
-        automatic dewarping found or None).
+        automatic dewarping found or None, the auto picture zones the render
+        settled or None when they stayed).
     """
     from scantailor.filters.output.generator import generate_output
 
@@ -849,7 +864,7 @@ def _process_output(
     }
 
     if options.detect_only:
-        return metadata, None, None, None, None
+        return metadata, None, None, None, None, None
 
     state.scale_to_dpi(params.output_dpi)
     view = state.view()
@@ -911,7 +926,23 @@ def _process_output(
         if options.keep_output_extras
         else None
     )
-    return metadata, result, found.as_source_spec(state), extras, found.metrics
+    auto_zones = None
+    if result.auto_picture_zones is not None:
+        auto_zones = AutoPictureZones(
+            zones=tuple(
+                _source_picture_zone(state, zone) for zone in result.auto_picture_zones
+            ),
+            picture_shape=params.picture_shape,
+        )
+        sequence.output_filter.settings.replace_auto_picture_zones(page_id, auto_zones)
+    return (
+        metadata,
+        result,
+        found.as_source_spec(state),
+        extras,
+        found.metrics,
+        auto_zones,
+    )
 
 
 def _mask_on_page(
@@ -1037,6 +1068,19 @@ def _view_zones(
         for spec in specs
         if spec.points
     ]
+
+
+def _source_picture_zone(state: _PageState, zone: Zone) -> PictureZoneSpec:
+    """A picture zone in the view's pixels, moved back into source coordinates."""
+    rect = state.xform.resulting_rect
+    points = state.xform.map_polygon_back(
+        zone.spline.points + np.array([rect.x, rect.y])
+    )
+    assert isinstance(zone.properties, PictureZoneProperties)
+    return PictureZoneSpec(
+        points=tuple((float(x), float(y)) for x, y in points),
+        properties=zone.properties,
+    )
 
 
 def _dewarper_source(

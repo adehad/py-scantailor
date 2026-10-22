@@ -62,7 +62,7 @@ from scantailor.core.worker_log import (
     worker_logging,
 )
 from scantailor.filters.output.generator import applied_post_deskew_angle
-from scantailor.filters.output.params import DistortionModelSpec
+from scantailor.filters.output.params import AutoPictureZones, DistortionModelSpec
 from scantailor.filters.output.params import Params as OutputParams
 from scantailor.filters.output.split_output import (
     BACKGROUND_DIR,
@@ -105,6 +105,8 @@ class RenderInfo:
         post_deskew_angle: The rotation the worker measured after dewarping, to
             be stored in the page's parameters; None when the page was not
             dewarped.
+        auto_picture_zones: The auto picture zones the worker settled, to be
+            stored in the page's parameters; None when they stayed.
         seconds: Wall time the worker spent loading, rendering and writing
             the page.
     """
@@ -115,6 +117,7 @@ class RenderInfo:
     distortion_model: DistortionModelSpec | None = None
     dewarp: DewarpSpec | None = None
     post_deskew_angle: float | None = None
+    auto_picture_zones: AutoPictureZones | None = None
     seconds: float = 0.0
 
 
@@ -735,6 +738,7 @@ def _render_page(job: _PageJob) -> tuple[Path, RenderInfo, tuple[Path, ...]]:
             post_deskew_angle=_measured_post_deskew_angle(rendered)
             if was_dewarped
             else None,
+            auto_picture_zones=rendered.auto_picture_zones,
             seconds=time.perf_counter() - started,
         )
         return job.output_path, info, tuple(written)
@@ -865,6 +869,10 @@ def run_batch(
                 if event.info.post_deskew_angle is not None:
                     stages.output_filter.settings.set_post_deskew_angle(
                         event.page, event.info.post_deskew_angle
+                    )
+                if event.info.auto_picture_zones is not None:
+                    stages.output_filter.settings.replace_auto_picture_zones(
+                        event.page, event.info.auto_picture_zones
                     )
             if not event.reused:
                 _record_output(result, event, params_hash(event.page), out_dir)

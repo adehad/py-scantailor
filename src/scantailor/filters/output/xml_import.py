@@ -87,9 +87,11 @@ def read_output(
     """Read the per-page settings of the ``<output>`` element.
 
     C++ keeps the zones beside the parameters; here they are part of the
-    parameters. The page's ``<processing-params>`` (auto-zone bookkeeping) and
-    ``<output-params>`` (a record of the files a previous run wrote, used by the
-    C++ cache) have no counterpart in the port and are not read.
+    parameters. Of the page's ``<processing-params>`` only ``autoZonesFound`` is
+    read, so that auto picture zones the project already has are kept rather
+    than detected again. ``<output-params>`` (a record of the files a previous
+    run wrote, used by the C++ cache) has no counterpart in the port and is
+    not read.
 
     Args:
         filter_element (ET.Element | None): The ``<output>`` element.
@@ -107,16 +109,29 @@ def read_output(
             fill_zones = _read_fill_zones(child(element, "fill-zones"))
             if params_element is None and not picture_zones and not fill_zones:
                 continue
-            params = _read_params(params_element).model_copy(
+            params = _read_params(params_element)
+            params = params.model_copy(
                 update={
                     "picture_zones": tuple(picture_zones),
                     "fill_zones": tuple(fill_zones),
+                    "auto_picture_zones_shape": _auto_zones_shape(
+                        child(element, "processing-params"), params
+                    ),
                 }
             )
             entries.append(
                 StageParamsEntry(page=page_id, params=params.model_dump(mode="json"))
             )
     return entries
+
+
+def _auto_zones_shape(
+    element: ET.Element | None, params: Params
+) -> PictureShapeOptions | None:
+    """The options the page's auto picture zones were found with, if C++ found them."""
+    found = attr_text(element, "autoZonesFound") == "1"
+    shape = params.picture_shape
+    return shape if found and shape.shape is PictureShape.RECTANGULAR else None
 
 
 def despeckle_level_from_factor(factor: float) -> DespeckleLevel:
