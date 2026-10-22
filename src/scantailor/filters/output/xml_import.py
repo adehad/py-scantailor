@@ -1,5 +1,6 @@
-"""Reading Output settings from a C++ ScanTailor project file."""
+"""Reading Output settings from C++ ScanTailor project files and profiles."""
 
+from dataclasses import dataclass
 from xml.etree import ElementTree as ET
 
 from loguru import logger
@@ -81,6 +82,30 @@ _PICTURE_LAYERS = {
     "foreground": PictureLayer.FOREGROUND,
     "background": PictureLayer.BACKGROUND,
 }
+
+
+@dataclass(frozen=True)
+class _ChildNames:
+    """Names of the option elements below a set of Output parameters."""
+
+    color: str
+    splitting: str
+    picture_shape: str
+    dewarping: str
+
+
+_PAGE_CHILDREN = _ChildNames(
+    color="color-params",
+    splitting="splitting",
+    picture_shape="picture-shape-options",
+    dewarping="dewarping-options",
+)
+_PROFILE_CHILDREN = _ChildNames(
+    color="colorParams",
+    splitting="splittingOptions",
+    picture_shape="pictureShapeOptions",
+    dewarping="dewarpingOptions",
+)
 
 
 def read_output(
@@ -165,11 +190,29 @@ def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
-def _read_params(element: ET.Element | None) -> Params:
+def read_profile_output(element: ET.Element | None) -> Params:
+    """Read the ``<output-params>`` of a C++ Default Parameters profile.
+
+    A profile stores the options of a page's ``<params>`` under other element
+    names. It has no black-on-white flag, distortion model or zones, so those
+    fields of the result hold nothing the profile said.
+
+    Args:
+        element (ET.Element | None): The ``<output-params>`` element.
+
+    Returns:
+        Params: The options; the port's defaults when the element is absent.
+    """
+    return _read_params(element, _PROFILE_CHILDREN)
+
+
+def _read_params(
+    element: ET.Element | None, names: _ChildNames = _PAGE_CHILDREN
+) -> Params:
     """Read a ``<params>`` element; an absent one gives the port's defaults."""
     if element is None:
         return Params()
-    color_params = child(element, "color-params")
+    color_params = child(element, names.color)
     despeckle = _clamp(attr_float(element, "despeckleLevel"), 0.0, MAX_DESPECKLE_FACTOR)
     return Params(
         output_dpi=_read_dpi(child(element, "dpi")),
@@ -180,12 +223,12 @@ def _read_params(element: ET.Element | None) -> Params:
         despeckle_level=despeckle_level_from_factor(despeckle),
         despeckle_factor=_continuous_despeckle(despeckle),
         black_on_white=attr_flag(element, "blackOnWhite"),
-        dewarping=_read_dewarping(child(element, "dewarping-options")),
+        dewarping=_read_dewarping(child(element, names.dewarping)),
         color_common=_read_color_common(child(color_params, "color-or-grayscale")),
-        picture_shape=_read_picture_shape(child(element, "picture-shape-options")),
+        picture_shape=_read_picture_shape(child(element, names.picture_shape)),
         depth_perception=_read_depth_perception(attr_text(element, "depthPerception")),
         distortion_model=_read_distortion_model(child(element, "distortion-model")),
-        splitting=_read_splitting(child(element, "splitting")),
+        splitting=_read_splitting(child(element, names.splitting)),
     )
 
 

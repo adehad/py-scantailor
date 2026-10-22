@@ -40,6 +40,12 @@ DIALOG_FOLDER = (
     / "dialogs"
 )
 MIN_ROWS = 12
+XML_PROFILE = (
+    pathlib.Path(__file__).resolve().parents[1]
+    / "fixtures"
+    / "xml_profiles"
+    / "Thick books.stp"
+)
 
 
 @pytest.fixture
@@ -594,6 +600,85 @@ class TestDefaultParamsDialog:
         qtbot.addWidget(reopened)
         assert find(reopened, QtWidgets.QSpinBox, "dewarpingMinSpanSB").value() == 25
         assert reopened.get_params().output.dewarp_min_span_percent == 25
+
+    def test_import_button_saves_a_cxx_profile_and_shows_it(
+        self, qtbot: QtBot, config: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            QtWidgets.QFileDialog,
+            "getOpenFileName",
+            lambda *args: (str(XML_PROFILE), ""),
+        )
+        dialog = self.make(qtbot, config)
+
+        def drive(dlg: QtWidgets.QDialog) -> None:
+            find(dlg, QtWidgets.QPushButton, "profileImportButton").click()
+            box = find(dlg, QtWidgets.QComboBox, "profileCB")
+            assert box.currentText() == "Thick books"
+            modes = find(dlg, QtWidgets.QComboBox, "colorModeSelector")
+            assert modes.currentData() == ColorMode.MIXED
+            assert find(dlg, QtWidgets.QPushButton, "profileDeleteButton").isEnabled()
+            accept(dlg)
+
+        exec_while(dialog, drive)
+        store = ProfileStore(config / "profiles")
+        assert store.names() == ["Thick books"]
+        assert ApplicationSettings.load().current_profile == "Thick books"
+        assert (
+            active_default_params(ApplicationSettings.load(), store).output.color_mode
+            is ColorMode.MIXED
+        )
+
+    @pytest.mark.parametrize(
+        ("answer", "replaced"),
+        [
+            (QtWidgets.QMessageBox.StandardButton.No, False),
+            (QtWidgets.QMessageBox.StandardButton.Yes, True),
+        ],
+    )
+    def test_importing_over_a_profile_of_the_same_name_asks_first(
+        self,
+        qtbot: QtBot,
+        config: pathlib.Path,
+        monkeypatch: pytest.MonkeyPatch,
+        answer: QtWidgets.QMessageBox.StandardButton,
+        replaced: bool,
+    ) -> None:
+        asked: list[str] = []
+
+        def question(*args: object) -> QtWidgets.QMessageBox.StandardButton:
+            asked.append(str(args[2]))
+            return answer
+
+        monkeypatch.setattr(QtWidgets.QMessageBox, "question", question)
+        store = ProfileStore(config / "profiles")
+        store.write("thick BOOKS", DefaultParams())
+        dialog = self.make(qtbot, config)
+
+        assert dialog.import_profile(XML_PROFILE) is replaced
+
+        assert asked == ["A profile named Thick books exists. Replace it?"]
+        assert len(store.names()) == 1
+        imported = store.read("Thick books").output.color_mode is ColorMode.MIXED
+        assert imported is replaced
+
+    def test_a_file_that_is_not_a_profile_is_reported_and_not_saved(
+        self, qtbot: QtBot, config: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        shown: list[str] = []
+        monkeypatch.setattr(
+            QtWidgets.QMessageBox,
+            "critical",
+            lambda *args: shown.append(args[2]),
+        )
+        broken = config / "broken.stp"
+        broken.write_text("<project/>", encoding="utf-8")
+        dialog = self.make(qtbot, config)
+
+        assert not dialog.import_profile(broken)
+
+        assert shown and shown[0].startswith("Error importing the profile.")
+        assert ProfileStore(config / "profiles").names() == []
 
     def test_custom_profile_name_may_not_be_reserved(
         self, qtbot: QtBot, config: pathlib.Path, monkeypatch: pytest.MonkeyPatch

@@ -24,6 +24,11 @@ Default parameter profiles
 
 .. automodule:: scantailor.core.default_params_profiles
 
+Importing ScanTailor Advanced profiles
+--------------------------------------
+
+.. automodule:: scantailor.core.xml_profile_import
+
 Batch processing
 ----------------
 
