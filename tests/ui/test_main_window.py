@@ -342,6 +342,20 @@ class TestThumbnailButtons:
         assert project_window.thumbnails.selected_pages() == pages[:3]
         project_window.renderer.wait_for_done()
 
+    def test_the_sort_order_chosen_at_a_stage_returns_with_the_stage(
+        self, project_window: MainWindow.MainWindowManager
+    ):
+        project_window.actionSwitchFilter4.trigger()
+        project_window.sortOptions.setCurrentIndex(2)
+
+        project_window.actionSwitchFilter3.trigger()
+        assert project_window.sortOptions.currentIndex() == 0
+        project_window.actionSwitchFilter4.trigger()
+
+        assert project_window.sortOptions.currentIndex() == 2
+        assert project_window.thumbnails.order_combo.currentIndex() == 2
+        project_window.renderer.wait_for_done()
+
     def test_go_to_button_opens_the_go_to_page_dialog(
         self,
         project_window: MainWindow.MainWindowManager,

@@ -789,7 +789,7 @@ class MainWindowManager:
         self.sortOptions.blockSignals(True)
         self.sortOptions.clear()
         self.sortOptions.addItems(names)
-        self.sortOptions.setCurrentIndex(0 if names else -1)
+        self.sortOptions.setCurrentIndex(self.thumbnails.order_combo.currentIndex())
         self.sortOptions.blockSignals(False)
         self.sortOptions.setVisible(bool(names))
         self.sortingOrderBtn.setVisible(bool(names))

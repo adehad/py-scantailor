@@ -22,7 +22,8 @@ on to Deskew selects both pages of a selected scan.
      - What it does
    * - Sort order list
      - Chooses how the pages are ordered. The choices depend on the stage shown.
-       See the table below.
+       See the table below. Each stage keeps its own choice while the project is
+       open.
    * - Sorting order button
      - Reverses the chosen order.
    * - Pause sorting button
