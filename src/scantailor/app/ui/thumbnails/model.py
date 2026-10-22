@@ -25,6 +25,11 @@ from scantailor.core.project import Project
 ThumbnailRenderer = Callable[[PageId, str], QImage]
 """Renders a small preview of a page at a stage. Called on worker threads."""
 
+FileDigestProvider = Callable[[PageId, str], str | None]
+"""Digests everything a page's preview at a stage is rendered from, in a form
+that stays valid across sessions, or returns None when the preview must not be
+kept on disk. Called on worker threads."""
+
 PageRole = Qt.ItemDataRole.UserRole
 IsCurrentRole = Qt.ItemDataRole.UserRole + 1
 IncompleteRole = Qt.ItemDataRole.UserRole + 2
@@ -123,11 +128,13 @@ class _RenderTask(QRunnable):
         max_size: QSize,
         signals: _RenderSignals,
         is_wanted: Callable[[ThumbnailKey], bool],
+        file_digest: FileDigestProvider | None,
     ) -> None:
         super().__init__()
         self._is_wanted = is_wanted
         self._key = key
         self._renderer = renderer
+        self._file_digest = file_digest
         self._cache = cache
         self._max_size = max_size
         self._signals = signals
@@ -140,7 +147,10 @@ class _RenderTask(QRunnable):
         if not self._is_wanted(self._key):
             self._signals.skipped.emit(self._key)
             return
-        image = self._cache.load_from_disk(self._key)
+        digest = self._digest()
+        image = (
+            None if digest is None else self._cache.load_from_disk(self._key, digest)
+        )
         if image is None:
             try:
                 rendered = self._renderer(self._key.page, self._key.stage)
@@ -156,8 +166,16 @@ class _RenderTask(QRunnable):
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
-            self._cache.store_to_disk(self._key, image)
+            # A render that detected parameters, or raced an edit, drew from
+            # other parameters than either digest names, so it is not kept.
+            if digest is not None and self._digest() == digest:
+                self._cache.store_to_disk(self._key, digest, image)
         self._signals.finished.emit(self._key, image)
+
+    def _digest(self) -> str | None:
+        if self._file_digest is None or self._cache.disk_directory is None:
+            return None
+        return self._file_digest(self._key.page, self._key.stage)
 
 
 class ThumbnailModel(QAbstractListModel):
@@ -174,6 +192,8 @@ class ThumbnailModel(QAbstractListModel):
         params_hash (Callable[[PageId, str], Hashable] | None): Digest of the
             parameters that affect a page's preview at a stage. Evaluated on
             the GUI thread whenever a thumbnail is requested.
+        file_digest (FileDigestProvider | None): Names what a preview kept on
+            disk was rendered from; without it, previews are not kept on disk.
         is_incomplete (IncompletenessProvider | None): Tells whether a page has
             no usable result at a stage. Evaluated on the GUI thread.
         find_deviant (DeviantPagesProvider | None): Finds the pages that stand
@@ -195,12 +215,14 @@ class ThumbnailModel(QAbstractListModel):
         parent: QObject | None = None,
         is_incomplete: IncompletenessProvider | None = None,
         find_deviant: DeviantPagesProvider | None = None,
+        file_digest: FileDigestProvider | None = None,
     ) -> None:
         """Initialise; arguments are described on the class."""
         super().__init__(parent)
         self._renderer = renderer
         self._cache = cache if cache is not None else ThumbnailCache()
         self._params_hash = params_hash
+        self._file_digest = file_digest
         self._is_incomplete = is_incomplete
         self._find_deviant = find_deviant
         self._reversed = False
@@ -481,6 +503,7 @@ class ThumbnailModel(QAbstractListModel):
                     self._render_size,
                     self._signals,
                     self._is_wanted,
+                    self._file_digest,
                 )
             )
         return image

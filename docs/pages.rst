@@ -110,6 +110,12 @@ result drawn over it in the colours of the stage's view.
 
 Fix Orientation and Output show the page alone.
 
+ScanTailor keeps the thumbnails in ``cache/thumbs`` inside the output folder,
+so a project opened again shows them without drawing every page again. It draws
+a thumbnail again when its page's settings, its scan file or the thumbnail
+quality change. The folder holds one file per page, stage and quality, and is
+safe to delete. Removing a page from the project deletes its files.
+
 .. _pages-that-stand-out:
 
 Pages that stand out
