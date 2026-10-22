@@ -100,55 +100,27 @@ class TestBinarizationOptions:
         with pytest.raises(ValueError):
             BinarizationOptions(threshold_adjustment=101)
 
-    def test_window_size_bounds(self):
-        """Window size has valid bounds."""
-        BinarizationOptions(window_size=10)
-        BinarizationOptions(window_size=1000)
+    def test_window_size_takes_upstreams_range_of_3_to_9999(self):
+        BinarizationOptions(window_size=3)
+        BinarizationOptions(window_size=9999)
 
         with pytest.raises(ValueError):
-            BinarizationOptions(window_size=9)
+            BinarizationOptions(window_size=2)
         with pytest.raises(ValueError):
-            BinarizationOptions(window_size=1001)
+            BinarizationOptions(window_size=10000)
 
-    def test_sauvola_coef_bounds(self):
-        """Sauvola coefficient has valid bounds."""
-        BinarizationOptions(sauvola_coef=0.0)
-        BinarizationOptions(sauvola_coef=1.0)
-
-        with pytest.raises(ValueError):
-            BinarizationOptions(sauvola_coef=-0.1)
-        with pytest.raises(ValueError):
-            BinarizationOptions(sauvola_coef=1.1)
-
-    def test_bradley_coef_bounds(self):
-        """Bradley coefficient has valid bounds."""
-        BinarizationOptions(bradley_coef=0.0)
-        BinarizationOptions(bradley_coef=1.0)
+    @pytest.mark.parametrize(
+        "field",
+        ["sauvola_coef", "wolf_coef", "bradley_coef", "edge_div_kep", "edge_div_kbd"],
+    )
+    def test_a_coefficient_takes_zero_up_to_upstreams_9_99(self, field: str):
+        BinarizationOptions(**{field: 0.0})
+        BinarizationOptions(**{field: 9.99})
 
         with pytest.raises(ValueError):
-            BinarizationOptions(bradley_coef=-0.1)
+            BinarizationOptions(**{field: -0.1})
         with pytest.raises(ValueError):
-            BinarizationOptions(bradley_coef=1.1)
-
-    def test_edge_div_kep_bounds(self):
-        """EdgeDiv kep coefficient has valid bounds."""
-        BinarizationOptions(edge_div_kep=0.0)
-        BinarizationOptions(edge_div_kep=1.0)
-
-        with pytest.raises(ValueError):
-            BinarizationOptions(edge_div_kep=-0.1)
-        with pytest.raises(ValueError):
-            BinarizationOptions(edge_div_kep=1.1)
-
-    def test_edge_div_kbd_bounds(self):
-        """EdgeDiv kbd coefficient has valid bounds."""
-        BinarizationOptions(edge_div_kbd=0.0)
-        BinarizationOptions(edge_div_kbd=1.0)
-
-        with pytest.raises(ValueError):
-            BinarizationOptions(edge_div_kbd=-0.1)
-        with pytest.raises(ValueError):
-            BinarizationOptions(edge_div_kbd=1.1)
+            BinarizationOptions(**{field: 10.0})
 
     def test_bradley_default_values(self):
         """Bradley options have correct defaults."""

@@ -728,6 +728,45 @@ class TestOutput:
         params = _params(project, "output", OutputParams)[_page(project, 1)]
         assert params.depth_perception == 3.0
 
+    @pytest.mark.parametrize(
+        ("window", "sauvola", "wolf", "expected"),
+        [
+            ("5000", "2.5", "4.2", (5000, 2.5, 4.2)),
+            ("20000", "12", "15", (9999, 9.99, 9.99)),
+            ("2", "0", "0", (3, 0.0, 0.0)),
+        ],
+    )
+    def test_binarization_values_keep_upstreams_ranges(
+        self,
+        tmp_path: Path,
+        window: str,
+        sauvola: str,
+        wolf: str,
+        expected: tuple[int, float, float],
+    ):
+        project_file = _fixture(tmp_path, "split_and_mixed")
+        text = project_file.read_text(encoding="utf-8").replace(
+            'windowSize="60" sauvolaCoef="0.4" wolfLowerBound="3" '
+            'wolfUpperBound="250" wolfCoef="0.5"',
+            f'windowSize="{window}" sauvolaCoef="{sauvola}" wolfLowerBound="3" '
+            f'wolfUpperBound="250" wolfCoef="{wolf}"',
+        )
+
+        project = import_xml_project(project_file, text).project
+
+        (wolf_page,) = [
+            params
+            for params in _params(project, "output", OutputParams).values()
+            if isinstance(params, OutputParams)
+            and params.binarization.method is BinarizationMethod.WOLF
+        ]
+        binarization = wolf_page.binarization
+        assert (
+            binarization.window_size,
+            binarization.sauvola_coef,
+            binarization.wolf_coef,
+        ) == pytest.approx(expected)
+
     def test_distortion_model_falls_back_to_spline_control_points(self, tmp_path: Path):
         xml = """<project version="3" outputDirectory="out">
 <directories><directory id="1" path="s"/></directories>

@@ -38,7 +38,13 @@ from scantailor.app.ui.widgets.help_icon import HELP_GROUP_PROPERTY
 from scantailor.app.ui.widgets.ticked_slider import TickedSlider
 from scantailor.core.models import Dpi, PageId
 from scantailor.dewarping.auto_model import DewarpMetrics
-from scantailor.filters.output.binarization import BinarizationMethod
+from scantailor.filters.output.binarization import (
+    MAX_COEFFICIENT,
+    MAX_WINDOW_SIZE,
+    MIN_COEFFICIENT,
+    MIN_WINDOW_SIZE,
+    BinarizationMethod,
+)
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.color_options import FillingColor
 from scantailor.filters.output.despeckle import DespeckleLevel
@@ -47,7 +53,13 @@ from scantailor.filters.output.dewarping_options import (
     DewarpingOptions,
 )
 from scantailor.filters.output.filter import Filter
-from scantailor.filters.output.params import ApplyGroup, DistortionModelSpec, Params
+from scantailor.filters.output.params import (
+    MAX_OUTPUT_DPI,
+    MIN_OUTPUT_DPI,
+    ApplyGroup,
+    DistortionModelSpec,
+    Params,
+)
 from scantailor.filters.output.picture_shape import PictureShape
 
 _DEPTH_PERCEPTION_SCALE = 10  # Slider steps per unit of depth perception.
@@ -475,7 +487,7 @@ class OptionsWidget(QWidget):
         dpi_layout.addWidget(
             QLabel(QtCore.QCoreApplication.translate("output::OptionsWidget", "DPI:"))
         )
-        self._dpi_spinbox = _spin_box("dpiSpinBox", 50, 1200)
+        self._dpi_spinbox = _spin_box("dpiSpinBox", MIN_OUTPUT_DPI, MAX_OUTPUT_DPI)
         self._dpi_spinbox.setValue(600)
         self._dpi_spinbox.setSingleStep(50)
         dpi_layout.addWidget(self._dpi_spinbox)
@@ -608,7 +620,9 @@ class OptionsWidget(QWidget):
             1,
             0,
         )
-        self._wiener_window_spinbox = _spin_box("wienerWindowSpinBox", 3, 99)
+        self._wiener_window_spinbox = _spin_box(
+            "wienerWindowSpinBox", MIN_WINDOW_SIZE, MAX_WINDOW_SIZE
+        )
         wiener_layout.addWidget(self._wiener_window_spinbox, 1, 1)
         common_layout.addLayout(wiener_layout)
 
@@ -757,7 +771,9 @@ class OptionsWidget(QWidget):
                 )
             )
         )
-        self._window_size_spinbox = _spin_box("windowSizeSpinBox", 10, 1000)
+        self._window_size_spinbox = _spin_box(
+            "windowSizeSpinBox", MIN_WINDOW_SIZE, MAX_WINDOW_SIZE
+        )
         self._window_size_spinbox.setValue(200)
         window_layout.addWidget(self._window_size_spinbox)
         window_layout.addItem(_spacer())
@@ -776,25 +792,27 @@ class OptionsWidget(QWidget):
     def _build_method_pages(self) -> None:
         """Add one page of method specific controls per binarization method."""
         self._sauvola_coef_spinbox = _double_spin_box(
-            "sauvolaCoefSpinBox", 0.0, 1.0, 0.01
+            "sauvolaCoefSpinBox", MIN_COEFFICIENT, MAX_COEFFICIENT, 0.01
         )
-        self._wolf_coef_spinbox = _double_spin_box("wolfCoefSpinBox", 0.0, 1.0, 0.01)
+        self._wolf_coef_spinbox = _double_spin_box(
+            "wolfCoefSpinBox", MIN_COEFFICIENT, MAX_COEFFICIENT, 0.01
+        )
         self._wolf_lower_spinbox = _spin_box("wolfLowerBoundSpinBox", 0, 255)
         self._wolf_upper_spinbox = _spin_box("wolfUpperBoundSpinBox", 0, 255)
         self._bradley_coef_spinbox = _double_spin_box(
-            "bradleyCoefSpinBox", 0.0, 1.0, 0.01
+            "bradleyCoefSpinBox", MIN_COEFFICIENT, MAX_COEFFICIENT, 0.01
         )
         self._edge_div_kep_spinbox = _double_spin_box(
-            "edgeDivKepSpinBox", 0.0, 1.0, 0.05
+            "edgeDivKepSpinBox", MIN_COEFFICIENT, MAX_COEFFICIENT, 0.05
         )
         self._edge_div_kbd_spinbox = _double_spin_box(
-            "edgeDivKbdSpinBox", 0.0, 1.0, 0.05
+            "edgeDivKbdSpinBox", MIN_COEFFICIENT, MAX_COEFFICIENT, 0.05
         )
         self._edge_plus_coef_spinbox = _double_spin_box(
-            "edgePlusCoefSpinBox", 0.0, 1.0, 0.05
+            "edgePlusCoefSpinBox", MIN_COEFFICIENT, MAX_COEFFICIENT, 0.05
         )
         self._blur_div_coef_spinbox = _double_spin_box(
-            "blurDivCoefSpinBox", 0.0, 1.0, 0.05
+            "blurDivCoefSpinBox", MIN_COEFFICIENT, MAX_COEFFICIENT, 0.05
         )
 
         pages: dict[BinarizationMethod, list[tuple[str, QWidget]]] = {

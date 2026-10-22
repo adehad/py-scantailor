@@ -29,6 +29,9 @@ from scantailor.core.zones import (
 )
 
 from .binarization import (
+    MAX_COEFFICIENT,
+    MAX_WINDOW_SIZE,
+    MIN_WINDOW_SIZE,
     BinarizationMethod,
     BinarizationOptions,
     ColorSegmenterOptions,
@@ -50,7 +53,6 @@ _DEFAULT_DPI = 600
 _DEFAULT_DEPTH_PERCEPTION = 2.0
 _MIN_DEPTH_PERCEPTION = 1.0
 _MAX_DEPTH_PERCEPTION = 3.0
-_MIN_WIENER_WINDOW = 3
 _DEFAULT_WIENER_WINDOW = 5
 _MIN_POINTS_PER_ZONE = 3
 _MIN_POINTS_PER_CURVE = 2
@@ -206,7 +208,7 @@ def _read_binarization(element: ET.Element | None) -> BinarizationOptions:
     """
     if element is None:
         return BinarizationOptions()
-    coef = _clamp(attr_float(element, "sauvolaCoef"), 0.0, 1.0)
+    coef = _clamp(attr_float(element, "sauvolaCoef"), 0.0, MAX_COEFFICIENT)
     method_name = attr_text(element, "binarizationMethod")
     edge_defaults = BinarizationOptions()
     edge_weights = {
@@ -231,9 +233,11 @@ def _read_binarization(element: ET.Element | None) -> BinarizationOptions:
     return BinarizationOptions(
         method=method,
         threshold_adjustment=int(_clamp(attr_int(element, "thresholdAdj"), -100, 100)),
-        window_size=int(_clamp(attr_int(element, "windowSize"), 10, 1000)),
+        window_size=int(
+            _clamp(attr_int(element, "windowSize"), MIN_WINDOW_SIZE, MAX_WINDOW_SIZE)
+        ),
         sauvola_coef=coef,
-        wolf_coef=_clamp(attr_float(element, "wolfCoef"), 0.0, 1.0),
+        wolf_coef=_clamp(attr_float(element, "wolfCoef"), 0.0, MAX_COEFFICIENT),
         wolf_lower_bound=int(_clamp(attr_int(element, "wolfLowerBound"), 0, 255)),
         wolf_upper_bound=int(_clamp(attr_int(element, "wolfUpperBound"), 0, 255)),
         bradley_coef=coef,
@@ -269,7 +273,7 @@ def _read_color_common(element: ET.Element | None) -> ColorCommonOptions:
     if not 0.0 <= wiener_coef <= 1.0:
         wiener_coef = 0.0
     wiener_window = attr_int(element, "wienerWinSize")
-    if wiener_window < _MIN_WIENER_WINDOW:
+    if not MIN_WINDOW_SIZE <= wiener_window <= MAX_WINDOW_SIZE:
         wiener_window = _DEFAULT_WIENER_WINDOW
     return ColorCommonOptions(
         fill_offcut=attr_flag(element, "fillOffcut"),

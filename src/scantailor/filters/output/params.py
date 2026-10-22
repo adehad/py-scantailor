@@ -29,6 +29,9 @@ from .picture_shape import PictureShape, PictureShapeOptions
 from .splitting_options import SplittingOptions
 
 _MIN_CURVE_POINTS = 2
+# Upstream's Change DPI dialog refuses resolutions outside this range.
+MIN_OUTPUT_DPI = 72
+MAX_OUTPUT_DPI = 1200
 
 
 class ApplyGroup(Enum):

@@ -7,6 +7,15 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# Ranges of upstream's binarization and Wiener controls. A window is clipped at
+# the image border, so even the largest one stays valid on a small page.
+MIN_WINDOW_SIZE = 3
+MAX_WINDOW_SIZE = 9999
+# Upstream's coefficient controls start at 0.01. These start at 0 so that a page
+# stored with a coefficient of 0 shows that value and can return to it.
+MIN_COEFFICIENT = 0.0
+MAX_COEFFICIENT = 9.99
+
 
 class BinarizationMethod(Enum):
     """Binarization algorithm to use.
@@ -78,18 +87,20 @@ class BinarizationOptions(BaseModel):
         method: The binarization algorithm to use.
         threshold_adjustment: Global threshold adjustment (-100 to 100).
             Positive values make image darker (more black).
-        window_size: Window size for local methods (every method but Otsu).
-        sauvola_coef: Sauvola's k coefficient (0.0-1.0).
-        wolf_coef: Wolf's k coefficient (0.0-1.0); Fox, Window and Grad read it too.
+        window_size: Window size for local methods (every method but Otsu),
+            3-9999.
+        sauvola_coef: Sauvola's k coefficient (0.0-9.99).
+        wolf_coef: Wolf's k coefficient (0.0-9.99); Fox, Window and Grad read it
+            too.
         wolf_lower_bound: Wolf's lower bound (0-255); Fox, Window and Grad read it
             too.
         wolf_upper_bound: Wolf's upper bound (0-255); Fox, Window and Grad read it
             too.
-        bradley_coef: Bradley's k coefficient (0.0-1.0). Higher values make
+        bradley_coef: Bradley's k coefficient (0.0-9.99). Higher values make
             it easier for pixels to be classified as foreground (black).
-        edge_div_kep: Edge enhancement weight (0.0-1.0), read by EdgePlus and
+        edge_div_kep: Edge enhancement weight (0.0-9.99), read by EdgePlus and
             EdgeDiv. Higher = more edge enhancement.
-        edge_div_kbd: Blur division weight (0.0-1.0), read by BlurDiv and
+        edge_div_kbd: Blur division weight (0.0-9.99), read by BlurDiv and
             EdgeDiv. Higher = more illumination normalization.
         normalize_illumination: Normalize illumination before binarization.
         savitzky_golay_smoothing: Smooth the gray image before binarization.
@@ -107,14 +118,14 @@ class BinarizationOptions(BaseModel):
 
     method: BinarizationMethod = BinarizationMethod.OTSU
     threshold_adjustment: int = Field(default=0, ge=-100, le=100)
-    window_size: int = Field(default=200, ge=10, le=1000)
-    sauvola_coef: float = Field(default=0.34, ge=0.0, le=1.0)
-    wolf_coef: float = Field(default=0.3, ge=0.0, le=1.0)
+    window_size: int = Field(default=200, ge=MIN_WINDOW_SIZE, le=MAX_WINDOW_SIZE)
+    sauvola_coef: float = Field(default=0.34, ge=MIN_COEFFICIENT, le=MAX_COEFFICIENT)
+    wolf_coef: float = Field(default=0.3, ge=MIN_COEFFICIENT, le=MAX_COEFFICIENT)
     wolf_lower_bound: int = Field(default=1, ge=0, le=255)
     wolf_upper_bound: int = Field(default=254, ge=0, le=255)
-    bradley_coef: float = Field(default=0.34, ge=0.0, le=1.0)
-    edge_div_kep: float = Field(default=0.5, ge=0.0, le=1.0)
-    edge_div_kbd: float = Field(default=0.5, ge=0.0, le=1.0)
+    bradley_coef: float = Field(default=0.34, ge=MIN_COEFFICIENT, le=MAX_COEFFICIENT)
+    edge_div_kep: float = Field(default=0.5, ge=MIN_COEFFICIENT, le=MAX_COEFFICIENT)
+    edge_div_kbd: float = Field(default=0.5, ge=MIN_COEFFICIENT, le=MAX_COEFFICIENT)
     normalize_illumination: bool = True
     savitzky_golay_smoothing: bool = True
     morphological_smoothing: bool = True
