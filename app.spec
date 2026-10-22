@@ -27,6 +27,35 @@ PACKAGE = SRC / "scantailor"
 ENTRY_POINTS = ROOT / "tools" / "pyinstaller"
 RESOURCES = PACKAGE / "resources"
 
+BUNDLE_IDENTIFIER = "io.github.adehad.py-scantailor"
+PROJECT_UTI = f"{BUNDLE_IDENTIFIER}.project"
+# Launch Services offers the app for a file only when the bundle declares the
+# file's type, here a UTI exported for the .ScanTailor extension. The Finder
+# then hands the file over as an open event, which main.FileOpenHandler takes.
+MACOS_INFO_PLIST = {
+    "LSBackgroundOnly": False,
+    "NSHighResolutionCapable": True,
+    "CFBundleDocumentTypes": [
+        {
+            "CFBundleTypeName": "ScanTailor Project",
+            "CFBundleTypeRole": "Editor",
+            "LSHandlerRank": "Owner",
+            "LSItemContentTypes": [PROJECT_UTI],
+        }
+    ],
+    "UTExportedTypeDeclarations": [
+        {
+            "UTTypeIdentifier": PROJECT_UTI,
+            "UTTypeDescription": "ScanTailor Project",
+            "UTTypeConformsTo": ["public.data"],
+            "UTTypeTagSpecification": {
+                "public.filename-extension": ["ScanTailor"],
+                "public.mime-type": ["application/x-scantailor-project"],
+            },
+        }
+    ],
+}
+
 
 def _beside_package(files: list[Path]) -> list[tuple[str, str]]:
     """Place each file at its path relative to src/, where the code looks for it."""
@@ -125,7 +154,7 @@ if sys.platform == "darwin":
         coll,
         name="ScanTailor.app",
         icon=str(RESOURCES / "ScanTailor.png"),
-        bundle_identifier="io.github.adehad.py-scantailor",
+        bundle_identifier=BUNDLE_IDENTIFIER,
         version=Version(metadata.version("py-scantailor")).base_version,
-        info_plist={"LSBackgroundOnly": False, "NSHighResolutionCapable": True},
+        info_plist=MACOS_INFO_PLIST,
     )

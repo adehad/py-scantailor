@@ -1,4 +1,4 @@
-"""The window opens a project file named on the command line."""
+"""The window opens a project file named on the command line or sent by the Finder."""
 
 from __future__ import annotations
 
@@ -6,18 +6,24 @@ import os
 import pathlib
 import subprocess
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING
 
 import pytest
-from PySide6 import QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 from scantailor.app.ui.MainWindow import MainWindowManager
 from scantailor.core.image_io import list_image_pages
 from scantailor.core.project import Project
-from scantailor.main import open_project_from_arguments, project_file_from_arguments
+from scantailor.main import (
+    FileOpenHandler,
+    open_project_from_arguments,
+    project_file_from_arguments,
+)
 
 if TYPE_CHECKING:
+    from pytestqt.qtbot import QtBot
+
     from conftest import PageImages
 
 
@@ -156,3 +162,95 @@ def test_a_bad_project_argument_warns_and_leaves_no_project_open(
     assert main_window.project is None
     assert len(warnings) == 1
     assert warnings[0].startswith("Unable to open the project file.")
+
+
+@pytest.fixture
+def file_open_handler(qtbot: QtBot) -> Iterator[FileOpenHandler]:
+    """A FileOpenHandler filtering the application's events, removed on teardown."""
+    app = QtWidgets.QApplication.instance()
+    assert app is not None
+    handler = FileOpenHandler()
+    app.installEventFilter(handler)
+    yield handler
+    app.removeEventFilter(handler)
+    handler.deleteLater()
+
+
+def _send_file_open(path: pathlib.Path) -> None:
+    app = QtWidgets.QApplication.instance()
+    assert app is not None
+    QtWidgets.QApplication.sendEvent(app, QtGui.QFileOpenEvent(str(path)))
+
+
+def test_a_file_open_event_opens_the_project_in_the_window(
+    main_window: MainWindowManager,
+    file_open_handler: FileOpenHandler,
+    page_images: PageImages,
+    tmp_path: pathlib.Path,
+    warnings: list[str],
+) -> None:
+    project_file = _save_project(page_images, tmp_path / "book.ScanTailor")
+    file_open_handler.attach_window(main_window)
+
+    _send_file_open(project_file)
+
+    assert main_window.projectFile == str(project_file)
+    assert warnings == []
+
+
+def test_a_file_open_event_before_the_window_opens_once_it_is_attached(
+    main_window: MainWindowManager,
+    file_open_handler: FileOpenHandler,
+    page_images: PageImages,
+    tmp_path: pathlib.Path,
+    warnings: list[str],
+) -> None:
+    project_file = _save_project(page_images, tmp_path / "book.ScanTailor")
+
+    _send_file_open(project_file)
+    assert main_window.project is None
+
+    file_open_handler.attach_window(main_window)
+
+    assert main_window.projectFile == str(project_file)
+    assert warnings == []
+
+
+def test_only_the_latest_file_sent_before_the_window_opens(
+    main_window: MainWindowManager,
+    file_open_handler: FileOpenHandler,
+    page_images: PageImages,
+    tmp_path: pathlib.Path,
+    warnings: list[str],
+) -> None:
+    _send_file_open(tmp_path / "missing.ScanTailor")
+    project_file = _save_project(page_images, tmp_path / "book.ScanTailor")
+    _send_file_open(project_file)
+
+    file_open_handler.attach_window(main_window)
+
+    assert main_window.projectFile == str(project_file)
+    assert warnings == []
+
+
+def test_a_file_open_event_for_a_bad_file_warns_and_opens_nothing(
+    main_window: MainWindowManager,
+    file_open_handler: FileOpenHandler,
+    tmp_path: pathlib.Path,
+    warnings: list[str],
+) -> None:
+    file_open_handler.attach_window(main_window)
+
+    _send_file_open(tmp_path / "missing.ScanTailor")
+
+    assert main_window.project is None
+    assert len(warnings) == 1
+    assert warnings[0].startswith("Unable to open the project file.")
+
+
+def test_events_other_than_file_open_pass_through_the_handler(
+    file_open_handler: FileOpenHandler,
+) -> None:
+    event = QtCore.QEvent(QtCore.QEvent.Type.User)
+
+    assert not file_open_handler.eventFilter(file_open_handler, event)

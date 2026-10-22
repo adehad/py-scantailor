@@ -120,6 +120,60 @@ def open_project_from_arguments(
     return window.open_project_file(project_file)
 
 
+class FileOpenHandler(QtCore.QObject):
+    """Open the project file the macOS Finder sends to the application.
+
+    On a cold launch Qt may put the Finder's document in the arguments, which
+    open_project_from_arguments() handles, and send no event for it. Otherwise
+    the Finder's request reaches the QApplication as a QFileOpenEvent, so
+    install this as an event filter on it. The event can arrive before the main
+    window exists; the file then waits until attach_window() and opens there.
+    Only the latest such file is kept, because the window holds one project.
+    """
+
+    def __init__(self, parent: QtCore.QObject | None = None) -> None:
+        """Create a handler with no window attached.
+
+        Args:
+            parent (QtCore.QObject | None): Owner of the handler.
+        """
+        super().__init__(parent)
+        self._window: MainWindowManager | None = None
+        self._pending: pathlib.Path | None = None
+
+    def attach_window(self, window: MainWindowManager) -> None:
+        """Send files to the window from now on, opening any that arrived earlier.
+
+        Args:
+            window (MainWindowManager): The shown main window.
+        """
+        self._window = window
+        pending, self._pending = self._pending, None
+        if pending is not None:
+            window.open_project_file(pending)
+
+    def eventFilter(self, watched: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        """Consume file open events and pass every other event on.
+
+        Args:
+            watched (QtCore.QObject): The object the event is for.
+            event (QtCore.QEvent): The event.
+
+        Returns:
+            bool: True if the event named a local file and was handled here.
+        """
+        if not isinstance(event, QtGui.QFileOpenEvent) or not event.file():
+            return super().eventFilter(watched, event)
+        project_file = pathlib.Path(event.file())
+        if self._window is None:
+            if self._pending is not None:
+                logger.warning("Ignoring project opened before it: {}", self._pending)
+            self._pending = project_file
+        else:
+            self._window.open_project_file(project_file)
+        return True
+
+
 def main() -> int:
     """Run the window application.
 
@@ -134,6 +188,8 @@ def main() -> int:
     setup_qcore()
     set_application_identity()
     app = QtWidgets.QApplication(sys.argv)
+    file_open_handler = FileOpenHandler(app)
+    app.installEventFilter(file_open_handler)
     app.aboutToQuit.connect(restore_qt_handler)
     logger.info("Qt platform {}, style {}", app.platformName(), app.style().name())
     apply_theme(app)
@@ -142,6 +198,7 @@ def main() -> int:
     main_window = MainWindowManager()
     main_window.show()
     open_project_from_arguments(main_window, app.arguments())
+    file_open_handler.attach_window(main_window)
     exit_code = app.exec()
     session.end()
     return exit_code
