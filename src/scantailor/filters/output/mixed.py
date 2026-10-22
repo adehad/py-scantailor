@@ -13,7 +13,13 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.core.zones import PictureLayer, PictureZoneProperties, Zone
+from scantailor.core.zones import (
+    PictureLayer,
+    PictureZoneProperties,
+    Zone,
+    ZoneCategory,
+    ZoneSpline,
+)
 from scantailor.imageproc.color_segmenter import segment_colors
 from scantailor.imageproc.filters import wiener_color_filter
 from scantailor.imageproc.pictures import (
@@ -41,7 +47,10 @@ def detect_picture_mask(
     dpi: tuple[int, int],
     options: PictureShapeOptions,
 ) -> NDArray[np.bool_]:
-    """Find picture regions automatically.
+    """Find free-form picture regions.
+
+    Rectangular pictures are not part of the mask: they become auto picture
+    zones (see ``find_auto_picture_zones``), which the user can edit.
 
     Args:
         gray (numpy.ndarray of numpy.uint8): 2-D gray page. Not modified.
@@ -49,22 +58,61 @@ def detect_picture_mask(
         options (PictureShapeOptions): Detection mode and sensitivity.
 
     Returns:
-        numpy.ndarray of numpy.bool: True where there is a picture; all False when
-            detection is off.
+        numpy.ndarray of numpy.bool: True where there is a picture; all False
+            unless the shape is free.
     """
-    if options.shape == PictureShape.OFF:
+    if options.shape != PictureShape.FREE:
         return np.zeros(gray.shape, dtype=bool)
+    return estimate_picture_mask(
+        gray,
+        dpi,
+        higher_search_sensitivity=options.higher_search_sensitivity,
+    )
+
+
+def find_auto_picture_zones(
+    gray: NDArray[np.uint8],
+    dpi: tuple[int, int],
+    options: PictureShapeOptions,
+) -> list[Zone]:
+    """Find rectangular pictures and return them as auto picture zones.
+
+    Each zone adds its rectangle to the pictures, as a zone on the painter
+    layer does.
+
+    Args:
+        gray (numpy.ndarray of numpy.uint8): 2-D gray page. Not modified.
+        dpi (tuple[int, int]): Horizontal and vertical resolution of ``gray``.
+        options (PictureShapeOptions): Sensitivity and search options; the
+            shape is taken to be rectangular.
+
+    Returns:
+        list[Zone]: One zone per picture, in the pixel coordinates of ``gray``.
+            The corners lie on the outermost picture pixels, which is what
+            ``polygon_mask`` fills.
+    """
     mask = estimate_picture_mask(
         gray,
         dpi,
         higher_search_sensitivity=options.higher_search_sensitivity,
     )
-    if options.shape == PictureShape.FREE:
-        return mask
-    boxes = np.zeros(gray.shape, dtype=bool)
-    for left, top, right, bottom in find_picture_rectangles(mask, options.sensitivity):
-        boxes[top : bottom + 1, left : right + 1] = True
-    return boxes
+    properties = PictureZoneProperties(
+        layer=PictureLayer.PAINTER2, category=ZoneCategory.AUTO
+    )
+    return [
+        Zone(
+            spline=ZoneSpline(
+                points=np.array(
+                    [(left, top), (right, top), (right, bottom), (left, bottom)],
+                    dtype=np.float64,
+                )
+            ),
+            properties=properties,
+        )
+        for left, top, right, bottom in find_picture_rectangles(
+            mask, options.sensitivity
+        )
+    ]
 
 
 @dataclass(frozen=True)

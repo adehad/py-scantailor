@@ -15,6 +15,7 @@ from scantailor.core.zones import (
     FillZoneProperties,
     PictureZoneProperties,
     Zone,
+    ZoneCategory,
     ZoneSpline,
 )
 from scantailor.dewarping import DEFAULT_MIN_SPAN_PERCENT
@@ -24,7 +25,7 @@ from .color_mode import ColorMode
 from .color_options import ColorCommonOptions
 from .despeckle import MAX_DESPECKLE_FACTOR, DespeckleLevel
 from .dewarping_options import DewarpingMode, DewarpingOptions
-from .picture_shape import PictureShapeOptions
+from .picture_shape import PictureShape, PictureShapeOptions
 from .splitting_options import SplittingOptions
 
 _MIN_CURVE_POINTS = 2
@@ -94,6 +95,22 @@ class PictureZoneSpec(ZoneOutline):
         return Zone(spline=self.to_spline(), properties=self.properties)
 
 
+class AutoPictureZones(BaseModel):
+    """What a mixed render settled about a page's auto picture zones.
+
+    Attributes:
+        zones: Zones from rectangular picture detection, in the coordinates of
+            ``Params.picture_zones``; empty when the page has none.
+        picture_shape: The picture shape options of the render. The zones are
+            stored only while the page still has these options.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    zones: tuple[PictureZoneSpec, ...] = ()
+    picture_shape: PictureShapeOptions = Field(default_factory=PictureShapeOptions)
+
+
 class FillZoneSpec(ZoneOutline):
     """A zone painted with a fixed colour.
 
@@ -149,7 +166,12 @@ class Params(BaseModel):
         depth_perception: Distance from the camera to the plane through the
             page's outer edges, from 1 to 3; used by dewarping.
         distortion_model: Page edges for manual dewarping.
-        picture_zones: Manual picture zones for mixed output.
+        picture_zones: Picture zones for mixed output. Zones of the auto
+            category come from rectangular picture detection; editing one makes
+            it manual.
+        auto_picture_zones_shape: The picture shape options the page's auto
+            zones were detected with; None when the page has none. A mixed
+            render detects them again when this differs from ``picture_shape``.
         fill_zones: Zones painted with a fixed colour.
         splitting: Saving mixed output as separate layers.
 
@@ -175,6 +197,7 @@ class Params(BaseModel):
     depth_perception: float = Field(default=2.0, ge=1.0, le=3.0)
     distortion_model: DistortionModelSpec = Field(default_factory=DistortionModelSpec)
     picture_zones: tuple[PictureZoneSpec, ...] = ()
+    auto_picture_zones_shape: PictureShapeOptions | None = None
     fill_zones: tuple[FillZoneSpec, ...] = ()
     splitting: SplittingOptions = Field(default_factory=SplittingOptions)
 
@@ -288,6 +311,33 @@ class Params(BaseModel):
     def with_picture_zones(self, zones: tuple[PictureZoneSpec, ...]) -> Self:
         """Create a copy with different picture zones."""
         return self.model_copy(update={"picture_zones": zones})
+
+    def with_auto_picture_zones(self, found: AutoPictureZones) -> Self:
+        """Create a copy whose auto picture zones are the ones a render found.
+
+        Manual zones stay as they are.
+
+        Args:
+            found (AutoPictureZones): The zones and the options they were found with.
+
+        Returns:
+            Self: The copy, which records ``found.picture_shape`` as the options
+                of its auto zones when they are rectangular, and None otherwise.
+        """
+        manual = tuple(
+            zone
+            for zone in self.picture_zones
+            if zone.properties.category is not ZoneCategory.AUTO
+        )
+        shape = found.picture_shape
+        return self.model_copy(
+            update={
+                "picture_zones": manual + found.zones,
+                "auto_picture_zones_shape": shape
+                if shape.shape is PictureShape.RECTANGULAR
+                else None,
+            }
+        )
 
     def with_fill_zones(self, zones: tuple[FillZoneSpec, ...]) -> Self:
         """Create a copy with different fill zones."""

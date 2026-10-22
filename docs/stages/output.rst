@@ -197,12 +197,20 @@ three quarters of a second.
    * - Shape
      - What it does
    * - **Off**
-     - Keeps the pictures as they were detected, without reshaping them.
+     - Detects no pictures. Only picture zones keep areas as pictures.
    * - **Free**
      - Follows the outline of each detected picture.
    * - **Rectangular**
-     - Reduces each picture to a rectangle. The sensitivity sets how readily an area
-       counts as a picture.
+     - Puts a picture zone around each detected picture, on the Picture Zones tab.
+       Below 100, the sensitivity trims each side of a rectangle back to the first
+       line that holds more than that percentage of picture pixels.
+
+Rectangular detection runs the first time a page renders in mixed mode, and again
+after the picture shape options change. Each run replaces the zones the previous run
+made. Moving, reshaping or copying a detected zone, or changing its layer, makes it a
+manual zone, which later runs leave alone. A deleted detected zone stays deleted
+until the options change. Switching to **Off** or **Free** removes the detected zones
+and keeps the manual ones.
 
 .. screenshot:: stage6_output_picture_shape
    :alt: The Picture Shape panel in mixed mode

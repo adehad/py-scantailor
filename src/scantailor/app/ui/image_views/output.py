@@ -68,6 +68,7 @@ from scantailor.core.zones import (
     FillZoneProperties,
     PictureLayer,
     PictureZoneProperties,
+    ZoneCategory,
 )
 from scantailor.filters.output.despeckle import DespeckleLevel, DespeckleStrength
 from scantailor.filters.output.params import DistortionModelSpec
@@ -255,6 +256,17 @@ class ViewZone:
             self.kind, QPolygonF(self.polygon), self.fill_color, self.properties
         )
 
+    def make_manual(self) -> None:
+        """Make an auto picture zone the user's own, so detection leaves it be."""
+        properties = self.properties
+        if (
+            isinstance(properties, PictureZoneProperties)
+            and properties.category is ZoneCategory.AUTO
+        ):
+            self.properties = properties.model_copy(
+                update={"category": ZoneCategory.MANUAL}
+            )
+
 
 @dataclass(frozen=True)
 class _Pick:
@@ -296,7 +308,8 @@ class OutputImageView(ImageViewBase):
     A zone is reshaped by dragging a corner (Ctrl keeps the corner square,
     dropping it on a neighbour merges the two), by pressing on an edge to add a
     corner there, and by D over a corner to remove it. Shift drags the whole
-    zone, Shift+Ctrl drags a copy. The right button opens a menu of the zones
+    zone, Shift+Ctrl drags a copy. Any of these, or a new layer, makes an auto
+    picture zone manual. The right button opens a menu of the zones
     under the cursor, from which a picture zone's layer is set and a fill zone's
     colour is picked from the page. Delete removes a zone.
 
@@ -1065,6 +1078,7 @@ class OutputImageView(ImageViewBase):
         self._default_layer = dialog.layer()
         changed = dialog.layer() != original_layer
         if changed:
+            zone.make_manual()
             self.zones_changed.emit()
         return changed
 
@@ -1452,6 +1466,7 @@ class OutputImageView(ImageViewBase):
             - copy.polygon.boundingRect().center()
         )
         copy.polygon = copy.polygon.translated(shift)
+        copy.make_manual()
         self._zones.append(copy)
         self._selected = len(self._zones) - 1
         self.update()
@@ -1586,6 +1601,7 @@ class OutputImageView(ImageViewBase):
             )
             event.accept()
             if drag.moved:
+                self._zones[drag.zone].make_manual()
                 self.zones_changed.emit()
             return
         super().mouseReleaseEvent(event)
@@ -1600,6 +1616,7 @@ class OutputImageView(ImageViewBase):
             self._drag_moved = True
         self.update()
         if self._drag_moved:
+            zone.make_manual()
             self.zones_changed.emit()
 
     def mouseDoubleClickEvent(self, event: QtGui.QMouseEvent) -> None:
@@ -1675,6 +1692,7 @@ class OutputImageView(ImageViewBase):
         if not geometry.remove_vertex(corners, pick.vertex):
             return False
         self._zones[pick.zone].polygon = QPolygonF(corners)
+        self._zones[pick.zone].make_manual()
         self._hover = None
         self.update()
         self.zones_changed.emit()

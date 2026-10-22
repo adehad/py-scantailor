@@ -14,7 +14,12 @@ from numpy.typing import NDArray
 
 from scantailor.core.estimate_background import normalize_illumination_gray
 from scantailor.core.models import Dpi
-from scantailor.core.zones import FillZoneProperties, Zone
+from scantailor.core.zones import (
+    FillZoneProperties,
+    PictureZoneProperties,
+    Zone,
+    ZoneCategory,
+)
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
 from scantailor.dewarping.raster_dewarper import (
     InterpolationMethod,
@@ -55,9 +60,11 @@ from .mixed import (
     compose_mixed_colored,
     compose_over_original,
     detect_picture_mask,
+    find_auto_picture_zones,
     rasterize_picture_zones,
 )
 from .params import Params
+from .picture_shape import PictureShape
 from .raster import fill_masked, polygon_mask
 from .render_params import RenderParams
 from .split_output import SplitImages, split_mixed_output
@@ -97,6 +104,9 @@ class OutputResult:
         despeckle_source: Only when asked for with ``keep_despeckle_source`` and
             the page is binarised: the text as a 0 (ink) and 255 bilevel page
             just before despeckling, whatever the despeckle level. None otherwise.
+        auto_picture_zones: Mixed mode only: the auto picture zones that replace
+            the page's stored ones, in the coordinates of the input image; empty
+            when the page should have none. None when the stored ones stay.
     """
 
     image: NDArray[np.uint8]
@@ -106,6 +116,7 @@ class OutputResult:
     ink_mask: NDArray[np.bool_] | None = None
     split: SplitImages | None = None
     despeckle_source: NDArray[np.uint8] | None = None
+    auto_picture_zones: tuple[Zone, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -205,7 +216,9 @@ def generate_output(
             Outline of the page as (x, y) vertices.
             What lies outside it is filled when ``fill_offcut`` is set. None
             means the whole image is page.
-        picture_zones (Sequence[Zone]): Manual picture zones, used by mixed mode.
+        picture_zones (Sequence[Zone]): Picture zones, used by mixed mode. Auto
+            zones count only while ``params`` say they are up to date; see
+            ``OutputResult.auto_picture_zones``.
         fill_zones (Sequence[Zone]): Fill zones, painted with their own colour
             after everything else.
         keep_despeckle_source (bool): Also return the page as it was before
@@ -223,16 +236,13 @@ def generate_output(
     params = params.with_color_common(color_options)
     render = RenderParams.from_params(params)
 
-    page = _PageGeometry.build(
-        image,
-        params,
-        render,
-        content_polygon,
-        page_outline,
-        picture_zones,
-        fill_zones,
-        source_outline,
+    layout = _PageLayout.build(
+        image.shape[:2], render, content_polygon, page_outline, source_outline
     )
+    drawn_zones, auto_zones, layout = _picture_zones_to_draw(
+        image, params, render, layout, picture_zones
+    )
+    page = _PageGeometry.build(image, params, layout, drawn_zones, fill_zones)
     if params.needs_dewarping() and dewarper is not None:
         page = _dewarp_page(page, params, render, dewarper)
 
@@ -258,6 +268,7 @@ def generate_output(
     if render.posterize and not render.need_binarization:
         result.image = _posterize(result.image, color_options)
     result.was_dewarped = page.was_dewarped
+    result.auto_picture_zones = auto_zones
     if render.split_output and result.picture_mask is not None:
         result.split = _split_layers(result, params, render)
     return result
@@ -310,20 +321,15 @@ class _PageGeometry:
         cls,
         image: NDArray[np.uint8],
         params: Params,
-        render: RenderParams,
-        content_polygon: Polygon | None,
-        page_outline: Polygon | None,
+        layout: _PageLayout,
         picture_zones: Sequence[Zone],
         fill_zones: Sequence[Zone],
-        source_outline: Polygon | None = None,
     ) -> _PageGeometry:
-        """Rasterise the layout and zones on the input image's grid."""
+        """Rasterise the zones on the input image's grid."""
         shape = image.shape[:2]
         return cls(
             image=image,
-            layout=_PageLayout.build(
-                shape, render, content_polygon, page_outline, source_outline
-            ),
+            layout=layout,
             picture_layers=(
                 rasterize_picture_zones(picture_zones, shape)
                 if params.color_mode == ColorMode.MIXED
@@ -331,6 +337,68 @@ class _PageGeometry:
             ),
             fill_zones=_rasterize_fill_zones(fill_zones, shape),
         )
+
+
+def _is_auto_zone(zone: Zone) -> bool:
+    properties = zone.properties
+    return (
+        isinstance(properties, PictureZoneProperties)
+        and properties.category is ZoneCategory.AUTO
+    )
+
+
+def _picture_zones_to_draw(
+    image: NDArray[np.uint8],
+    params: Params,
+    render: RenderParams,
+    layout: _PageLayout,
+    zones: Sequence[Zone],
+) -> tuple[list[Zone], tuple[Zone, ...] | None, _PageLayout]:
+    """Pick the picture zones a render draws, detecting auto zones when due.
+
+    Auto zones count only in mixed mode with rectangular pictures, and only
+    when they were detected with the current picture shape options. Otherwise
+    detection runs again on ``image``, before any dewarping, so that the zones
+    share the coordinates of the other zones.
+
+    Args:
+        image (numpy.ndarray of numpy.uint8): Input image, 2-D gray or BGR(A).
+        params (scantailor.filters.output.params.Params): Output parameters.
+        render (RenderParams): Flags derived from ``params``.
+        layout (_PageLayout): Page and fill areas of ``image``.
+        zones (Sequence[Zone]): The page's picture zones, auto ones included.
+
+    Returns:
+        tuple[list[Zone], tuple[Zone, ...] | None, _PageLayout]: The zones to
+            draw; the auto zones that replace the stored ones, or None when
+            those stay; and ``layout``, holding the illumination-normalised
+            gray when detection made it.
+    """
+    if params.color_mode != ColorMode.MIXED:
+        return list(zones), None, layout
+    manual = [zone for zone in zones if not _is_auto_zone(zone)]
+    options = params.picture_shape
+    if options.shape != PictureShape.RECTANGULAR:
+        outdated = params.auto_picture_zones_shape is not None or len(manual) < len(
+            zones
+        )
+        return manual, () if outdated else None, layout
+    if params.auto_picture_zones_shape == options:
+        return list(zones), None, layout
+
+    gray = bgr_to_gray(image if params.black_on_white else _invert_polarity(image))
+    if render.normalize_illumination:
+        gray = _normalized_gray(gray, layout)
+        layout = replace(layout, normalized=gray)
+    dpi = params.output_dpi
+    found = tuple(
+        find_auto_picture_zones(
+            _wiener_gray(gray, params.color_common),
+            (dpi.horizontal, dpi.vertical),
+            options,
+        )
+    )
+    return manual + list(found), found, layout
 
 
 def _rasterize_fill_zones(
@@ -371,7 +439,7 @@ def _dewarp_page(
     gray = bgr_to_gray(oriented)
     normalized: NDArray[np.uint8] | None = None
     if render.normalize_illumination or render.normalize_illumination_color:
-        normalized = normalize_illumination_gray(gray, page.layout.page_outline)
+        normalized = _normalized_gray(gray, page.layout)
         gray = normalized
 
     dewarper = (
@@ -647,17 +715,18 @@ def _generate_mixed_output(
 ) -> OutputResult:
     """Generate mixed output: pictures keep their grays or colours, text is binarised.
 
-    Picture regions come from automatic detection (see ``PictureShapeOptions``)
-    and from manual zones, whose layers add to, remove from or invert the
-    detected picture mask. Everything outside the kept area is filled with
-    white, or with black when the filling colour says so.
+    Picture regions come from free-form detection (see ``PictureShapeOptions``)
+    and from picture zones, whose layers add to, remove from or invert the
+    detected picture mask; rectangular detection arrives as auto zones.
+    Everything outside the kept area is filled with white, or with black when
+    the filling colour says so.
 
     Args:
         image (numpy.ndarray of numpy.uint8): Input image, 2-D gray or BGR(A).
         params (scantailor.filters.output.params.Params): Output parameters.
         render (RenderParams): Flags derived from ``params``.
         layout (_PageLayout): Page and fill areas.
-        picture_layers (PictureLayers): Rasterised manual picture zones.
+        picture_layers (PictureLayers): Rasterised picture zones.
         keep_despeckle_source (bool): Keep the text before despeckling in the
             result.
 
