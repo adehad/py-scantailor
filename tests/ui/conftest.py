@@ -351,10 +351,25 @@ def project_window(
     respond_to_modal(accept=True)
     main_window.actionNewProject.trigger()
     assert main_window.project is not None
-    # Windows will not move or delete a scan a render thread still holds open.
-    main_window.renderer.wait_for_done(10_000)
-    main_window.thumbnails.model.wait_for_idle(10_000)
+    _wait_until_no_scan_is_open(main_window)
     return main_window
+
+
+def _wait_until_no_scan_is_open(window: MainWindowManager) -> None:
+    """Wait until no render or thumbnail worker reads a scan.
+
+    Windows will not move or delete a scan a worker still holds open. Thumbnails
+    are requested as the list paints, so draining the event loop can start new
+    renders; the wait ends only when a drain starts none.
+    """
+    model = window.thumbnails.model
+    deadline = QtCore.QDeadlineTimer(10_000)
+    while True:
+        assert window.renderer.wait_for_done(deadline.remainingTime())
+        assert model.wait_for_idle(deadline.remainingTime())
+        QtWidgets.QApplication.processEvents()
+        if window.renderer.wait_for_done(0) and model.wait_for_idle(0):
+            return
 
 
 @dataclasses.dataclass
