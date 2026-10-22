@@ -20,6 +20,7 @@ from types import ModuleType
 
 import numpy as np
 import pytest
+import shiboken6
 from PIL import Image
 from PySide6 import QtCore, QtGui, QtTest, QtWidgets
 
@@ -459,6 +460,8 @@ def test_manual_screenshots_capture_every_named_shot(
     manager.modified = False
     manager.ui.close()
     pump(0.2)
+    # Deleting the window joins its render and thumbnail pools before the scans go.
+    shiboken6.delete(manager.ui)
     shutil.rmtree(work_dir, ignore_errors=True)
 
     _assert_complete(shots)

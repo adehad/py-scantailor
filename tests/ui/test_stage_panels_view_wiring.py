@@ -7,6 +7,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pytest
+import shiboken6
 from PySide6 import QtCore, QtGui, QtWidgets
 from pytestqt.qtbot import QtBot
 
@@ -57,11 +58,12 @@ def _panels(stage: FilterStage) -> StagePanels:
 
 @pytest.fixture(autouse=True)
 def _release_panels() -> Iterator[None]:
-    """Stop the panels watching their viewports before they are collected."""
+    """Delete the panels, joining their source decoding pool, then their widgets."""
     yield
     while _made:
         panels = _made.pop()
-        panels.view.viewport().removeEventFilter(panels)
+        for qobject in (panels, panels.view, panels.options):
+            shiboken6.delete(qobject)
 
 
 def _source() -> _Source:
@@ -337,6 +339,7 @@ class TestContentMask:
         panels._refresh_geometry()
         destroyed: list[bool] = []
         panels.view.destroyed.connect(lambda: destroyed.append(True))
+        options = panels.options
         was_enabled = gc.isenabled()
         gc.disable()
         try:
@@ -345,6 +348,7 @@ class TestContentMask:
         finally:
             if was_enabled:
                 gc.enable()
+            shiboken6.delete(options)
 
     def test_the_mask_is_computed_once_for_an_unchanged_page(self, monkeypatch):
         from scantailor.app.ui import stage_panels

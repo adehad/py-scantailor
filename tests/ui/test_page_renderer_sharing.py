@@ -1,6 +1,7 @@
 """The renderer shares decoded sources and lets the page on screen go first."""
 
 import threading
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -11,6 +12,7 @@ from pytestqt.qtbot import QtBot
 from scantailor.app.ui import page_renderer, source_cache, stage_panels
 from scantailor.app.ui.page_renderer import PageRenderer, render_thumbnail
 from scantailor.app.ui.source_cache import SourceCache
+from scantailor.app.ui.stage_panels import StagePanels
 from scantailor.core.image_io import write_image
 from scantailor.core.models import Dpi, ImageId, PageId
 from scantailor.core.stage_sequence import FilterStage, StageSequence
@@ -73,13 +75,16 @@ def test_renders_of_one_page_decode_it_once(
 
 
 def test_stage_panels_reuse_the_source_the_renderer_decoded(
-    qtbot: QtBot, tmp_path: Path, decodes: list[ImageId]
+    qtbot: QtBot,
+    tmp_path: Path,
+    decodes: list[ImageId],
+    make_stage_panels: Callable[[FilterStage, StageSequence], StagePanels],
 ) -> None:
     page = _page(tmp_path / "a.tif")
     stages = _stages(page)
     renderer = PageRenderer()
     _render(qtbot, renderer, page, stages, FilterStage.DESKEW)
-    panels = stage_panels.StagePanels(FilterStage.DESKEW, stages)
+    panels = make_stage_panels(FilterStage.DESKEW, stages)
     panels.set_source_cache(renderer.sources)
 
     panels.set_page(page)
@@ -90,12 +95,15 @@ def test_stage_panels_reuse_the_source_the_renderer_decoded(
 
 
 def test_stage_panels_decode_through_the_cache_the_renderer_then_reuses(
-    qtbot: QtBot, tmp_path: Path, decodes: list[ImageId]
+    qtbot: QtBot,
+    tmp_path: Path,
+    decodes: list[ImageId],
+    make_stage_panels: Callable[[FilterStage, StageSequence], StagePanels],
 ) -> None:
     page = _page(tmp_path / "a.tif")
     stages = _stages(page)
     renderer = PageRenderer()
-    panels = stage_panels.StagePanels(FilterStage.DESKEW, stages)
+    panels = make_stage_panels(FilterStage.DESKEW, stages)
     panels.set_source_cache(renderer.sources)
 
     panels.set_page(page)

@@ -17,6 +17,8 @@ from pytestqt.qtbot import QtBot
 from scantailor.app._ui import resources_rc
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
 from scantailor.app.ui.MainWindow import MainWindowManager, SaveChoice
+from scantailor.app.ui.stage_panels import StagePanels
+from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.main import setup_qcore
 
 PAGE_WIDTH = 600
@@ -68,20 +70,51 @@ def isolated_settings(tmp_path: pathlib.Path) -> Iterator[pathlib.Path]:
     QtCore.QCoreApplication.setApplicationName(previous_app)
 
 
-@pytest.fixture(autouse=True)
-def no_window_outlives_its_test() -> Iterator[None]:
-    """Hide windows a test left showing and let their deferred deletes run.
+def _parentless_windows() -> dict[int, QtWidgets.QWidget]:
+    """Return the live top-level widgets that no other widget owns, by address.
 
-    QTest.mouseMove moves the platform cursor, and the offscreen platform hands the
-    move to the first exposed top-level window, in creation order, that contains
-    the point. A window left over from an earlier test on the same worker therefore
-    swallows the hover meant for the widget under test.
+    Popups such as menus are top-level windows too, but their parent deletes them.
     """
-    yield
+    windows = {}
     for widget in QtWidgets.QApplication.topLevelWidgets():
-        if widget.isVisible():
-            widget.hide()
+        if shiboken6.isValid(widget) and widget.parentWidget() is None:
+            windows[shiboken6.getCppPointer(widget)[0]] = widget
+    return windows
+
+
+@pytest.fixture(autouse=True)
+def no_window_outlives_its_test(qapp: QtWidgets.QApplication) -> Iterator[None]:
+    """Fail a test that leaves a parentless widget alive, then delete the widget.
+
+    A leftover window keeps its thumbnail and render workers running after the
+    test's files are gone, and the cycle collector may later destroy it on a worker
+    thread, which crashes Qt. The offscreen platform also hands QTest.mouseMove to
+    the first exposed top-level window containing the point, so a leftover window
+    swallows hovers meant for later tests.
+
+    Args:
+        qapp (QtWidgets.QApplication): Needed so widgets can be listed.
+    """
+    before = set(_parentless_windows())
+    yield
     QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
+    leaked = []
+    for address, widget in _parentless_windows().items():
+        if address in before:
+            widget.hide()
+        else:
+            leaked.append(widget)
+    names = sorted(
+        " ".join(filter(None, (type(widget).__name__, widget.objectName())))
+        for widget in leaked
+    )
+    for widget in leaked:
+        widget.hide()
+        shiboken6.delete(widget)
+    assert not names, (
+        f"the test left windows alive: {', '.join(names)}; give them to "
+        "qtbot.addWidget or delete them at teardown"
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -137,6 +170,35 @@ def main_window(
         for dialog in manager.ui.findChildren(QtWidgets.QDialog):
             dialog.close()
         manager.ui.close()
+        # Deleting the window joins its thumbnail and render pools, so no worker
+        # still reads the test's files once its other fixtures tear down.
+        shiboken6.delete(manager.ui)
+
+
+@pytest.fixture
+def make_stage_panels(
+    qapp: QtWidgets.QApplication,
+) -> Iterator[Callable[[FilterStage, StageSequence], StagePanels]]:
+    """Return a function that builds stage panels deleted at teardown.
+
+    The panels go before their widgets: deleting them joins their source
+    decoding pool.
+
+    Args:
+        qapp (QtWidgets.QApplication): Needed before any widget is built.
+    """
+    made: list[StagePanels] = []
+
+    def make(stage: FilterStage, sequence: StageSequence) -> StagePanels:
+        panels = StagePanels(stage, sequence)
+        made.append(panels)
+        return panels
+
+    yield make
+    for panels in made:
+        for qobject in (panels, panels.view, panels.options):
+            if shiboken6.isValid(qobject):
+                shiboken6.delete(qobject)
 
 
 @pytest.fixture
