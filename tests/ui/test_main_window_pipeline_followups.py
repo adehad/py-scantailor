@@ -12,7 +12,7 @@ from scantailor.app.ui import MainWindow
 from scantailor.app.ui.MainWindow import MainWindowManager
 from scantailor.core.batch import BatchResult
 from scantailor.core.default_params import DefaultParams, PageLayoutDefaults
-from scantailor.core.models import Margins, PageId
+from scantailor.core.models import Margins, PageId, SubPage
 from scantailor.core.settings import ApplicationSettings
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
 
@@ -142,6 +142,38 @@ class TestAutoSaveDuringBatch:
 
         assert not target.exists()
         window.renderer.wait_for_done()
+
+
+class TestThumbnailDigestPerStage:
+    @staticmethod
+    def _halves(window: MainWindowManager) -> tuple[PageId, PageId]:
+        image = window.pages()[0].image_id
+        return (
+            PageId(image_id=image, sub_page=SubPage.LEFT_PAGE),
+            PageId(image_id=image, sub_page=SubPage.RIGHT_PAGE),
+        )
+
+    @pytest.mark.parametrize("stage", ["0", "1"])
+    def test_editing_either_half_makes_the_scan_thumbnail_stale_where_scans_are_listed(
+        self, settled_window: MainWindowManager, stage: str
+    ):
+        left, right = self._halves(settled_window)
+        before = settled_window._thumbnail_digest(left, stage)
+
+        settled_window._invalidate_thumbnails(right)
+
+        assert settled_window._thumbnail_digest(left, stage) != before
+
+    @pytest.mark.parametrize("stage", ["2", "5"])
+    def test_editing_one_half_keeps_the_other_halfs_thumbnail_where_pages_are_listed(
+        self, settled_window: MainWindowManager, stage: str
+    ):
+        left, right = self._halves(settled_window)
+        before = settled_window._thumbnail_digest(left, stage)
+
+        settled_window._invalidate_thumbnails(right)
+
+        assert settled_window._thumbnail_digest(left, stage) == before
 
 
 class TestAggregateSizeChange:

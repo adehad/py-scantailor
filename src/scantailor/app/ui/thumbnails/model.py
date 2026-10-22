@@ -19,7 +19,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QImage
 
 from scantailor.app.ui.thumbnails.cache import ThumbnailCache, ThumbnailKey
-from scantailor.core.models import PageId, SubPage, page_name
+from scantailor.core.models import ImageId, PageId, SubPage, page_name
 from scantailor.core.project import Project
 
 ThumbnailRenderer = Callable[[PageId, str], QImage]
@@ -38,7 +38,8 @@ class PageEntry:
     """What an order option may inspect about a page.
 
     Args:
-        page (PageId): The page.
+        page (PageId): The page; when the list shows images, the image's first
+            page, standing for the whole image.
         width (int): Source width in pixels; half the image for one page of a
             two-page image, 0 when the image size is unknown.
         height (int): Source height in pixels, 0 when unknown.
@@ -152,7 +153,11 @@ class _RenderTask(QRunnable):
 
 
 class ThumbnailModel(QAbstractListModel):
-    """One row per page; thumbnails are produced on demand off the GUI thread.
+    """One row per page, or per image; thumbnails are rendered off the GUI thread.
+
+    At stages that work on whole images the model lists images: each row's page
+    is the image's first page, and every method that takes a page finds the row
+    of any page of that image.
 
     Args:
         renderer (ThumbnailRenderer): Renders a preview for (page, stage).
@@ -187,8 +192,11 @@ class ThumbnailModel(QAbstractListModel):
         self._is_incomplete = is_incomplete
         self._reversed = False
         self._render_size = render_size or QSize(160, 160)
+        self._project: Project | None = None
+        self._lists_images = False
         self._entries: list[PageEntry] = []
         self._rows: dict[PageId, int] = {}
+        self._image_pages: dict[ImageId, list[PageId]] = {}
         self._order = natural_order()
         self._stage = ""
         self._current: PageId | None = None
@@ -231,13 +239,38 @@ class ThumbnailModel(QAbstractListModel):
         self._render_size = QSize(size)
         self.invalidate()
 
+    @property
+    def lists_images(self) -> bool:
+        """Whether each row stands for a whole image rather than one page."""
+        return self._lists_images
+
     def pages(self) -> list[PageId]:
-        """Return the pages in display order."""
+        """Return the page of each row, in display order."""
         return [entry.page for entry in self._entries]
 
     def row_of(self, page: PageId) -> int:
         """Return the row showing a page, or -1."""
-        return self._rows.get(page, -1)
+        return self._rows.get(self._row_page(page), -1)
+
+    def pages_of_row(self, page: PageId) -> list[PageId]:
+        """Return every page the row showing ``page`` stands for.
+
+        Args:
+            page (PageId): Any page of the project.
+
+        Returns:
+            list[PageId]: All pages of the image when the list shows images, in
+                the project's order; otherwise just ``page``.
+        """
+        if not self._lists_images:
+            return [page]
+        return list(self._image_pages.get(page.image_id, [page]))
+
+    def _row_page(self, page: PageId) -> PageId:
+        """Return the page that identifies the row showing ``page``."""
+        if not self._lists_images:
+            return page
+        return self._image_pages.get(page.image_id, [page])[0]
 
     def set_project(self, project: Project | None) -> None:
         """Replace the pages with those of a project.
@@ -246,12 +279,24 @@ class ThumbnailModel(QAbstractListModel):
             project (Project | None): The project, or None to empty the list.
         """
         self.beginResetModel()
-        self._entries = _entries_for(project) if project is not None else []
+        self._project = project
         self._current = None
         self._failed.clear()
+        self._fill_entries()
+        self.endResetModel()
+
+    def _fill_entries(self) -> None:
+        """List the project's pages or images, marked and in the chosen order."""
+        project = self._project
+        pages = project.get_pages() if project is not None else []
+        self._image_pages = {}
+        for page in pages:
+            self._image_pages.setdefault(page.image_id, []).append(page)
+        self._entries = (
+            _entries_for(project, self._lists_images) if project is not None else []
+        )
         self._mark_incomplete_pages()
         self._sort_entries()
-        self.endResetModel()
 
     def set_order(self, order: PageOrderOption, reverse: bool | None = None) -> None:
         """Reorder the rows.
@@ -298,17 +343,27 @@ class ThumbnailModel(QAbstractListModel):
             self._emit_changed(entry_page, [IncompleteRole])
         self._resort()
 
-    def set_stage(self, stage: str) -> None:
+    def set_stage(self, stage: str, lists_images: bool = False) -> None:
         """Switch the stage whose previews are shown.
+
+        Switching between listing pages and listing images resets the model, so
+        views lose their selection and current index.
 
         Args:
             stage (str): Stage key passed to the renderer.
+            lists_images (bool): Show one row per image instead of one per page.
         """
-        if stage == self._stage:
+        if stage == self._stage and lists_images == self._lists_images:
             return
         self._stage = stage
-        self._mark_incomplete_pages()
-        self._resort()
+        if lists_images != self._lists_images:
+            self.beginResetModel()
+            self._lists_images = lists_images
+            self._fill_entries()
+            self.endResetModel()
+        else:
+            self._mark_incomplete_pages()
+            self._resort()
         self.invalidate()
 
     def set_current_page(self, page: PageId | None) -> None:
@@ -371,11 +426,11 @@ class ThumbnailModel(QAbstractListModel):
             return None
         page = self._entries[index.row()].page
         if role == Qt.ItemDataRole.DisplayRole:
-            return page_label(page)
+            return image_label(page) if self._lists_images else page_label(page)
         if role == PageRole:
             return page
         if role == IsCurrentRole:
-            return page == self._current
+            return self._current is not None and page == self._row_page(self._current)
         if role == IncompleteRole:
             return self._entries[index.row()].incomplete
         if role == Qt.ItemDataRole.DecorationRole:
@@ -420,16 +475,17 @@ class ThumbnailModel(QAbstractListModel):
         self._emit_changed(key.page, [Qt.ItemDataRole.DecorationRole])
 
     def _emit_changed(self, page: PageId | None, roles: list[int]) -> None:
-        row = self._rows.get(page, -1) if page is not None else -1
+        row = self.row_of(page) if page is not None else -1
         if row >= 0:
             self.dataChanged.emit(self.index(row), self.index(row), roles)
 
     def _mark_incomplete_pages(self, page: PageId | None = None) -> list[PageId]:
         """Update the incomplete flag of the entries; return the pages that changed."""
         provider, stage = self._is_incomplete, self._stage
+        wanted = self._row_page(page) if page is not None else None
         changed: list[PageId] = []
         for row, entry in enumerate(self._entries):
-            if page is not None and entry.page != page:
+            if wanted is not None and entry.page != wanted:
                 continue
             incomplete = provider(entry.page, stage) if provider is not None else False
             if incomplete != entry.incomplete:
@@ -469,11 +525,17 @@ class ThumbnailModel(QAbstractListModel):
         self.layoutChanged.emit()
 
 
-def page_label(page: PageId) -> str:
-    """Return the caption shown under a thumbnail."""
+def image_label(page: PageId) -> str:
+    """Return the caption shown under the thumbnail of the image a page is on."""
     name = page.image_id.file_path.name
     if page.image_id.page > 0:
         name = f"{name} [{page.image_id.page}]"
+    return name
+
+
+def page_label(page: PageId) -> str:
+    """Return the caption shown under a thumbnail."""
+    name = image_label(page)
     if page.sub_page == SubPage.LEFT_PAGE:
         return f"{name} (L)"
     if page.sub_page == SubPage.RIGHT_PAGE:
@@ -481,15 +543,16 @@ def page_label(page: PageId) -> str:
     return name
 
 
-def _entries_for(project: Project) -> list[PageEntry]:
+def _entries_for(project: Project, lists_images: bool) -> list[PageEntry]:
     sizes: dict[PageId, tuple[int, int]] = {}
     for info in project.images:
         width, height = info.metadata.width, info.metadata.height
-        if info.num_sub_pages == 2:
+        if info.num_sub_pages == 2 and not lists_images:
             width //= 2
         for sub_page in SubPage:
             sizes[PageId(image_id=info.id, sub_page=sub_page)] = (width, height)
+    pages = project.get_image_pages() if lists_images else project.get_pages()
     return [
         PageEntry(page, *sizes.get(page, (0, 0)), position)
-        for position, page in enumerate(project.get_pages())
+        for position, page in enumerate(pages)
     ]

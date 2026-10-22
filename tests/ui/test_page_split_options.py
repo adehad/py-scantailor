@@ -149,7 +149,7 @@ class TestPageCount:
 
         assert window.project.images[0].num_sub_pages == 2
         assert len(window.pages()) == 4
-        assert window.thumbnails.pages() == window.pages()
+        assert window.thumbnails.pages() == window.project.get_image_pages()
         assert window.modified
 
     def test_current_page_is_kept_on_the_same_image(

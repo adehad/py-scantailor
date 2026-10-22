@@ -195,7 +195,8 @@ class TestReverseTwoPageOrder:
         assert window.project is not None
         assert window.project.layout_direction == "RTL"
         assert window.pages()[:2] == [right, left]
-        assert window.thumbnails.pages() == window.pages()
+        assert window.thumbnails.pages() == window.project.get_image_pages()
+        assert window.thumbnails.pages()[0] == right
         assert window.modified
         window.renderer.wait_for_done()
 
@@ -234,6 +235,7 @@ class TestReverseTwoPageOrder:
         self, project_window: MainWindowManager
     ) -> None:
         window = project_window
+        window.actionSwitchFilter3.trigger()
         left, right = self._split_first_image(window)
         window.selectionModeBtn.setChecked(True)
         window.thumbnails.view.selectionModel().select(

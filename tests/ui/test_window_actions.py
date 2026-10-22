@@ -12,6 +12,7 @@ from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui import batch_runner, page_renderer
 from scantailor.app.ui.dialogs.apply_to import ApplyToDialog
+from scantailor.app.ui.dialogs.split_mode import SplitModeDialog
 from scantailor.app.ui.image_views.select_content import SelectContentImageView
 from scantailor.app.ui.MainWindow import MainWindowManager
 from scantailor.core.batch import BatchResult, PageDone
@@ -26,6 +27,7 @@ from scantailor.filters.page_layout.params import ContentRect, ContentSize
 from scantailor.filters.page_split.dependencies import (
     Dependencies as SplitDependencies,
 )
+from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.page_split.page_layout import PageLayout
 from scantailor.filters.page_split.params import Params as SplitParams
 from scantailor.filters.select_content.content_box import ContentBox, PageBox
@@ -683,6 +685,137 @@ class TestApplyToDialog:
         assert not dialog.option_checked("flag")
 
 
+class TestImageListStages:
+    """Fix Orientation and Page Split list and count images, not pages."""
+
+    @pytest.fixture
+    def spread_window(self, settled_window: MainWindowManager) -> MainWindowManager:
+        """The three scans, each split into two pages, shown at Fix Orientation."""
+        window = settled_window
+        window.apply_to_pages(
+            FilterStage.PAGE_SPLIT, window.pages(), layout_type=LayoutType.TWO_PAGES
+        )
+        window.renderer.wait_for_done()
+        assert len(window.pages()) == 6
+        return window
+
+    @staticmethod
+    def _images(window: MainWindowManager) -> list[ImageId]:
+        assert window.project is not None
+        return [info.id for info in window.project.images]
+
+    def test_each_scan_has_one_thumbnail_until_the_split(
+        self, spread_window: MainWindowManager
+    ):
+        window = spread_window
+        assert window.project is not None
+
+        at_fix_orientation = window.thumbnails.pages()
+        _switch_stage(window, FilterStage.PAGE_SPLIT)
+        at_page_split = window.thumbnails.pages()
+        _switch_stage(window, FilterStage.DESKEW)
+
+        assert at_fix_orientation == window.project.get_image_pages()
+        assert at_page_split == window.project.get_image_pages()
+        assert window.thumbnails.pages() == window.pages()
+        window.renderer.wait_for_done()
+
+    def test_the_right_page_stays_current_through_page_split(
+        self, spread_window: MainWindowManager
+    ):
+        window = spread_window
+        _switch_stage(window, FilterStage.DESKEW)
+        right = window.pages()[3]
+        window.page_selected(right)
+
+        _switch_stage(window, FilterStage.PAGE_SPLIT)
+        window.page_selected(window.thumbnails.pages()[1])
+        at_page_split = window.current_page
+        _switch_stage(window, FilterStage.DESKEW)
+
+        assert at_page_split == right
+        assert window.current_page == right
+        window.renderer.wait_for_done()
+
+    def test_every_other_page_at_fix_orientation_counts_images(
+        self, spread_window: MainWindowManager
+    ):
+        window = spread_window
+        orientation = window.stages.fix_orientation_filter
+        first, second, third = self._images(window)
+        orientation.rotate_clockwise(first)
+
+        _answer_apply_dialog(ApplyScope.EVERY_OTHER)
+        window.show_apply_dialog(FilterStage.FIX_ORIENTATION)
+
+        assert orientation.get_rotation(third).degrees == 90
+        assert orientation.get_rotation(second).degrees == 0
+
+    def test_every_other_page_at_page_split_counts_images(
+        self, spread_window: MainWindowManager
+    ):
+        window = spread_window
+        _switch_stage(window, FilterStage.PAGE_SPLIT)
+        split = window.stages.page_split_filter
+        current = window.current_page
+        assert current is not None
+        split.set_params(
+            current,
+            split.get_params(current).with_manual_layout(
+                PageLayout.two_pages(600, 800, 300)
+            ),
+        )
+
+        def answer() -> None:
+            modal = QtWidgets.QApplication.activeModalWidget()
+            if not isinstance(modal, SplitModeDialog):
+                QtCore.QTimer.singleShot(10, answer)
+                return
+            modal._mode_auto.setChecked(True)
+            modal._every_other_rb.setChecked(True)
+            modal._on_submit()
+
+        QtCore.QTimer.singleShot(10, answer)
+        window.show_apply_dialog(FilterStage.PAGE_SPLIT)
+
+        layout_types = [
+            split.get_layout_type(PageId(image_id=image))
+            for image in self._images(window)
+        ]
+        assert layout_types == [
+            LayoutType.AUTO_LAYOUT_TYPE,
+            LayoutType.TWO_PAGES,
+            LayoutType.AUTO_LAYOUT_TYPE,
+        ]
+        window.renderer.wait_for_done()
+
+    def test_a_page_split_thumbnail_shows_the_whole_scan_and_detects_its_layout(
+        self, spread_window: MainWindowManager
+    ):
+        window = spread_window
+        left = window.pages()[0]
+        split = window.stages.page_split_filter
+        assert split.get_params(left).page_layout is None
+
+        thumbnail = window._render_page_thumbnail(
+            left, str(int(FilterStage.PAGE_SPLIT))
+        )
+
+        assert thumbnail.width() / thumbnail.height() == pytest.approx(
+            600 / 800, abs=0.02
+        )
+        assert split.get_params(left).page_layout is not None
+
+    def test_a_batch_at_page_split_runs_every_page(
+        self, spread_window: MainWindowManager
+    ):
+        window = spread_window
+        _switch_stage(window, FilterStage.PAGE_SPLIT)
+
+        assert window._batch_pages() == window.pages()
+        window.renderer.wait_for_done()
+
+
 class TestPropagationOnStageChange:
     """Leaving a stage passes its results on, as the C++ main window does."""
 
@@ -702,7 +835,7 @@ class TestPropagationOnStageChange:
         _switch_stage(window, FilterStage.PAGE_SPLIT)
 
         assert len(window.pages()) == 6
-        assert len(window.thumbnails.pages()) == 6
+        assert len(window.thumbnails.pages()) == 3
         assert window.modified
         assert window.current_page in window.pages()
         window.renderer.wait_for_done()

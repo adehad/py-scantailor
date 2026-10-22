@@ -475,3 +475,115 @@ def test_queued_renders_of_a_stage_that_is_no_longer_shown_are_skipped(
     qtbot.wait(50)
 
     assert [stage for _page, stage in calls] == ["page_split"]
+
+
+class TestImageList:
+    """At the stages that work on whole images, a spread has one thumbnail."""
+
+    @pytest.fixture
+    def spread_project(self) -> Project:
+        """A two-page spread between two single pages."""
+        project = Project()
+        for name in ("first.png", "spread.png", "last.png"):
+            project.add_image(
+                ImageId(file_path=Path(name)), ImageMetadata(width=800, height=600)
+            )
+        project.images[1].num_sub_pages = 2
+        return project
+
+    @pytest.fixture
+    def thumbnails(
+        self, qtbot: QtBot, spread_project: Project, renderer: CountingRenderer
+    ) -> ThumbnailListWidget:
+        thumbnails = ThumbnailListWidget(renderer, spread_project, stage="2")
+        qtbot.addWidget(thumbnails)
+        thumbnails.set_multi_selection_enabled(True)
+        return thumbnails
+
+    @staticmethod
+    def _halves(project: Project) -> tuple[PageId, PageId]:
+        left, right = project.get_pages()[1:3]
+        return left, right
+
+    def test_a_spread_has_one_thumbnail_captioned_with_its_file_name(
+        self, thumbnails: ThumbnailListWidget, spread_project: Project
+    ) -> None:
+        thumbnails.set_stage("1", lists_images=True)
+
+        assert thumbnails.pages() == spread_project.get_image_pages()
+        model = thumbnails.model
+        assert model.data(model.index(1)) == "spread.png"
+
+    def test_leaving_the_image_stages_lists_both_halves_again(
+        self, thumbnails: ThumbnailListWidget, spread_project: Project
+    ) -> None:
+        thumbnails.set_stage("1", lists_images=True)
+
+        thumbnails.set_stage("2")
+
+        assert thumbnails.pages() == spread_project.get_pages()
+        assert thumbnails.model.data(thumbnails.model.index(1)) == "spread.png (L)"
+
+    def test_either_half_finds_the_spread_thumbnail(
+        self, thumbnails: ThumbnailListWidget, spread_project: Project
+    ) -> None:
+        left, right = self._halves(spread_project)
+
+        thumbnails.set_stage("1", lists_images=True)
+
+        assert thumbnails.model.row_of(left) == thumbnails.model.row_of(right) == 1
+        assert thumbnails.model.pages_of_row(right) == [left, right]
+
+    def test_an_image_thumbnail_is_as_wide_as_the_whole_spread(
+        self, thumbnails: ThumbnailListWidget
+    ) -> None:
+        thumbnails.set_stage("1", lists_images=True)
+
+        thumbnails.set_order(1)
+
+        assert [entry.width for entry in thumbnails.model._entries] == [800] * 3
+
+    def test_the_right_half_stays_current_through_the_image_stages(
+        self, thumbnails: ThumbnailListWidget, spread_project: Project
+    ) -> None:
+        _left, right = self._halves(spread_project)
+        thumbnails.set_current_page(right)
+        emitted: list[PageId] = []
+        thumbnails.page_selected.connect(emitted.append)
+
+        thumbnails.set_stage("1", lists_images=True)
+        on_images = thumbnails.current_page()
+        highlighted = thumbnails.model.data(thumbnails.model.index(1), IsCurrentRole)
+        thumbnails.set_stage("2")
+
+        assert on_images == right
+        assert highlighted
+        assert thumbnails.current_page() == right
+        assert thumbnails.view.currentIndex().row() == 2
+        assert emitted == []
+
+    def test_selecting_one_half_selects_the_spread_and_then_both_halves(
+        self, thumbnails: ThumbnailListWidget, spread_project: Project
+    ) -> None:
+        left, right = self._halves(spread_project)
+        thumbnails.select_pages([right])
+
+        thumbnails.set_stage("1", lists_images=True)
+        on_images = thumbnails.selected_pages()
+        thumbnails.set_stage("2")
+
+        assert on_images == [left]
+        assert thumbnails.selected_pages() == [left, right]
+
+    def test_removing_a_spread_thumbnail_removes_both_halves(
+        self, thumbnails: ThumbnailListWidget, spread_project: Project
+    ) -> None:
+        left, right = self._halves(spread_project)
+        thumbnails.set_stage("1", lists_images=True)
+        thumbnails.set_current_page(left)
+        requested: list[list[PageId]] = []
+        thumbnails.remove_pages_requested.connect(requested.append)
+
+        thumbnails._request_removal()
+
+        assert requested == [[left, right]]

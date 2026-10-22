@@ -7,6 +7,13 @@ Working with pages
 The thumbnail column lists the pages of the project. The buttons above it set the
 page order and how the thumbnails are shown.
 
+Fix Orientation and Split Pages work on whole scans, so at those two stages the
+column shows one thumbnail per scanned image, and a two-page spread appears once.
+The **Apply to ...** options that count pages, such as **Every other page**, count
+scans there. From Deskew on, each page has its own thumbnail. The current page and
+the selection carry over: a scan is selected when any of its pages is, and going
+on to Deskew selects both pages of a selected scan.
+
 .. list-table::
    :header-rows: 1
    :widths: 30 70
