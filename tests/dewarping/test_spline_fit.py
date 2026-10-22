@@ -16,6 +16,7 @@ from scantailor.dewarping.spline_fit import (
     _points_and_derivs,
     control_points_attraction_force,
     fit_extended_spline,
+    fit_spline_between_ends,
     junction_points_attraction_force,
     linear_combination_at,
     lu_solve,
@@ -321,6 +322,44 @@ class TestFittingAnExtendedSpline:
 
         assert first is not None and second is not None
         np.testing.assert_array_equal(first.positions, second.positions)
+
+
+class TestFittingASplineBetweenEnds:
+    TENSIONS = np.array([0.0, -1.0, -1.0, -1.0, 0.0])
+
+    @staticmethod
+    def _sine_polyline() -> np.ndarray:
+        xs = np.linspace(100, 900, 60)
+        return np.column_stack([xs, 300 + 60 * np.sin(np.pi * (xs - 100) / 800)])
+
+    def test_the_spline_starts_and_ends_on_the_polylines_ends(self) -> None:
+        polyline = self._sine_polyline()
+
+        spline = fit_spline_between_ends(polyline, self.TENSIONS)
+
+        assert spline.positions[0] == pytest.approx(polyline[0], abs=1e-9)
+        assert spline.positions[-1] == pytest.approx(polyline[-1], abs=1e-9)
+
+    def test_the_fitted_spline_stays_within_a_pixel_of_a_sine(self) -> None:
+        spline = fit_spline_between_ends(self._sine_polyline(), self.TENSIONS)
+
+        points = spline.to_polyline()
+        expected = 300 + 60 * np.sin(np.pi * (points[:, 0] - 100) / 800)
+        assert np.abs(points[:, 1] - expected).max() < 1.0
+
+    def test_the_number_of_tensions_sets_the_number_of_control_points(self) -> None:
+        spline = fit_spline_between_ends(self._sine_polyline(), np.zeros(3))
+
+        assert spline.positions.shape == (3, 2)
+
+    def test_a_straight_polyline_gives_control_points_on_it(self) -> None:
+        xs = np.linspace(100, 900, 30)
+        polyline = np.column_stack([xs, 0.5 * xs + 10])
+
+        spline = fit_spline_between_ends(polyline, self.TENSIONS)
+
+        positions = spline.positions
+        assert positions[:, 1] == pytest.approx(0.5 * positions[:, 0] + 10, abs=1e-6)
 
 
 class TestRecordedOutputs:

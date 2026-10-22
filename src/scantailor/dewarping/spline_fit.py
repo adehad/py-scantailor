@@ -1010,7 +1010,39 @@ def _fit_extended_spline(
 
     # Main stage: only the two bounds stay constrained.
     cons_a, cons_b = _constraints_to_lines(pos, tension, [0.0, 1.0], [bound1, bound2])
+    return _pull_onto_polyline(pos, tension, vertices, cons_a, cons_b)
 
+
+def _pull_onto_polyline(
+    pos: FloatArray,
+    tension: FloatArray,
+    vertices: FloatArray,
+    cons_a: FloatArray,
+    cons_b: FloatArray,
+) -> FloatArray | None:
+    """Pull a spline onto a polyline over up to ``_MAX_ITERATIONS`` rounds.
+
+    Each round balances the pull of the polyline against an internal force that
+    keeps the control points evenly spread, and that force weakens from
+    ``_INITIAL_FORCE_RATIO`` to ``_TARGET_FORCE_RATIO`` of the pull. The fit
+    stops early when a round improves the total force by less than
+    ``_MIN_IMPROVEMENT_PERCENT``, and steps back when a round folds the spline.
+
+    Args:
+        pos (numpy.ndarray of numpy.float64): Starting control points, ``(n, 2)``.
+        tension (numpy.ndarray of numpy.float64): Tension of each control point.
+        vertices (numpy.ndarray of numpy.float64): The polyline as
+            :func:`_model_vertices` describes it.
+        cons_a (numpy.ndarray of numpy.float64): Constraint rows, see
+            :func:`_constraints_to_lines`.
+        cons_b (numpy.ndarray of numpy.float64): Constraint constants.
+
+    Returns:
+        numpy.ndarray of numpy.float64 | None: The control points, or None when
+            the first round folds the spline back on itself.
+    """
+    count = pos.shape[0]
+    num_vars = 2 * count
     ratio = _INITIAL_FORCE_RATIO
     iterations_to_target = _MAX_ITERATIONS - 1
     rate = (_TARGET_FORCE_RATIO - ratio) / iterations_to_target
@@ -1213,3 +1245,37 @@ def fit_extended_spline(
     if positions is None:
         return None
     return FittedSpline(positions=positions, tensions=np.ones(len(positions)))
+
+
+def fit_spline_between_ends(polyline: FloatArray, tensions: FloatArray) -> FittedSpline:
+    """Fit a spline to a polyline, with its ends pinned to the polyline's ends.
+
+    The control points start evenly spaced on the chord and are pulled onto the
+    polyline as :func:`fit_extended_spline` pulls them, without its first stage.
+    When the first round already folds the spline, the chord is returned.
+
+    Args:
+        polyline (numpy.ndarray of numpy.float64): Points, shape ``(n, 2)``,
+            n >= 2, whose ends differ.
+        tensions (numpy.ndarray of numpy.float64): Tension of each control
+            point; their number sets how many control points the spline gets.
+
+    Returns:
+        FittedSpline: The spline, starting at ``polyline[0]`` and ending at
+            ``polyline[-1]``.
+    """
+    points = np.asarray(polyline, dtype=np.float64)
+    tension = np.asarray(tensions, dtype=np.float64)
+    count = tension.shape[0]
+    fraction = (np.arange(count) / (count - 1.0))[:, None]
+    chord = points[0] + (points[-1] - points[0]) * fraction
+    pins = [
+        np.stack([end, end + offset])
+        for end in (points[0], points[-1])
+        for offset in (np.array([1.0, 0.0]), np.array([0.0, 1.0]))
+    ]
+    cons_a, cons_b = _constraints_to_lines(chord, tension, [0.0, 0.0, 1.0, 1.0], pins)
+    fitted = _pull_onto_polyline(
+        chord, tension, _model_vertices(points), cons_a, cons_b
+    )
+    return FittedSpline(positions=chord if fitted is None else fitted, tensions=tension)

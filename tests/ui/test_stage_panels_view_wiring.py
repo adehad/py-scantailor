@@ -23,6 +23,7 @@ from scantailor.app.ui.image_views.select_content import SelectContentImageView
 from scantailor.app.ui.stage_panels import StagePanels, _fill_zone_mapper, _Source
 from scantailor.core.content_mask import ContentMask
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
+from scantailor.core.page_geometry import build_transformation
 from scantailor.core.pipeline import OutputExtras
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation
@@ -32,6 +33,8 @@ from scantailor.filters.output.params import DistortionModelSpec, FillZoneSpec
 from scantailor.filters.output.params import Params as OutputParams
 from scantailor.filters.page_layout.guide import Guide as StoredGuide
 from scantailor.filters.page_split.page_layout import PageLayout
+from scantailor.filters.select_content.content_box import ContentBox
+from scantailor.filters.select_content.params import Params as SelectContentParams
 
 pytestmark = pytest.mark.usefixtures("qapp")
 
@@ -484,9 +487,13 @@ class TestDewarpingGridWaitsForItsTab:
         fed: list[DistortionModelSpec] = []
         feed = view.set_distortion_model
 
-        def record(model: DistortionModelSpec, depth: float) -> None:
+        def record(
+            model: DistortionModelSpec,
+            depth: float,
+            default_area: QtCore.QRectF | None = None,
+        ) -> None:
             fed.append(model)
-            feed(model, depth)
+            feed(model, depth, default_area)
 
         view.set_distortion_model = record  # type: ignore[method-assign]
         output = np.full((HEIGHT, WIDTH), 200, dtype=np.uint8)
@@ -527,6 +534,89 @@ class TestDewarpingGridWaitsForItsTab:
         view.set_current_tab(ImageViewTab.DEWARPING)
 
         assert len(fed) == 1
+
+
+class TestDewarpingGridStartsOnTheContentBox:
+    BOX = ContentBox(x=10.0, y=20.0, width=30.0, height=40.0)
+
+    @staticmethod
+    def _with_content_box(box: ContentBox) -> StagePanels:
+        panels = _panels(FilterStage.OUTPUT)
+        panels.sequence.select_content_filter.set_params(
+            PAGE, SelectContentParams(content_box=box)
+        )
+        return panels
+
+    def test_the_content_box_is_given_in_the_output_views_pixels(self):
+        panels = self._with_content_box(self.BOX)
+        xform = ImageTransformation.from_size(WIDTH, HEIGHT, Dpi.uniform(300))
+
+        area = panels._content_box_in_view(
+            PAGE, (WIDTH, HEIGHT), 300.0, xform, np.array([2.0, 3.0])
+        )
+
+        assert area == QtCore.QRectF(20.0, 60.0, 60.0, 120.0)
+
+    def test_a_page_without_content_gives_no_box(self):
+        panels = self._with_content_box(ContentBox())
+        xform = ImageTransformation.from_size(WIDTH, HEIGHT, Dpi.uniform(300))
+
+        assert (
+            panels._content_box_in_view(PAGE, (WIDTH, HEIGHT), 300.0, xform, np.ones(2))
+            is None
+        )
+
+    @staticmethod
+    def _show(panels: StagePanels, page: PageId, box: ContentBox) -> QtCore.QRectF:
+        """Show a rendered page with no model; return the box its grid starts on."""
+        panels.sequence.select_content_filter.set_params(
+            page, SelectContentParams(content_box=box)
+        )
+        panels._clear_overlays()
+        panels._page = page
+        panels.options.set_current_page(page)  # type: ignore[attr-defined]
+        source = _source()
+        panels._source = _Source(page.image_id, source.pixels, source.dpi)
+        oriented = (source.pixels.shape[1], source.pixels.shape[0])
+        rect = build_transformation(
+            panels.sequence, page, oriented, source.dpi, FilterStage.PAGE_LAYOUT
+        ).resulting_rect
+        output = np.full((round(rect.height), round(rect.width)), 200, np.uint8)
+        view = panels.view
+        assert isinstance(view, OutputImageView)
+        view.set_image(output)
+        panels.set_output_extras(OutputExtras(output, None, 300))
+        panels.show_image(output)
+        top, bottom = view.control_points()
+        return QtCore.QRectF(top[0], bottom[-1])
+
+    def test_a_page_without_a_model_starts_its_grid_on_the_content_box(self):
+        panels = _panels(FilterStage.OUTPUT)
+        view = panels.view
+        assert isinstance(view, OutputImageView)
+        view.set_current_tab(ImageViewTab.DEWARPING)
+
+        shown = self._show(panels, PAGE, self.BOX)
+
+        assert (shown.width(), shown.height()) == pytest.approx(
+            (self.BOX.width, self.BOX.height), abs=1.0
+        )
+
+    def test_the_next_page_without_a_model_starts_on_its_own_content_box(self):
+        panels = _panels(FilterStage.OUTPUT)
+        view = panels.view
+        assert isinstance(view, OutputImageView)
+        view.set_current_tab(ImageViewTab.DEWARPING)
+        other = PageId(
+            image_id=ImageId(file_path=Path("other.png")), sub_page=SubPage.SINGLE_PAGE
+        )
+        self._show(panels, PAGE, self.BOX)
+
+        shown = self._show(
+            panels, other, ContentBox(x=50.0, y=60.0, width=200.0, height=300.0)
+        )
+
+        assert (shown.width(), shown.height()) == pytest.approx((200.0, 300.0), abs=1.0)
 
 
 def test_a_decode_that_ends_after_the_widgets_are_deleted_is_dropped(
