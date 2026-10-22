@@ -1,6 +1,7 @@
 """Page Split options: icons, page count, detected values and apply-to."""
 
 import pathlib
+from collections.abc import Callable
 
 import cv2
 import numpy as np
@@ -282,16 +283,16 @@ def _skewed_text_page() -> np.ndarray:
 
 class TestRefreshAfterRender:
     def test_deskew_spin_box_shows_the_detected_angle_after_the_render(
-        self, qtbot: QtBot, tmp_path: pathlib.Path
+        self,
+        tmp_path: pathlib.Path,
+        make_stage_panels: Callable[[FilterStage, StageSequence], StagePanels],
     ):
         scan = tmp_path / "scan.png"
         image = _skewed_text_page()
         assert cv2.imwrite(str(scan), image)
         page = PageId(image_id=ImageId(file_path=scan))
         sequence = StageSequence()
-        panels = StagePanels(FilterStage.DESKEW, sequence)
-        qtbot.addWidget(panels.options)
-        qtbot.addWidget(panels.view)
+        panels = make_stage_panels(FilterStage.DESKEW, sequence)
         panels.set_page(page)
         spin_box = panels.options.findChild(QtWidgets.QDoubleSpinBox, "angleSpinBox")
         assert spin_box is not None
@@ -313,7 +314,9 @@ class TestRefreshAfterRender:
         assert not panels.options._manual_btn.isChecked()  # type: ignore[attr-defined]
 
     def test_page_split_buttons_show_the_detected_layout_after_the_render(
-        self, qtbot: QtBot, tmp_path: pathlib.Path
+        self,
+        tmp_path: pathlib.Path,
+        make_stage_panels: Callable[[FilterStage, StageSequence], StagePanels],
     ):
         scan = tmp_path / "spread.png"
         image = np.full((400, 600), 220, dtype=np.uint8)
@@ -321,9 +324,7 @@ class TestRefreshAfterRender:
         assert cv2.imwrite(str(scan), image)
         page = PageId(image_id=ImageId(file_path=scan))
         sequence = StageSequence()
-        panels = StagePanels(FilterStage.PAGE_SPLIT, sequence)
-        qtbot.addWidget(panels.options)
-        qtbot.addWidget(panels.view)
+        panels = make_stage_panels(FilterStage.PAGE_SPLIT, sequence)
         panels.set_page(page)
         options = panels.options
         assert isinstance(options, page_split.OptionsWidget)

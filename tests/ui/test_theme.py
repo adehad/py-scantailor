@@ -18,10 +18,6 @@ SRC_ROOT = pathlib.Path(theme.__file__).resolve().parents[3]
 def app(qapp: QtWidgets.QApplication, monkeypatch):
     """Application restored to its original look; QSettings is isolated by conftest."""
     monkeypatch.delenv(theme.THEME_ENV_VAR, raising=False)
-    for widget in qapp.topLevelWidgets():
-        widget.hide()
-        widget.deleteLater()
-    QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
     style = qapp.style().name()
     palette = qapp.palette()
     font = qapp.font()

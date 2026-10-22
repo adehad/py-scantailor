@@ -1,5 +1,6 @@
 """The Output stage shows what auto dewarping found and takes the minimum span."""
 
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -223,20 +224,19 @@ class TestDewarpingTabNote:
 
 
 class TestStagePanels:
-    @staticmethod
-    def _panels(qtbot: QtBot) -> StagePanels:
+    @pytest.fixture
+    def panels(
+        self, make_stage_panels: Callable[[FilterStage, StageSequence], StagePanels]
+    ) -> StagePanels:
         sequence = StageSequence()
         sequence.output_filter.set_params(PAGE, _auto())
-        panels = StagePanels(FilterStage.OUTPUT, sequence)
-        qtbot.addWidget(panels.options)
-        qtbot.addWidget(panels.view)
+        panels = make_stage_panels(FilterStage.OUTPUT, sequence)
         panels.set_page(PAGE)
         return panels
 
     def test_the_extras_of_a_render_feed_the_panel_and_the_tab(
-        self, qtbot: QtBot
+        self, panels: StagePanels
     ) -> None:
-        panels = self._panels(qtbot)
         page = np.full((100, 80), 200, dtype=np.uint8)
 
         panels.set_output_extras(OutputExtras(page, None, 300, dewarp_metrics=BUILT))
@@ -250,8 +250,7 @@ class TestStagePanels:
         assert isinstance(view, OutputImageView)
         assert view.dewarp_note() == BUILT.describe()
 
-    def test_extras_without_metrics_clear_both(self, qtbot: QtBot) -> None:
-        panels = self._panels(qtbot)
+    def test_extras_without_metrics_clear_both(self, panels: StagePanels) -> None:
         page = np.full((100, 80), 200, dtype=np.uint8)
         panels.set_output_extras(OutputExtras(page, None, 300, dewarp_metrics=BUILT))
 
@@ -264,8 +263,7 @@ class TestStagePanels:
         assert label is not None
         assert not label.isVisibleTo(panels.options)
 
-    def test_leaving_the_page_clears_the_note(self, qtbot: QtBot) -> None:
-        panels = self._panels(qtbot)
+    def test_leaving_the_page_clears_the_note(self, panels: StagePanels) -> None:
         page = np.full((100, 80), 200, dtype=np.uint8)
         panels.set_output_extras(OutputExtras(page, None, 300, dewarp_metrics=BUILT))
 

@@ -1,6 +1,6 @@
 """The Select Content width and height fields show and resize the page box."""
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import numpy as np
@@ -180,17 +180,19 @@ def shared_units() -> Iterator[UnitsProvider]:
 
 
 @pytest.fixture
-def panels(qapp: object, shared_units: UnitsProvider) -> Iterator[StagePanels]:
+def panels(
+    shared_units: UnitsProvider,
+    make_stage_panels: Callable[[FilterStage, StageSequence], StagePanels],
+) -> StagePanels:
     sequence = StageSequence()
     sequence.select_content_filter.set_manual_page(PAGE, MANUAL_PAGE)
-    panels = StagePanels(FilterStage.SELECT_CONTENT, sequence)
+    panels = make_stage_panels(FilterStage.SELECT_CONTENT, sequence)
     panels._page = PAGE
     panels.options.set_current_page(PAGE)  # type: ignore[attr-defined]
     panels._adopt_source(IMAGE, np.full((2000, 1500), 255, dtype=np.uint8), DPI)
     panels._stage_image = np.zeros((2000, 1500), dtype=np.uint8)
     panels._refresh_geometry()
-    yield panels
-    panels.view.viewport().removeEventFilter(panels)
+    return panels
 
 
 class TestPanelSync:
