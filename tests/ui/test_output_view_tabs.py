@@ -301,12 +301,15 @@ class TestDewarpingTab:
 
         assert len(painted) > 2
 
-    def test_the_depth_perception_redraws_the_grid(self, dewarping: OutputImageView):
+    def test_the_depth_perception_redraws_the_grid(
+        self, qtbot: QtBot, dewarping: OutputImageView
+    ):
         before = dewarping._dewarp.grid
         assert before is not None
 
         dewarping.set_depth_perception(1.2)
 
+        qtbot.waitUntil(lambda: dewarping._dewarp.grid is not before)
         after = dewarping._dewarp.grid
         assert after is not None and not np.allclose(before, after)
 

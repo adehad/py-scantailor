@@ -344,8 +344,10 @@ class OptionsWidget(QWidget):
     Every control writes the parameters of the current page and emits
     ``params_changed`` so the page renders again. Controls that take a number
     wait ``RELOAD_DELAY_MS`` after the last change before they emit, so that
-    dragging or typing renders once. Which controls show depends on the colour
-    mode and on whether the dewarping tab of the image view is active.
+    dragging or typing renders once. The depth perception slider only redraws
+    the dewarping tab's grid, and the page renders once that tab is left. Which
+    controls show depends on the colour mode and on whether the dewarping tab
+    of the image view is active.
 
     Signals:
         params_changed: Emitted when any parameter changes.
@@ -357,11 +359,16 @@ class OptionsWidget(QWidget):
             despeckle level, so that the despeckling tab can preview it before
             the page renders again.
             Args: level (DespeckleLevel)
+        depth_perception_changed: Emitted at once when the user moves the depth
+            perception slider, so that the dewarping tab can redraw its grid.
+            The page renders again only once that tab is left.
+            Args: depth_perception (float)
     """
 
     params_changed = Signal(PageId)
     apply_group_requested = Signal(object)
     despeckle_level_changed = Signal(object)
+    depth_perception_changed = Signal(float)
 
     RELOAD_DELAY_MS = 750
 
@@ -386,6 +393,9 @@ class OptionsWidget(QWidget):
         self._dewarp_metrics: DewarpMetrics | None = None
         self._apply_buttons: dict[ApplyGroup, QPushButton] = {}
         self._pending_page_id: PageId | None = None
+        # The page whose depth perception changed on the dewarping tab, and the
+        # depth its last render used.
+        self._held_depth: tuple[PageId, float] | None = None
         self._reload_timer = QTimer(self)
         self._reload_timer.setSingleShot(True)
         self._reload_timer.setInterval(self.RELOAD_DELAY_MS)
@@ -1767,6 +1777,7 @@ class OptionsWidget(QWidget):
         if self._pending_page_id not in (None, page_id):
             self.flush_pending_reload()
         if page_id != self._current_page_id:
+            self._release_held_depth()
             self._dewarp_metrics = None
         self._current_page_id = page_id
         self._update_ui()
@@ -1776,6 +1787,25 @@ class OptionsWidget(QWidget):
         self._reload_timer.stop()
         page_id, self._pending_page_id = self._pending_page_id, None
         if page_id is not None:
+            self._report(page_id)
+        self._release_held_depth()
+
+    def _report(self, page_id: PageId) -> None:
+        """Emit ``params_changed``; the render it asks for takes any held depth."""
+        if self._held_depth is not None and self._held_depth[0] == page_id:
+            self._held_depth = None
+        self.params_changed.emit(page_id)
+
+    def _release_held_depth(self) -> None:
+        """Emit ``params_changed`` if the depth perception changed since the render."""
+        if self._held_depth is None:
+            return
+        page_id, rendered = self._held_depth
+        if self._pending_page_id == page_id:
+            self.flush_pending_reload()
+            return
+        self._held_depth = None
+        if self._filter.get_params(page_id).depth_perception != rendered:
             self.params_changed.emit(page_id)
 
     def set_dewarping_tab_active(self, active: bool) -> None:
@@ -1784,10 +1814,15 @@ class OptionsWidget(QWidget):
         The dewarping tab hides the mode and despeckle controls and shows the
         depth perception slider.
 
+        Leaving the tab renders the page again if its depth perception changed
+        there.
+
         Args:
             active (bool): True while the dewarping tab of the image view shows.
         """
         self._dewarping_tab_active = active
+        if not active:
+            self._release_held_depth()
         self._update_ui()
 
     def set_despeckle_tab_active(self, active: bool) -> None:
@@ -1841,7 +1876,7 @@ class OptionsWidget(QWidget):
             )
         self._filter.set_params(page_id, params)
         self._update_ui()
-        self.params_changed.emit(page_id)
+        self._report(page_id)
 
     def _edit(
         self,
@@ -1870,7 +1905,7 @@ class OptionsWidget(QWidget):
         else:
             self._reload_timer.stop()
             self._pending_page_id = None
-            self.params_changed.emit(page_id)
+            self._report(page_id)
 
     def _edit_binarization(self, delayed: bool = False, **fields: object) -> None:
         self._edit(
@@ -2195,9 +2230,17 @@ class OptionsWidget(QWidget):
 
     def _on_depth_changed(self, value: int) -> None:
         self._depth_label.setText(f"{value / _DEPTH_PERCEPTION_SCALE:.1f}")
-        if not self._depth_slider.isSliderDown():
+        if self._dewarping_tab_active or not self._depth_slider.isSliderDown():
             self._commit_depth()
 
     def _commit_depth(self) -> None:
         depth = self._depth_slider.value() / _DEPTH_PERCEPTION_SCALE
-        self._edit(lambda p: p.with_depth_perception(depth))
+        page_id = self._current_page_id
+        if not self._dewarping_tab_active or page_id is None or self._updating:
+            self._edit(lambda p: p.with_depth_perception(depth))
+            return
+        params = self._filter.get_params(page_id)
+        if self._held_depth is None:
+            self._held_depth = (page_id, params.depth_perception)
+        self._filter.set_params(page_id, params.with_depth_perception(depth))
+        self.depth_perception_changed.emit(depth)

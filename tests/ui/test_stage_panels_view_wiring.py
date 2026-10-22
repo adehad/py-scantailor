@@ -536,6 +536,66 @@ class TestDewarpingGridWaitsForItsTab:
         assert len(fed) == 1
 
 
+class TestDepthPerceptionRedrawsTheGrid:
+    def test_moving_the_slider_redraws_the_grid_without_rendering(self, qtbot: QtBot):
+        panels = _panels(FilterStage.OUTPUT)
+        TestDewarpingGridWaitsForItsTab._show_output(panels)
+        view = panels.view
+        assert isinstance(view, OutputImageView)
+        view.set_current_tab(ImageViewTab.DEWARPING)
+        before = view._dewarp.grid
+        slider = panels.options.findChild(QtWidgets.QSlider, "depthPerceptionSlider")
+        assert before is not None and slider is not None
+
+        with qtbot.assertNotEmitted(panels.settings_changed):
+            slider.setValue(slider.value() + 7)
+            qtbot.waitUntil(lambda: view._dewarp.grid is not before)
+
+        after = view._dewarp.grid
+        assert after is not None
+        assert not np.allclose(after, before)
+
+    def test_leaving_the_tab_after_moving_the_slider_renders_the_page(
+        self, qtbot: QtBot
+    ):
+        panels = _panels(FilterStage.OUTPUT)
+        TestDewarpingGridWaitsForItsTab._show_output(panels)
+        view = panels.view
+        assert isinstance(view, OutputImageView)
+        view.set_current_tab(ImageViewTab.DEWARPING)
+        slider = panels.options.findChild(QtWidgets.QSlider, "depthPerceptionSlider")
+        assert slider is not None
+        slider.setValue(slider.value() + 7)
+
+        with qtbot.waitSignal(panels.settings_changed, timeout=1000):
+            view.set_current_tab(ImageViewTab.OUTPUT)
+
+
+class TestEditsHeldForAPageThatWasLeft:
+    def test_a_depth_change_released_after_moving_on_names_the_left_page(
+        self, qtbot: QtBot
+    ):
+        panels = _panels(FilterStage.OUTPUT)
+        view = panels.view
+        assert isinstance(view, OutputImageView)
+        view.set_current_tab(ImageViewTab.DEWARPING)
+        slider = panels.options.findChild(QtWidgets.QSlider, "depthPerceptionSlider")
+        assert slider is not None
+        slider.setValue(slider.value() + 5)
+        other = PageId(
+            image_id=ImageId(file_path=Path("other.png")), sub_page=SubPage.SINGLE_PAGE
+        )
+        panels._page = other
+
+        with (
+            qtbot.assertNotEmitted(panels.settings_changed),
+            qtbot.waitSignal(panels.other_page_edited) as edited,
+        ):
+            panels.options.set_current_page(other)  # type: ignore[attr-defined]
+
+        assert edited.args == [PAGE]
+
+
 class TestDewarpingGridStartsOnTheContentBox:
     BOX = ContentBox(x=10.0, y=20.0, width=30.0, height=40.0)
 

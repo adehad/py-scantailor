@@ -1100,6 +1100,7 @@ class MainWindowManager:
         panels.source_failed.connect(self._on_source_failed)
         panels.source_decoded.connect(self._on_source_decoded)
         panels.settings_changed.connect(self._on_settings_edited)
+        panels.other_page_edited.connect(self._on_other_page_edited)
         panels.page_size_changed.connect(self.status_panel.set_page_size)
         panels.cursor_moved.connect(self.status_panel.set_cursor_position)
         self._connect_apply_requests(panels)
@@ -1511,6 +1512,11 @@ class MainWindowManager:
         self.modified = True
         self._invalidate_thumbnails(self._current_page)
         self._request_render()
+
+    def _on_other_page_edited(self, page: PageId) -> None:
+        """React to an edit stored for a page after the user left it."""
+        self.modified = True
+        self._invalidate_thumbnails(page)
 
     def _remember_aggregate_size(self) -> bool:
         """Note the size the pages are matched to; tell whether it moved.
