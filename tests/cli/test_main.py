@@ -80,7 +80,22 @@ def test_run_exits_zero_and_prints_batch_report(
     report = json.loads(capsys.readouterr().out)
     assert code == ExitCode.OK
     assert report["written"] == 2
+    assert report["kept"] == 0
     assert report["failed"] == {}
+
+
+@pytest.mark.slow
+def test_second_run_keeps_the_unchanged_output_files(
+    project_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    main(["run", str(project_path), "--workers", "1"])
+    capsys.readouterr()
+
+    code = main(["run", str(project_path), "--workers", "1"])
+
+    report = json.loads(capsys.readouterr().out)
+    assert code == ExitCode.OK
+    assert report["written"] == report["kept"] == 2
 
 
 @pytest.mark.slow

@@ -747,6 +747,11 @@
         <translation>Concluído: {written} gravadas, {failed} com falha</translation>
     </message>
     <message>
+        <location filename="../app/ui/dialogs/batch_progress.py" line="144"/>
+        <source>Done: {written} written, {kept} kept, {failed} failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../app/ui/dialogs/batch_progress.py" line="107"/>
         <source>, {count} not started</source>
         <translation>, {count} não iniciadas</translation>

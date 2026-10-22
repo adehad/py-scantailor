@@ -7,6 +7,7 @@ Workers receive the stage defaults and parameters as plain JSON data and rebuild
 their own settings, so no lock-holding object is pickled.
 """
 
+import functools
 import multiprocessing
 import os
 import statistics
@@ -31,6 +32,7 @@ from numpy.typing import NDArray
 from scantailor.core.dewarp_spec import DewarpSpec
 from scantailor.core.image_io import tiff_compressions_in_use, write_image
 from scantailor.core.models import Dpi, PageId, SubPage, page_name
+from scantailor.core.output_reuse import build_record, is_reusable, output_params_hash
 from scantailor.core.page_source import DpiOverrides, load_page
 from scantailor.core.pipeline import (
     PipelineOptions,
@@ -40,14 +42,15 @@ from scantailor.core.pipeline import (
 )
 from scantailor.core.project import (
     LayoutDirection,
+    PageOutputRecord,
     StageParamsEntry,
     assign_output_file_labels,
 )
 from scantailor.core.settings import ApplicationSettings, TiffCompressions
 from scantailor.core.stage_params import (
-    STAGE_KEYS,
     apply_stage_defaults,
     apply_stage_params,
+    collect_effective_stage_params,
     collect_stage_defaults,
     collect_stage_params,
 )
@@ -67,6 +70,7 @@ from scantailor.filters.output.split_output import (
     ORIGINAL_BACKGROUND_DIR,
     write_split_images,
 )
+from scantailor.filters.page_layout.params import ContentSize
 
 DEFAULT_DPI = 300.0
 
@@ -116,17 +120,23 @@ class RenderInfo:
 
 @dataclass(frozen=True)
 class PageDone:
-    """A page was rendered and written.
+    """A page was rendered and written, or its unchanged output was kept.
 
     Attributes:
         page: The finished page.
-        path: Where its output was written.
-        info: Geometry of the written page; None when not recorded.
+        path: Where its output is.
+        info: Geometry of the written page; None when not recorded, and for a
+            page whose output was kept.
+        files: Every file written for the page, the output file first.
+        reused: True when the page's existing output files matched its
+            settings, so nothing was rendered.
     """
 
     page: PageId
     path: Path
     info: RenderInfo | None = None
+    files: tuple[Path, ...] = ()
+    reused: bool = False
 
 
 @dataclass(frozen=True)
@@ -152,15 +162,20 @@ class BatchResult:
 
     Attributes:
         detected: Pages whose geometry was measured, in the order they finished.
-        written: Output path of every page that finished.
-        render_info: Geometry of every written page.
+        written: Output path of every page that finished, including kept ones.
+        reused: Pages whose existing output was kept instead of rendered.
+        render_info: Geometry of every page rendered in this batch.
+        output_records: What the output of every finished page was rendered
+            from, to store in the project for the next batch.
         failed: Error text of every page that failed.
         cancelled: Pages that were never started because of cancellation.
     """
 
     detected: list[PageId] = field(default_factory=list)
     written: dict[PageId, Path] = field(default_factory=dict)
+    reused: list[PageId] = field(default_factory=list)
     render_info: dict[PageId, RenderInfo] = field(default_factory=dict)
+    output_records: dict[PageId, PageOutputRecord] = field(default_factory=dict)
     failed: dict[PageId, str] = field(default_factory=dict)
     cancelled: list[PageId] = field(default_factory=list)
 
@@ -546,36 +561,6 @@ def _load_entries(data: StageParamsData) -> dict[str, list[StageParamsEntry]]:
     }
 
 
-def collect_effective_stage_params(
-    stages: StageSequence, pages: Sequence[PageId]
-) -> StageParamsData:
-    """Gather the parameters every page and stage would use, defaults included.
-
-    Unlike ``collect_stage_params``, pages without explicit parameters are
-    included with the values ``Settings.get_params`` falls back to, so a worker
-    renders them the way the calling process would.
-
-    Args:
-        stages (StageSequence): The stages whose settings are read.
-        pages (Sequence[PageId]): Pages to export.
-
-    Returns:
-        StageParamsData: Entries per stage key, JSON-compatible.
-    """
-    entries = collect_stage_params(stages, list(pages))
-    for stage in FilterStage:
-        if stage is FilterStage.FIX_ORIENTATION:
-            continue
-        settings: Any = stages.filter_at(stage).settings
-        entries[STAGE_KEYS[stage]] = [
-            StageParamsEntry(
-                page=page, params=settings.get_params(page).model_dump(mode="json")
-            )
-            for page in pages
-        ]
-    return _dump_entries(entries)
-
-
 @dataclass(frozen=True)
 class _PhaseConfig:
     """Plain-data settings of one batch phase, shared by all of its jobs.
@@ -707,8 +692,13 @@ def _as_writable(image: NDArray[np.uint8], is_binary: bool) -> NDArray:
     return image
 
 
-def _render_page(job: _PageJob) -> tuple[Path, RenderInfo]:
-    """Render one page in a worker and write it; returns its path and geometry."""
+def _render_page(job: _PageJob) -> tuple[Path, RenderInfo, tuple[Path, ...]]:
+    """Render one page in a worker and write it.
+
+    Returns:
+        tuple[pathlib.Path, RenderInfo, tuple[pathlib.Path, ...]]: The output
+            path, the page's geometry and every file written, output first.
+    """
     started = time.perf_counter()
     with logger.contextualize(page=page_name(job.page)):
         if job.output_path is None:
@@ -725,9 +715,10 @@ def _render_page(job: _PageJob) -> tuple[Path, RenderInfo]:
         write_image(
             job.output_path, _as_writable(rendered.image, is_binary), dpi, compressions
         )
+        written = [job.output_path]
         if rendered.split is not None:
             with tiff_compressions_in_use(compressions):
-                write_split_images(
+                written += write_split_images(
                     job.output_path.parent, job.output_path.name, rendered.split, dpi
                 )
         if rendered.transformation is None or dpi is None:
@@ -746,7 +737,7 @@ def _render_page(job: _PageJob) -> tuple[Path, RenderInfo]:
             else None,
             seconds=time.perf_counter() - started,
         )
-        return job.output_path, info
+        return job.output_path, info, tuple(written)
 
 
 def _measured_post_deskew_angle(rendered: PipelineResult) -> float | None:
@@ -786,6 +777,7 @@ def run_batch(
     file_labels: Mapping[Path, int] | None = None,
     end_stage: FilterStage = FilterStage.OUTPUT,
     worker_limit: Callable[[], int | None] | None = None,
+    output_records: Mapping[PageId, PageOutputRecord] | None = None,
 ) -> BatchResult:
     """Process pages through the pipeline up to ``end_stage``.
 
@@ -794,6 +786,10 @@ def run_batch(
     rendering then reuses the same pool, whose workers receive the effective
     parameters of every page, defaults included, as JSON-compatible data, and
     write each page as a TIFF. A batch that ends earlier writes no files.
+
+    A page whose ``output_records`` entry still matches its settings, its
+    source file and its output files is not rendered again; it is reported as
+    a ``PageDone`` with ``reused`` set.
 
     Args:
         stages (StageSequence): Settings of the project; updated by detection.
@@ -825,6 +821,9 @@ def run_batch(
         worker_limit (Callable[[], int | None] | None): Asked before each page is
             started for how many pages may run at once, at most ``max_workers``.
             None, as the argument or the answer, means ``max_workers``.
+        output_records (Mapping[PageId, PageOutputRecord] | None): Records of
+            an earlier batch, as stored in ``Project.output_records``; every
+            page is rendered when None.
 
     Returns:
         BatchResult: Written, failed and never-started pages.
@@ -834,9 +833,29 @@ def run_batch(
         tiff_compressions or ApplicationSettings.get_instance().tiff_compressions
     )
 
+    # Every hash comes after geometry detection, and nothing later changes the
+    # layout, so one snapshot of the shared page size serves the whole batch.
+    @functools.cache
+    def aggregate_mm() -> ContentSize:
+        return stages.page_layout_filter.settings.get_aggregate_hard_size_mm()
+
+    def params_hash(page: PageId) -> str:
+        return output_params_hash(
+            stages,
+            page,
+            dpi_override=(dpi_overrides or {}).get(page.image_id),
+            default_dpi=default_dpi,
+            tiff_compressions=compressions,
+            aggregate_mm=aggregate_mm(),
+        )
+
+    out_dir = Path(output_dir)
+
     def report(event: BatchEvent) -> None:
         if isinstance(event, PageDone):
             result.written[event.page] = event.path
+            if event.reused:
+                result.reused.append(event.page)
             if event.info is not None:
                 result.render_info[event.page] = event.info
                 if event.info.distortion_model is not None:
@@ -847,6 +866,8 @@ def run_batch(
                     stages.output_filter.settings.set_post_deskew_angle(
                         event.page, event.info.post_deskew_angle
                     )
+            if not event.reused:
+                _record_output(result, event, params_hash(event.page), out_dir)
         elif isinstance(event, PageDetected):
             result.detected.append(event.page)
         elif isinstance(event, PageFailed):
@@ -879,6 +900,10 @@ def run_batch(
             end_stage,
         )
         if end_stage == FilterStage.OUTPUT:
+            names = output_file_names(pages, layout_direction, file_labels)
+            ready = _keep_unchanged_outputs(
+                ready, output_records or {}, names, out_dir, params_hash, report, result
+            )
             _render_ready_pages(
                 ready,
                 _PhaseConfig(
@@ -888,8 +913,8 @@ def run_batch(
                     default_dpi=default_dpi,
                     tiff_compressions=compressions,
                 ),
-                output_file_names(pages, layout_direction, file_labels),
-                Path(output_dir),
+                names,
+                out_dir,
                 dpi_overrides or {},
                 pool,
                 workers,
@@ -903,6 +928,45 @@ def run_batch(
             "batch end: {}", _batch_summary(result, time.perf_counter() - started)
         )
     return result
+
+
+def _keep_unchanged_outputs(
+    ready: Sequence[PageId],
+    records: Mapping[PageId, PageOutputRecord],
+    names: Mapping[PageId, str],
+    output_dir: Path,
+    params_hash: Callable[[PageId], str],
+    report: Callable[[BatchEvent], None],
+    result: BatchResult,
+) -> list[PageId]:
+    """Report the pages whose output files can be kept; return the rest.
+
+    Returns:
+        list[PageId]: Pages that need rendering, in project order.
+    """
+    to_render: list[PageId] = []
+    for page in ready:
+        record = records.get(page)
+        if record is None or not is_reusable(
+            record, params_hash(page), output_dir, names[page]
+        ):
+            to_render.append(page)
+            continue
+        result.output_records[page] = record
+        files = tuple(output_dir / key for key in record.files)
+        report(PageDone(page, output_dir / names[page], files=files, reused=True))
+    return to_render
+
+
+def _record_output(
+    result: BatchResult, done: PageDone, params_hash: str, output_dir: Path
+) -> None:
+    """Remember what a rendered page's files came from, or forget a stale record."""
+    record = build_record(done.page, params_hash, output_dir, done.files)
+    if record is None:
+        result.output_records.pop(done.page, None)
+    else:
+        result.output_records[done.page] = record
 
 
 def _render_ready_pages(
@@ -944,11 +1008,12 @@ def _render_ready_pages(
 
     def on_outcome(
         job: _PageJob,
-        rendered: tuple[Path, RenderInfo] | None,
+        rendered: tuple[Path, RenderInfo, tuple[Path, ...]] | None,
         error: BaseException | None,
     ) -> None:
         if rendered is not None:
-            report(PageDone(job.page, *rendered))
+            path, info, files = rendered
+            report(PageDone(job.page, path, info, files))
         else:
             error = error or RuntimeError("no result")
             _log_page_failure(job.page, "render", error)
@@ -969,8 +1034,10 @@ def _render_ready_pages(
 
 def _batch_summary(result: BatchResult, seconds: float) -> str:
     """Count a batch's outcomes and name its slowest page, for the log."""
+    kept = f"{len(result.reused)} kept, " if result.reused else ""
     text = (
-        f"{len(result.detected)} detected, {len(result.written)} written, "
+        f"{len(result.detected)} detected, "
+        f"{len(result.written) - len(result.reused)} written, {kept}"
         f"{len(result.failed)} failed, "
         f"{len(result.cancelled)} cancelled in {seconds:.1f} s"
     )

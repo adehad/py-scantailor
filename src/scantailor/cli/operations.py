@@ -106,8 +106,10 @@ def set_option(project_path: Path, name: str, raw_value: str) -> OptionsReport:
 def run_project(project_path: Path, max_workers: int | None) -> BatchReport:
     """Process every page of a project through all stages and save the result.
 
-    Pages that fail are reported and left out of the output. The project is
-    saved either way, so detected parameters are kept for the next run.
+    Pages that fail are reported and left out of the output. A page whose
+    settings, source file and output files are unchanged since the last run
+    keeps its output file. The project is saved either way, so detected
+    parameters and the record of what was written are kept for the next run.
 
     Args:
         project_path (pathlib.Path): The project JSON file.
@@ -127,11 +129,14 @@ def run_project(project_path: Path, max_workers: int | None) -> BatchReport:
         max_workers=max_workers,
         dpi_overrides=dpi_overrides_of(project),
         file_labels=project.output_file_label_map(),
+        output_records=project.output_record_map(),
     )
+    project.set_output_records(result.output_records)
     save_project(project, stages, project_path)
     return BatchReport(
         output_directory=absolute(out_dir),
         written=len(result.written),
+        kept=len(result.reused),
         failed={page_name(page): error for page, error in result.failed.items()},
         cancelled=len(result.cancelled),
     )

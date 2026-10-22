@@ -11,7 +11,7 @@ from PySide6 import QtCore
 from scantailor.core.batch import BatchEvent, BatchResult, PageDetected, run_batch
 from scantailor.core.models import PageId
 from scantailor.core.page_source import DpiOverrides
-from scantailor.core.project import LayoutDirection
+from scantailor.core.project import LayoutDirection, PageOutputRecord
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 
 
@@ -33,6 +33,7 @@ class _BatchWorker(QtCore.QObject):
         file_labels: Mapping[Path, int] | None,
         end_stage: FilterStage,
         worker_limit: Callable[[], int | None],
+        output_records: Mapping[PageId, PageOutputRecord] | None,
     ) -> None:
         super().__init__()
         self._arguments = (stages, pages, output_dir)
@@ -43,6 +44,7 @@ class _BatchWorker(QtCore.QObject):
         self._file_labels = file_labels
         self._end_stage = end_stage
         self._worker_limit = worker_limit
+        self._output_records = output_records
 
     def _on_event(self, event: BatchEvent) -> None:
         if isinstance(event, PageDetected):
@@ -68,6 +70,7 @@ class _BatchWorker(QtCore.QObject):
                     file_labels=self._file_labels,
                     end_stage=self._end_stage,
                     worker_limit=self._worker_limit,
+                    output_records=self._output_records,
                 )
             except Exception as error:
                 logger.exception("Batch processing failed")
@@ -134,6 +137,7 @@ class BatchRunner(QtCore.QObject):
         dpi_overrides: DpiOverrides | None = None,
         file_labels: Mapping[Path, int] | None = None,
         end_stage: FilterStage = FilterStage.OUTPUT,
+        output_records: Mapping[PageId, PageOutputRecord] | None = None,
     ) -> None:
         """Start a batch on a new thread.
 
@@ -148,6 +152,9 @@ class BatchRunner(QtCore.QObject):
             file_labels (Mapping[Path, int] | None): Stored output file labels of
                 the project's source files.
             end_stage (FilterStage): Last stage to run; only Output writes files.
+            output_records (Mapping[PageId, PageOutputRecord] | None): Stored
+                records of earlier output; pages that still match them are
+                not rendered again.
 
         Raises:
             RuntimeError: If a batch is already running.
@@ -168,6 +175,7 @@ class BatchRunner(QtCore.QObject):
             file_labels,
             end_stage,
             lambda: self._worker_limit,
+            output_records,
         )
         thread = QtCore.QThread(self)
         worker.moveToThread(thread)

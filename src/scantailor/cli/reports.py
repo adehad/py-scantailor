@@ -51,12 +51,15 @@ class BatchReport(BaseModel):
     Args:
         output_directory (str): Folder the processed files were written to.
         written (int): Pages that finished.
+        kept (int): Of those, pages whose output files were already up to date
+            and so were not rendered again.
         failed (dict[str, str]): Error text per page that failed.
         cancelled (int): Pages never started.
     """
 
     output_directory: str
     written: int
+    kept: int = 0
     failed: dict[str, str] = Field(default_factory=dict)
     cancelled: int = 0
 

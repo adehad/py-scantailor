@@ -140,7 +140,14 @@ class BatchProgressDialog(QtWidgets.QDialog):
             result (BatchResult): The finished batch.
         """
         self._running = False
-        if self._renders:
+        if self._renders and result.reused:
+            summary = self.tr("Done: {written} written, {kept} kept, {failed} failed")
+            summary = summary.format(
+                written=len(result.written) - len(result.reused),
+                kept=len(result.reused),
+                failed=len(result.failed),
+            )
+        elif self._renders:
             summary = self.tr("Done: {written} written, {failed} failed").format(
                 written=len(result.written), failed=len(result.failed)
             )

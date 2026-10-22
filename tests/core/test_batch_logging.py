@@ -67,6 +67,20 @@ def test_the_batch_summary_counts_outcomes_and_names_the_slowest_page() -> None:
     )
 
 
+def test_the_batch_summary_counts_kept_pages_apart_from_written_ones() -> None:
+    kept = _page("a.tif")
+    result = BatchResult(
+        detected=[kept, _page("b.tif")],
+        written={kept: Path("a.tif"), _page("b.tif"): Path("b.tif")},
+        reused=[kept],
+        render_info={_page("b.tif"): _info(3.0)},
+    )
+
+    summary = batch._batch_summary(result, 10.0)
+
+    assert summary.startswith("2 detected, 1 written, 1 kept, 0 failed")
+
+
 def test_a_failed_page_is_logged_once_as_an_error_with_its_traceback(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

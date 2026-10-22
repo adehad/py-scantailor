@@ -1870,6 +1870,7 @@ class MainWindowManager:
             dpi_overrides=self._dpi_overrides,
             file_labels=project.output_file_label_map(),
             end_stage=end_stage,
+            output_records=project.output_record_map(),
         )
 
     def stopBatchProcessing(self) -> None:
@@ -1920,6 +1921,7 @@ class MainWindowManager:
         self.last_batch_result = result
         self._render_info.update(result.render_info)
         if self.project is not None:
+            self.project.set_output_records(result.output_records)
             for page, info in result.render_info.items():
                 self.project.set_text_geometry(
                     page,

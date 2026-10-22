@@ -811,6 +811,11 @@
         <translation>완료: {written}개 기록, {failed}개 실패</translation>
     </message>
     <message>
+        <location filename="../app/ui/dialogs/batch_progress.py" line="144"/>
+        <source>Done: {written} written, {kept} kept, {failed} failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../app/ui/dialogs/batch_progress.py" line="107"/>
         <source>, {count} not started</source>
         <translation>, {count}개 시작 안 됨</translation>
