@@ -87,7 +87,8 @@ When to enable the Page Box
      - **Auto** finds the paper edge in the wrong place. Drag the sides of the box in
        the image, as for the content box, or type its **Width** and **Height**,
        which resize it from its top left corner. The page box always grows to
-       hold the content box.
+       hold the content box. **Width** and **Height** follow the box while you
+       drag it.
 
 .. screenshot:: stage4_select_content_page_box_auto
    :alt: Select Content with the Page Box on Auto around the paper of a scan

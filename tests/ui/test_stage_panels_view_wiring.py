@@ -694,3 +694,18 @@ def test_a_decode_that_ends_after_the_widgets_are_deleted_is_dropped(
     QtWidgets.QApplication.processEvents()
 
     assert panels._source is None
+
+
+class TestSelectContentLivePageSize:
+    def test_a_page_box_being_dragged_shows_its_size_in_the_options(self):
+        panels = _panels(FilterStage.SELECT_CONTENT)
+        options = panels.options
+        width = options.findChild(QtWidgets.QDoubleSpinBox, "widthSpinBox")
+        height = options.findChild(QtWidgets.QDoubleSpinBox, "heightSpinBox")
+        assert width is not None and height is not None
+        stored = panels.sequence.select_content_filter.get_params(PAGE).page_box
+
+        panels.view.page_rect_size_changed.emit(QtCore.QSizeF(321, 456))  # type: ignore[attr-defined]
+
+        assert (width.value(), height.value()) == (321, 456)
+        assert panels.sequence.select_content_filter.get_params(PAGE).page_box == stored

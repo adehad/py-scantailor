@@ -484,6 +484,8 @@ class StagePanels(QtCore.QObject):
         elif isinstance(view, SelectContentImageView):
             view.manual_content_rect_set.connect(self._on_content_rect_set)
             view.manual_page_rect_set.connect(self._on_page_rect_set)
+            if isinstance(self.options, select_content.OptionsWidget):
+                view.page_rect_size_changed.connect(self.options.show_page_box_size)
         elif isinstance(view, PageLayoutImageView):
             view.margins_set_locally.connect(self._on_margins_set)
             if isinstance(self.options, page_layout.OptionsWidget):
