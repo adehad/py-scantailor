@@ -42,7 +42,10 @@ from scantailor.filters.output.binarization import BinarizationMethod
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.color_options import FillingColor
 from scantailor.filters.output.despeckle import DespeckleLevel
-from scantailor.filters.output.dewarping_options import DewarpingMode
+from scantailor.filters.output.dewarping_options import (
+    DewarpingMode,
+    DewarpingOptions,
+)
 from scantailor.filters.output.filter import Filter
 from scantailor.filters.output.params import ApplyGroup, DistortionModelSpec, Params
 from scantailor.filters.output.picture_shape import PictureShape
@@ -72,6 +75,37 @@ _DEWARPING_MODES = (
         QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Marginal"),
     ),
 )
+
+
+def dewarping_status_text(options: DewarpingOptions) -> str | None:
+    """Describe the post-deskew of a page dewarped from drawn or binding edges.
+
+    The stored angle is the rotation the generator applies; the line shows its
+    negation, the skew the last render found, rounded to hundredths of a degree.
+
+    Args:
+        options (DewarpingOptions): The page's dewarping options.
+
+    Returns:
+        str | None: Upstream's status line, such as "Manual (deskew: 1.25°)";
+            None for Off and Auto, whose mode buttons already say all there is.
+    """
+    if options.mode not in (DewarpingMode.MANUAL, DewarpingMode.MARGINAL):
+        return None
+    mode = QtCore.QCoreApplication.translate(
+        "output::OptionsWidget", cast(str, dict(_DEWARPING_MODES)[options.mode])
+    )
+    if not options.post_deskew:
+        deskew = QtCore.QCoreApplication.translate(
+            "output::OptionsWidget", "deskew disabled"
+        )
+        return f"{mode} ({deskew})"
+    # Adding 0.0 turns a rounded -0.0 into 0.0, which formats without a sign.
+    angle = -round(options.post_deskew_angle, 2) + 0.0
+    deskew = QtCore.QCoreApplication.translate("output::OptionsWidget", "deskew")
+    return f"{mode} ({deskew}: {angle:g}°)"
+
+
 _METHOD_LABELS = {
     BinarizationMethod.OTSU: QtCore.QT_TRANSLATE_NOOP("output::OptionsWidget", "Otsu"),
     BinarizationMethod.SAUVOLA: QtCore.QT_TRANSLATE_NOOP(
@@ -1132,6 +1166,12 @@ class OptionsWidget(QWidget):
         self._dewarp_off_btn.setChecked(True)
         dewarp_layout.addWidget(self._dewarp_modes)
 
+        self._dewarping_status_label = QLabel()
+        self._dewarping_status_label.setObjectName("dewarpingStatusLabel")
+        self._dewarping_status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._dewarping_status_label.setVisible(False)
+        dewarp_layout.addWidget(self._dewarping_status_label)
+
         self._min_span_row = QWidget()
         self._min_span_row.setObjectName("dewarpMinSpanRow")
         span_layout = QHBoxLayout(self._min_span_row)
@@ -1846,6 +1886,12 @@ class OptionsWidget(QWidget):
         self._dewarp_metrics = metrics
         self._show_dewarp_metrics()
 
+    def show_dewarping_status(self) -> None:
+        """Show the current page's post-deskew angle, which a render measures."""
+        if self._current_page_id is None:
+            return
+        self._show_dewarping_status(self._filter.get_params(self._current_page_id))
+
     def show_black_on_white(self) -> None:
         """Show the current page's polarity, which a render may have measured."""
         if self._current_page_id is None:
@@ -2114,6 +2160,7 @@ class OptionsWidget(QWidget):
         self._min_span_row.setVisible(dewarping.is_auto())
         self._min_span_spinbox.setValue(params.dewarp_min_span_percent)
         self._show_dewarp_metrics()
+        self._show_dewarping_status(params)
         self._post_deskew_check.setChecked(dewarping.post_deskew)
         self._post_deskew_check.setEnabled(dewarping.is_enabled())
 
@@ -2222,11 +2269,19 @@ class OptionsWidget(QWidget):
         label.setText("" if metrics is None else metrics.describe())
         label.setVisible(metrics is not None and self._dewarp_auto_btn.isChecked())
 
+    def _show_dewarping_status(self, params: Params) -> None:
+        status = dewarping_status_text(params.dewarping)
+        self._dewarping_status_label.setText(status or "")
+        self._dewarping_status_label.setVisible(status is not None)
+
     def _on_min_span_changed(self, value: int) -> None:
         self._edit(lambda p: p.with_dewarp_min_span_percent(value), delayed=True)
 
     def _on_post_deskew_changed(self, checked: bool) -> None:
-        self._edit(lambda p: p.with_dewarping(p.dewarping.with_post_deskew(checked)))
+        self._edit(
+            lambda p: p.with_dewarping(p.dewarping.with_post_deskew(checked)),
+            refresh=True,
+        )
 
     def _on_depth_changed(self, value: int) -> None:
         self._depth_label.setText(f"{value / _DEPTH_PERCEPTION_SCALE:.1f}")
