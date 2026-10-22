@@ -250,9 +250,10 @@ How you can open a project by double-clicking it depends on the build:
        Once a desktop integration tool such as AppImageLauncher or Gear Lever
        installs it, ``.ScanTailor`` files open in the program.
    * - macOS
-     - Not supported yet: the Finder sends the file as an open event, not as an
-       argument. Start the program from a terminal with
-       ``ScanTailor.app/Contents/MacOS/ScanTailor book.ScanTailor``.
+     - ``ScanTailor.app`` declares the ``.ScanTailor`` file type, so the Finder
+       opens a double-clicked project in the program, whether or not it is
+       already running. If another program has claimed the type, choose **Open
+       With** on the file and pick ScanTailor.
 
 The command line tool ``scantailor-cli`` is separate and never opens a window.
 
