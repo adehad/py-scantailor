@@ -681,12 +681,102 @@ class TestDewarping:
 
         assert bw.params.dewarping.mode == mode
 
-    def test_depth_perception_slider_sets_depth_perception(self, bw: _Widget):
+    def test_depth_perception_slider_stores_the_value_without_rendering(
+        self, bw: _Widget
+    ):
         bw.widget.set_dewarping_tab_active(True)
 
         bw.find(QtWidgets.QSlider, "depthPerceptionSlider").setValue(25)
 
         assert bw.params.depth_perception == pytest.approx(2.5)
+        assert bw.changed == []
+
+    def test_depth_perception_slider_sends_the_value_to_the_grid_at_once(
+        self, qtbot: QtBot, bw: _Widget
+    ):
+        bw.widget.set_dewarping_tab_active(True)
+
+        with qtbot.waitSignal(bw.widget.depth_perception_changed) as emitted:
+            bw.find(QtWidgets.QSlider, "depthPerceptionSlider").setValue(25)
+
+        assert emitted.args == [pytest.approx(2.5)]
+
+    def test_dragging_the_depth_perception_slider_sends_each_step_to_the_grid(
+        self, bw: _Widget
+    ):
+        bw.widget.set_dewarping_tab_active(True)
+        slider = bw.find(QtWidgets.QSlider, "depthPerceptionSlider")
+        sent: list[float] = []
+        bw.widget.depth_perception_changed.connect(sent.append)
+
+        slider.setSliderDown(True)
+        slider.setValue(21)
+        slider.setValue(22)
+
+        assert sent == [pytest.approx(2.1), pytest.approx(2.2)]
+        assert bw.changed == []
+
+    def test_leaving_the_dewarping_tab_after_a_depth_change_renders_once(
+        self, bw: _Widget
+    ):
+        bw.widget.set_dewarping_tab_active(True)
+        slider = bw.find(QtWidgets.QSlider, "depthPerceptionSlider")
+        slider.setValue(25)
+        slider.setValue(28)
+
+        bw.widget.set_dewarping_tab_active(False)
+
+        assert bw.changed == [PAGE]
+
+    def test_leaving_the_dewarping_tab_with_the_depth_set_back_does_not_render(
+        self, bw: _Widget
+    ):
+        bw.widget.set_dewarping_tab_active(True)
+        slider = bw.find(QtWidgets.QSlider, "depthPerceptionSlider")
+        original = slider.value()
+        slider.setValue(25)
+        slider.setValue(original)
+
+        bw.widget.set_dewarping_tab_active(False)
+
+        assert bw.changed == []
+
+    def test_leaving_the_tab_after_an_edit_that_rendered_does_not_render_again(
+        self, bw: _Widget
+    ):
+        bw.widget.set_dewarping_tab_active(True)
+        bw.find(QtWidgets.QSlider, "depthPerceptionSlider").setValue(25)
+        bw.click(QtWidgets.QPushButton, "dewarpManualBtn")
+
+        bw.widget.set_dewarping_tab_active(False)
+
+        assert bw.changed == [PAGE]
+
+    def test_leaving_the_tab_with_a_delayed_edit_waiting_renders_once(
+        self, bw: _Widget
+    ):
+        bw.click(QtWidgets.QPushButton, "dewarpAutoBtn")
+        bw.widget.set_dewarping_tab_active(True)
+        bw.changed.clear()
+        bw.find(QtWidgets.QSlider, "depthPerceptionSlider").setValue(25)
+        bw.find(QtWidgets.QSpinBox, "dewarpMinSpanSB").setValue(55)
+
+        bw.widget.set_dewarping_tab_active(False)
+        bw.widget.flush_pending_reload()
+
+        assert bw.changed == [PAGE]
+
+    def test_going_to_another_page_renders_the_page_whose_depth_changed(
+        self, bw: _Widget
+    ):
+        bw.widget.set_dewarping_tab_active(True)
+        bw.find(QtWidgets.QSlider, "depthPerceptionSlider").setValue(25)
+        other = PageId(
+            image_id=ImageId(file_path=Path("other.png")), sub_page=SubPage.SINGLE_PAGE
+        )
+
+        bw.widget.set_current_page(other)
+
         assert bw.changed == [PAGE]
 
     def test_controls_show_stored_depth_perception(self, qtbot: QtBot):

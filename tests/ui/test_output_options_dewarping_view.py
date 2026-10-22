@@ -8,6 +8,7 @@ from numpy.typing import NDArray
 from PySide6 import QtCore, QtGui
 from pytestqt.qtbot import QtBot
 
+from scantailor.app.ui.image_views.dewarp_editor import DewarpEditor
 from scantailor.app.ui.image_views.output import DewarpingImageView
 from scantailor.core.models import Dpi
 from scantailor.core.transformation import ImageTransformation
@@ -182,13 +183,54 @@ class TestShowingAModel:
         )
         assert painted
 
-    def test_changing_depth_perception_changes_the_grid(self, view: DewarpingImageView):
+    def test_changing_depth_perception_changes_the_grid(
+        self, qtbot: QtBot, view: DewarpingImageView
+    ):
         view.set_distortion_model(CURVED, 1.0)
         before = view.grab().toImage()
 
         view.set_depth_perception(3.0)
 
-        assert view.grab().toImage() != before
+        qtbot.waitUntil(lambda: view.grab().toImage() != before)
+
+    def test_depth_changes_in_one_event_loop_turn_redraw_once_for_the_last(
+        self, qtbot: QtBot, view: DewarpingImageView, monkeypatch: pytest.MonkeyPatch
+    ):
+        view.set_distortion_model(CURVED, 2.0)
+        drawn: list[float] = []
+        compute = DewarpEditor._compute_grid
+
+        def counting(editor: DewarpEditor) -> NDArray[np.float64] | None:
+            drawn.append(editor._depth_perception)
+            return compute(editor)
+
+        monkeypatch.setattr(DewarpEditor, "_compute_grid", counting)
+
+        for depth in (1.2, 1.6, 2.4, 2.9):
+            view.set_depth_perception(depth)
+        qtbot.waitUntil(lambda: bool(drawn))
+        qtbot.wait(20)
+
+        assert drawn == [2.9]
+
+    def test_showing_a_model_drops_a_pending_depth_redraw(
+        self, qtbot: QtBot, view: DewarpingImageView, monkeypatch: pytest.MonkeyPatch
+    ):
+        view.set_distortion_model(CURVED, 2.0)
+        view.set_depth_perception(1.2)
+        drawn: list[float] = []
+        compute = DewarpEditor._compute_grid
+
+        def counting(editor: DewarpEditor) -> NDArray[np.float64] | None:
+            drawn.append(editor._depth_perception)
+            return compute(editor)
+
+        monkeypatch.setattr(DewarpEditor, "_compute_grid", counting)
+
+        view.set_distortion_model(CURVED, 2.5)
+        qtbot.wait(20)
+
+        assert drawn == [2.5]
 
 
 class TestManualEditing:

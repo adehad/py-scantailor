@@ -384,6 +384,8 @@ each of its edges.
 
 Editing the grid of a page whose dewarping is **Auto** or **Marginal** makes it
 **Manual**. **Depth perception** is the slider that appears while this tab shows.
+Moving it redraws the grid at once; the page renders again when you leave the tab,
+and only if the value changed.
 
 .. screenshot:: stage6_tab_dewarping
    :alt: The Dewarping tab with the distortion grid

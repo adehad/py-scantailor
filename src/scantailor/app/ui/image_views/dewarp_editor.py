@@ -14,7 +14,14 @@ from typing import cast
 import numpy as np
 from numpy.typing import NDArray
 from PySide6 import QtGui
-from PySide6.QtCore import QT_TRANSLATE_NOOP, QCoreApplication, QPointF, QRectF, Qt
+from PySide6.QtCore import (
+    QT_TRANSLATE_NOOP,
+    QCoreApplication,
+    QPointF,
+    QRectF,
+    Qt,
+    QTimer,
+)
 from PySide6.QtGui import QPainter, QPen, QPolygonF
 
 from scantailor.app.ui.image_views.base import ImageViewBase
@@ -75,6 +82,12 @@ class DewarpEditor:
         self._dragged: tuple[int, int] | None = None
         self._drag_changed = False
         self._hover = QPointF()
+        # A grid takes a good part of a second on a large page, so depth
+        # changes that queue up behind one redraw are drawn once, for the last.
+        self._depth_redraw = QTimer(host)
+        self._depth_redraw.setSingleShot(True)
+        self._depth_redraw.setInterval(0)
+        self._depth_redraw.timeout.connect(self._rebuild)
 
     @property
     def grid(self) -> NDArray[np.float64] | None:
@@ -104,6 +117,7 @@ class DewarpEditor:
                 the page's content box; the whole image when None or empty.
         """
         self._depth_perception = depth_perception
+        self._depth_redraw.stop()
         self._dragged = None
         area = default_area
         if area is None or area.isEmpty():
@@ -128,13 +142,15 @@ class DewarpEditor:
         self._rebuild()
 
     def set_depth_perception(self, depth_perception: float) -> None:
-        """Redraw the grid for another depth perception.
+        """Redraw the grid for another depth perception once control returns to Qt.
+
+        Several calls before that redraw once, for the last value.
 
         Args:
             depth_perception (float): Distance to the page plane, 1 to 3.
         """
         self._depth_perception = depth_perception
-        self._rebuild()
+        self._depth_redraw.start()
 
     def has_model(self) -> bool:
         """Return whether a model was shown, so that there are edges to edit."""

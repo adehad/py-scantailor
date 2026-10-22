@@ -289,6 +289,8 @@ class StagePanels(QtCore.QObject):
 
     Signals:
         settings_changed: The user edited the current page.
+        other_page_edited: An edit held back until the user moved on was
+            stored for a page that is no longer shown. Args: page (PageId).
         page_size_changed: The view shows another page or size. Args: size
             (QSizeF | None) in pixels at the given resolution, None when no page
             is shown; dpi (float).
@@ -304,6 +306,7 @@ class StagePanels(QtCore.QObject):
     """
 
     settings_changed = QtCore.Signal()
+    other_page_edited = QtCore.Signal(object)
     page_size_changed = QtCore.Signal(object, float)
     cursor_moved = QtCore.Signal(object)
     unremove_page_requested = QtCore.Signal(object)
@@ -460,7 +463,7 @@ class StagePanels(QtCore.QObject):
                 widget.alignment_changed.connect(forward)
             case FilterStage.OUTPUT:
                 widget = output.OptionsWidget(sequence.output_filter)
-                widget.params_changed.connect(forward)
+                widget.params_changed.connect(self._on_output_params_changed)
         install_help_icons(widget)
         return widget
 
@@ -488,6 +491,9 @@ class StagePanels(QtCore.QObject):
             view.tab_changed.connect(self._on_output_tab_changed)
             if isinstance(self.options, output.OptionsWidget):
                 self.options.despeckle_level_changed.connect(view.set_despeckle_level)
+                self.options.depth_perception_changed.connect(
+                    self._on_depth_perception_changed
+                )
             view.set_tabs(list(ImageViewTab))
 
     def _keep_page_layout_state_in_settings(self, state: PageLayoutState) -> None:
@@ -534,6 +540,14 @@ class StagePanels(QtCore.QObject):
             self.options.show_black_on_white()
         if isinstance(self.view, OutputImageView):
             self.view.set_dewarp_note(None if metrics is None else metrics.describe())
+
+    def _on_output_params_changed(self, page: PageId) -> None:
+        # Reloads held back for a page, such as a depth perception change,
+        # are reported when the user has already moved on to the next page.
+        if page != self._page:
+            self.other_page_edited.emit(page)
+            return
+        self._on_option_edited()
 
     def _on_option_edited(self, *_args: object) -> None:
         # The widgets have already stored the new values, so the signal
@@ -1031,6 +1045,13 @@ class StagePanels(QtCore.QObject):
                 params.depth_perception,
                 self._content_area,
             )
+
+    def _on_depth_perception_changed(self, depth: float) -> None:
+        view = self.view
+        if isinstance(view, OutputImageView):
+            view.set_depth_perception(depth)
+        if self._fed_model is not None:
+            self._fed_model = (self._fed_model[0], depth)
 
     def _on_distortion_model_edited(self, model: DistortionModelSpec) -> None:
         xform = self._output_transformation
