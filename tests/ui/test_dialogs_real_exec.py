@@ -14,7 +14,6 @@ from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.dialogs.about import AboutDialog
 from scantailor.app.ui.dialogs.load_files_status import LoadFilesStatusDialog
-from scantailor.app.ui.dialogs.out_of_memory import OutOfMemoryDialog
 from scantailor.app.ui.dialogs.project_files import ProjectFilesDialog
 from scantailor.app.ui.dialogs.remove_pages import RemovePagesDialog
 from scantailor.app.ui.dialogs.split_mode import SplitModeDialog
@@ -183,41 +182,6 @@ def test_remove_pages_dialog_asks_with_the_page_count_and_accepts(qtbot: QtBot):
     assert "3 pages" in seen["text"]
 
 
-def test_out_of_memory_dialog_offers_saving_and_declines(qtbot: QtBot):
-    dialog = OutOfMemoryDialog()
-    qtbot.addWidget(dialog)
-    requested: list[str] = []
-    dialog.save_project_requested.connect(lambda: requested.append("save"))
-
-    def drive(dlg: QtWidgets.QDialog) -> None:
-        save = _find(dlg, QtWidgets.QPushButton, "saveProjectBtn")
-        decline = _find(dlg, QtWidgets.QPushButton, "dontSaveBtn")
-        tabs = _find(dlg, QtWidgets.QTabWidget, "tabWidget")
-        _assert_shown(dlg, save, decline, tabs)
-        assert isinstance(save, QtWidgets.QPushButton)
-        assert isinstance(decline, QtWidgets.QPushButton)
-        save.click()
-        decline.click()
-
-    assert _exec_while(dialog, drive) == QtWidgets.QDialog.DialogCode.Rejected
-    assert requested == ["save"]
-
-
-def test_out_of_memory_dialog_success_page_closes(qtbot: QtBot):
-    dialog = OutOfMemoryDialog()
-    qtbot.addWidget(dialog)
-
-    def drive(dlg: QtWidgets.QDialog) -> None:
-        assert isinstance(dlg, OutOfMemoryDialog)
-        dlg.show_save_success()
-        button_box = _find(dlg, QtWidgets.QDialogButtonBox, "buttonBox")
-        _assert_shown(dlg, button_box)
-        assert isinstance(button_box, QtWidgets.QDialogButtonBox)
-        button_box.rejected.emit()
-
-    assert _exec_while(dialog, drive) == QtWidgets.QDialog.DialogCode.Rejected
-
-
 def test_about_dialog_shows_version_and_license_and_closes(qtbot: QtBot):
     dialog = AboutDialog()
     qtbot.addWidget(dialog)
@@ -276,11 +240,10 @@ def test_split_mode_dialog_reports_chosen_settings_on_ok(qtbot: QtBot):
         lambda: AboutDialog(),
         lambda: LoadFilesStatusDialog(),
         lambda: RemovePagesDialog(page_count=1),
-        lambda: OutOfMemoryDialog(),
         lambda: ProjectFilesDialog(),
         lambda: SplitModeDialog(),
     ],
-    ids=["about", "load_status", "remove_pages", "out_of_memory", "files", "split"],
+    ids=["about", "load_status", "remove_pages", "files", "split"],
 )
 def test_embedded_form_is_a_child_widget_not_a_second_window(
     qtbot: QtBot, dialog_factory: Callable[[], QtWidgets.QDialog]

@@ -51,8 +51,6 @@ class StageListModel(QAbstractTableModel):
         """
         super().__init__(parent)
         self._stages = stages
-        self._show_animation = False
-        self._selected_row = -1
 
     def rowCount(
         self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()
@@ -126,16 +124,6 @@ class StageListModel(QAbstractTableModel):
                 return Qt.AlignmentFlag.AlignCenter
 
         return None
-
-    def set_batch_animation(self, selected_row: int, show: bool) -> None:
-        """Set batch processing animation state.
-
-        Args:
-            selected_row: The selected row to show animation for.
-            show: Whether to show the animation.
-        """
-        self._selected_row = selected_row
-        self._show_animation = show
 
 
 class StageListDelegate(QStyledItemDelegate):

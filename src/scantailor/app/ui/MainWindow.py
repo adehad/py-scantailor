@@ -404,7 +404,6 @@ class MainWindowManager:
         self._saved_state: str | None = None
         self.workerThreadPool = None  # std::make_unique<WorkerThreadPool>()
         self.interactiveQueue = None  # std::make_unique<ProcessingTaskQueue>()
-        self.outOfMemoryDialog = None  # std::make_unique<OutOfMemoryDialog>()
         self.curFilter = 0
         self.ignoreSelectionChanges = 0
         self.ignorePageOrderingChanges = 0
