@@ -23,6 +23,11 @@ Application settings
 
 .. automodule:: scantailor.core.settings
 
+Portable mode
+-------------
+
+.. automodule:: scantailor.core.portable
+
 Filter stages
 -------------
 

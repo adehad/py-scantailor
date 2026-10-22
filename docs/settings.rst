@@ -5,6 +5,39 @@ Settings and default parameters
 **Tools > Default parameters ...** holds the values new projects start from.
 **Tools > Units** sets the same Units value as the Settings dialog.
 
+.. _portable-mode:
+
+Portable mode
+-------------
+
+ScanTailor normally keeps its settings, profiles and logs in your user folders.
+To keep them with the program instead, for example on a USB stick, create an
+empty folder named ``config`` beside the ``ScanTailor`` executable. At the next
+start, ScanTailor uses that folder for everything it stores:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Path in ``config``
+     - What it holds
+   * - ``settings.json``
+     - The options of the Settings dialog and the selected profile.
+   * - ``profiles``
+     - Saved Default parameters profiles.
+   * - ``ScanTailor/pyScanTailor.ini``
+     - Window layout, recent projects and other remembered choices.
+   * - ``logs``
+     - Session logs and crash files. See :doc:`reporting_problems`.
+
+ScanTailor checks for the folder only at start-up. If it cannot create files in
+the folder, it logs a warning and uses the user folders. To carry existing
+settings over, copy ``settings.json`` and the ``profiles`` folder into
+``config`` from ``%APPDATA%\ScanTailor`` on Windows,
+``~/Library/Application Support/ScanTailor`` on macOS or ``~/.config/scantailor``
+on Linux. Running from source never uses portable mode. See
+:mod:`scantailor.core.portable`.
+
 Settings
 --------
 

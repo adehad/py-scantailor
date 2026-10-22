@@ -24,6 +24,8 @@ manager. The folder is:
    * - Linux
      - ``$XDG_STATE_HOME/scantailor/logs``, which is
        ``~/.local/state/scantailor/logs`` unless you set ``XDG_STATE_HOME``
+   * - Portable install
+     - ``config/logs`` beside the program. See :ref:`portable-mode`.
 
 Which files to attach
 *********************

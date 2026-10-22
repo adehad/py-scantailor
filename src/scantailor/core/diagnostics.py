@@ -32,6 +32,7 @@ from loguru import logger
 from PySide6 import QtCore
 
 from scantailor.__about__ import APP_NAME, __version__
+from scantailor.core.portable import portable_folder
 from scantailor.core.settings import ApplicationSettings
 from scantailor.core.worker_log import EXTRA_DEFAULTS, start_bridge
 
@@ -87,8 +88,12 @@ def log_folder() -> Path:
         Path: ``%LOCALAPPDATA%/ScanTailor/logs`` on Windows,
             ``~/Library/Logs/ScanTailor`` on macOS and
             ``$XDG_STATE_HOME/scantailor/logs`` (``~/.local/state`` when unset)
-            elsewhere. The folder may not exist yet.
+            elsewhere; ``logs`` in the portable folder when the program is
+            portable. The folder may not exist yet.
     """
+    portable = portable_folder()
+    if portable is not None:
+        return portable / "logs"
     if sys.platform == "win32":
         local = os.environ.get("LOCALAPPDATA")
         base = Path(local) if local else Path.home() / "AppData" / "Local"
@@ -292,6 +297,8 @@ def banner_lines(log_file: Path | None) -> list[str]:
             and the settings and log paths, one line each.
     """
     build = "frozen (PyInstaller)" if getattr(sys, "frozen", False) else "from source"
+    if portable_folder() is not None:
+        build += ", portable"
     libraries = "; ".join(
         f"{label} {_library_version(distribution, module, attribute)}"
         for label, distribution, module, attribute in _LIBRARIES
