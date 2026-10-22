@@ -340,6 +340,8 @@ class StagePanels(QtCore.QObject):
         # Carries fill zones between the page and the dewarped output they are
         # drawn on; None when the output is not dewarped.
         self._fill_zone_mapper: DewarpingPointMapper | None = None
+        # Where the dewarping grid starts while the page has no model.
+        self._content_area: QtCore.QRectF | None = None
         self._extras: OutputExtras | None = None
         self._fed_extras: OutputExtras | None = None
         self._fed_model: tuple[DistortionModelSpec, float] | None = None
@@ -665,6 +667,7 @@ class StagePanels(QtCore.QObject):
             view.set_zones([])
             self._output_transformation = None
             self._fill_zone_mapper = None
+            self._content_area = None
             self._extras = None
             self._fed_extras = None
             self._fed_model = None
@@ -917,6 +920,9 @@ class StagePanels(QtCore.QObject):
         params = self.sequence.output_filter.get_params(page)
         mapper = _fill_zone_mapper(params, xform, scale, image)
         self._fill_zone_mapper = mapper
+        self._content_area = self._content_box_in_view(
+            page, oriented_size, dpi, xform, scale
+        )
         zones = [
             self._view_zone(spec, ZoneKind.PICTURE, xform, scale)
             for spec in params.picture_zones
@@ -926,6 +932,37 @@ class StagePanels(QtCore.QObject):
         ]
         view.set_zones(zones)
         self._feed_output_tabs(view, params, xform, scale)
+
+    def _content_box_in_view(
+        self,
+        page: PageId,
+        oriented_size: tuple[int, int],
+        dpi: Dpi,
+        xform: ImageTransformation,
+        scale: NDArray[np.float64],
+    ) -> QtCore.QRectF | None:
+        """Return the page's content box in the Output view's pixels.
+
+        Select Content stores the box after deskewing, which differs from the
+        Output transformation by the crop to the page, so the box goes through
+        the source image to get there.
+
+        Returns:
+            QtCore.QRectF | None: The box; None when the page has no content.
+        """
+        content = content_rect_of(self.sequence, page)
+        if content.is_empty():
+            return None
+        selected = build_transformation(
+            self.sequence, page, oriented_size, dpi, FilterStage.DESKEW
+        )
+        source = selected.map_polygon_back(content.to_polygon())
+        corners = xform.map_polygon(source) * scale
+        (left, top), (right, bottom) = corners.min(axis=0), corners.max(axis=0)
+        return QtCore.QRectF(
+            QtCore.QPointF(float(left), float(top)),
+            QtCore.QPointF(float(right), float(bottom)),
+        )
 
     def _feed_output_tabs(
         self,
@@ -992,6 +1029,7 @@ class StagePanels(QtCore.QObject):
             view.set_distortion_model(
                 _model_in_view_pixels(params.distortion_model, xform, scale),
                 params.depth_perception,
+                self._content_area,
             )
 
     def _on_distortion_model_edited(self, model: DistortionModelSpec) -> None:

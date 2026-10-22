@@ -395,7 +395,7 @@ class TestEdgeDraggedAlongAnAxis:
         assert all(dx == pytest.approx(20 / view.zoom_level) for dx, _dy in shifts)
         assert all(dy == pytest.approx(0) for _dx, dy in shifts)
 
-    def test_without_a_key_only_the_end_moves(self, qtbot, view):
+    def test_without_a_key_the_edge_turns_about_its_other_end(self, qtbot, view):
         view.set_tabs(ALL_TABS, ImageViewTab.DEWARPING)
         view.set_distortion_model(CURVED, 2.0)
         before, _bottom = view.control_points()
@@ -403,5 +403,6 @@ class TestEdgeDraggedAlongAnAxis:
         self._drag_end(qtbot, view, NONE)
 
         after, _bottom = view.control_points()
-        assert after[1] == before[1]
+        assert after[-1] == before[-1]
         assert after[0] != before[0]
+        assert after[1] != before[1]

@@ -21,6 +21,7 @@ from scantailor.app.ui.image_views.base import ImageViewBase
 from scantailor.app.ui.image_views.zone_geometry import nearest_on_segment
 from scantailor.app.ui.theme.tokens import view_color
 from scantailor.dewarping.page_dewarper import dewarper_from_polylines
+from scantailor.dewarping.spline_fit import fit_spline_between_ends, spline_point_at
 from scantailor.filters.output.params import DistortionModelSpec
 from scantailor.math.spline import XSpline
 
@@ -70,6 +71,7 @@ class DewarpEditor:
         self._grid: NDArray[np.float64] | None = None
         self._depth_perception = 2.0
         self._shown_model: DistortionModelSpec | None = None
+        self._shown_area = QRectF()
         self._dragged: tuple[int, int] | None = None
         self._drag_changed = False
         self._hover = QPointF()
@@ -93,27 +95,32 @@ class DewarpEditor:
         """Show a model without reporting a change.
 
         Args:
-            model (DistortionModelSpec): Edges in image pixels. When it is not
-                defined the editor starts from straight edges along the top and
-                bottom of ``default_area``.
+            model (DistortionModelSpec): Edges in image pixels. A defined
+                model's edges get curves fitted to them, so that each has a few
+                control points to drag. When it is not defined the editor starts
+                from straight edges along the top and bottom of ``default_area``.
             depth_perception (float): Distance to the page plane, 1 to 3.
-            default_area (QRectF | None): Where straight edges start; the whole
-                image when None.
+            default_area (QRectF | None): Where straight edges start, usually
+                the page's content box; the whole image when None or empty.
         """
         self._depth_perception = depth_perception
         self._dragged = None
-        if model != self._shown_model or not self._controls[0]:
+        area = default_area
+        if area is None or area.isEmpty():
+            image = self._host.image
+            area = QRectF(image.rect()) if image else QRectF()
+        # Pages without a model all share the same empty model, so only the
+        # area tells one page's straight start from another's.
+        start_moved = not model.is_defined() and area != self._shown_area
+        if model != self._shown_model or start_moved or not self._controls[0]:
             self._shown_model = model
+            self._shown_area = area
             if model.is_defined():
                 self._controls = [
-                    self._pick_control_points(model.top),
-                    self._pick_control_points(model.bottom),
+                    self._fit_control_points(model.top),
+                    self._fit_control_points(model.bottom),
                 ]
             else:
-                area = default_area
-                if area is None:
-                    image = self._host.image
-                    area = QRectF(image.rect()) if image else QRectF()
                 self._controls = [
                     [area.topLeft(), area.topRight()],
                     [area.bottomLeft(), area.bottomRight()],
@@ -152,25 +159,54 @@ class DewarpEditor:
             bottom=tuple((float(x), float(y)) for x, y in self._edges[1]),
         )
 
-    def _pick_control_points(
-        self, polyline: tuple[tuple[float, float], ...]
+    @classmethod
+    def _fit_control_points(
+        cls, polyline: tuple[tuple[float, float], ...]
     ) -> list[QPointF]:
-        """Pick the control points of an edge: the ends and a few between them."""
-        if len(polyline) <= self.MAX_CONTROL_POINTS:
-            picked = list(range(len(polyline)))
-        else:
-            spread = np.linspace(0, len(polyline) - 1, self.MAX_CONTROL_POINTS)
-            picked = np.round(spread).astype(int).tolist()
-        return [QPointF(*polyline[i]) for i in picked]
+        """Fit a curve of ``MAX_CONTROL_POINTS`` to an edge and return its points.
+
+        The fit uses approximating tension between sharp ends, as upstream's
+        DewarpingView does. Fitting the editor's interpolating curve instead
+        bunches the inner points wherever one segment can cover a flat stretch,
+        which leaves nothing to grab elsewhere. The editor's points are then
+        taken from the fitted curve at its junctions, so they sit on the curve
+        and stay spread out.
+
+        An edge of ``MAX_CONTROL_POINTS`` points or fewer keeps them, since the
+        curve then passes through every one. So does an edge whose ends
+        coincide, which cannot be fitted.
+        """
+        points = np.asarray(polyline, dtype=np.float64)
+        count = cls.MAX_CONTROL_POINTS
+        if len(points) <= count or np.array_equal(points[0], points[-1]):
+            return [QPointF(x, y) for x, y in points]
+        approximating = np.ones(count)
+        approximating[[0, -1]] = 0.0
+        fitted = fit_spline_between_ends(points, approximating)
+        return [
+            QPointF(*spline_point_at(fitted.positions, approximating, t))
+            for t in np.linspace(0.0, 1.0, count)
+        ]
+
+    @staticmethod
+    def _tensions(count: int) -> NDArray[np.float64]:
+        """Return the tensions of an edge: sharp ends, interpolating between.
+
+        Interpolating tension keeps every control point on the curve, where
+        the user can see and grab it.
+        """
+        tensions = np.full(count, -1.0)
+        tensions[:1] = 0.0
+        tensions[-1:] = 0.0
+        return tensions
 
     @staticmethod
     def _sample_curve(points: list[QPointF]) -> NDArray[np.float64]:
         """Sample a curve passing through the control points."""
         spline = XSpline()
-        last = len(points) - 1
-        for index, point in enumerate(points):
-            tension = 0.0 if index in (0, last) else -1.0
-            spline.append_control_point((point.x(), point.y()), tension)
+        tensions = DewarpEditor._tensions(len(points))
+        for point, tension in zip(points, tensions, strict=True):
+            spline.append_control_point((point.x(), point.y()), float(tension))
         return spline.to_polyline()
 
     def _rebuild(self) -> None:
@@ -322,6 +358,9 @@ class DewarpEditor:
     def mouse_move(self, event: QtGui.QMouseEvent) -> bool:
         """Move the picked control point.
 
+        Dragging an end turns and scales the whole edge about the other end,
+        or with Shift or Ctrl held moves the whole edge along one axis.
+
         Args:
             event (QtGui.QMouseEvent): The move.
 
@@ -335,21 +374,46 @@ class DewarpEditor:
         point = self._host.widget_to_image().map(event.position())
         points = self._controls[edge]
         if index in (0, len(points) - 1):
-            shifted = self._shifted_edge(
-                points, points[index], point, event.modifiers()
-            )
-            if shifted is not None:
-                self._controls[edge] = shifted
-                self._drag_changed = True
-                self._rebuild()
-                event.accept()
-                return True
-        if points[index] != point:
-            points[index] = point
+            moved = self._shifted_edge(points, points[index], point, event.modifiers())
+            if moved is None:
+                moved = self._turned_edge(points, index, point)
+        else:
+            moved = [*points[:index], point, *points[index + 1 :]]
+        if moved != points:
+            self._controls[edge] = moved
             self._drag_changed = True
             self._rebuild()
         event.accept()
         return True
+
+    @staticmethod
+    def _turned_edge(points: list[QPointF], end: int, target: QPointF) -> list[QPointF]:
+        """Rotate and scale a whole edge about one end so the other reaches a target.
+
+        The edge keeps its shape. When the two ends are less than a pixel apart
+        no rotation is defined, so the points are spread evenly along the line
+        from the fixed end to the target instead.
+
+        Args:
+            points (list[QPointF]): Control points of the edge, in order.
+            end (int): Index of the dragged end, first or last.
+            target (QPointF): Where the dragged end goes.
+
+        Returns:
+            list[QPointF]: The moved points, in the same order.
+        """
+        pivot = points[-1 if end == 0 else 0]
+        origin = complex(pivot.x(), pivot.y())
+        grabbed = complex(points[end].x(), points[end].y()) - origin
+        wanted = complex(target.x(), target.y()) - origin
+        if abs(grabbed) <= 1.0:
+            step = 1.0 / (len(points) - 1)
+            spread = [origin + wanted * (index * step) for index in range(len(points))]
+            moved = spread if end == len(points) - 1 else spread[::-1]
+        else:
+            turn = wanted / grabbed
+            moved = [origin + (complex(p.x(), p.y()) - origin) * turn for p in points]
+        return [QPointF(z.real, z.imag) for z in moved]
 
     @staticmethod
     def _shifted_edge(

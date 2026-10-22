@@ -349,8 +349,7 @@ this tab is showing.
 
 While the pointer is over a zone, a vertex, an edge or the dewarping grid, the
 status bar says what a click or a drag does there, including the keys that change
-it. In the Dewarping tab, hold **Ctrl** while dragging an end point of an edge to move
-it only vertically, or **Shift** to move it only horizontally.
+it.
 
 .. screenshot:: stage6_tab_fill_zones
    :alt: The Fill Zones tab with a fill zone drawn over the page
@@ -360,7 +359,29 @@ drawn and edited on the dewarped page and stored in page coordinates. If the
 dewarping model cannot be used, they are drawn on the undewarped page.
 
 The **Dewarping** tab shows the page as it is before dewarping, with the distortion
-grid over it. Drag the corners and edges of the grid as you would those of a zone.
+grid over it. The grid hangs between a top and a bottom edge, each a curve through a
+few control points. A page with no model yet starts with straight edges along the top
+and bottom of its content box. A detected model gets a curve of five points fitted to
+each of its edges.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Action
+     - Effect
+   * - Drag an inner point
+     - Bends the edge through the new position.
+   * - Click an edge between points
+     - Adds a point there.
+   * - Press **D** over an inner point
+     - Removes the point.
+   * - Drag an end point
+     - Turns and stretches the whole edge about its other end, keeping its shape.
+   * - Drag an end point with **Ctrl**
+     - Moves the whole edge up or down.
+   * - Drag an end point with **Shift**
+     - Moves the whole edge left or right.
+
 Editing the grid of a page whose dewarping is **Auto** or **Marginal** makes it
 **Manual**. **Depth perception** is the slider that appears while this tab shows.
 

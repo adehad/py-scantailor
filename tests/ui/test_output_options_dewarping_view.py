@@ -1,7 +1,10 @@
 """The dewarping tab of the Output view: model grid and manual control points."""
 
+from collections.abc import Callable
+
 import numpy as np
 import pytest
+from numpy.typing import NDArray
 from PySide6 import QtCore, QtGui
 from pytestqt.qtbot import QtBot
 
@@ -98,7 +101,53 @@ class TestShowingAModel:
 
         top, _ = view.control_points()
         assert len(top) == DewarpingImageView.MAX_CONTROL_POINTS
-        assert (top[0].x(), top[-1].x()) == (LEFT, RIGHT)
+        assert (top[0].x(), top[0].y()) == pytest.approx((LEFT, TOP), abs=1e-6)
+        assert (top[-1].x(), top[-1].y()) == pytest.approx((RIGHT, TOP), abs=1e-6)
+
+    @staticmethod
+    def _curled_model() -> tuple[
+        DistortionModelSpec, Callable[[NDArray[np.float64]], NDArray[np.float64]]
+    ]:
+        def curl(x: NDArray[np.float64]) -> NDArray[np.float64]:
+            return TOP - 60.0 * np.exp(-(x - LEFT) / 40.0) + 0.05 * (x - LEFT)
+
+        xs = np.linspace(LEFT, RIGHT, 60)
+        model = DistortionModelSpec(
+            top=tuple(zip(xs.tolist(), curl(xs).tolist(), strict=True)),
+            bottom=tuple((float(x), BOTTOM) for x in xs),
+        )
+        return model, curl
+
+    def test_the_curve_fitted_to_a_curled_edge_stays_within_five_pixels_of_it(
+        self, view: DewarpingImageView
+    ):
+        # The top edge curls up sharply near the spine: a curve through five
+        # evenly picked samples misses the curl by about 14 pixels.
+        model, curl = self._curled_model()
+
+        view.set_distortion_model(model, 2.0)
+
+        edge = np.asarray(view.distortion_model().top)
+        assert np.abs(edge[:, 1] - curl(edge[:, 0])).max() < 5.0
+
+    def test_the_points_fitted_to_a_curled_edge_are_spread_along_it(
+        self, view: DewarpingImageView
+    ):
+        model, _curl = self._curled_model()
+
+        view.set_distortion_model(model, 2.0)
+
+        top, _ = view.control_points()
+        gaps = np.diff([p.x() for p in top])
+        assert gaps.min() > 0.1 * (RIGHT - LEFT)
+
+    def test_a_depth_change_before_any_model_draws_no_grid(
+        self, qtbot: QtBot, view: DewarpingImageView
+    ):
+        view.set_depth_perception(2.5)
+        qtbot.wait(10)
+
+        assert view.grid() is None
 
     def test_showing_a_model_does_not_report_a_change(
         self, qtbot: QtBot, view: DewarpingImageView
@@ -178,6 +227,62 @@ class TestManualEditing:
 
         first = emitted.args[0].top[0]
         assert first == pytest.approx((LEFT - 20.0, TOP - 10.0), abs=1.5)
+
+    def test_dragging_an_end_point_turns_the_edge_about_the_other_end(
+        self, qtbot: QtBot, view: DewarpingImageView
+    ):
+        view.set_distortion_model(CURVED, 2.0)
+
+        # A quarter turn clockwise about the left end, keeping the length.
+        _drag(
+            qtbot,
+            view,
+            _widget_pos(view, RIGHT, TOP),
+            _widget_pos(view, LEFT, TOP + (RIGHT - LEFT)),
+        )
+
+        top, _ = view.control_points()
+        assert (top[0].x(), top[0].y()) == pytest.approx((LEFT, TOP), abs=1e-6)
+        assert (top[1].x(), top[1].y()) == pytest.approx(
+            (LEFT + 30.0, TOP + 200.0), abs=2.5
+        )
+
+    def test_dragging_an_end_point_inwards_shrinks_the_edge_with_its_curve(
+        self, qtbot: QtBot, view: DewarpingImageView
+    ):
+        view.set_distortion_model(CURVED, 2.0)
+
+        _drag(
+            qtbot,
+            view,
+            _widget_pos(view, RIGHT, TOP),
+            _widget_pos(view, 300.0, TOP),
+        )
+
+        top, _ = view.control_points()
+        assert (top[1].x(), top[1].y()) == pytest.approx((200.0, TOP - 15.0), abs=1.5)
+        assert (top[2].x(), top[2].y()) == pytest.approx((300.0, TOP), abs=1.5)
+
+    def test_dragging_an_end_off_a_collapsed_edge_spreads_its_points_evenly(
+        self, qtbot: QtBot, view: DewarpingImageView
+    ):
+        collapsed = DistortionModelSpec(
+            top=((LEFT, TOP), (300.0, TOP - 30.0), (LEFT + 0.5, TOP)),
+            bottom=CURVED.bottom,
+        )
+        view.set_distortion_model(collapsed, 2.0)
+
+        _drag(
+            qtbot,
+            view,
+            _widget_pos(view, LEFT, TOP),
+            _widget_pos(view, LEFT - 80.0, TOP),
+        )
+
+        top, _ = view.control_points()
+        assert [(p.x(), p.y()) for p in top] == pytest.approx(
+            [(LEFT - 80.0, TOP), (LEFT - 39.75, TOP), (LEFT + 0.5, TOP)], abs=1.5
+        )
 
     def test_pressing_on_an_edge_adds_a_control_point_there(
         self, qtbot: QtBot, view: DewarpingImageView
