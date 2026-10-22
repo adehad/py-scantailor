@@ -5,7 +5,7 @@ previous processing run). Only those are written out, so unset pages keep
 following the stage defaults after a project is reopened.
 """
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
 from pydantic import BaseModel
@@ -105,6 +105,39 @@ def collect_stage_params(
         if entries:
             result[STAGE_KEYS[stage]] = entries
     return result
+
+
+def collect_effective_stage_params(
+    stages: StageSequence, pages: Sequence[PageId]
+) -> dict[str, list[dict[str, Any]]]:
+    """Gather the parameters every page and stage would use, defaults included.
+
+    Unlike ``collect_stage_params``, pages without explicit parameters are
+    included with the values ``Settings.get_params`` falls back to, so a worker
+    renders them the way the calling process would.
+
+    Args:
+        stages (StageSequence): The stages whose settings are read.
+        pages (Sequence[PageId]): Pages to export.
+
+    Returns:
+        dict[str, list[dict[str, Any]]]: Entries per stage key, JSON-compatible.
+    """
+    entries = collect_stage_params(stages, list(pages))
+    for stage in FilterStage:
+        if stage is FilterStage.FIX_ORIENTATION:
+            continue
+        settings: Any = stages.filter_at(stage).settings
+        entries[STAGE_KEYS[stage]] = [
+            StageParamsEntry(
+                page=page, params=settings.get_params(page).model_dump(mode="json")
+            )
+            for page in pages
+        ]
+    return {
+        key: [entry.model_dump(mode="json") for entry in stage_entries]
+        for key, stage_entries in entries.items()
+    }
 
 
 def apply_stage_params(

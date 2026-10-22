@@ -59,7 +59,9 @@ def _render_in_process(
         default_dpi=SOURCE_DPI,
         tiff_compressions=compressions,
     )
-    path, _info = _render_page(_PageJob(page, config, tmp_path / "out" / "a.tif"))
+    path, _info, _files = _render_page(
+        _PageJob(page, config, tmp_path / "out" / "a.tif")
+    )
     with Image.open(path) as written:
         return written.tag_v2[COMPRESSION_TAG]
 

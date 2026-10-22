@@ -13,7 +13,7 @@ from enum import IntEnum
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 from scantailor.core.pdf_source import PdfSource
@@ -148,6 +148,56 @@ class PageTextGeometry(BaseModel):
     geometry: dict[str, Any]
 
 
+class FileStamp(BaseModel):
+    """Size and modification time that tell whether a file was replaced or edited.
+
+    Args:
+        size (int): File size in bytes.
+        mtime_ns (int): Modification time in nanoseconds since the epoch.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    size: int = Field(ge=0)
+    mtime_ns: int
+
+    @classmethod
+    def of(cls, path: Path) -> FileStamp | None:
+        """Stamp a file as it is now.
+
+        Args:
+            path (pathlib.Path): The file.
+
+        Returns:
+            FileStamp | None: Its stamp, or None when it is not a readable file.
+        """
+        try:
+            status = path.stat()
+        except OSError:
+            return None
+        if not path.is_file():
+            return None
+        return cls(size=status.st_size, mtime_ns=status.st_mtime_ns)
+
+
+class PageOutputRecord(BaseModel):
+    """What a page's output files were rendered from, so a batch can reuse them.
+
+    Args:
+        page (PageId): The page.
+        params_hash (str): Digest of everything that decides the page's output
+            pixels and encoding; see ``core.output_reuse.output_params_hash``.
+        source (FileStamp): The source image file as it was rendered.
+        files (dict[str, FileStamp]): Every file written for the page, keyed by
+            its POSIX path relative to the output folder, as written.
+    """
+
+    page: PageId
+    params_hash: str
+    source: FileStamp
+    files: dict[str, FileStamp]
+
+
 class OutputFileLabel(BaseModel):
     """The number that tells apart source files sharing a file name.
 
@@ -212,6 +262,9 @@ class Project(BaseModel):
         text_geometry (list[PageTextGeometry]): Geometry of pages written by a
             batch, so that their source text can be carried over in a later
             session.
+        output_records (list[PageOutputRecord]): What each page's output files
+            were rendered from, so a later batch skips pages that would come
+            out the same.
     """
 
     version: int = 1
@@ -224,6 +277,7 @@ class Project(BaseModel):
     output_file_labels: list[OutputFileLabel] = Field(default_factory=list)
     pdf_sources: list[PdfSource] = Field(default_factory=list)
     text_geometry: list[PageTextGeometry] = Field(default_factory=list)
+    output_records: list[PageOutputRecord] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod
@@ -438,6 +492,9 @@ class Project(BaseModel):
         self.text_geometry = [
             entry for entry in self.text_geometry if entry.page in survivors
         ]
+        self.output_records = [
+            entry for entry in self.output_records if entry.page in survivors
+        ]
         return doomed
 
     def restore_removed_half(self, image_id: ImageId) -> list[PageId]:
@@ -482,6 +539,20 @@ class Project(BaseModel):
             (entry.geometry for entry in self.text_geometry if entry.page == page),
             None,
         )
+
+    def output_record_map(self) -> dict[PageId, PageOutputRecord]:
+        """Return the stored output records keyed by page."""
+        return {entry.page: entry for entry in self.output_records}
+
+    def set_output_records(self, records: Mapping[PageId, PageOutputRecord]) -> None:
+        """Store new output records, replacing those of the same pages.
+
+        Args:
+            records (Mapping[PageId, PageOutputRecord]): Records by page, such as
+                ``BatchResult.output_records``.
+        """
+        kept = [entry for entry in self.output_records if entry.page not in records]
+        self.output_records = [*kept, *records.values()]
 
     def most_common_dpi(self) -> Dpi | None:
         """Return the resolution most of the project's images were scanned at.
@@ -543,6 +614,10 @@ class Project(BaseModel):
         self.text_geometry = [
             PageTextGeometry(page=remap_page(entry.page), geometry=entry.geometry)
             for entry in self.text_geometry
+        ]
+        self.output_records = [
+            entry.model_copy(update={"page": remap_page(entry.page)})
+            for entry in self.output_records
         ]
         self.stage_params = {
             stage: [
@@ -677,7 +752,8 @@ def _path_holders(data: dict[str, Any]) -> Iterator[tuple[dict[str, Any], str]]:
     yield data, "output_directory"
     image_ids = [info.get("id") for info in _dicts(data.get("images"))]
     pages = [data.get("selected_page")]
-    pages.extend(entry.get("page") for entry in _dicts(data.get("text_geometry")))
+    for key in ("text_geometry", "output_records"):
+        pages.extend(entry.get("page") for entry in _dicts(data.get(key)))
     for source in [*_dicts(data.get("pdf_sources")), *_dicts([data.get("pdf_source")])]:
         yield source, "pdf_path"
         yield source, "pages_dir"

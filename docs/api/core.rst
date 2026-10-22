@@ -29,6 +29,11 @@ Batch processing
 
 .. automodule:: scantailor.core.batch
 
+Output reuse
+------------
+
+.. automodule:: scantailor.core.output_reuse
+
 PDF import
 ----------
 

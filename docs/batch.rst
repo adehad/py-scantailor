@@ -65,6 +65,8 @@ The window also has these parts:
    * - Summary
      - Shown at the end: pages written, or pages processed for a batch that stops
        before Output, then pages failed and, after a stop, pages not started.
+       Pages whose files were kept, as described under
+       `Pages that have not changed`_, are counted apart as kept.
 
 How many pages run at once
 --------------------------
@@ -133,6 +135,46 @@ See :mod:`scantailor.core.batch`.
 The TIFF compression comes from **Tools > Settings ... > Saving**, which has one
 setting for black and white pages and one for grey and colour pages. See
 :doc:`settings`.
+
+Pages that have not changed
+---------------------------
+
+A batch from Output does not render a page again when its output would come out
+the same. After writing a page, the batch stores a record of it in the project
+file. The next batch from Output keeps the page's existing files, and lists the
+page in the result window as usual, when all of these still hold:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
+
+   * - Check
+     - What renders the page again
+   * - Settings
+     - Any change to the page at any stage, from Fix Orientation to Output, or
+       to a stage-wide default such as the output resolution. For a page aligned
+       with the others in Margins, a change to the shared page size, which
+       another page's content box can move.
+   * - Resolution
+     - A different resolution set for the image with **Fix DPI**.
+   * - TIFF compression
+     - A different compression in **Tools > Settings ... > Saving**.
+   * - Source file
+     - The scan was replaced or edited, so its size or modification time differ.
+   * - Output files
+     - The page's output file, or one of its layer files in the
+       ``foreground``, ``background`` or ``original_background`` folders, was
+       deleted, replaced or edited. A new output folder or a new file name, for
+       instance after changing the reading direction, has the same effect.
+
+A page with no record, such as every page of a project saved by an earlier
+version, is rendered. To force every page to render again, delete the output
+files.
+
+The interactive Output view always renders the page in memory and never reads or
+writes the output files.
+
+See :mod:`scantailor.core.output_reuse`.
 
 Batch and PDF export
 --------------------
