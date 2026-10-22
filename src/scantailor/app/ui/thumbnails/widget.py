@@ -55,6 +55,7 @@ from scantailor.app.ui.thumbnails.deviation import deviation_provider
 from scantailor.app.ui.thumbnails.model import (
     DeviantPagesProvider,
     DeviantRole,
+    FileDigestProvider,
     IncompletenessProvider,
     IncompleteRole,
     IsCurrentRole,
@@ -556,6 +557,9 @@ class ThumbnailListWidget(QWidget):
         stage (str): Stage key whose previews are shown.
         params_hash (Callable[[PageId, str], Hashable] | None): Digest of the
             parameters affecting a preview; a changed digest forces a re-render.
+        file_digest (FileDigestProvider | None): Names what a thumbnail kept on
+            disk was rendered from; thumbnails are kept on disk only with it
+            and a cache directory.
         cache_directory (Path | None): Directory for on-disk thumbnails, or
             None for memory only.
         cache_capacity (int): Thumbnails kept in memory.
@@ -599,6 +603,7 @@ class ThumbnailListWidget(QWidget):
         project: Project | None = None,
         stage: str = "",
         params_hash: Callable[[PageId, str], Hashable] | None = None,
+        file_digest: FileDigestProvider | None = None,
         cache_directory: Path | None = None,
         cache_capacity: int = 256,
         thumbnail_size: QSize | None = None,
@@ -615,6 +620,7 @@ class ThumbnailListWidget(QWidget):
             renderer,
             cache=ThumbnailCache(cache_capacity, cache_directory),
             params_hash=params_hash,
+            file_digest=file_digest,
             render_size=render_size or size,
             thread_count=thread_count,
             parent=self,
@@ -701,6 +707,14 @@ class ThumbnailListWidget(QWidget):
         self._view.setMinimumWidth(self._minimum_view_width())
         self._view.doItemsLayout()
         self._view.viewport().update()
+
+    def set_cache_directory(self, directory: Path | None) -> None:
+        """Keep thumbnails on disk in another directory from now on.
+
+        Args:
+            directory (Path | None): The directory, or None for memory only.
+        """
+        self._model.cache.set_disk_directory(directory)
 
     def set_render_size(self, size: QSize) -> None:
         """Render thumbnails at another resolution, rendering them again.

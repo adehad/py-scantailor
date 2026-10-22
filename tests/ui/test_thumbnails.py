@@ -1,6 +1,7 @@
 """Tests for the standalone page thumbnail list."""
 
 import threading
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -543,32 +544,91 @@ def test_failed_render_is_not_retried_in_a_loop(qtbot: QtBot, project: Project) 
     assert len(attempts) == len(WIDTHS)
 
 
-def test_disk_cache_survives_new_widget(
+def _shown_with_disk_cache(
+    qtbot: QtBot,
+    project: Project,
+    renderer: CountingRenderer,
+    directory: Path,
+    file_digest: Callable[[PageId, str], str | None],
+) -> ThumbnailListWidget:
+    """Show every thumbnail of a new list kept on disk in ``directory``."""
+    thumbnails = ThumbnailListWidget(
+        renderer,
+        project,
+        stage="s",
+        file_digest=file_digest,
+        cache_directory=directory,
+    )
+    qtbot.addWidget(thumbnails)
+    thumbnails.resize(240, 700)
+    thumbnails.show()
+    qtbot.wait_exposed(thumbnails)
+    thumbnails.view.viewport().repaint()
+    wait_for_renders(qtbot, thumbnails, len(WIDTHS))
+    return thumbnails
+
+
+def test_thumbnails_kept_on_disk_are_shown_by_a_new_list_without_rendering(
     qtbot: QtBot, project: Project, tmp_path: Path
 ) -> None:
-    first = CountingRenderer()
-    one = ThumbnailListWidget(
-        first, project, stage="s", cache_directory=tmp_path / "cache"
+    directory = tmp_path / "cache"
+    _shown_with_disk_cache(
+        qtbot, project, CountingRenderer(), directory, lambda _page, _stage: "d1"
     )
-    qtbot.addWidget(one)
-    one.resize(240, 700)
-    one.show()
-    qtbot.wait_exposed(one)
-    one.view.viewport().repaint()
-    wait_for_renders(qtbot, one, len(WIDTHS))
-    assert len(list((tmp_path / "cache").glob("*.png"))) == len(WIDTHS)
+    assert len(list(directory.glob("*.png"))) == len(WIDTHS)
 
     second = CountingRenderer()
-    two = ThumbnailListWidget(
-        second, project, stage="s", cache_directory=tmp_path / "cache"
+    _shown_with_disk_cache(
+        qtbot, project, second, directory, lambda _page, _stage: "d1"
     )
-    qtbot.addWidget(two)
-    two.resize(240, 700)
-    two.show()
-    qtbot.wait_exposed(two)
-    two.view.viewport().repaint()
-    wait_for_renders(qtbot, two, len(WIDTHS))
+
     assert second.calls == []
+
+
+def test_a_changed_digest_renders_again_and_replaces_the_stale_file(
+    qtbot: QtBot, project: Project, tmp_path: Path
+) -> None:
+    directory = tmp_path / "cache"
+    _shown_with_disk_cache(
+        qtbot, project, CountingRenderer(), directory, lambda _page, _stage: "d1"
+    )
+
+    second = CountingRenderer()
+    _shown_with_disk_cache(
+        qtbot, project, second, directory, lambda _page, _stage: "d2"
+    )
+
+    assert len(second.calls) == len(WIDTHS)
+    assert len(list(directory.glob("*.png"))) == len(WIDTHS)
+
+
+def test_a_thumbnail_without_a_digest_is_rendered_but_not_written(
+    qtbot: QtBot, project: Project, tmp_path: Path
+) -> None:
+    directory = tmp_path / "cache"
+
+    _shown_with_disk_cache(
+        qtbot, project, CountingRenderer(), directory, lambda _page, _stage: None
+    )
+
+    assert not directory.exists()
+
+
+def test_a_render_whose_digest_changed_meanwhile_is_not_written(
+    qtbot: QtBot, project: Project, tmp_path: Path
+) -> None:
+    """The render drew from parameters that a detection or an edit replaced."""
+    directory = tmp_path / "cache"
+    digests = iter(range(1_000_000))
+    lock = threading.Lock()
+
+    def ever_changing(_page: PageId, _stage: str) -> str:
+        with lock:
+            return str(next(digests))
+
+    _shown_with_disk_cache(qtbot, project, CountingRenderer(), directory, ever_changing)
+
+    assert not directory.exists()
 
 
 class TestThumbnailCache:
@@ -594,26 +654,81 @@ class TestThumbnailCache:
         with pytest.raises(ValueError, match="capacity"):
             ThumbnailCache(capacity=0)
 
-    def test_different_params_hash_is_a_different_key(self) -> None:
+    def test_different_params_hash_is_a_different_key_in_memory_only(self) -> None:
+        """One file per page, stage and size, so a new render replaces the old."""
         page = PageId(image_id=ImageId(file_path=Path("a.png")))
         assert ThumbnailKey(page, "s", 1) != ThumbnailKey(page, "s", 2)
         assert (
             ThumbnailKey(page, "s", 1).file_stem()
-            != ThumbnailKey(page, "s", 2).file_stem()
+            == ThumbnailKey(page, "s", 2).file_stem()
         )
 
-    def test_disk_round_trip(self, tmp_path: Path) -> None:
+    def test_a_different_stage_or_size_is_a_different_file(self) -> None:
+        page = PageId(image_id=ImageId(file_path=Path("a.png")))
+        stems = {
+            ThumbnailKey(page, "s", 0, (160, 160)).file_stem(),
+            ThumbnailKey(page, "t", 0, (160, 160)).file_stem(),
+            ThumbnailKey(page, "s", 0, (320, 320)).file_stem(),
+        }
+        assert len(stems) == 3
+
+    def test_disk_round_trip_with_the_same_digest(self, tmp_path: Path) -> None:
         cache = ThumbnailCache(disk_directory=tmp_path / "d")
         image = QImage(8, 4, QImage.Format.Format_RGB32)
         image.fill(QColor("red"))
-        cache.store_to_disk(self.key(1), image)
-        loaded = cache.load_from_disk(self.key(1))
+        cache.store_to_disk(self.key(1), "abc", image)
+        loaded = cache.load_from_disk(self.key(1), "abc")
         assert loaded is not None
         assert (loaded.width(), loaded.height()) == (8, 4)
+        assert loaded.pixelColor(0, 0) == QColor("red")
+
+    def test_a_file_stored_with_another_digest_is_a_miss(self, tmp_path: Path) -> None:
+        cache = ThumbnailCache(disk_directory=tmp_path / "d")
+        cache.store_to_disk(
+            self.key(1), "old", QImage(8, 4, QImage.Format.Format_RGB32)
+        )
+        assert cache.load_from_disk(self.key(1), "new") is None
+
+    def test_storing_leaves_the_callers_image_without_the_digest(
+        self, tmp_path: Path
+    ) -> None:
+        cache = ThumbnailCache(disk_directory=tmp_path / "d")
+        image = QImage(8, 4, QImage.Format.Format_RGB32)
+        cache.store_to_disk(self.key(1), "abc", image)
+        assert image.textKeys() == []
+
+    def test_removing_pages_deletes_their_files_at_every_stage_and_size(
+        self, tmp_path: Path
+    ) -> None:
+        cache = ThumbnailCache(disk_directory=tmp_path / "d")
+        image = QImage(2, 2, QImage.Format.Format_RGB32)
+        for number in (1, 2):
+            page = self.key(number).page
+            for stage, size in (("s", (160, 160)), ("t", (160, 160)), ("s", (8, 8))):
+                cache.store_to_disk(ThumbnailKey(page, stage, 0, size), "d", image)
+
+        cache.remove_from_disk([self.key(1).page])
+
+        assert sorted(path.name for path in (tmp_path / "d").iterdir()) == sorted(
+            f"{ThumbnailKey(self.key(2).page, stage, 0, size).file_stem()}.png"
+            for stage, size in (("s", (160, 160)), ("t", (160, 160)), ("s", (8, 8)))
+        )
+
+    def test_removing_pages_without_a_directory_does_nothing(self) -> None:
+        ThumbnailCache().remove_from_disk([self.key(1).page])
 
     def test_disk_miss_without_directory(self) -> None:
         cache = ThumbnailCache()
-        assert cache.load_from_disk(self.key(1)) is None
+        assert cache.load_from_disk(self.key(1), "abc") is None
+
+    def test_a_new_directory_is_used_for_later_files(self, tmp_path: Path) -> None:
+        cache = ThumbnailCache(disk_directory=tmp_path / "first")
+        cache.set_disk_directory(tmp_path / "second")
+        cache.store_to_disk(
+            self.key(1), "abc", QImage(2, 2, QImage.Format.Format_RGB32)
+        )
+        assert not (tmp_path / "first").exists()
+        assert len(list((tmp_path / "second").glob("*.png"))) == 1
 
 
 def test_queued_renders_of_a_stage_that_is_no_longer_shown_are_skipped(
@@ -877,3 +992,24 @@ class TestCancelingSelectionQuestion:
 
         assert answers == []
         assert widget.selected_pages() == pages
+
+
+def test_a_thumbnail_file_that_cannot_be_replaced_is_left_and_logged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The render still reaches the list; only the disk copy is skipped."""
+    cache = ThumbnailCache(disk_directory=tmp_path / "d")
+    key = TestThumbnailCache.key(1)
+    cache.store_to_disk(key, "old", QImage(2, 2, QImage.Format.Format_RGB32))
+
+    def refuse(_self: Path, _target: Path) -> Path:
+        raise PermissionError("in use")
+
+    monkeypatch.setattr(Path, "replace", refuse)
+    cache.store_to_disk(key, "new", QImage(2, 2, QImage.Format.Format_RGB32))
+    monkeypatch.undo()
+
+    assert cache.load_from_disk(key, "old") is not None
+    assert [path.name for path in (tmp_path / "d").iterdir()] == [
+        f"{key.file_stem()}.png"
+    ]

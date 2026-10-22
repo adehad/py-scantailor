@@ -3,7 +3,7 @@
 import hashlib
 import threading
 import weakref
-from collections.abc import Callable, Hashable
+from collections.abc import Callable, Hashable, Sequence
 from dataclasses import dataclass
 
 import cv2
@@ -39,6 +39,7 @@ __all__ = [
     "render_page",
     "render_page_with_model",
     "render_thumbnail",
+    "thumbnail_file_digest",
     "warm_up_qt_image_types",
 ]
 
@@ -67,6 +68,9 @@ _DETECTING_STAGES = (
 _SourceGeometry = tuple[tuple[int, int], Dpi]
 """Width and height of a decoded source before Fix Orientation, and its resolution."""
 
+
+# Bump when a change to thumbnail rendering makes the thumbnails kept on disk stale.
+THUMBNAIL_FILE_FORMAT = 1
 
 # Keys name their content, so every window and project can share one memo.
 _SHARED_MEMO = ThumbnailMemo()
@@ -411,7 +415,9 @@ def _oriented(
     return (height, width) if rotation.degrees % 180 else (width, height)
 
 
-def _source_key(image_id: ImageId, dpi_overrides: DpiOverrides | None) -> Hashable:
+def _source_key(
+    image_id: ImageId, dpi_overrides: DpiOverrides | None
+) -> tuple[ImageId, Dpi | None, tuple[int, int] | None]:
     """Name a source by the image, its project resolution and the file's state."""
     override = dpi_overrides.get(image_id) if dpi_overrides else None
     try:
@@ -457,6 +463,7 @@ class _ParamDigests:
             FilterStage.DESKEW: sequence.deskew_filter.get_params,
             FilterStage.SELECT_CONTENT: sequence.select_content_filter.get_params,
             FilterStage.PAGE_LAYOUT: sequence.page_layout_filter.get_params,
+            FilterStage.OUTPUT: sequence.output_filter.get_params,
         }
         detecting: list[str] = []
         for stage, params in params_of.items():
@@ -470,6 +477,51 @@ class _ParamDigests:
             digest.update(aggregate.model_dump_json().encode())
         digest.update(str(int(end_stage)).encode())
         return cls(tuple(detecting), digest.hexdigest())
+
+
+def thumbnail_file_digest(
+    pages: Sequence[PageId],
+    sequence: StageSequence,
+    end_stage: FilterStage,
+    dpi_overrides: DpiOverrides | None = None,
+    removed_halves: tuple[bool, bool] = (False, False),
+) -> str | None:
+    """Digest what a thumbnail is rendered from, for keeping it on disk.
+
+    Covers each page's source file (its path, size and modification time) and
+    project resolution, every stage's parameters up to ``end_stage``, the size
+    the pages are matched to, the removed halves, the polarity detection
+    setting and ``THUMBNAIL_FILE_FORMAT``. Nothing in it lives only as long as
+    the session, so a thumbnail stored with it can be shown in a later session.
+
+    Safe to call from worker threads; settings are only read.
+
+    Args:
+        pages (Sequence[PageId]): Every page the thumbnail stands for: one page,
+            or all pages of an image where the list shows images.
+        sequence (StageSequence): Stages holding the pages' parameters.
+        end_stage (FilterStage): Stage the thumbnail shows.
+        dpi_overrides (DpiOverrides | None): Project resolutions that win over
+            the image file's.
+        removed_halves (tuple[bool, bool]): Whether the left and the right half
+            of the image were removed from the project.
+
+    Returns:
+        str | None: A hex digest, or None when a source file cannot be read,
+            so that there is nothing to tell a replaced file by.
+    """
+    polarity = ApplicationSettings.get_instance().polarity_detection
+    digest = hashlib.blake2b(
+        repr((THUMBNAIL_FILE_FORMAT, removed_halves, polarity)).encode(),
+        digest_size=16,
+    )
+    for page_id in pages:
+        source_key = _source_key(page_id.image_id, dpi_overrides)
+        if source_key[-1] is None:
+            return None
+        params = _ParamDigests.of(page_id, sequence, end_stage, source_key)
+        digest.update(params.everything.encode())
+    return digest.hexdigest()
 
 
 def shrink_to_thumbnail(

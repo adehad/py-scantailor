@@ -59,6 +59,7 @@ from scantailor.app.ui.page_renderer import (
     release_thumbnail_memory,
     render_thumbnail,
     shrink_to_thumbnail,
+    thumbnail_file_digest,
 )
 from scantailor.app.ui.panels.new_open_project import NewOpenProjectPanel
 from scantailor.app.ui.pdf_worker import (
@@ -136,6 +137,25 @@ _LAST_INPUT_DIR_KEY = "project/lastInputDir"
 _LAST_PDF_DIR_KEY = "project/lastPdfDir"
 _LAST_PDF_DPI_KEY = "project/lastPdfDpi"
 THUMBNAIL_SIZE = QtCore.QSize(160, 160)
+
+
+def thumbnail_cache_directory(project: Project | None) -> pathlib.Path | None:
+    """Return where a project's thumbnails are kept between sessions.
+
+    Args:
+        project (Project | None): The open project.
+
+    Returns:
+        pathlib.Path | None: ``cache/thumbs`` in the output folder, as upstream
+            keeps it, or None when there is no project or its output folder
+            is not an absolute path, so nothing is written relative to the
+            working directory.
+    """
+    if project is None or not project.output_directory.is_absolute():
+        return None
+    return project.output_directory / "cache" / "thumbs"
+
+
 _AUTO_SAVE_INTERVAL_MS = 60_000
 # Thumbnail zoom: one step and the limits of the largest thumbnail, in pixels.
 _THUMBNAIL_STEP = (25.0, 16.0)
@@ -618,6 +638,7 @@ class MainWindowManager:
         self.thumbnails = ThumbnailListWidget(
             self._render_page_thumbnail,
             params_hash=self._thumbnail_digest,
+            file_digest=self._thumbnail_file_digest,
             thumbnail_size=THUMBNAIL_SIZE,
         )
         self.thumbnails.apply_settings(ApplicationSettings.get_instance())
@@ -693,6 +714,31 @@ class MainWindowManager:
         removed = self._removed_halves.get(page.image_id, (False, False))
         return (self._thumbnail_epoch, removed, *versions)
 
+    def _thumbnail_file_digest(self, page: PageId, stage: str) -> str | None:
+        """Return what identifies a thumbnail kept on disk; runs on a worker thread.
+
+        Args:
+            page (PageId): The page the thumbnail is drawn for.
+            stage (str): The ``FilterStage`` value as a decimal string, or ""
+                when no stage is selected.
+
+        Returns:
+            str | None: The digest, or None when the thumbnail is not kept.
+        """
+        if not stage:
+            return None
+        end_stage = FilterStage(int(stage))
+        pages = [page]
+        if end_stage.lists_images:
+            pages = [PageId(image_id=page.image_id, sub_page=sub) for sub in SubPage]
+        return thumbnail_file_digest(
+            pages,
+            self.stages,
+            end_stage,
+            self._dpi_overrides,
+            self._removed_halves.get(page.image_id, (False, False)),
+        )
+
     def _list_pages_in_thumbnails(self, project: Project | None) -> None:
         """Show a project's pages, noting which image halves were removed."""
         self._removed_halves = (
@@ -704,6 +750,7 @@ class MainWindowManager:
                 if info.left_half_removed or info.right_half_removed
             }
         )
+        self.thumbnails.set_cache_directory(thumbnail_cache_directory(project))
         self.thumbnails.set_project(project)
 
     def _invalidate_thumbnails(self, page: PageId | None = None) -> None:
@@ -2812,6 +2859,7 @@ class MainWindowManager:
         removed = project.remove_pages(doomed)
         if not removed:
             return
+        self.thumbnails.model.cache.remove_from_disk(removed)
         if erase_output:
             erase_output_files(
                 removed,
