@@ -47,6 +47,7 @@ from scantailor.core.black_on_white_estimator import is_black_on_white
 from scantailor.core.content_mask import ContentMask, compute_content_mask
 from scantailor.core.image_io import ImageLoadError
 from scantailor.core.models import (
+    Dpi,
     ImageId,
     Margins,
     OrthogonalRotation,
@@ -57,6 +58,7 @@ from scantailor.core.page_geometry import (
     build_transformation,
     content_rect_of,
     transformation_dpi,
+    view_dpi,
 )
 from scantailor.core.page_source import DpiOverrides, load_page
 from scantailor.core.pipeline import OutputExtras
@@ -159,11 +161,11 @@ class _Source:
 
     image_id: ImageId
     pixels: NDArray[np.uint8]
-    dpi: float
+    dpi: Dpi
 
 
 class _SourceSignals(QtCore.QObject):
-    loaded = QtCore.Signal(int, object, object, float)
+    loaded = QtCore.Signal(int, object, object, object)
     failed = QtCore.Signal(int, object, str)
 
 
@@ -196,7 +198,7 @@ class _SourceTask(QtCore.QRunnable):
         except (ImageLoadError, OSError) as error:
             self._report(self._signals.failed, str(error))
             return
-        self._report(self._signals.loaded, page.pixels, page.horizontal_dpi())
+        self._report(self._signals.loaded, page.pixels, page.resolution())
 
     def _report(self, signal: QtCore.SignalInstance, *args: object) -> None:
         try:
@@ -581,7 +583,7 @@ class StagePanels(QtCore.QObject):
             else self._sources.peek(image_id, self._dpi_overrides)
         )
         if cached is not None:
-            self._adopt_source(image_id, cached.pixels, cached.horizontal_dpi())
+            self._adopt_source(image_id, cached.pixels, cached.resolution())
             return
         self._source_pool.start(
             _SourceTask(
@@ -593,13 +595,13 @@ class StagePanels(QtCore.QObject):
             )
         )
 
-    @QtCore.Slot(int, object, object, float)
+    @QtCore.Slot(int, object, object, object)
     def _on_source_loaded(
         self,
         generation: int,
         image_id: ImageId,
         pixels: NDArray[np.uint8],
-        dpi: float,
+        dpi: Dpi,
     ) -> None:
         if generation != self._source_generation or not self._widgets_alive():
             return
@@ -614,13 +616,14 @@ class StagePanels(QtCore.QObject):
         return shiboken6.isValid(self.options) and shiboken6.isValid(self.view)
 
     def _adopt_source(
-        self, image_id: ImageId, pixels: NDArray[np.uint8], dpi: float
+        self, image_id: ImageId, pixels: NDArray[np.uint8], dpi: Dpi
     ) -> None:
         self._source = _Source(image_id, pixels, dpi)
         if isinstance(
             self.options, page_layout.OptionsWidget | select_content.OptionsWidget
         ):
-            self.options.set_page_dpi(dpi, dpi)
+            square = view_dpi(dpi)
+            self.options.set_page_dpi(square, square)
         if isinstance(self.options, fix_orientation.OptionsWidget):
             height, width = pixels.shape[:2]
             self.options.set_image_size(width, height)
@@ -675,7 +678,7 @@ class StagePanels(QtCore.QObject):
         page, source = current
         self._show_image_for(page, source)
         self._refresh_geometry()
-        self._announce_page_size(source.dpi)
+        self._announce_page_size(view_dpi(source.dpi))
 
     def _rotation(self, page: PageId) -> OrthogonalRotation:
         return self.sequence.fix_orientation_filter.get_rotation(page.image_id)
@@ -792,7 +795,7 @@ class StagePanels(QtCore.QObject):
             self._refresh_zones(view, page, oriented_size, source.dpi)
 
     def _content_mask_provider(
-        self, page: PageId, source_dpi: float, xform: ImageTransformation
+        self, page: PageId, source_dpi: Dpi, xform: ImageTransformation
     ) -> Callable[[], ContentMask | None]:
         """Return a function that finds the content of the page when first asked.
 
@@ -842,7 +845,7 @@ class StagePanels(QtCore.QObject):
         view: SelectContentImageView,
         page: PageId,
         oriented_size: tuple[int, int],
-        dpi: float,
+        dpi: Dpi,
     ) -> None:
         params = self.sequence.select_content_filter.get_params(page)
         xform = build_transformation(
@@ -865,7 +868,7 @@ class StagePanels(QtCore.QObject):
         view: PageLayoutImageView,
         page: PageId,
         oriented_size: tuple[int, int],
-        dpi: float,
+        dpi: Dpi,
     ) -> None:
         sequence = self.sequence
         filter_ = sequence.page_layout_filter
@@ -892,7 +895,7 @@ class StagePanels(QtCore.QObject):
         view: OutputImageView,
         page: PageId,
         oriented_size: tuple[int, int],
-        dpi: float,
+        dpi: Dpi,
     ) -> None:
         xform = build_transformation(
             self.sequence, page, oriented_size, dpi, FilterStage.PAGE_LAYOUT

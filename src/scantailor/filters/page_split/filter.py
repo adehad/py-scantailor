@@ -13,7 +13,7 @@ from functools import partial
 import numpy as np
 from numpy.typing import NDArray
 
-from scantailor.core.models import PageId
+from scantailor.core.models import Dpi, PageId
 
 from .dependencies import Dependencies
 from .layout_type import LayoutType
@@ -161,7 +161,7 @@ class Filter:
         self,
         image: NDArray[np.uint8],
         page_id: PageId,
-        dpi: float = 300.0,
+        dpi: Dpi | float = 300.0,
         store_result: bool = True,
         rotation_degrees: int = 0,
         bw_threshold: int | None = None,
@@ -172,7 +172,7 @@ class Filter:
         Args:
             image: The image to analyze (grayscale or color).
             page_id: The page ID to associate with the result.
-            dpi: Image resolution in dots per inch.
+            dpi: Image resolution in dots per inch; the axes may differ.
             store_result: If True, store the result in settings, unless the
                 page's parameters changed while it was being detected.
             rotation_degrees: Orthogonal rotation already applied to ``image``;
@@ -404,7 +404,7 @@ class Filter:
         self,
         image: NDArray[np.uint8],
         page_id: PageId,
-        dpi: float = 300.0,
+        dpi: Dpi | float = 300.0,
         rotation_degrees: int = 0,
         bw_threshold: int | None = None,
         trim_area: NDArray[np.float64] | None = None,
@@ -420,7 +420,7 @@ class Filter:
         Args:
             image: The oriented image to process.
             page_id: The page ID.
-            dpi: Image resolution.
+            dpi: Image resolution; the axes may differ.
             rotation_degrees: Orthogonal rotation applied to ``image``.
             bw_threshold: The page's stored black and white threshold, if any.
             trim_area: Corners, in pixels of ``image``, of the region a manual
@@ -476,7 +476,7 @@ class Filter:
         self,
         image: NDArray[np.uint8],
         page_id: PageId,
-        dpi: float,
+        dpi: Dpi | float,
         rotation_degrees: int,
         bw_threshold: int | None,
         trim_area: NDArray[np.float64] | None,

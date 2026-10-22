@@ -165,6 +165,13 @@ tooltip gives the reason:
      - At this resolution the page would be more than 500 mm long along one side.
        Processing such a page can run out of memory.
 
+The x and y resolutions may differ, as on a scanner that steps more coarsely down the
+page than across it. Every stage from Split Pages on shows and processes such a scan
+resampled to square pixels at the smaller of the two, as if it had been scanned at
+that resolution on both axes. A 300 x 150 dpi scan therefore works as a 150 dpi one:
+sizes in millimetres and the output page come out at the page's real size, and the
+pixel values in Select Content and Margins count those square pixels.
+
 The status bar shows the resolution of the current page's image, for example
 ``300 dpi``. When most pages of the project have another resolution, theirs
 follows in brackets, as in ``600 dpi (most pages 300 dpi)``, so a page scanned at

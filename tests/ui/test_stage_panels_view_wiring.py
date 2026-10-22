@@ -69,7 +69,7 @@ def _release_panels() -> Iterator[None]:
 def _source() -> _Source:
     pixels = np.full((HEIGHT * 10, WIDTH * 10), 255, dtype=np.uint8)
     pixels[300:340, 100:500] = 20
-    return _Source(IMAGE, pixels, 300.0)
+    return _Source(IMAGE, pixels, Dpi.uniform(300))
 
 
 class TestOutputGridEdits:

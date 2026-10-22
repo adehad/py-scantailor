@@ -34,9 +34,17 @@ class LoadedPage:
     pixels: NDArray[np.uint8]
     dpi: Dpi
 
-    def horizontal_dpi(self, default: float = FALLBACK_DPI) -> float:
-        """Horizontal resolution to size the page by, or ``default`` when null."""
-        return float(self.dpi.horizontal) if not self.dpi.is_null() else default
+    def resolution(self, default: float = FALLBACK_DPI) -> Dpi:
+        """Resolution to process the page at, ``default`` on both axes when null.
+
+        Args:
+            default (float): Dots per inch assumed when neither the project nor
+                the file defines a resolution.
+
+        Returns:
+            Dpi: ``dpi``, whose axes may differ, or ``default`` on both.
+        """
+        return Dpi.uniform(round(default)) if self.dpi.is_null() else self.dpi
 
 
 def dpi_overrides_of(project: Project | None) -> dict[ImageId, Dpi]:

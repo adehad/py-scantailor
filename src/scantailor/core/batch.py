@@ -623,7 +623,7 @@ def _detect_page(job: _PageJob) -> StageParamsData:
         overrides = {job.page.image_id: job.dpi_override} if job.dpi_override else None
         loaded = load_page(job.page.image_id, overrides)
         options = PipelineOptions(
-            dpi=loaded.horizontal_dpi(job.config.default_dpi),
+            dpi=loaded.resolution(job.config.default_dpi),
             end_stage=job.config.end_stage,
             black_on_white_detection=job.config.black_on_white_detection,
         )
@@ -723,7 +723,7 @@ def _render_page(job: _PageJob) -> tuple[Path, RenderInfo, tuple[Path, ...]]:
         overrides = {job.page.image_id: job.dpi_override} if job.dpi_override else None
         loaded = load_page(job.page.image_id, overrides)
         options = PipelineOptions(
-            dpi=loaded.horizontal_dpi(job.config.default_dpi),
+            dpi=loaded.resolution(job.config.default_dpi),
             black_on_white_detection=job.config.black_on_white_detection,
         )
         rendered = process_page(loaded.pixels, job.page, stages, options)

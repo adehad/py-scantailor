@@ -72,16 +72,16 @@ def test_thumbnail_is_rendered_at_the_project_dpi(tmp_path: Path):
 
 @pytest.mark.parametrize(
     ("override", "expected"),
-    [(Dpi.uniform(FIXED_DPI), float(FIXED_DPI)), (None, float(FILE_DPI))],
+    [(Dpi.uniform(FIXED_DPI), Dpi.uniform(FIXED_DPI)), (None, Dpi.uniform(FILE_DPI))],
     ids=["fixed", "unfixed"],
 )
 def test_stage_panel_source_is_decoded_with_the_effective_dpi(
-    tmp_path: Path, override: Dpi | None, expected: float
+    tmp_path: Path, override: Dpi | None, expected: Dpi
 ):
     page = _source(tmp_path / "low.tif", FILE_DPI)
     overrides = {page.image_id: override} if override else {}
     signals = stage_panels._SourceSignals()
-    loaded: list[float] = []
+    loaded: list[Dpi] = []
     signals.loaded.connect(lambda _gen, _id, _pixels, dpi: loaded.append(dpi))
 
     stage_panels._SourceTask(1, page.image_id, overrides, signals).run()

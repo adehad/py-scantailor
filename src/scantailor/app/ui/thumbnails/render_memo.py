@@ -10,6 +10,8 @@ import numpy as np
 from numpy.typing import NDArray
 from PySide6.QtGui import QImage
 
+from scantailor.core.models import Dpi
+
 __all__ = ["ReducedSource", "ThumbnailMemo", "reduced_copy"]
 
 _MIB = 1 << 20
@@ -27,13 +29,13 @@ class ReducedSource:
         pixels (NDArray[np.uint8]): Read-only ``(H, W)`` gray or ``(H, W, 3)``
             BGR pixels, before Fix Orientation.
         full_size (tuple[int, int]): Width and height of the full-size decode.
-        dpi (float): Horizontal resolution of the full-size decode, as the
-            pipeline is given it.
+        dpi (Dpi): Resolution of the full-size decode, as the pipeline is
+            given it.
     """
 
     pixels: NDArray[np.uint8]
     full_size: tuple[int, int]
-    dpi: float
+    dpi: Dpi
 
     @property
     def scale(self) -> float:
@@ -182,13 +184,13 @@ class ThumbnailMemo:
 
 
 def reduced_copy(
-    pixels: NDArray[np.uint8], dpi: float, longest_side: int
+    pixels: NDArray[np.uint8], dpi: Dpi, longest_side: int
 ) -> ReducedSource | None:
     """Shrink a decoded source so that its longest side is ``longest_side``.
 
     Args:
         pixels (NDArray[np.uint8]): Full-size ``(H, W)`` or ``(H, W, 3)`` pixels.
-        dpi (float): Horizontal resolution of ``pixels``, for the pipeline.
+        dpi (Dpi): Resolution of ``pixels``, for the pipeline.
         longest_side (int): Wanted length of the longer side, in pixels.
 
     Returns:

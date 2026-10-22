@@ -13,7 +13,7 @@ from scantailor.app.ui.image_views.select_content import SelectContentImageView
 from scantailor.app.ui.options_widgets import select_content
 from scantailor.app.ui.stage_panels import StagePanels
 from scantailor.app.ui.units_provider import UnitsProvider
-from scantailor.core.models import ImageId, PageId, SubPage
+from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 from scantailor.core.settings import Units
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.select_content.content_box import ContentBox, PageBox
@@ -189,7 +189,9 @@ def panels(
     panels = make_stage_panels(FilterStage.SELECT_CONTENT, sequence)
     panels._page = PAGE
     panels.options.set_current_page(PAGE)  # type: ignore[attr-defined]
-    panels._adopt_source(IMAGE, np.full((2000, 1500), 255, dtype=np.uint8), DPI)
+    panels._adopt_source(
+        IMAGE, np.full((2000, 1500), 255, dtype=np.uint8), Dpi.uniform(round(DPI))
+    )
     panels._stage_image = np.zeros((2000, 1500), dtype=np.uint8)
     panels._refresh_geometry()
     return panels
@@ -216,3 +218,25 @@ class TestPanelSync:
         _spin(panels.options, "heightSpinBox").setValue(700.0)
 
         assert view.page_rect == QtCore.QRectF(20.0, 30.0, 1000.0, 700.0)
+
+
+class TestUnequalResolution:
+    """The page box is in the view's square pixels, at the smaller resolution."""
+
+    def test_both_sizes_convert_with_the_smaller_resolution(
+        self,
+        shared_units: UnitsProvider,
+        make_stage_panels: Callable[[FilterStage, StageSequence], StagePanels],
+    ) -> None:
+        sequence = StageSequence()
+        sequence.select_content_filter.set_manual_page(PAGE, MANUAL_PAGE)
+        panels = make_stage_panels(FilterStage.SELECT_CONTENT, sequence)
+        panels._page = PAGE
+        panels.options.set_current_page(PAGE)  # type: ignore[attr-defined]
+        shared_units.set_units(Units.MILLIMETERS)
+
+        unequal = Dpi(horizontal=2 * round(DPI), vertical=round(DPI))
+        panels._adopt_source(IMAGE, np.full((1000, 3000), 255, np.uint8), unequal)
+
+        assert _spin(panels.options, "widthSpinBox").value() == pytest.approx(100.0)
+        assert _spin(panels.options, "heightSpinBox").value() == pytest.approx(150.0)

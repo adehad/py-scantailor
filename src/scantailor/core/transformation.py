@@ -472,8 +472,23 @@ class ImageTransformation:
                 Its four corners after pre-scale and pre-rotate,
             shape (4, 2); the coordinates ``set_pre_crop_area`` takes.
         """
+        return self.orig_polygon_to_pre_crop_space(_rect_to_polygon(rect))
+
+    def orig_polygon_to_pre_crop_space(
+        self, polygon: NDArray[np.float64]
+    ) -> NDArray[np.float64]:
+        """Map a polygon of the original image to the pre-crop area's space.
+
+        Args:
+            polygon (numpy.ndarray of numpy.float64): ``(N, 2)`` points in
+                original image coordinates.
+
+        Returns:
+            numpy.ndarray of numpy.float64: The points after pre-scale and
+            pre-rotate; the coordinates ``set_pre_crop_area`` takes.
+        """
         return _transform_polygon(
-            _rect_to_polygon(rect),
+            np.asarray(polygon, dtype=np.float64),
             _then(self._pre_scale_xform, self._pre_rotate_xform),
         )
 
@@ -601,40 +616,35 @@ class ImageTransformation:
         return _then(xform, _translation_matrix(dx, dy))
 
     def _calc_post_scale_xform(self, target_dpi: Dpi) -> NDArray[np.float64]:
-        """Calculate post-scale transformation to achieve target DPI."""
-        if target_dpi.is_null():
+        """Calculate the post-scale that brings the result to ``target_dpi``.
+
+        A unit step along each result axis is measured after the pre-scale,
+        where pixels are square at ``pre_scaled_dpi``, so the length is in the
+        same units whatever the rotations in between. In the original pixels
+        of an image with unequal resolutions, a step that a rotation turns onto
+        the other axis would be divided by the wrong axis's resolution.
+        """
+        pre_dpi = self._pre_scaled_dpi
+        if target_dpi.is_null() or pre_dpi.is_null():
             return _identity_matrix()
 
-        # Calculate effective DPI at this point in the pipeline
-        # We need to measure how a unit length in resulting coords
-        # maps back to original coords
-        current_transform = _then(
-            self._pre_scale_xform,
+        after_pre_scale = _then(
             self._pre_rotate_xform,
             self._pre_crop_xform,
             self._post_rotate_xform,
             self._post_crop_xform,
         )
-        inv_current = np.asarray(np.linalg.inv(current_transform), dtype=np.float64)
-
-        # Transform unit vectors back to original
-        origin = np.array([[0, 0]], dtype=np.float64)
-        h_unit = np.array([[1, 0]], dtype=np.float64)
-        v_unit = np.array([[0, 1]], dtype=np.float64)
-
-        orig_origin = _transform_polygon(origin, inv_current)
-        orig_h = _transform_polygon(h_unit, inv_current)
-        orig_v = _transform_polygon(v_unit, inv_current)
-
-        h_len = float(np.linalg.norm(orig_h - orig_origin))
-        v_len = float(np.linalg.norm(orig_v - orig_origin))
-
-        if self.orig_dpi.is_null() or h_len < 1e-10 or v_len < 1e-10:
+        back = np.asarray(np.linalg.inv(after_pre_scale), dtype=np.float64)
+        units = _transform_polygon(
+            np.array([[0, 0], [1, 0], [0, 1]], dtype=np.float64), back
+        )
+        h_len = float(np.linalg.norm(units[1] - units[0]))
+        v_len = float(np.linalg.norm(units[2] - units[0]))
+        if h_len < 1e-10 or v_len < 1e-10:
             return _identity_matrix()
 
-        xscale = float(target_dpi.horizontal * h_len / self.orig_dpi.horizontal)
-        yscale = float(target_dpi.vertical * v_len / self.orig_dpi.vertical)
-
+        xscale = float(target_dpi.horizontal * h_len / pre_dpi.horizontal)
+        yscale = float(target_dpi.vertical * v_len / pre_dpi.vertical)
         return _scale_matrix(xscale, yscale)
 
     def _reset_pre_crop_area(self) -> None:

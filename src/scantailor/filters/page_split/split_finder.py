@@ -11,6 +11,8 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.models import Dpi
+from scantailor.core.transformation import ImageTransformation, render_transformed
 from scantailor.imageproc.binary_threshold import to_gray
 
 from .layout_type import LayoutType
@@ -32,7 +34,7 @@ class SplitResult:
 def detect_split(
     image: NDArray[np.uint8],
     layout_type: LayoutType = LayoutType.AUTO_LAYOUT_TYPE,
-    dpi: float = 300.0,
+    dpi: Dpi | float = 300.0,
     bw_threshold: int | None = None,
     region: tuple[int, int, int, int] | None = None,
 ) -> SplitResult:
@@ -43,7 +45,9 @@ def detect_split(
             (H, W) gray or (H, W, 3 or 4) BGR(A) image.
         layout_type (LayoutType): Requested layout; ``AUTO_LAYOUT_TYPE`` lets the
             detector choose.
-        dpi (float): Resolution of the image, the same horizontally and vertically.
+        dpi (Dpi | float): Resolution of the image; a number means the same on
+            both axes. The estimator needs square pixels, so an image whose
+            axes differ is analysed resampled to the smaller resolution.
         bw_threshold (int | None): Gray level below which a pixel counts as black
             when whitespace is analysed. By default Otsu's threshold of the
             analysed part of the image.
@@ -55,6 +59,29 @@ def detect_split(
         SplitResult: The layout, always of the requested type unless that was
         automatic.
     """
-    return SplitResult(
-        estimate_page_layout(to_gray(image), layout_type, dpi, bw_threshold, region)
+    gray = to_gray(image)
+    if not isinstance(dpi, Dpi):
+        dpi = Dpi.uniform(round(dpi))
+    if dpi.horizontal == dpi.vertical:
+        return SplitResult(
+            estimate_page_layout(
+                gray, layout_type, dpi.horizontal, bw_threshold, region
+            )
+        )
+    height, width = gray.shape
+    xform = ImageTransformation.from_size(width, height, dpi)
+    square = render_transformed(gray, xform)
+    x_scale = square.shape[1] / width
+    y_scale = square.shape[0] / height
+    if region is not None:
+        x, y, region_width, region_height = region
+        region = (
+            round(x * x_scale),
+            round(y * y_scale),
+            max(1, round(region_width * x_scale)),
+            max(1, round(region_height * y_scale)),
+        )
+    layout = estimate_page_layout(
+        square, layout_type, xform.pre_scaled_dpi.horizontal, bw_threshold, region
     )
+    return SplitResult(layout.scaled(1 / x_scale, 1 / y_scale))

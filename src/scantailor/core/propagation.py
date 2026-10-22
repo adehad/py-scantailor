@@ -267,7 +267,7 @@ def propagate_content_boxes(project: Project, stages: StageSequence) -> None:
         ):
             _forget_geometry(stages, page)
             continue
-        dpi = float(metadata.dpi.horizontal) if metadata.is_dpi_ok() else DEFAULT_DPI
+        dpi = metadata.dpi if metadata.is_dpi_ok() else DEFAULT_DPI
         stored_only = PipelineOptions(start_stage=FilterStage.OUTPUT, dpi=dpi)
         # Only the image size matters when nothing is detected.
         blank = np.zeros((metadata.height, metadata.width), dtype=np.uint8)

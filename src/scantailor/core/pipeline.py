@@ -30,6 +30,7 @@ from scantailor.core.page_geometry import (
     page_crop_area,
     page_polygon,
     selection_rects,
+    transformation_dpi,
 )
 from scantailor.core.settings import BlackOnWhiteDetection
 from scantailor.core.stage_summary import summarize_stage
@@ -148,7 +149,9 @@ class PipelineOptions:
     Attributes:
         start_stage: First stage to execute (default: FIX_ORIENTATION).
         end_stage: Last stage to execute (default: OUTPUT).
-        dpi: Image resolution in dots per inch.
+        dpi: Resolution of the image as decoded, before Fix Orientation; a
+            number means the same on both axes. The views after Fix
+            Orientation are resampled to square pixels at the smaller axis's.
         dewarper: Dewarper to use for every page instead of the one the output
             parameters describe.
         detect_only: If True, only run detection without applying transforms.
@@ -167,7 +170,7 @@ class PipelineOptions:
 
     start_stage: FilterStage = FilterStage.FIX_ORIENTATION
     end_stage: FilterStage = FilterStage.OUTPUT
-    dpi: float = 300.0
+    dpi: Dpi | float = 300.0
     dewarper: CylindricalSurfaceDewarper | None = None
     detect_only: bool = False
     keep_output_extras: bool = False
@@ -185,8 +188,18 @@ class _PageState:
     transformation changes.
     """
 
-    def __init__(self, source: NDArray[np.uint8], dpi: float) -> None:
-        self._dpi = Dpi.uniform(max(2, round(dpi)))
+    def __init__(
+        self, source: NDArray[np.uint8], dpi: Dpi | float, rotation_degrees: int = 0
+    ) -> None:
+        """Start from pixels that Fix Orientation turned by ``rotation_degrees``.
+
+        Args:
+            source (NDArray[np.uint8]): The pixels.
+            dpi (Dpi | float): Resolution of the image as decoded, unturned.
+            rotation_degrees (int): Orthogonal rotation already applied.
+        """
+        self._decoded_dpi = dpi
+        self._source_dpi = transformation_dpi(dpi, rotation_degrees)
         self._view: NDArray[np.uint8] | None = None
         self._black_on_white: bool | None = None
         self.source = source
@@ -199,15 +212,27 @@ class _PageState:
 
     def _new_transformation(self, source: NDArray[np.uint8]) -> ImageTransformation:
         height, width = source.shape[:2]
-        return ImageTransformation.from_size(width, height, self._dpi)
+        return ImageTransformation.from_size(width, height, self._source_dpi)
+
+    @property
+    def source_dpi(self) -> Dpi:
+        """Resolution of ``source``; its axes may differ."""
+        return self._source_dpi
 
     @property
     def dpi(self) -> Dpi:
-        """Resolution the transformation is built with."""
-        return self._dpi
+        """Resolution of the view, whose pixels are square."""
+        return self.xform.pre_scaled_dpi
 
-    def replace_source(self, source: NDArray[np.uint8]) -> None:
-        """Swap in new source pixels and discard the accumulated transformation."""
+    def replace_source(self, source: NDArray[np.uint8], rotation_degrees: int) -> None:
+        """Swap in turned source pixels and discard the accumulated transformation.
+
+        Args:
+            source (NDArray[np.uint8]): The decoded image turned by
+                ``rotation_degrees``.
+            rotation_degrees (int): Orthogonal rotation applied to the pixels.
+        """
+        self._source_dpi = transformation_dpi(self._decoded_dpi, rotation_degrees)
         self.source = source
         self.xform = self._new_transformation(source)
         self.content_polygon_source = None
@@ -247,7 +272,7 @@ class _PageState:
 
     def crop_to(self, area: NDArray[np.float64]) -> None:
         """Crop to a polygon given in source coordinates."""
-        self.xform.set_pre_crop_area(area)
+        self.xform.set_pre_crop_area(self.xform.orig_polygon_to_pre_crop_space(area))
         self._view = None
         self._black_on_white = None
 
@@ -371,7 +396,8 @@ def render_from_reduced_source(
         full_width, full_height = full_height, full_width
     # Zero strides: the geometry only reads the full-size source's shape.
     stand_in = np.broadcast_to(np.uint8(0), (full_height, full_width))
-    state = _PageState(stand_in, options.dpi)
+    rotation = orientation.get_rotation(page_id.image_id).degrees
+    state = _PageState(stand_in, options.dpi, rotation)
     _apply_trim(state, page_id, sequence)
     for stage in FilterStage:
         if FilterStage.FIX_ORIENTATION < stage <= options.end_stage:
@@ -589,7 +615,9 @@ def _process_fix_orientation(
     metadata: dict[str, object] = {"rotation_degrees": rotation.degrees}
 
     if not options.detect_only:
-        state.replace_source(filter_.process_image(state.source, page_id.image_id))
+        state.replace_source(
+            filter_.process_image(state.source, page_id.image_id), rotation.degrees
+        )
         trim_area = _apply_trim(state, page_id, sequence)
         if trim_area is not None:
             metadata["trim_area"] = trim_area.tolist()
@@ -628,7 +656,7 @@ def _process_page_split(
         filter_.process(
             state.source,
             page_id,
-            dpi=options.dpi,
+            dpi=state.source_dpi,
             rotation_degrees=sequence.fix_orientation_filter.get_rotation(
                 page_id.image_id
             ).degrees,
@@ -757,7 +785,7 @@ def _process_select_content(
         params = filter_.process(
             lambda: state.detection_view(options.black_on_white_detection),
             page_id,
-            dpi=options.dpi,
+            dpi=float(state.dpi.horizontal),
             outside=lambda: _outside_source_mask(state),
             outside_key=_outside_source_key(state),
             page_outline=_polygon_points(state.xform.resulting_pre_crop_area),

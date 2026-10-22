@@ -43,7 +43,7 @@ class TestLoadPage:
         page = load_page(image_id, {image_id: Dpi.uniform(FIXED_DPI)})
 
         assert page.dpi == Dpi.uniform(FIXED_DPI)
-        assert page.horizontal_dpi() == FIXED_DPI
+        assert page.resolution() == Dpi.uniform(FIXED_DPI)
 
     def test_pages_without_an_override_keep_the_file_dpi(self, tmp_path: Path):
         image_id = _write_source(tmp_path / "a.tif", FILE_DPI)
@@ -68,7 +68,7 @@ class TestLoadPage:
 
         np.testing.assert_array_equal(fixed.pixels, load_image(image_id)[0])
 
-    def test_file_without_dpi_falls_back_to_the_default_horizontal_dpi(
+    def test_file_without_dpi_falls_back_to_the_default_on_both_axes(
         self, tmp_path: Path
     ):
         path = tmp_path / "nodpi.png"
@@ -77,7 +77,7 @@ class TestLoadPage:
         page = load_page(ImageId(file_path=path))
 
         assert page.dpi.is_null()
-        assert page.horizontal_dpi(default=123.0) == 123.0
+        assert page.resolution(default=123.0) == Dpi.uniform(123)
 
 
 class TestDpiOverridesOf:

@@ -30,23 +30,49 @@ _MIN_CROP_EDGE_PX = 1.0
 _MIN_DPI = 2
 
 
-def transformation_dpi(dpi: float) -> Dpi:
-    """Return the integer resolution a transformation is built with.
+def transformation_dpi(dpi: Dpi | float, rotation_degrees: int = 0) -> Dpi:
+    """Return the integer resolution a transformation of the source is built with.
 
     Args:
-        dpi (float): Source resolution in dots per inch.
+        dpi (Dpi | float): Resolution of the image as decoded; a number means
+            the same on both axes.
+        rotation_degrees (int): Orthogonal rotation Fix Orientation applied to
+            the pixels; 90 and 270 swap the axes.
 
     Returns:
-        Dpi: Square-pixel resolution, at least 2.
+        Dpi: Resolution of the rotated pixels, each axis at least 2.
     """
-    return Dpi.uniform(max(_MIN_DPI, round(dpi)))
+    if not isinstance(dpi, Dpi):
+        dpi = Dpi.uniform(round(dpi))
+    horizontal = max(_MIN_DPI, dpi.horizontal)
+    vertical = max(_MIN_DPI, dpi.vertical)
+    if rotation_degrees % 180:
+        horizontal, vertical = vertical, horizontal
+    return Dpi(horizontal=horizontal, vertical=vertical)
+
+
+def view_dpi(dpi: Dpi | float) -> float:
+    """Return the resolution of the views the stages after Fix Orientation show.
+
+    A transformation resamples to square pixels at the smaller of the two
+    resolutions before any other step, as upstream's ImageTransformation does,
+    so the boxes, margins and sizes those stages store are in such pixels.
+
+    Args:
+        dpi (Dpi | float): Resolution of the image as decoded.
+
+    Returns:
+        float: Dots per inch on both axes of the view.
+    """
+    resolution = transformation_dpi(dpi)
+    return float(min(resolution.horizontal, resolution.vertical))
 
 
 def build_transformation(
     sequence: StageSequence,
     page_id: PageId,
     oriented_size: tuple[int, int],
-    dpi: float,
+    dpi: Dpi | float,
     through: FilterStage,
 ) -> ImageTransformation:
     """Build the transformation defined by the stages up to ``through``.
@@ -56,7 +82,8 @@ def build_transformation(
         page_id (PageId): The page.
         oriented_size (tuple[int, int]): Width and height in pixels of the source
             image after Fix Orientation.
-        dpi (float): Resolution of the source image.
+        dpi (Dpi | float): Resolution of the image as decoded, before Fix
+            Orientation; a number means the same on both axes.
         through (FilterStage): Last stage whose geometry is included.
             ``FIX_ORIENTATION`` gives the identity, or the crop to the manual
             trim when the image has one, ``PAGE_SPLIT`` adds the crop to the
@@ -68,12 +95,15 @@ def build_transformation(
         stages after ``through`` work in.
     """
     width, height = oriented_size
-    xform = ImageTransformation.from_size(width, height, transformation_dpi(dpi))
+    rotation = sequence.fix_orientation_filter.get_rotation(page_id.image_id)
+    xform = ImageTransformation.from_size(
+        width, height, transformation_dpi(dpi, rotation.degrees)
+    )
     trim_area = sequence.fix_orientation_filter.trim_crop_area(
         page_id.image_id, oriented_size
     )
     if trim_area is not None:
-        xform.set_pre_crop_area(trim_area)
+        xform.set_pre_crop_area(xform.orig_polygon_to_pre_crop_space(trim_area))
     if through < FilterStage.PAGE_SPLIT:
         return xform
 
@@ -84,7 +114,7 @@ def build_transformation(
         else page_crop_area(layout, page_id.sub_page, oriented_size, trim_area)
     )
     if crop is not None:
-        xform.set_pre_crop_area(crop)
+        xform.set_pre_crop_area(xform.orig_polygon_to_pre_crop_space(crop))
     if through < FilterStage.DESKEW:
         return xform
 

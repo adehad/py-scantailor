@@ -265,7 +265,9 @@ class TestThumbnailMemo:
     def test_sources_beyond_the_budget_evict_the_least_recently_used(self) -> None:
         memo = ThumbnailMemo(source_budget=250)
         sources = {
-            name: ReducedSource(np.zeros((10, 10), np.uint8), (100, 100), 300.0)
+            name: ReducedSource(
+                np.zeros((10, 10), np.uint8), (100, 100), Dpi.uniform(300)
+            )
             for name in "abc"
         }
         memo.keep_reduced_source("a", sources["a"])
@@ -280,7 +282,9 @@ class TestThumbnailMemo:
 
     def test_a_kept_source_is_read_only(self) -> None:
         memo = ThumbnailMemo()
-        source = ReducedSource(np.zeros((10, 10), np.uint8), (100, 100), 300.0)
+        source = ReducedSource(
+            np.zeros((10, 10), np.uint8), (100, 100), Dpi.uniform(300)
+        )
 
         memo.keep_reduced_source("a", source)
 
@@ -318,12 +322,16 @@ class TestThumbnailMemo:
 
 class TestReducedCopy:
     def test_the_longer_side_is_shrunk_to_the_length_asked_for(self) -> None:
-        reduced = reduced_copy(np.zeros((1000, 700, 3), np.uint8), 600.0, 200)
+        reduced = reduced_copy(
+            np.zeros((1000, 700, 3), np.uint8), Dpi.uniform(600), 200
+        )
 
         assert reduced is not None
         assert reduced.pixels.shape == (200, 140, 3)
         assert reduced.full_size == (700, 1000)
-        assert reduced.dpi == 600.0
+        assert reduced.dpi == Dpi.uniform(600)
 
     def test_a_copy_not_even_half_as_large_is_not_made(self) -> None:
-        assert reduced_copy(np.zeros((300, 200), np.uint8), 300.0, 150) is None
+        assert (
+            reduced_copy(np.zeros((300, 200), np.uint8), Dpi.uniform(300), 150) is None
+        )
