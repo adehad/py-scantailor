@@ -175,7 +175,8 @@ Selecting several pages
 Removing the current page from the selection makes the nearest selected page
 current, looking before it first. Going to another page with the navigation
 buttons or keys selects only that page and turns the multi page selection button
-off.
+off. When several pages are selected, ScanTailor first asks whether to cancel the
+selection; **Tools > Settings** can turn the question off.
 
 Insert, remove and add pages
 ----------------------------

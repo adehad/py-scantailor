@@ -319,6 +319,29 @@ class TestThumbnailButtons:
         assert len(project_window.thumbnails.selected_pages()) == 1
         project_window.renderer.wait_for_done()
 
+    def test_refusing_to_cancel_a_selection_keeps_the_page_and_the_selection(
+        self,
+        project_window: MainWindow.MainWindowManager,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        pages = project_window.pages()
+        project_window.current_page = pages[0]
+        project_window.thumbnails.select_pages(pages[1:3])
+        asked: list[str] = []
+
+        def refuse(box: QtWidgets.QMessageBox) -> int:
+            asked.append(box.windowTitle())
+            return int(QtWidgets.QMessageBox.StandardButton.Cancel.value)
+
+        monkeypatch.setattr(QtWidgets.QMessageBox, "exec", refuse)
+
+        project_window.goNextPage()
+
+        assert asked == ["Canceling multi page selection"]
+        assert project_window.current_page == pages[0]
+        assert project_window.thumbnails.selected_pages() == pages[:3]
+        project_window.renderer.wait_for_done()
+
     def test_go_to_button_opens_the_go_to_page_dialog(
         self,
         project_window: MainWindow.MainWindowManager,

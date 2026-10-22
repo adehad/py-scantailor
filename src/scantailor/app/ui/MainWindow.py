@@ -2444,8 +2444,15 @@ class MainWindowManager:
         return self.project is not None and not self.batch_runner.is_running
 
     def _go_to_page(self, page: PageId) -> None:
-        """Make ``page`` current, scrolling the list to it only while Focus is on."""
-        if not self._is_shown_as_current(page):
+        """Make ``page`` current, scrolling the list to it only while Focus is on.
+
+        The user may refuse to give up a selection of several pages, which keeps
+        the current page.
+        """
+        if (
+            not self._is_shown_as_current(page)
+            and self.thumbnails.canceling_selection_accepted()
+        ):
             self.current_page = page
 
     def _go_to_page_index(self, index: int) -> None:

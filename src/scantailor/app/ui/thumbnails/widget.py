@@ -1,5 +1,6 @@
 """Standalone page thumbnail list with sort order and selection handling."""
 
+import contextlib
 import math
 from collections.abc import Callable, Hashable, Sequence
 from dataclasses import dataclass, field
@@ -33,9 +34,11 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
+    QCheckBox,
     QComboBox,
     QListView,
     QMenu,
+    QMessageBox,
     QRubberBand,
     QStyle,
     QStyledItemDelegate,
@@ -383,6 +386,7 @@ class _ThumbnailView(QListView):
     A plain click selects only the clicked thumbnail, Ctrl+click adds or removes
     one, and Shift+click adds every thumbnail between the current one and the
     clicked one. With ``toggle_on_click`` set, a plain click acts as Ctrl+click.
+    A plain click goes ahead only when ``reset_accepted`` returns True.
     The last selected thumbnail cannot be removed; removing the current one makes
     the nearest selected thumbnail current, the one before it first.
 
@@ -407,6 +411,7 @@ class _ThumbnailView(QListView):
         self._drag: _DragSelection | None = None
         self._press_point = QPoint()
         self.toggle_on_click = False
+        self.reset_accepted: Callable[[], bool] = lambda: True
         self._press_handled = False
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
@@ -485,6 +490,8 @@ class _ThumbnailView(QListView):
         drag.touched = touched
 
     def _select_only(self, index: QModelIndex) -> None:
+        if not self.reset_accepted():
+            return
         self.selectionModel().setCurrentIndex(
             index, QItemSelectionModel.SelectionFlag.ClearAndSelect
         )
@@ -633,6 +640,7 @@ class ThumbnailListWidget(QWidget):
 
         self._view = _ThumbnailView(self)
         self._view.selection_reset.connect(self.selection_reset)
+        self._view.reset_accepted = self.canceling_selection_accepted
         self._view.setModel(self._model)
         self._delegate = ThumbnailDelegate(size, self._view)
         self._view.setItemDelegate(self._delegate)
@@ -931,6 +939,59 @@ class ThumbnailListWidget(QWidget):
             enabled (bool): Whether to follow the current page.
         """
         self._follow_current = enabled
+
+    def canceling_selection_accepted(self) -> bool:
+        """Ask whether a selection of several pages may be replaced by one page.
+
+        Nothing is asked when the settings turn the question off, or when the
+        selection is one page or the two pages of one image. Ticking "Don't
+        show this message again" and answering OK turns the question off.
+
+        Returns:
+            bool: False when the user cancelled, True otherwise.
+        """
+        settings = ApplicationSettings.get_instance()
+        if not settings.show_canceling_selection_question:
+            return True
+        selected = self.selected_pages()
+        if len(selected) < 2 or (
+            len(selected) == 2 and selected[0].image_id == selected[1].image_id
+        ):
+            return True
+        box = QMessageBox(self)
+        box.setWindowTitle(
+            QtCore.QCoreApplication.translate(
+                "QObject", "Canceling multi page selection"
+            )
+        )
+        box.setText(
+            QtCore.QCoreApplication.translate(
+                "QObject", "%1 pages selection are going to be canceled. Continue?"
+            ).replace("%1", str(len(selected)))
+        )
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setStandardButtons(
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
+        )
+        box.setDefaultButton(QMessageBox.StandardButton.Ok)
+        box.setCheckBox(
+            QCheckBox(
+                QtCore.QCoreApplication.translate(
+                    "QObject", "Don't show this message again."
+                ),
+                box,
+            )
+        )
+        try:
+            accepted = box.exec() == QMessageBox.StandardButton.Ok
+            if accepted and box.checkBox().isChecked():
+                settings.show_canceling_selection_question = False
+                # save() has logged the failure; the answer holds for this session.
+                with contextlib.suppress(OSError):
+                    settings.save()
+        finally:
+            box.deleteLater()
+        return accepted
 
     def set_selection_mode_enabled(self, enabled: bool) -> None:
         """Make a plain click add or remove a page, as Ctrl+click does.
