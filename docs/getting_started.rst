@@ -77,8 +77,8 @@ The New Project dialog has these controls:
        split scan are numbered and which half comes first in a two-page spread.
        See :ref:`reverse-spread-order`.
    * - Fix DPIs, even if they look OK
-     - Present in the dialog but not used in this version. The Fix DPI dialog
-       opens only for images that have no usable resolution.
+     - Opens the Fix DPI dialog for every chosen image, even when each file
+       stores a usable resolution. Use it when the files store a wrong one.
 
 To make a project:
 
@@ -93,8 +93,8 @@ A multi-page TIFF adds each of its pages to the project. If some files cannot be
 read, a status window lists them with the files that loaded. You can continue
 without the failed files or cancel the whole import.
 
-If an image has no usable resolution, the Fix DPI dialog opens before the
-program creates the project. See :ref:`fix-dpi`.
+If an image has no usable resolution, or the Fix DPIs box is ticked, the Fix DPI
+dialog opens before the program creates the project. See :ref:`fix-dpi`.
 
 The first page opens when the project is created. The program writes the project
 to disk only when you save it with **File > Save Project** (Ctrl+S). It never
@@ -116,7 +116,8 @@ lists those images and asks for a value.
    * - How the dialog opens
      - What cancelling it does
    * - By itself, when you create a project, insert pages or open a project file
-       and an image has no usable resolution
+       and an image has no usable resolution, and when you create a project or
+       insert pages with Fix DPIs, even if they look OK ticked
      - Cancels the creation, insertion or opening.
    * - From **Tools > Fix DPI ...**, for every page of the open project
      - Closes the dialog and keeps the resolutions the images had.
