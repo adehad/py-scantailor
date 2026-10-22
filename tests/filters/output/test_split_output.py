@@ -239,4 +239,4 @@ class TestWriteSplitImages:
         result = split_by_foreground_mask(rgba, text_region, ForegroundType.COLOR)
         paths = write_split_images(tmp_path, "p.tif", result)
         with Image.open(paths[1]) as background:
-            assert background.mode == "RGB"
+            assert "A" not in background.mode

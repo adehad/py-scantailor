@@ -5,6 +5,8 @@ from numpy.typing import NDArray
 
 _MIN_LEVEL = 2
 _MAX_LEVEL = 255
+# Pixels packed at a time when a page is split into a palette: 4 MB of uint32.
+_CHUNK_PIXELS = 1 << 20
 # Share of the pixels each end of the range may drop as sensor noise. Counted
 # cumulatively, not per level: scanned ink is spread thinly over dozens of levels
 # and no single dark level would reach it.
@@ -166,6 +168,74 @@ def _normalize_palette(
     stretched = np.clip(stretched, 0, 255)
     stretched[special] = palette[special]
     return stretched
+
+
+def to_indexed(
+    image: NDArray[np.uint8], max_colours: int
+) -> tuple[NDArray[np.uint8], NDArray[np.uint8]] | None:
+    """Split an image into its colours and a per-pixel index into them.
+
+    Args:
+        image (NDArray[np.uint8]): 2-D grey or (H, W, 3) BGR image.
+        max_colours (int): Most colours the palette may hold, at most 256 so
+            that every index fits a byte.
+
+    Returns:
+        tuple[NDArray[np.uint8], NDArray[np.uint8]] | None: The palette, grey
+        levels of shape (n,) or RGB rows of shape (n, 3), sorted, and an (H, W)
+        uint8 index image; None when the image has more than ``max_colours``
+        colours.
+    """
+    if image.ndim == 2:
+        levels = np.flatnonzero(np.bincount(image.ravel(), minlength=256))
+        if len(levels) > max_colours:
+            return None
+        lookup = np.zeros(256, dtype=np.uint8)
+        lookup[levels] = np.arange(len(levels), dtype=np.uint8)
+        return levels.astype(np.uint8), lookup[image]
+    # A photo page has thousands of colours, so a strided sample rejects it
+    # before the whole page is packed.
+    pixels = image.reshape(-1, 3)
+    colours = np.unique(_packed_rgb(pixels[::97]))
+    if len(colours) > max_colours:
+        return None
+    # Chunks bound the temporary arrays to a few megabytes, and the colour count
+    # is checked after each one, so a page the sample let through stops early.
+    indices = np.empty(len(pixels), dtype=np.uint8)
+    for start in range(0, len(pixels), _CHUNK_PIXELS):
+        packed = _packed_rgb(pixels[start : start + _CHUNK_PIXELS])
+        found = np.searchsorted(colours, packed)
+        unseen = colours[np.minimum(found, len(colours) - 1)] != packed
+        if unseen.any():
+            grown = np.union1d(colours, packed[unseen])
+            if len(grown) > max_colours:
+                return None
+            # The chunks already indexed point into the old palette.
+            renumber = np.searchsorted(grown, colours).astype(np.uint8)
+            indices[:start] = renumber[indices[:start]]
+            colours = grown
+            found = np.searchsorted(colours, packed)
+        indices[start : start + _CHUNK_PIXELS] = found
+    indices = indices.reshape(image.shape[:2])
+    rgb = np.stack([colours >> 16, (colours >> 8) & 0xFF, colours & 0xFF], axis=1)
+    return rgb.astype(np.uint8), indices
+
+
+def _packed_rgb(bgr: NDArray[np.uint8]) -> NDArray[np.integer]:
+    """Pack each BGR pixel into one integer.
+
+    Args:
+        bgr (NDArray[np.uint8]): Pixels of shape (..., 3), blue first.
+
+    Returns:
+        NDArray[np.integer]: uint32 values 0xRRGGBB, of the shape of ``bgr``
+        without its last axis.
+    """
+    return (
+        (bgr[..., 2].astype(np.uint32) << 16)
+        | (bgr[..., 1].astype(np.uint32) << 8)
+        | bgr[..., 0]
+    )
 
 
 def _hsv_saturation_value(rgb: NDArray[np.int64]) -> tuple[NDArray, NDArray]:

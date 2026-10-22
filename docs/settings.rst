@@ -74,7 +74,11 @@ greyed out. This build does not act on them, so they keep their stored values.
      - CCITT G4 is the usual choice for black and white pages.
    * - Saving: Color compression
      - TIFF compression of grey and colour output: None, LZW, Deflate or JPEG.
-       JPEG is lossy. The others keep every pixel.
+       JPEG is lossy. The others keep every pixel. With them, ScanTailor writes a
+       colour page of at most 256 colours, such as posterized output, as a palette
+       image, smaller than 24-bit colour. If all of those colours are grey, it
+       writes 8-bit grey. A page with transparency keeps 24-bit colour and its
+       alpha channel.
      - LZW or Deflate for lossless files. JPEG only to save space.
    * - Auto detect light content on dark background
      - Deskew and Select Content check whether a page has light text on a dark

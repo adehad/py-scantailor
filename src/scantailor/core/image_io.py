@@ -34,6 +34,7 @@ from PIL import Image, UnidentifiedImageError
 from scantailor.core.models import Dpi, ImageId
 from scantailor.core.project import ImageMetadata
 from scantailor.core.settings import TiffCompression, TiffCompressions
+from scantailor.imageproc.posterizer import to_indexed
 
 # Scans routinely exceed Pillow's default decompression-bomb threshold of about
 # 89 megapixels. Pillow warns above this limit and refuses above twice it.
@@ -42,6 +43,7 @@ Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 _MAX_SAMPLE_16: Final = 65535
 _TIFF_SUFFIXES: Final = frozenset({".tif", ".tiff"})
+_MAX_PALETTE_COLOURS: Final = 256
 _TAG_X_RESOLUTION: Final = 282
 _TAG_Y_RESOLUTION: Final = 283
 _TAG_RESOLUTION_UNIT: Final = 296
@@ -449,6 +451,32 @@ def tiff_compressions_in_use(compressions: TiffCompressions) -> Iterator[None]:
         _default_compressions.reset(token)
 
 
+def _colour_image(bgr: NDArray[np.uint8], *, palette: bool) -> Image.Image:
+    """Make the Pillow image a BGR page is written from.
+
+    With ``palette``, a page of at most 256 colours, such as posterized output,
+    becomes a palette image, and one whose colours are all grey becomes a grey
+    image, as C++ writes an indexed QImage. Otherwise it stays 24-bit RGB.
+
+    Args:
+        bgr (NDArray[np.uint8]): (H, W, 3) BGR page. Not modified.
+        palette (bool): Whether a palette image may be written; libtiff's JPEG
+            codec takes no palette images.
+
+    Returns:
+        Image.Image: A mode ``P``, ``L`` or ``RGB`` image of the same pixels.
+    """
+    indexed = to_indexed(bgr, _MAX_PALETTE_COLOURS) if palette else None
+    if indexed is None:
+        return Image.fromarray(np.ascontiguousarray(bgr[..., ::-1]), mode="RGB")
+    colours, indices = indexed
+    if np.all(colours == colours[:, :1]):
+        return Image.fromarray(np.ascontiguousarray(bgr[..., 0]), mode="L")
+    image = Image.fromarray(indices, mode="P")
+    image.putpalette(colours.tobytes())
+    return image
+
+
 def write_image(
     path: Path,
     pixels: NDArray,
@@ -461,7 +489,9 @@ def write_image(
     convention); TIFF output uses the black-and-white method, CCITT G4 unless
     chosen otherwise. ``uint8`` arrays are gray ``(H, W)`` or BGR ``(H, W, 3)``
     and use the colour method, LZW unless chosen otherwise. Like C++, grey images
-    follow the colour method. ``(H, W, 4)`` ``uint8`` arrays are BGRA and keep
+    follow the colour method. A BGR TIFF of at most 256 colours is written as a
+    palette image, or as grey when every colour is grey, unless the colour method
+    is JPEG. ``(H, W, 4)`` ``uint8`` arrays are BGRA and keep
     their alpha as an extra sample, as C++ does for images with an alpha channel.
     16-bit RGB is not written, since C++ writes none either; reduce it to 8 bits.
 
@@ -497,7 +527,9 @@ def write_image(
         image = Image.fromarray(pixels, mode="L")
         compression = _PILLOW_COMPRESSION[chosen.color]
     elif pixels.dtype == np.uint8 and pixels.ndim == 3 and pixels.shape[2] == 3:
-        image = Image.fromarray(np.ascontiguousarray(pixels[..., ::-1]), mode="RGB")
+        image = _colour_image(
+            pixels, palette=is_tiff and chosen.color != TiffCompression.JPEG
+        )
         compression = _PILLOW_COMPRESSION[chosen.color]
     elif pixels.dtype == np.uint8 and pixels.ndim == 3 and pixels.shape[2] == 4:
         bgra_to_rgba = pixels[..., [2, 1, 0, 3]]
