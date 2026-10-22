@@ -65,8 +65,10 @@ greyed out. This build does not act on them, so they keep their stored values.
        in the thumbnail column.
      - For a narrow window or a large page preview.
    * - Show question on canceling multi page selection
-     - Stored, but this version does not ask the question.
-     - Not available.
+     - Asks before a click or a move to another page replaces a selection of
+       several pages with one page. Two halves of one image count as one. "Don't
+       show this message again" in the question clears this box.
+     - Clear it if you rarely select several pages by mistake.
    * - Saving: B&W compression
      - TIFF compression of black and white output: None, LZW, Deflate or CCITT G4.
      - CCITT G4 is the usual choice for black and white pages.

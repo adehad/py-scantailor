@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QColor, QImage, QMouseEvent
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.thumbnails import (
@@ -18,6 +18,7 @@ from scantailor.app.ui.thumbnails import (
 from scantailor.app.ui.thumbnails.model import IsCurrentRole
 from scantailor.core.models import ImageId, PageId
 from scantailor.core.project import ImageMetadata, Project
+from scantailor.core.settings import ApplicationSettings
 
 WIDTHS = [900, 300, 600, 450]
 
@@ -149,6 +150,7 @@ def test_ctrl_click_adds_pages_with_selection_mode_off(
 def test_plain_click_selects_only_the_clicked_page_with_selection_mode_off(
     qtbot: QtBot, widget: ThumbnailListWidget
 ) -> None:
+    ApplicationSettings.get_instance().show_canceling_selection_question = False
     pages = widget.pages()
     click(qtbot, widget, pages[0])
     click(qtbot, widget, pages[2], Qt.KeyboardModifier.ControlModifier)
@@ -755,3 +757,123 @@ class TestImageList:
         thumbnails._request_removal()
 
         assert requested == [[left, right]]
+
+
+class TestCancelingSelectionQuestion:
+    @pytest.fixture
+    def answers(self, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+        """Answer the question with the next queued reply and record its text."""
+        replies: list[tuple[QMessageBox.StandardButton, bool]] = []
+        asked: list[str] = []
+
+        def answer(box: QMessageBox) -> int:
+            asked.append(box.text())
+            button, dont_ask_again = replies.pop(0)
+            box.checkBox().setChecked(dont_ask_again)
+            return int(button.value)
+
+        monkeypatch.setattr(QMessageBox, "exec", answer)
+        self.replies = replies
+        return asked
+
+    @staticmethod
+    def _select_three(qtbot: QtBot, widget: ThumbnailListWidget) -> list[PageId]:
+        pages = widget.pages()
+        click(qtbot, widget, pages[0])
+        for page in pages[1:3]:
+            click(qtbot, widget, page, Qt.KeyboardModifier.ControlModifier)
+        return pages
+
+    def test_cancelling_the_question_keeps_the_selection_and_current_page(
+        self, qtbot: QtBot, widget: ThumbnailListWidget, answers: list[str]
+    ) -> None:
+        pages = self._select_three(qtbot, widget)
+        self.replies.append((QMessageBox.StandardButton.Cancel, False))
+
+        click(qtbot, widget, pages[3])
+
+        assert answers == ["3 pages selection are going to be canceled. Continue?"]
+        assert widget.selected_pages() == pages[:3]
+        assert widget.current_page() == pages[2]
+
+    def test_accepting_the_question_selects_only_the_clicked_page(
+        self, qtbot: QtBot, widget: ThumbnailListWidget, answers: list[str]
+    ) -> None:
+        pages = self._select_three(qtbot, widget)
+        self.replies.append((QMessageBox.StandardButton.Ok, False))
+
+        click(qtbot, widget, pages[1])
+
+        assert widget.selected_pages() == [pages[1]]
+        assert ApplicationSettings.get_instance().show_canceling_selection_question
+
+    def test_dont_show_again_with_ok_turns_the_question_off(
+        self, qtbot: QtBot, widget: ThumbnailListWidget, answers: list[str]
+    ) -> None:
+        pages = self._select_three(qtbot, widget)
+        self.replies.append((QMessageBox.StandardButton.Ok, True))
+        click(qtbot, widget, pages[3])
+        for page in pages[:2]:
+            click(qtbot, widget, page, Qt.KeyboardModifier.ControlModifier)
+
+        click(qtbot, widget, pages[2])
+
+        assert len(answers) == 1
+        assert widget.selected_pages() == [pages[2]]
+        assert not ApplicationSettings.get_instance().show_canceling_selection_question
+
+    def test_dont_show_again_with_cancel_keeps_asking(
+        self, qtbot: QtBot, widget: ThumbnailListWidget, answers: list[str]
+    ) -> None:
+        pages = self._select_three(qtbot, widget)
+        self.replies.append((QMessageBox.StandardButton.Cancel, True))
+
+        click(qtbot, widget, pages[3])
+
+        assert ApplicationSettings.get_instance().show_canceling_selection_question
+
+    def test_nothing_is_asked_when_the_setting_is_off(
+        self, qtbot: QtBot, widget: ThumbnailListWidget, answers: list[str]
+    ) -> None:
+        ApplicationSettings.get_instance().show_canceling_selection_question = False
+        pages = self._select_three(qtbot, widget)
+
+        click(qtbot, widget, pages[3])
+
+        assert answers == []
+        assert widget.selected_pages() == [pages[3]]
+
+    def test_nothing_is_asked_for_one_selected_page(
+        self, qtbot: QtBot, widget: ThumbnailListWidget, answers: list[str]
+    ) -> None:
+        pages = widget.pages()
+        click(qtbot, widget, pages[0])
+
+        click(qtbot, widget, pages[1])
+
+        assert answers == []
+
+    def test_nothing_is_asked_for_the_two_halves_of_one_image(
+        self, qtbot: QtBot, renderer: CountingRenderer, answers: list[str]
+    ) -> None:
+        image = ImageId(file_path=Path("spread.png"))
+        project = Project()
+        project.add_image(image, ImageMetadata(width=2000, height=1400))
+        project.images[0].num_sub_pages = 2
+        thumbnails = ThumbnailListWidget(renderer, project, stage="3")
+        qtbot.addWidget(thumbnails)
+        left, right = thumbnails.pages()
+        thumbnails.select_pages([left, right])
+
+        assert thumbnails.canceling_selection_accepted()
+        assert answers == []
+
+    def test_ctrl_click_never_asks(
+        self, qtbot: QtBot, widget: ThumbnailListWidget, answers: list[str]
+    ) -> None:
+        pages = self._select_three(qtbot, widget)
+
+        click(qtbot, widget, pages[3], Qt.KeyboardModifier.ControlModifier)
+
+        assert answers == []
+        assert widget.selected_pages() == pages
