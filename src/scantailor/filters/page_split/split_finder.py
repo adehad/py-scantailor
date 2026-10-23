@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.core.models import Dpi
 from scantailor.core.transformation import ImageTransformation, render_transformed
 from scantailor.imageproc.binary_threshold import to_gray
@@ -37,6 +38,7 @@ def detect_split(
     dpi: Dpi | float = 300.0,
     bw_threshold: int | None = None,
     region: tuple[int, int, int, int] | None = None,
+    dbg: DebugImages | None = None,
 ) -> SplitResult:
     """Detect how to split an upright page image into pages.
 
@@ -54,6 +56,7 @@ def detect_split(
         region (tuple[int, int, int, int] | None): ``(x, y, width, height)`` of
             the only part of the image to analyse, such as what a manual trim
             keeps. The layout is still in the pixels of the whole image.
+        dbg (DebugImages | None): Receives the estimator's intermediate images.
 
     Returns:
         SplitResult: The layout, always of the requested type unless that was
@@ -65,7 +68,7 @@ def detect_split(
     if dpi.horizontal == dpi.vertical:
         return SplitResult(
             estimate_page_layout(
-                gray, layout_type, dpi.horizontal, bw_threshold, region
+                gray, layout_type, dpi.horizontal, bw_threshold, region, dbg
             )
         )
     height, width = gray.shape
@@ -82,6 +85,11 @@ def detect_split(
             max(1, round(region_height * y_scale)),
         )
     layout = estimate_page_layout(
-        square, layout_type, xform.pre_scaled_dpi.horizontal, bw_threshold, region
+        square,
+        layout_type,
+        xform.pre_scaled_dpi.horizontal,
+        bw_threshold,
+        region,
+        dbg,
     )
     return SplitResult(layout.scaled(1 / x_scale, 1 / y_scale))

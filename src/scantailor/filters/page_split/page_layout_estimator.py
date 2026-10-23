@@ -39,6 +39,8 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
+from scantailor.imageproc import debug_drawing as draw
 from scantailor.imageproc.area_scale import scale_to_gray
 from scantailor.imageproc.binary_morphology import open_brick, seed_fill
 from scantailor.imageproc.binary_shear import h_shear
@@ -73,6 +75,8 @@ _OFFCUT_MAX_WIDTH_FRACTION = 4
 _MIN_OFFCUT_GUTTER = 20
 _OFFCUT_GUTTER_RATIO = 2
 _SKEW_ACCURACY = 0.5
+# Opacity of upstream's red tint over the spans in the debug image.
+_SPAN_ALPHA = 0x50 / 0xFF
 
 _Matrix = NDArray[np.float64]
 
@@ -91,6 +95,7 @@ def estimate_page_layout(
     dpi: float,
     bw_threshold: int | None = None,
     region: tuple[int, int, int, int] | None = None,
+    dbg: DebugImages | None = None,
 ) -> PageLayout:
     """Detect how an upright page image divides into pages.
 
@@ -106,6 +111,8 @@ def estimate_page_layout(
         region (tuple[int, int, int, int] | None): ``(x, y, width, height)`` of
             the only part of ``gray`` to analyse, such as what a manual trim
             keeps. It is clipped to the image. By default the whole image.
+        dbg (DebugImages | None): Receives the folding line search's images and,
+            when no folding line decides, the whitespace analysis's.
 
     Returns:
         PageLayout: The layout of the whole image, with cutter lines spanning
@@ -118,13 +125,13 @@ def estimate_page_layout(
     if layout_type == LayoutType.SINGLE_PAGE_UNCUT:
         return PageLayout.single_page_uncut(full_width, full_height)
 
-    folding = _try_cut_at_folding_line(layout_type, analysed, dpi)
+    folding = _try_cut_at_folding_line(layout_type, analysed, dpi, dbg)
     if folding is not None:
         layout = _to_page_layout(folding, width, height)
     else:
         if bw_threshold is None:
             bw_threshold = otsu_threshold(analysed)
-        layout = _cut_at_whitespace(layout_type, analysed, dpi, bw_threshold)
+        layout = _cut_at_whitespace(layout_type, analysed, dpi, bw_threshold, dbg)
     if (x0, y0, width, height) == (0, 0, full_width, full_height):
         return layout
     return _in_whole_image(layout, x0, y0, full_width, full_height)
@@ -219,12 +226,15 @@ def _across_height(line: Line, height: int) -> Line:
 
 
 def _try_cut_at_folding_line(
-    layout_type: LayoutType, gray: NDArray[np.uint8], dpi: float
+    layout_type: LayoutType,
+    gray: NDArray[np.uint8],
+    dpi: float,
+    dbg: DebugImages | None = None,
 ) -> _Cutters | None:
     """Cut at the folding lines found in the image, if there are usable ones."""
     height, width = gray.shape
     num_pages = _num_pages(layout_type, width, height)
-    lines = find_lines(gray, dpi, _MAX_FOLDING_LINES)
+    lines = find_lines(gray, dpi, _MAX_FOLDING_LINES, dbg)
     lines.sort(key=_center_x)
     center = 0.5 * width
 
@@ -317,20 +327,31 @@ def _to_300_dpi_binary(
     return scaled < threshold, _scaling(factor, factor)
 
 
-def _remove_garbage_and_halve(black: NDArray[np.bool_]) -> NDArray[np.bool_]:
+def _remove_garbage_and_halve(
+    black: NDArray[np.bool_], dbg: DebugImages | None = None
+) -> NDArray[np.bool_]:
     """Halve to 150 dpi and drop specks and the shadows of the page borders."""
     reduced = reduce_threshold(black, 2)
+    if dbg is not None:
+        dbg.add(reduced, "reduced")
 
     # A real mark contains a bar at least 4 pixels long, either way.
     bars = open_brick(reduced, 4, 1) | open_brick(reduced, 1, 4)
     reduced = seed_fill(bars, reduced)
+    if dbg is not None:
+        dbg.add(reduced, "garbage_removed")
 
     wide_shadow = open_brick(reduced, 200, 14, black_surroundings=True)
     tall_shadow = open_brick(reduced, 14, 300, black_surroundings=True)
+    seed = wide_shadow | tall_shadow
+    if dbg is not None:
+        dbg.add(seed, "shadows_seed")
     grown = cv2.dilate(reduced.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(
         np.bool_
     )
-    shadows = seed_fill(wide_shadow | tall_shadow, grown)
+    shadows = seed_fill(seed, grown)
+    if dbg is not None:
+        dbg.add(shadows, "shadowsDilated")
     return reduced & ~shadows
 
 
@@ -388,12 +409,17 @@ def _cut_at_whitespace(
     gray: NDArray[np.uint8],
     dpi: float,
     bw_threshold: int,
+    dbg: DebugImages | None = None,
 ) -> PageLayout:
     """Find whitespace to cut through; always returns a layout of the requested type."""
     height, width = gray.shape
     black, to_300 = _to_300_dpi_binary(gray, dpi, bw_threshold)
-    img = _remove_garbage_and_halve(black)
+    if dbg is not None:
+        dbg.add(black, "bw300")
+    img = _remove_garbage_and_halve(black, dbg)
     to_150 = to_300 @ _scaling(0.5, 0.5)
+    if dbg is not None:
+        dbg.add(img, "no_garbage")
 
     left_offcut = _has_left_offcut(img)
     right_offcut = _has_right_offcut(img)
@@ -404,10 +430,12 @@ def _cut_at_whitespace(
     if skew.angle != 0.0 and skew.confidence >= Skew.GOOD_CONFIDENCE:
         img, deskew_matrix = _deskew(img, skew)
         to_150 = to_150 @ deskew_matrix
+        if dbg is not None and not np.array_equal(deskew_matrix, np.eye(3)):
+            dbg.add(img, "shear_applied")
 
     num_pages = _num_pages(layout_type, width, height)
     cutters = _cut_at_whitespace_deskewed_150(
-        layout_type, num_pages, img, left_offcut, right_offcut
+        layout_type, num_pages, img, left_offcut, right_offcut, dbg
     )
 
     back = np.asarray(np.linalg.inv(to_150), dtype=np.float64)
@@ -424,27 +452,61 @@ def _map_line(line: Line, matrix: _Matrix) -> Line:
     )
 
 
-def _content_columns(img: NDArray[np.bool_]) -> NDArray[np.int64]:
-    """Count, per column, the kept components whose bounding box covers it.
+def _content_boxes(img: NDArray[np.bool_]) -> NDArray[np.int32]:
+    """Return the component stats rows of the components that count as content.
 
     Components that are tiny or much taller than wide (rules, edges) are not
-    content. Only whether a column is covered matters downstream.
+    content.
     """
     _count, _labels, stats, _centroids = cv2.connectedComponentsWithStats(
         img.astype(np.uint8), connectivity=8
     )
-    left = stats[1:, cv2.CC_STAT_LEFT]
-    box_width = stats[1:, cv2.CC_STAT_WIDTH]
-    box_height = stats[1:, cv2.CC_STAT_HEIGHT]
+    boxes = stats[1:]
+    box_width = boxes[:, cv2.CC_STAT_WIDTH]
+    box_height = boxes[:, cv2.CC_STAT_HEIGHT]
     keep = (
         (box_width >= _MIN_COMPONENT_SIZE)
         & (box_height >= _MIN_COMPONENT_SIZE)
         & (box_height / np.maximum(box_width, 1) <= _MAX_COMPONENT_ASPECT)
     )
-    edges = np.zeros(img.shape[1] + 1, dtype=np.int64)
-    np.add.at(edges, left[keep], 1)
-    np.add.at(edges, (left + box_width)[keep], -1)
+    return boxes[keep]
+
+
+def _content_columns(img: NDArray[np.bool_]) -> NDArray[np.int64]:
+    """Count, per column, the content components whose bounding box covers it."""
+    return _box_columns(_content_boxes(img), img.shape[1])
+
+
+def _box_columns(boxes: NDArray[np.int32], width: int) -> NDArray[np.int64]:
+    """Count, per column, the boxes covering it.
+
+    Only whether a column is covered matters downstream.
+    """
+    left = boxes[:, cv2.CC_STAT_LEFT]
+    edges = np.zeros(width + 1, dtype=np.int64)
+    np.add.at(edges, left, 1)
+    np.add.at(edges, left + boxes[:, cv2.CC_STAT_WIDTH], -1)
     return np.cumsum(edges)[:-1]
+
+
+def _filled_boxes(
+    shape: tuple[int, int], boxes: NDArray[np.int32]
+) -> NDArray[np.bool_]:
+    """Return a mask that is True inside each content box."""
+    mask = np.zeros(shape, dtype=np.bool_)
+    for x, y, w, h in boxes[:, :4].tolist():
+        mask[y : y + h, x : x + w] = True
+    return mask
+
+
+def _draw_spans(img: NDArray[np.bool_], spans: list[Span]) -> NDArray[np.uint8]:
+    """Tint the columns of each span red over the black and white page."""
+    canvas = draw.to_bgr(img)
+    for span in spans:
+        draw.tint(
+            canvas, (slice(None), slice(span.begin, span.end)), draw.RED, _SPAN_ALPHA
+        )
+    return canvas
 
 
 def _cut_at_whitespace_deskewed_150(
@@ -453,18 +515,28 @@ def _cut_at_whitespace_deskewed_150(
     img: NDArray[np.bool_],
     left_offcut: bool,
     right_offcut: bool,
+    dbg: DebugImages | None = None,
 ) -> _Cutters:
     """Choose cutters from the content spans of a deskewed 150 dpi page."""
     height, width = img.shape
+    boxes = _content_boxes(img)
+    if dbg is not None:
+        dbg.add(_filled_boxes((height, width), boxes), "ccImg")
     spans = find_content_spans(
-        _content_columns(img).tolist(), _MIN_CONTENT_WIDTH, _MIN_WHITESPACE_WIDTH
+        _box_columns(boxes, width).tolist(),
+        _MIN_CONTENT_WIDTH,
+        _MIN_WHITESPACE_WIDTH,
     )
+    if dbg is not None:
+        dbg.add(_draw_spans(img, spans), "spans")
     if num_pages == 1:
         return _process_spans_single_page(
             layout_type, spans, width, height, left_offcut, right_offcut
         )
     # One page may hold nothing but a little garbage.
     _remove_insignificant_edge_spans(spans)
+    if dbg is not None:
+        dbg.add(_draw_spans(img, spans), "spans_refined")
     return _process_spans_two_pages(spans, width)
 
 

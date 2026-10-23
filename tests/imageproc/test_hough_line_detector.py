@@ -188,3 +188,18 @@ def test_equal_peaks_come_in_raster_order_of_their_first_bin() -> None:
     assert [line.quality for line in lines] == [9, 7, 7]
     centre_columns = [round(line.distance + detector._bias - 0.5) for line in lines]
     assert centre_columns == [15, 30, 5]
+
+
+def test_hough_space_picture_tints_the_strongest_peak_and_few_other_bins() -> None:
+    height = 220
+    xs, ys = _vertical_line_points(60, height)
+    detector = HoughLineDetector(160, height, THICKNESS, START, STEP, ANGLES)
+    detector.process(xs, ys, np.full(len(xs), 5, dtype=np.uint32))
+
+    visual = detector.visualize_hough_space(500)
+
+    tinted = visual[..., 2] > visual[..., 0]
+    assert visual.shape[2] == 3
+    assert 0 < np.count_nonzero(tinted) < 10
+    strongest = np.unravel_index(np.argmax(detector._histogram), tinted.shape)
+    assert tinted[strongest]

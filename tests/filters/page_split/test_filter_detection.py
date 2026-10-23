@@ -91,11 +91,11 @@ class TestLayoutTypeChosenWhileProcessing:
         page_id = _page_id()
         detect = split_filter_module.detect_split
 
-        def apply_to_during_detection(*args: Any) -> SplitResult:
+        def apply_to_during_detection(*args: Any, **kwargs: Any) -> SplitResult:
             page_filter.apply_layout_type(
                 page_id, [page_id], LayoutType.TWO_PAGES, apply_cut=False
             )
-            return detect(*args)
+            return detect(*args, **kwargs)
 
         monkeypatch.setattr(
             split_filter_module, "detect_split", apply_to_during_detection

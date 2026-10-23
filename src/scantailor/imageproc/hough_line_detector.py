@@ -129,6 +129,27 @@ class HoughLineDetector:
                 np.uint32
             )
 
+    def visualize_hough_space(self, quality_lower_bound: int) -> NDArray[np.uint8]:
+        """Draw the vote histogram with its peaks, for debug images.
+
+        Args:
+            quality_lower_bound (int): The bound ``find_lines`` would get.
+
+        Returns:
+            NDArray[np.uint8]: ``(angles, distance bins, 3)`` BGR image: votes
+                as gray scaled to the highest bin, peaks tinted half red.
+        """
+        highest = int(self._histogram.max(initial=0))
+        if highest == 0:
+            gray = np.zeros(self._histogram.shape, dtype=np.uint8)
+        else:
+            gray = np.floor(self._histogram * (255.0 / highest) + 0.5).astype(np.uint8)
+        visual = np.asarray(cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR), dtype=np.uint8)
+        peaks = _find_histogram_peaks(self._histogram, quality_lower_bound)
+        red = np.array([0, 0, 255], dtype=np.float64)
+        visual[peaks] = np.round((visual[peaks] + red) / 2).astype(np.uint8)
+        return visual
+
     def find_lines(self, quality_lower_bound: int) -> list[HoughLine]:
         """Return the lines whose vote sum reaches the bound, best first.
 
