@@ -632,7 +632,7 @@ class TestApplyTo:
         "scope", [ApplyScope.ALL_PAGES, ApplyScope.THIS_PAGE_EVERY_OTHER]
     )
     def test_processing_button_copies_only_the_polarity_as_chosen_by_hand(
-        self, settled_window: MainWindowManager, scope: ApplyScope
+        self, settled_window: MainWindowManager, scope: ApplyScope, qtbot: QtBot
     ):
         window = settled_window
         _switch_stage(window, FilterStage.OUTPUT)
@@ -641,11 +641,15 @@ class TestApplyTo:
         assert current is not None
         output = window.stages.output_filter
         output.set_params(
-            current,
-            output.get_params(current)
-            .with_black_on_white(False)
-            .with_color_mode(ColorMode.MIXED),
+            current, output.get_params(current).with_color_mode(ColorMode.MIXED)
         )
+        polarity = window.filterOptions.findChild(QtWidgets.QCheckBox, "blackOnWhiteCB")
+        assert polarity is not None and polarity.isChecked()
+        polarity.click()
+        # The renders started so far measure the printed pages as black on
+        # white; they all end before Apply, as a loaded machine can make them.
+        qtbot.waitUntil(lambda: window.renderer.wait_for_done(0), timeout=60_000)
+        qtbot.wait(50)
         before = {page: output.get_params(page) for page in pages}
         button = window.filterOptions.findChild(
             QtWidgets.QPushButton, "apply_processing_btn"
@@ -654,9 +658,13 @@ class TestApplyTo:
 
         _answer_apply_dialog(scope)
         button.click()
-
         targets = set(select_pages(scope, current, pages)) - {current}
+        # A render that ends after Apply measures the targets too.
+        for page in targets:
+            output.settings.set_detected_black_on_white(page, True)
+
         assert targets
+        assert output.get_params(current).black_on_white is False
         for page in pages:
             after = output.get_params(page)
             if page in targets:
