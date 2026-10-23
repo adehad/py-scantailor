@@ -13,6 +13,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.core.zones import (
     PictureLayer,
     PictureZoneProperties,
@@ -46,6 +47,7 @@ def detect_picture_mask(
     gray: NDArray[np.uint8],
     dpi: tuple[int, int],
     options: PictureShapeOptions,
+    dbg: DebugImages | None = None,
 ) -> NDArray[np.bool_]:
     """Find free-form picture regions.
 
@@ -56,6 +58,7 @@ def detect_picture_mask(
         gray (numpy.ndarray of numpy.uint8): 2-D gray page. Not modified.
         dpi (tuple[int, int]): Horizontal and vertical resolution of ``gray``.
         options (PictureShapeOptions): Detection mode and sensitivity.
+        dbg (DebugImages | None): Receives the picture detector's steps.
 
     Returns:
         numpy.ndarray of numpy.bool: True where there is a picture; all False
@@ -67,6 +70,7 @@ def detect_picture_mask(
         gray,
         dpi,
         higher_search_sensitivity=options.higher_search_sensitivity,
+        dbg=dbg,
     )
 
 
@@ -74,6 +78,7 @@ def find_auto_picture_zones(
     gray: NDArray[np.uint8],
     dpi: tuple[int, int],
     options: PictureShapeOptions,
+    dbg: DebugImages | None = None,
 ) -> list[Zone]:
     """Find rectangular pictures and return them as auto picture zones.
 
@@ -85,6 +90,7 @@ def find_auto_picture_zones(
         dpi (tuple[int, int]): Horizontal and vertical resolution of ``gray``.
         options (PictureShapeOptions): Sensitivity and search options; the
             shape is taken to be rectangular.
+        dbg (DebugImages | None): Receives the picture detector's steps.
 
     Returns:
         list[Zone]: One zone per picture, in the pixel coordinates of ``gray``.
@@ -95,6 +101,7 @@ def find_auto_picture_zones(
         gray,
         dpi,
         higher_search_sensitivity=options.higher_search_sensitivity,
+        dbg=dbg,
     )
     properties = PictureZoneProperties(
         layer=PictureLayer.PAINTER2, category=ZoneCategory.AUTO

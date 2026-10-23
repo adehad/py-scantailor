@@ -211,9 +211,9 @@ class TestWorkingSize:
         seen: list[tuple[int, ...]] = []
         original = module._suppress_text_and_shadow
 
-        def spy(small):
+        def spy(small, dbg=None):
             seen.append(small.shape)
-            return original(small)
+            return original(small, dbg)
 
         monkeypatch.setattr(module, "_suppress_text_and_shadow", spy)
 

@@ -12,6 +12,7 @@ import numpy as np
 from loguru import logger
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.core.estimate_background import normalize_illumination_gray
 from scantailor.core.models import Dpi
 from scantailor.core.zones import (
@@ -191,6 +192,7 @@ def generate_output(
     fill_zones: Sequence[Zone] = (),
     keep_despeckle_source: bool = False,
     source_outline: Polygon | None = None,
+    dbg: DebugImages | None = None,
 ) -> OutputResult:
     """Generate the output image according to parameters.
 
@@ -228,6 +230,8 @@ def generate_output(
             coordinates of ``image``. Pixels outside it have nothing behind
             them and are always filled with the margin colour. None means
             ``image`` is all source.
+        dbg (DebugImages | None): Receives the intermediate images of the
+            generation, the illumination estimate and the despeckling.
 
     Returns:
         OutputResult with the processed image.
@@ -240,18 +244,20 @@ def generate_output(
         image.shape[:2], render, content_polygon, page_outline, source_outline
     )
     drawn_zones, auto_zones, layout = _picture_zones_to_draw(
-        image, params, render, layout, picture_zones
+        image, params, render, layout, picture_zones, dbg
     )
     page = _PageGeometry.build(image, params, layout, drawn_zones, fill_zones)
     if params.needs_dewarping() and dewarper is not None:
-        page = _dewarp_page(page, params, render, dewarper)
+        page = _dewarp_page(page, params, render, dewarper, dbg)
 
     if params.color_mode == ColorMode.BLACK_AND_WHITE:
         result = _generate_binary_output(
-            page.image, params, render, page.layout, keep_despeckle_source
+            page.image, params, render, page.layout, keep_despeckle_source, dbg
         )
     elif params.color_mode == ColorMode.COLOR_GRAYSCALE:
-        result = _generate_grayscale_output(page.image, params, render, page.layout)
+        result = _generate_grayscale_output(
+            page.image, params, render, page.layout, dbg
+        )
     else:
         assert page.picture_layers is not None
         result = _generate_mixed_output(
@@ -261,17 +267,36 @@ def generate_output(
             page.layout,
             page.picture_layers,
             keep_despeckle_source,
+            dbg,
         )
 
     if page.fill_zones:
         result = _apply_fill_zones(result, page.fill_zones)
+    if dbg is not None:
+        _record_filled(result, params, render, dbg)
     if render.posterize and not render.need_binarization:
         result.image = _posterize(result.image, color_options)
+        if dbg is not None:
+            dbg.add(result.image, "posterized")
     result.was_dewarped = page.was_dewarped
     result.auto_picture_zones = auto_zones
     if render.split_output and result.picture_mask is not None:
         result.split = _split_layers(result, params, render)
     return result
+
+
+def _record_filled(
+    result: OutputResult, params: Params, render: RenderParams, dbg: DebugImages
+) -> None:
+    """Record the page with its fill zones painted, under upstream's label.
+
+    Upstream records nothing here for black and white output without colour
+    segmentation.
+    """
+    if params.color_mode != ColorMode.BLACK_AND_WHITE:
+        dbg.add(result.image, "fillZones")
+    elif render.color_segmentation:
+        dbg.add(result.image, "segmented_with_fill_zones")
 
 
 def _split_layers(
@@ -353,6 +378,7 @@ def _picture_zones_to_draw(
     render: RenderParams,
     layout: _PageLayout,
     zones: Sequence[Zone],
+    dbg: DebugImages | None = None,
 ) -> tuple[list[Zone], tuple[Zone, ...] | None, _PageLayout]:
     """Pick the picture zones a render draws, detecting auto zones when due.
 
@@ -367,6 +393,8 @@ def _picture_zones_to_draw(
         render (RenderParams): Flags derived from ``params``.
         layout (_PageLayout): Page and fill areas of ``image``.
         zones (Sequence[Zone]): The page's picture zones, auto ones included.
+        dbg (DebugImages | None): Receives the illumination estimate and the
+            picture detector's steps when detection runs.
 
     Returns:
         tuple[list[Zone], tuple[Zone, ...] | None, _PageLayout]: The zones to
@@ -388,7 +416,7 @@ def _picture_zones_to_draw(
 
     gray = bgr_to_gray(image if params.black_on_white else _invert_polarity(image))
     if render.normalize_illumination:
-        gray = _normalized_gray(gray, layout)
+        gray = _normalized_gray(gray, layout, dbg)
         layout = replace(layout, normalized=gray)
     dpi = params.output_dpi
     found = tuple(
@@ -396,6 +424,7 @@ def _picture_zones_to_draw(
             _wiener_gray(gray, params.color_common),
             (dpi.horizontal, dpi.vertical),
             options,
+            dbg,
         )
     )
     return manual + list(found), found, layout
@@ -417,6 +446,7 @@ def _dewarp_page(
     params: Params,
     render: RenderParams,
     source: DewarperSource,
+    dbg: DebugImages | None = None,
 ) -> _PageGeometry:
     """Dewarp the page with its masks, normalising illumination first.
 
@@ -430,6 +460,8 @@ def _dewarp_page(
         render (RenderParams): Flags derived from ``params``.
         source (Any): A dewarper, or a function that builds one from
             the normalised gray page.
+        dbg (DebugImages | None): Receives the illumination estimate and the
+            dewarped page.
 
     Returns:
         _PageGeometry: The dewarped page, or ``page`` with its illumination
@@ -439,7 +471,7 @@ def _dewarp_page(
     gray = bgr_to_gray(oriented)
     normalized: NDArray[np.uint8] | None = None
     if render.normalize_illumination or render.normalize_illumination_color:
-        normalized = _normalized_gray(gray, page.layout)
+        normalized = _normalized_gray(gray, page.layout, dbg)
         gray = normalized
 
     dewarper = (
@@ -471,8 +503,11 @@ def _dewarp_page(
 
     layout = page.layout
     layers = page.picture_layers
+    dewarped = warp(page.image, _WHITE if params.black_on_white else 0)
+    if dbg is not None:
+        dbg.add(dewarped, "dewarped")
     return _PageGeometry(
-        image=warp(page.image, _WHITE if params.black_on_white else 0),
+        image=dewarped,
         layout=_PageLayout(
             page_outline=None,
             page=None if layout.page is None else warp_mask(layout.page),
@@ -546,6 +581,7 @@ def _generate_binary_output(
     render: RenderParams,
     layout: _PageLayout,
     keep_despeckle_source: bool = False,
+    dbg: DebugImages | None = None,
 ) -> OutputResult:
     """Generate black and white output.
 
@@ -556,6 +592,7 @@ def _generate_binary_output(
         layout (_PageLayout): Page and fill areas.
         keep_despeckle_source (bool): Keep the page before despeckling in the
             result.
+        dbg (DebugImages | None): Receives each step's image.
 
     Returns:
         OutputResult: Binary image (uint8, 0 or 255) of the input's height and width.
@@ -564,26 +601,30 @@ def _generate_binary_output(
         image = _invert_polarity(image)
     gray = bgr_to_gray(image)
     if render.normalize_illumination:
-        gray = _normalized_gray(gray, layout)
+        gray = _normalized_gray(gray, layout, dbg)
+    if dbg is not None:
+        dbg.add(gray, "maybeNormalized")
     gray = _wiener_gray(gray, params.color_common)
     color_page = _segmentation_source(image, gray, params, render)
 
-    binary = _binarize_page(gray, params, render)
+    binary = _binarize_page(gray, params, render, dbg)
 
     if layout.keep is not None:
         margin = 0 if params.color_common.filling_color == FillingColor.BLACK else 255
         binary = fill_masked(binary, ~layout.keep, margin)
+    if dbg is not None:
+        dbg.add(binary, "binarized_and_cropped")
 
     if render.morphological_smoothing:
-        binary = _morphological_smooth(binary)
+        binary = _morphological_smooth(binary, dbg)
 
     # Despeckling stays the last step that changes which pixels are ink.
     source = binary.copy() if keep_despeckle_source else None
     if params.despeckle_strength > 0.0:
-        binary = _despeckle(binary, params.despeckle_strength, params.output_dpi)
+        binary = _despeckle(binary, params.despeckle_strength, params.output_dpi, dbg)
 
     if color_page is not None:
-        result = _colored_binary_output(color_page, binary, params, render, layout)
+        result = _colored_binary_output(color_page, binary, params, render, layout, dbg)
     else:
         if not params.black_on_white:
             binary = 255 - binary
@@ -626,6 +667,7 @@ def _colored_binary_output(
     params: Params,
     render: RenderParams,
     layout: _PageLayout,
+    dbg: DebugImages | None = None,
 ) -> OutputResult:
     """Colour the ink of a binarised page with the colours of the original.
 
@@ -637,6 +679,7 @@ def _colored_binary_output(
         params (scantailor.filters.output.params.Params): Output parameters.
         render (RenderParams): Flags derived from ``params``.
         layout (_PageLayout): Page and fill areas.
+        dbg (DebugImages | None): Receives the coloured text.
 
     Returns:
         OutputResult: Coloured text on white, inverted for white-on-black output.
@@ -655,6 +698,8 @@ def _colored_binary_output(
         params.color_common.posterization if render.posterize else None,
         background,
     )
+    if dbg is not None:
+        dbg.add(text, "segmented")
     if not params.black_on_white:
         text = _invert_polarity(text)
     return OutputResult(image=text, is_binary=False)
@@ -665,6 +710,7 @@ def _generate_grayscale_output(
     params: Params,
     render: RenderParams,
     layout: _PageLayout,
+    dbg: DebugImages | None = None,
 ) -> OutputResult:
     """Generate grayscale or colour output.
 
@@ -680,6 +726,8 @@ def _generate_grayscale_output(
         params (scantailor.filters.output.params.Params): Output parameters.
         render (RenderParams): Flags derived from ``params``.
         layout (_PageLayout): Page and fill areas.
+        dbg (DebugImages | None): Receives the illumination estimate and the
+            normalised page.
 
     Returns:
         OutputResult: New uint8 array with the shape of the input.
@@ -689,8 +737,10 @@ def _generate_grayscale_output(
         image = _invert_polarity(image)
     result = image
     if render.normalize_illumination:
-        brightness = _normalized_gray(bgr_to_gray(image), layout)
+        brightness = _normalized_gray(bgr_to_gray(image), layout, dbg)
         result = _with_brightness(image, brightness)
+    if dbg is not None:
+        dbg.add(result, "maybeNormalized")
     result = wiener_color_filter(
         result, color_options.wiener_window_size, color_options.wiener_coef
     )
@@ -712,6 +762,7 @@ def _generate_mixed_output(
     layout: _PageLayout,
     picture_layers: PictureLayers,
     keep_despeckle_source: bool = False,
+    dbg: DebugImages | None = None,
 ) -> OutputResult:
     """Generate mixed output: pictures keep their grays or colours, text is binarised.
 
@@ -729,6 +780,7 @@ def _generate_mixed_output(
         picture_layers (PictureLayers): Rasterised picture zones.
         keep_despeckle_source (bool): Keep the text before despeckling in the
             result.
+        dbg (DebugImages | None): Receives each step's image.
 
     Returns:
         OutputResult: New uint8 array with the shape of the input. Text pixels
@@ -741,25 +793,40 @@ def _generate_mixed_output(
 
     raw_gray = bgr_to_gray(image)
     normalized_gray = (
-        _normalized_gray(raw_gray, layout) if render.normalize_illumination else None
+        _normalized_gray(raw_gray, layout, dbg)
+        if render.normalize_illumination
+        else None
     )
+    if dbg is not None:
+        dbg.add(
+            image
+            if normalized_gray is None
+            else _with_brightness(image, normalized_gray),
+            "maybeNormalized",
+        )
     text_gray = _wiener_gray(
         raw_gray if normalized_gray is None else normalized_gray, color_options
     )
 
     dpi = params.output_dpi
     dpi_pair = (dpi.horizontal, dpi.vertical)
-    picture = detect_picture_mask(text_gray, dpi_pair, params.picture_shape)
-    binary = _binarize_page(text_gray, params, render)
+    binary = _binarize_page(text_gray, params, render, dbg)
     if layout.keep is not None:
         binary = fill_masked(binary, ~layout.keep, 255)
+    if dbg is not None:
+        dbg.add(binary, "binarized_and_cropped")
     if render.morphological_smoothing:
-        binary = _morphological_smooth(binary)
+        binary = _morphological_smooth(binary, dbg)
+    picture = detect_picture_mask(text_gray, dpi_pair, params.picture_shape, dbg)
+    if dbg is not None:
+        dbg.add(~picture, "bwMask")
 
     raw_ink: NDArray[np.bool_] = binary == 0
     text_region, _ = apply_picture_layers(~picture, raw_ink, picture_layers)
     if layout.keep is not None:
         text_region |= ~layout.keep
+    if dbg is not None:
+        dbg.add(text_region, "bwMask with zones")
 
     normalized_page = (
         None if normalized_gray is None else _with_brightness(image, normalized_gray)
@@ -773,10 +840,12 @@ def _generate_mixed_output(
             source = np.where(raw_ink & text_region, 0, 255).astype(np.uint8)
         if params.despeckle_strength > 0.0:
             speckled = np.where(ink, 0, 255).astype(np.uint8)
-            ink = _despeckle(speckled, params.despeckle_strength, dpi) == 0
+            ink = _despeckle(speckled, params.despeckle_strength, dpi, dbg) == 0
         result = _compose_text(
-            layer, ink, text_region, params, render, layout, dpi_pair
+            layer, ink, text_region, params, render, layout, dpi_pair, dbg
         )
+        if dbg is not None:
+            dbg.add(result, "combined")
     else:
         result = layer.copy()
 
@@ -803,6 +872,7 @@ def _compose_text(
     render: RenderParams,
     layout: _PageLayout,
     dpi: tuple[int, int],
+    dbg: DebugImages | None = None,
 ) -> NDArray[np.uint8]:
     """Put the page's ink, black or coloured, over the picture layer.
 
@@ -816,6 +886,7 @@ def _compose_text(
         render (RenderParams): Flags derived from ``params``.
         layout (_PageLayout): Page area, for the background colour.
         dpi (tuple[int, int]): Horizontal and vertical output resolution.
+        dbg (DebugImages | None): Receives the coloured ink.
 
     Returns:
         numpy.ndarray of numpy.uint8: The composed page.
@@ -830,6 +901,8 @@ def _compose_text(
             params.color_common.posterization if render.posterize else None,
             dominant_background_color(layer, layout.page),
         )
+        if dbg is not None:
+            dbg.add(colored, "segmented")
     if render.original_background:
         return compose_over_original(layer, ink, colored)
     if colored is None:
@@ -850,11 +923,13 @@ def _mixed_margin_color(
     return _margin_color(result, params, layout)
 
 
-def _normalized_gray(gray: NDArray[np.uint8], layout: _PageLayout) -> NDArray[np.uint8]:
+def _normalized_gray(
+    gray: NDArray[np.uint8], layout: _PageLayout, dbg: DebugImages | None = None
+) -> NDArray[np.uint8]:
     """Illumination-normalise a gray page, unless that was already done."""
     if layout.normalized is not None:
         return layout.normalized
-    return normalize_illumination_gray(gray, layout.page_outline)
+    return normalize_illumination_gray(gray, layout.page_outline, dbg)
 
 
 def _apply_fill_zones(
@@ -934,10 +1009,13 @@ def _binarize_page(
     gray: NDArray[np.uint8],
     params: Params,
     render: RenderParams,
+    dbg: DebugImages | None = None,
 ) -> NDArray[np.uint8]:
     """Smooth if asked and binarise a gray page; 0 is ink."""
     if render.savitzky_golay_smoothing:
         gray = _smooth_gray(gray, params.output_dpi)
+        if dbg is not None:
+            dbg.add(gray, "smoothed")
     return _binarize(gray, params.binarization)
 
 
@@ -1109,6 +1187,7 @@ def _despeckle(
     binary: NDArray[np.uint8],
     strength: float,
     dpi: Dpi,
+    dbg: DebugImages | None = None,
 ) -> NDArray[np.uint8]:
     """Remove small noise components that are not near text.
 
@@ -1117,25 +1196,34 @@ def _despeckle(
         strength (float): Despeckle strength, 0 for off; 1, 2 and 3 are the
             cautious, normal and aggressive presets.
         dpi (Dpi): Resolution of ``binary``; the smaller axis sets the thresholds.
+        dbg (DebugImages | None): Receives the despeckler's steps and its result.
 
     Returns:
         numpy.ndarray of numpy.uint8: Despeckled binary image.
     """
     if strength <= 0.0:
         return binary
-    return despeckle_image(binary, min(dpi.horizontal, dpi.vertical), strength)
+    despeckled = despeckle_image(
+        binary, min(dpi.horizontal, dpi.vertical), strength, dbg
+    )
+    if dbg is not None:
+        dbg.add(despeckled, "despeckled")
+    return despeckled
 
 
-def _morphological_smooth(binary: NDArray[np.uint8]) -> NDArray[np.uint8]:
+def _morphological_smooth(
+    binary: NDArray[np.uint8], dbg: DebugImages | None = None
+) -> NDArray[np.uint8]:
     """Apply morphological smoothing to a binary image.
 
     This helps smooth jagged edges.
 
     Args:
-        binary: Binary input image.
+        binary (NDArray[np.uint8]): Binary input image.
+        dbg (DebugImages | None): Receives the smoothed image.
 
     Returns:
-        Smoothed binary image.
+        NDArray[np.uint8]: Smoothed binary image.
     """
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
 
@@ -1145,4 +1233,7 @@ def _morphological_smooth(binary: NDArray[np.uint8]) -> NDArray[np.uint8]:
     # Closing fills small holes
     result = cv2.morphologyEx(result, cv2.MORPH_CLOSE, kernel)
 
-    return np.asarray(result, dtype=np.uint8)
+    smoothed = np.asarray(result, dtype=np.uint8)
+    if dbg is not None:
+        dbg.add(smoothed, "edges_smoothed")
+    return smoothed

@@ -23,6 +23,8 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
+
 # Vertical offsets count double so that marks beside a word are preferred over
 # marks above or below it.
 _VERTICAL_SCALE = 2
@@ -69,6 +71,7 @@ def despeckle(
     binary: NDArray[np.uint8],
     dpi: int,
     level: float,
+    dbg: DebugImages | None = None,
 ) -> NDArray[np.uint8]:
     """Remove small black components that are not near substantial ones.
 
@@ -81,6 +84,9 @@ def despeckle(
         dpi (int): Resolution of the image; use the smaller of the horizontal
             and vertical values. Non-positive values are treated as 300.
         level (float): Despeckle strength; values of 0 or below return a copy.
+        dbg (DebugImages | None): Receives the components with the big ones
+            merged into one, then the Voronoi cells of the first pass and, when
+            it runs, of the second; each component in its own colour.
 
     Returns:
         NDArray[np.uint8]: New image of the same shape where removed ink is 255
@@ -114,6 +120,11 @@ def despeckle(
     node_of_label[small_labels] = np.arange(1, small_labels.size + 1, dtype=np.int32)
     node_of_label[0] = -1
     cropped = binary[box]
+    if dbg is not None:
+        dbg.add(
+            _visualized(_paste_nodes(binary.shape, box, node_of_label[labels], 0)),
+            "big_components_unified",
+        )
     if not is_big.any():
         keep = np.zeros(small_labels.size + 1, dtype=bool)
         return _paste(binary, box, _remove_unkept(cropped, node_of_label, labels, keep))
@@ -131,6 +142,9 @@ def despeckle(
     border = _BORDER_RADII * thresholds.attach_radius
     everyone = np.ones(node_pixels.size, dtype=bool)
     lo, hi, sq_dist = _nearest_neighbour_distances(nodes, everyone, False, border)
+    if dbg is not None:
+        cells = _voronoi_cells(nodes, everyone, False)
+        dbg.add(_visualized(_paste_nodes(binary.shape, box, cells, border)), "voronoi")
     near_small, near_big = _anchor_tags(
         lo, hi, sq_dist, node_pixels, thresholds, node_pixels.size
     )
@@ -141,6 +155,12 @@ def despeckle(
         # components with only small neighbours look again with the others
         # fixed in place.
         second = _nearest_neighbour_distances(nodes, only_small, True, border)
+        if dbg is not None:
+            cells = _voronoi_cells(nodes, only_small, True)
+            dbg.add(
+                _visualized(_paste_nodes(binary.shape, box, cells, border)),
+                "voronoi_special",
+            )
         lo, hi, sq_dist = _min_per_pair(
             np.concatenate([lo, second[0]]),
             np.concatenate([hi, second[1]]),
@@ -150,6 +170,80 @@ def despeckle(
 
     keep = _reachable_from_big(lo, hi, sq_dist, node_pixels, thresholds)
     return _paste(binary, box, _remove_unkept(cropped, node_of_label, labels, keep))
+
+
+def _voronoi_cells(
+    nodes: NDArray[np.int32], claims: NDArray[np.bool_], rest_is_fixed: bool
+) -> NDArray[np.int32]:
+    """Assign every pixel to the node of its nearest claiming ink pixel.
+
+    The whole array is transformed at once, unlike the banded transform of
+    ``_nearest_neighbour_distances``, so it costs more memory and is only
+    made for debug images.
+
+    Args:
+        nodes (NDArray[np.int32]): Node id per pixel, -1 for background.
+        claims (NDArray[np.bool_]): Per node, whether its ink claims territory.
+        rest_is_fixed (bool): Whether unclaiming ink keeps its own node.
+
+    Returns:
+        NDArray[np.int32]: Node id per pixel; -1 everywhere when no ink claims.
+    """
+    ink = nodes >= 0
+    sources = ink & claims[np.where(ink, nodes, 0)]
+    if not sources.any():
+        return np.full(nodes.shape, -1, dtype=np.int32)
+    scale = _VERTICAL_SCALE
+    stretched = np.repeat(np.where(sources, np.uint8(0), np.uint8(255)), scale, 0)
+    _, label_image = cv2.distanceTransformWithLabels(
+        stretched, cv2.DIST_L2, 3, labelType=cv2.DIST_LABEL_PIXEL
+    )
+    _, source_node = _sources_by_label(nodes, sources, scale)
+    cells = source_node[np.asarray(label_image, dtype=np.int32)[::scale]]
+    if rest_is_fixed:
+        np.copyto(cells, nodes, where=ink & ~sources)
+    return cells
+
+
+def _paste_nodes(
+    shape: tuple[int, ...],
+    box: tuple[slice, slice],
+    nodes: NDArray[np.int32],
+    border: int,
+) -> NDArray[np.int32]:
+    """Place node ids of ``box`` padded as ``_pad_with_background`` does on a page."""
+    rows, cols = box
+    top = max(rows.start - border, 0)
+    left = max(cols.start - border, 0)
+    page = np.full(shape[:2], -1, dtype=np.int32)
+    page[top : top + nodes.shape[0], left : left + nodes.shape[1]] = nodes
+    return page
+
+
+def _visualized(nodes: NDArray[np.int32]) -> NDArray[np.uint8]:
+    """Draw each node in its own hue on white, as upstream's connectivity maps.
+
+    Hues come from the bit-reversed node number, so neighbouring numbers get
+    far apart colours.
+
+    Args:
+        nodes (NDArray[np.int32]): Node id per pixel, -1 for background.
+
+    Returns:
+        NDArray[np.uint8]: (H, W, 3) BGR picture.
+    """
+    labels = np.arange(1, int(nodes.max(initial=-1)) + 2, dtype=np.int64)
+    bits = np.maximum(1, np.ceil(np.log2(labels + 1)).astype(np.int64))
+    reversed_bits = np.zeros_like(labels)
+    for bit in range(int(bits.max(initial=1))):
+        reversed_bits |= ((labels >> bit) & 1) << np.maximum(bits - 1 - bit, 0)
+    hue = np.round(0.99 * 179 * reversed_bits / ((1 << bits) - 1)).astype(np.uint8)
+    hsv = np.full((labels.size, 1, 3), 255, dtype=np.uint8)
+    hsv[:, 0, 0] = hue
+    palette = np.vstack(
+        [[[255, 255, 255]], cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)[:, 0, :]]
+    ).astype(np.uint8)
+    return palette[nodes + 1]
 
 
 def _paste(
