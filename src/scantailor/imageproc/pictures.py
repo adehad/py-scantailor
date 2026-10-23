@@ -4,6 +4,8 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
+
 from .filters import stretch_gray_range
 from .reconstruction import reconstruction
 
@@ -27,6 +29,7 @@ def detect_pictures(
     gray: NDArray[np.uint8],
     *,
     higher_search_sensitivity: bool = False,
+    dbg: DebugImages | None = None,
 ) -> NDArray[np.uint8]:
     """Map how picture-like each pixel of a 300 dpi gray page is.
 
@@ -37,6 +40,9 @@ def detect_pictures(
         gray (NDArray[np.uint8]): 2-D gray page at about 300 dpi. Not modified.
         higher_search_sensitivity (bool): Also stretch weak responses so that
             faint pictures reach the picture threshold.
+        dbg (DebugImages | None): Receives each step. The gradient, marker and
+            reconstruction are dark where upstream's are light, because this
+            implementation reconstructs by erosion where upstream seed-fills.
 
     Returns:
         NDArray[np.uint8]: Map of the same shape; values from ``PICTURE_THRESHOLD``
@@ -54,6 +60,11 @@ def detect_pictures(
     gradient = (
         255 - (255 - darkest.astype(np.uint32)) * lightest.astype(np.uint32) // 255
     ).astype(np.uint8)
+    if dbg is not None:
+        dbg.add(stretched, "stretched")
+        dbg.add(darkest, "eroded")
+        dbg.add(lightest, "dilated")
+        dbg.add(gradient, "grayGradient")
 
     marker = np.asarray(
         cv2.dilate(
@@ -64,16 +75,26 @@ def detect_pictures(
         ),
         dtype=np.uint8,
     )
-    picture_like = 255 - _reconstruct_by_erosion(marker, gradient)
+    reconstructed = _reconstruct_by_erosion(marker, gradient)
+    picture_like = 255 - reconstructed
+    if dbg is not None:
+        dbg.add(marker, "marker")
+        dbg.add(reconstructed, "reconstructed")
+        dbg.add(picture_like, "reconstructed_inverted")
 
     frame = np.full_like(picture_like, 255)
     frame[0, :] = frame[-1, :] = frame[:, 0] = frame[:, -1] = 0
     holes_filled = _reconstruct_by_erosion(frame, picture_like)
+    if dbg is not None:
+        dbg.add(holes_filled, "holesFilled")
 
     if higher_search_sensitivity:
-        return stretch_gray_range(
+        stretched2 = stretch_gray_range(
             holes_filled, _HIGHER_SENSITIVITY_BLACK_CLIP, _RANGE_CLIP
         )
+        if dbg is not None:
+            dbg.add(stretched2, "stretched2")
+        return stretched2
     return holes_filled
 
 
@@ -95,6 +116,7 @@ def estimate_picture_mask(
     dpi: tuple[int, int],
     *,
     higher_search_sensitivity: bool = False,
+    dbg: DebugImages | None = None,
 ) -> NDArray[np.bool_]:
     """Find picture regions of a gray page of any resolution.
 
@@ -102,6 +124,7 @@ def estimate_picture_mask(
         gray (NDArray[np.uint8]): 2-D gray page. Not modified.
         dpi (tuple[int, int]): Horizontal and vertical resolution of ``gray``.
         higher_search_sensitivity (bool): See ``detect_pictures``.
+        dbg (DebugImages | None): Receives the steps of ``detect_pictures``.
 
     Returns:
         NDArray[np.bool_]: True where there is a picture, same shape as ``gray``.
@@ -121,7 +144,7 @@ def estimate_picture_mask(
         dtype=np.uint8,
     )
     detected = detect_pictures(
-        small, higher_search_sensitivity=higher_search_sensitivity
+        small, higher_search_sensitivity=higher_search_sensitivity, dbg=dbg
     )
     full = cv2.resize(detected, (width, height), interpolation=cv2.INTER_LINEAR)
     return np.asarray(full) >= PICTURE_THRESHOLD

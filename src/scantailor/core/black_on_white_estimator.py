@@ -10,6 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from scantailor.core.content_mask import render_page_at_dpi
+from scantailor.core.debug_images import DebugImages
 from scantailor.core.transformation import ImageTransformation
 from scantailor.imageproc.background_color import otsu_threshold
 from scantailor.imageproc.binarize import binarize_otsu
@@ -25,7 +26,11 @@ _BLOCK_CLOSE_BRICK = (200, 200)
 _BLOCK_DILATE_BRICK = (30, 30)
 
 
-def is_black_on_white(pixels: NDArray[np.uint8], xform: ImageTransformation) -> bool:
+def is_black_on_white(
+    pixels: NDArray[np.uint8],
+    xform: ImageTransformation,
+    dbg: DebugImages | None = None,
+) -> bool:
     """Tell whether a page has dark content on a light background.
 
     A page whose pixels are mostly light inside its pre-crop area is black on
@@ -40,6 +45,8 @@ def is_black_on_white(pixels: NDArray[np.uint8], xform: ImageTransformation) -> 
         pixels (NDArray[np.uint8]): The image ``xform`` starts from, gray or BGR.
             Not modified.
         xform (ImageTransformation): The page's transformation. Not modified.
+        dbg (DebugImages | None): Receives the refining pass's images when the
+            page is looked at again.
 
     Returns:
         bool: True for dark content on a light background, and for a page
@@ -49,7 +56,7 @@ def is_black_on_white(pixels: NDArray[np.uint8], xform: ImageTransformation) -> 
     gray = _gray(pixels)
     if is_black_on_white_in_area(gray, _source_pre_crop_mask(page_xform, gray.shape)):
         return True
-    return is_black_on_white_refining(gray, page_xform)
+    return is_black_on_white_refining(gray, page_xform, dbg)
 
 
 def is_black_on_white_in_area(gray: NDArray[np.uint8], area: NDArray[np.bool_]) -> bool:
@@ -78,7 +85,9 @@ def is_black_on_white_in_area(gray: NDArray[np.uint8], area: NDArray[np.bool_]) 
 
 
 def is_black_on_white_refining(
-    pixels: NDArray[np.uint8], xform: ImageTransformation
+    pixels: NDArray[np.uint8],
+    xform: ImageTransformation,
+    dbg: DebugImages | None = None,
 ) -> bool:
     """Tell the polarity from the areas where a page has strokes.
 
@@ -92,6 +101,8 @@ def is_black_on_white_refining(
         pixels (NDArray[np.uint8]): The image ``xform`` starts from, gray or BGR.
             Not modified.
         xform (ImageTransformation): Maps the image to the page. Not modified.
+        dbg (DebugImages | None): Receives the cleaned 150 dpi page and the
+            content area; True, drawn black, is content.
 
     Returns:
         bool: True for dark content on a light background, and for a page with
@@ -108,8 +119,12 @@ def is_black_on_white_refining(
         255 - binary, REFINING_DPI, _NORMAL_DESPECKLE_LEVEL
     )
     dark = light_specks_removed != 0
+    if dbg is not None:
+        dbg.add(dark, "bw150")
 
     content = _content_area(dark)
+    if dbg is not None:
+        dbg.add(content, "content_mask")
     return 2 * int(np.count_nonzero(dark & content)) <= int(np.count_nonzero(content))
 
 

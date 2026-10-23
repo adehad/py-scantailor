@@ -10,6 +10,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.imageproc.polynomial_line import fit_polynomial_lines
 from scantailor.imageproc.polynomial_surface import PolynomialSurface, _axis_basis
 from scantailor.imageproc.reconstruction import reconstruction
@@ -69,7 +70,9 @@ def _open_vertical(image: NDArray[np.uint8], height: int) -> NDArray[np.uint8]:
     return np.asarray(opened[pad:-pad], dtype=np.uint8)
 
 
-def _suppress_text_and_shadow(small: NDArray[np.uint8]) -> NDArray[np.uint8]:
+def _suppress_text_and_shadow(
+    small: NDArray[np.uint8], dbg: DebugImages | None = None
+) -> NDArray[np.uint8]:
     """Remove text from a downscaled page, choosing between two strategies.
 
     Hole filling followed by a vertical opening copes with shadows that touch a
@@ -79,6 +82,8 @@ def _suppress_text_and_shadow(small: NDArray[np.uint8]) -> NDArray[np.uint8]:
 
     Args:
         small (NDArray[np.uint8]): Downscaled grayscale page.
+        dbg (DebugImages | None): Receives both candidates, their difference,
+            its smooth fit, the residual and the chosen candidate.
 
     Returns:
         NDArray[np.uint8]: Page with dark text suppressed.
@@ -91,10 +96,20 @@ def _suppress_text_and_shadow(small: NDArray[np.uint8]) -> NDArray[np.uint8]:
     diff = method2 - method1
     approximated = PolynomialSurface.fit(diff, 3, 3).render(diff.shape)
     residual = cv2.absdiff(diff, approximated)
+    if dbg is not None:
+        dbg.add(method1, "preproc_method1")
+        dbg.add(method2, "preproc_method2")
+        dbg.add(diff, "raw_diff")
+        dbg.add(approximated, "approx_diff")
+        dbg.add(residual, "raw_vs_approx_diff")
 
     unexplained = np.count_nonzero(residual > _PICTURE_DIFFERENCE)
     if unexplained < _PICTURE_PIXEL_FRACTION * residual.size:
+        if dbg is not None:
+            dbg.add(method1, "use_method1")
         return method1
+    if dbg is not None:
+        dbg.add(method2, "use_method2")
     return method2
 
 
@@ -121,6 +136,7 @@ def _drop_sparse_lines(mask: NDArray[np.bool_]) -> NDArray[np.bool_]:
 def estimate_background(
     gray: NDArray[np.uint8],
     area_to_consider: Sequence[tuple[float, float]] | None = None,
+    dbg: DebugImages | None = None,
 ) -> PolynomialSurface:
     """Estimate the paper background of a page as a polynomial surface.
 
@@ -135,6 +151,9 @@ def estimate_background(
             vertices in ``gray`` pixel coordinates. Pixels outside it do not take
             part in the fit. None, or a polygon that covers no pixel of the
             image, uses the whole image.
+        dbg (DebugImages | None): Receives the downscaled page, the text
+            suppression steps and the mask of pixels the fit uses after each
+            refinement; True, drawn black, takes part.
 
     Returns:
         PolynomialSurface: Background model. ``render(gray.shape)`` gives a
@@ -159,7 +178,9 @@ def estimate_background(
         ),
         dtype=np.uint8,
     )
-    background = _suppress_text_and_shadow(small)
+    if dbg is not None:
+        dbg.add(small, "downscaled")
+    background = _suppress_text_and_shadow(small, dbg)
 
     mask = np.ones(background.shape, dtype=bool)
     if area_to_consider is not None and len(area_to_consider) > 0:
@@ -171,10 +192,18 @@ def estimate_background(
         cv2.fillPoly(inside, [polygon], 1)
         if inside.any():
             mask = inside.astype(bool)
+    if dbg is not None:
+        dbg.add(mask, "areaToConsider")
 
     mask = _mask_outliers(background, mask)
+    if dbg is not None:
+        dbg.add(mask, "mask")
     mask = cv2.erode(mask.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
+    if dbg is not None:
+        dbg.add(mask, "eroded")
     mask = _drop_sparse_lines(mask)
+    if dbg is not None:
+        dbg.add(mask, "lines_extended")
     return PolynomialSurface.fit(
         background, SURFACE_HOR_DEGREE, SURFACE_VERT_DEGREE, mask
     )
@@ -244,6 +273,7 @@ def _render_band(
 def normalize_illumination_gray(
     gray: NDArray[np.uint8],
     area_to_consider: Sequence[tuple[float, float]] | None = None,
+    dbg: DebugImages | None = None,
 ) -> NDArray[np.uint8]:
     """Flatten uneven lighting in a grayscale page.
 
@@ -251,12 +281,18 @@ def normalize_illumination_gray(
         gray (NDArray[np.uint8]): 2-D grayscale page. Not modified.
         area_to_consider (Sequence[tuple[float, float]] | None): Polygon limiting
             where the background is sampled; see ``estimate_background``.
+        dbg (DebugImages | None): Receives the page, the estimation's images,
+            the background rendered at full size and the normalised page.
 
     Returns:
         NDArray[np.uint8]: New array of the same shape in which the estimated
         paper colour is mapped to 255.
     """
-    surface = estimate_background(gray, area_to_consider)
+    if dbg is not None:
+        dbg.add(gray, "toBeNormalized")
+    surface = estimate_background(gray, area_to_consider, dbg)
+    if dbg is not None:
+        dbg.add(surface.render(gray.shape), "background")
     height, width = gray.shape
     # Bands give the same values as ``surface.render`` without its full-page
     # float64 temporaries.
@@ -271,4 +307,6 @@ def normalize_illumination_gray(
             _render_band(left_factor, hor_basis_t, start, stop),
             out[start:stop],
         )
+    if dbg is not None:
+        dbg.add(out, "normalized_illumination")
     return out

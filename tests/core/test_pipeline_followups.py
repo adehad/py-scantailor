@@ -220,7 +220,7 @@ class TestDespeckleStrength:
     def _levels_seen_by_the_despeckler(monkeypatch, params_update: dict) -> list:
         seen: list[float] = []
 
-        def spy(binary, dpi, level):
+        def spy(binary, dpi, level, dbg=None):
             seen.append(level)
             return binary.copy()
 
@@ -273,7 +273,7 @@ class TestDespeckleStrength:
     def test_the_metadata_reports_the_strength(self, monkeypatch):
         monkeypatch.setattr(
             "scantailor.filters.output.generator.despeckle_image",
-            lambda binary, dpi, level: binary.copy(),
+            lambda binary, dpi, level, dbg=None: binary.copy(),
         )
         page = _page()
         sequence = StageSequence()

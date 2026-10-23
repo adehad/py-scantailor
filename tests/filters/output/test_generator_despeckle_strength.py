@@ -37,7 +37,9 @@ def _params(mode: ColorMode) -> Params:
 def strengths_seen(monkeypatch: pytest.MonkeyPatch) -> list[float]:
     seen: list[float] = []
 
-    def spy(binary: np.ndarray, dpi: int, strength: float) -> np.ndarray:
+    def spy(
+        binary: np.ndarray, dpi: int, strength: float, dbg: object = None
+    ) -> np.ndarray:
         seen.append(strength)
         return binary.copy()
 
