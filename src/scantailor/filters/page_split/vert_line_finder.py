@@ -14,6 +14,8 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
+from scantailor.imageproc import debug_drawing as draw
 from scantailor.imageproc.area_scale import transform_scale_to_gray
 from scantailor.imageproc.hough_line_detector import HoughLine, HoughLineDetector
 
@@ -35,6 +37,8 @@ _TALL_WINDOW = np.ones((11, 1), np.uint8)
 _GAP_CLOSING_HEIGHT = 19
 _MIN_QUALITY_FACTOR = 1.8
 _MIN_WEIGHTED_LEVEL = 1
+# Width in pixels of upstream's red lines in the debug image.
+_VECTOR_LINE_WIDTH = 3.0
 
 
 @dataclass(frozen=True)
@@ -78,7 +82,12 @@ class _LineGroup:
             self.leader = other.leader
 
 
-def find_lines(gray: NDArray[np.uint8], dpi: float, max_lines: int = 8) -> list[Line]:
+def find_lines(
+    gray: NDArray[np.uint8],
+    dpi: float,
+    max_lines: int = 8,
+    dbg: DebugImages | None = None,
+) -> list[Line]:
     """Find nearly vertical dark lines in a page.
 
     Args:
@@ -86,6 +95,9 @@ def find_lines(gray: NDArray[np.uint8], dpi: float, max_lines: int = 8) -> list[
         dpi (float): Resolution of ``gray``.
         max_lines (int): How many lines to return at most; the rest are
             dropped in order of the quality of their best candidate.
+        dbg (DebugImages | None): Receives the 100 dpi page, the strokes before
+            and after short ones are removed, the Hough space and the lines
+            found.
 
     Returns:
         list[tuple[tuple[float, float], tuple[float, float]]]:
@@ -93,7 +105,9 @@ def find_lines(gray: NDArray[np.uint8], dpi: float, max_lines: int = 8) -> list[
         running from top to bottom of the page, the point with the smaller x first.
     """
     gray100 = _reduce_to_working_dpi(gray, dpi)
-    raster_lines = _vertical_raster_lines(gray100)
+    if dbg is not None:
+        dbg.add(gray100, "gray100")
+    raster_lines = _vertical_raster_lines(gray100, dbg)
     height, width = raster_lines.shape
 
     detector = HoughLineDetector(
@@ -111,7 +125,14 @@ def find_lines(gray: NDArray[np.uint8], dpi: float, max_lines: int = 8) -> list[
     detector.process(xs.astype(np.int64), ys.astype(np.int64), weights)
 
     min_quality = int(height * _LINE_THICKNESS * _MIN_QUALITY_FACTOR) + 1
+    if dbg is not None:
+        dbg.add(detector.visualize_hough_space(min_quality), "hough_space")
     groups = _group_lines(detector.find_lines(min_quality), height)
+    if dbg is not None:
+        leaders = [(g.leader.left, g.leader.right) for g in groups[:max_lines]]
+        canvas = draw.to_bgr(gray100)
+        draw.draw_lines(canvas, leaders, draw.RED, _VECTOR_LINE_WIDTH)
+        dbg.add(canvas, "vector_lines")
 
     scale = dpi / _WORKING_DPI
     lines: list[Line] = []
@@ -178,7 +199,9 @@ def _round_half_up(value: float) -> int:
     return math.floor(value + 0.5)
 
 
-def _vertical_raster_lines(gray100: NDArray[np.uint8]) -> NDArray[np.uint8]:
+def _vertical_raster_lines(
+    gray100: NDArray[np.uint8], dbg: DebugImages | None = None
+) -> NDArray[np.uint8]:
     """Highlight dark strokes that are thin across and at least 19 pixels tall.
 
     Black is the foreground here, so OpenCV's dilation (a maximum) is the
@@ -198,9 +221,13 @@ def _vertical_raster_lines(gray100: NDArray[np.uint8]) -> NDArray[np.uint8]:
         borderValue=0,
     )
     strokes = cv2.subtract(wide, tall)
+    if dbg is not None:
+        dbg.add(strokes, "vert_raster_lines")
     column = np.ones((_GAP_CLOSING_HEIGHT, 1), np.uint8)
     narrowed = cv2.erode(strokes, column, borderType=cv2.BORDER_CONSTANT, borderValue=0)
     closed = cv2.dilate(narrowed, column, borderType=cv2.BORDER_CONSTANT, borderValue=0)
+    if dbg is not None:
+        dbg.add(closed, "short_segments_removed")
     return np.asarray(closed, dtype=np.uint8)
 
 

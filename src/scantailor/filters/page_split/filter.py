@@ -8,11 +8,12 @@ It splits scanned images into individual pages, handling cases like:
 """
 
 import math
-from functools import partial
+from typing import NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.core.models import Dpi, PageId
 
 from .dependencies import Dependencies
@@ -22,6 +23,18 @@ from .page_layout_adapter import adapt_page_layout, correct_page_layout_type
 from .params import Params
 from .settings import Settings
 from .split_finder import SplitResult, detect_split
+
+
+class Settled(NamedTuple):
+    """What ``Filter.settle`` left the page with.
+
+    Attributes:
+        params (Params): The page's parameters.
+        detected (bool): Whether the layout estimator ran.
+    """
+
+    params: Params
+    detected: bool
 
 
 class Filter:
@@ -166,6 +179,7 @@ class Filter:
         rotation_degrees: int = 0,
         bw_threshold: int | None = None,
         trim_area: NDArray[np.float64] | None = None,
+        dbg: DebugImages | None = None,
     ) -> SplitResult:
         """Detect how to split an image.
 
@@ -182,6 +196,8 @@ class Filter:
             trim_area: Corners, in pixels of ``image``, of the region a manual
                 trim keeps. Only that region is analysed and a change of it
                 invalidates the result.
+            dbg (DebugImages | None): Receives the estimator's intermediate
+                images.
 
         Returns:
             SplitResult with the detected layout, in the pixels of ``image``.
@@ -190,7 +206,7 @@ class Filter:
         layout_type = params.layout_type
         trim = _trim_rect(trim_area, image.shape)
 
-        result = detect_split(image, layout_type, dpi, bw_threshold, trim)
+        result = detect_split(image, layout_type, dpi, bw_threshold, trim, dbg=dbg)
 
         if store_result:
             dependencies = self._dependencies_of(
@@ -408,8 +424,30 @@ class Filter:
         rotation_degrees: int = 0,
         bw_threshold: int | None = None,
         trim_area: NDArray[np.float64] | None = None,
+        dbg: DebugImages | None = None,
     ) -> Params:
         """Make the stored layout fit the image, detecting only when it must.
+
+        Takes the arguments of ``settle`` and returns only its parameters.
+
+        Returns:
+            Params: The updated parameters.
+        """
+        return self.settle(
+            image, page_id, dpi, rotation_degrees, bw_threshold, trim_area, dbg
+        ).params
+
+    def settle(
+        self,
+        image: NDArray[np.uint8],
+        page_id: PageId,
+        dpi: Dpi | float = 300.0,
+        rotation_degrees: int = 0,
+        bw_threshold: int | None = None,
+        trim_area: NDArray[np.float64] | None = None,
+        dbg: DebugImages | None = None,
+    ) -> Settled:
+        """Make the stored layout fit the image and tell whether it detected.
 
         A stored layout is kept while its dependencies hold. When the image size
         or rotation changed, or the requested type differs from the one the
@@ -418,30 +456,41 @@ class Filter:
         another type than the requested one, or none, is detected.
 
         Args:
-            image: The oriented image to process.
-            page_id: The page ID.
-            dpi: Image resolution; the axes may differ.
-            rotation_degrees: Orthogonal rotation applied to ``image``.
-            bw_threshold: The page's stored black and white threshold, if any.
-            trim_area: Corners, in pixels of ``image``, of the region a manual
-                trim keeps; None when there is no trim.
+            image (NDArray[np.uint8]): The oriented image to process.
+            page_id (PageId): The page ID.
+            dpi (Dpi | float): Image resolution; the axes may differ.
+            rotation_degrees (int): Orthogonal rotation applied to ``image``.
+            bw_threshold (int | None): The page's stored black and white
+                threshold, if any.
+            trim_area (NDArray[np.float64] | None): Corners, in pixels of
+                ``image``, of the region a manual trim keeps; None when there
+                is no trim.
+            dbg (DebugImages | None): Receives the estimator's intermediate
+                images when it runs.
 
         Returns:
-            The updated parameters. When the page's parameters changed while it
-            was processed, they are kept and returned instead of the result.
+            Settled: The updated parameters and whether the estimator ran. When
+                the page's parameters changed while it was processed, they are
+                kept and returned instead of the result.
         """
         params = self.get_params(page_id)
         layout = params.page_layout
         requested = params.layout_type
-        detect = partial(
-            self._detect,
-            image,
-            page_id,
-            dpi,
-            rotation_degrees,
-            bw_threshold,
-            trim_area,
-        )
+
+        def detect() -> Settled:
+            return Settled(
+                self._detect(
+                    image,
+                    page_id,
+                    dpi,
+                    rotation_degrees,
+                    bw_threshold,
+                    trim_area,
+                    dbg,
+                ),
+                detected=True,
+            )
+
         if layout is None or _conflicts(requested, layout):
             return detect()
 
@@ -453,7 +502,7 @@ class Filter:
         ):
             new_layout = correct_page_layout_type(layout)
             if new_layout.layout_type == layout.layout_type:
-                return params
+                return Settled(params, detected=False)
         elif requested == LayoutType.AUTO_LAYOUT_TYPE:
             return detect()
         else:
@@ -469,8 +518,8 @@ class Filter:
             dependencies=current.model_copy(update={"layout_type": new_type}),
         )
         if self._settings.replace_params(page_id, params, new_params):
-            return new_params
-        return self.get_params(page_id)
+            return Settled(new_params, detected=False)
+        return Settled(self.get_params(page_id), detected=False)
 
     def _detect(
         self,
@@ -480,6 +529,7 @@ class Filter:
         rotation_degrees: int,
         bw_threshold: int | None,
         trim_area: NDArray[np.float64] | None,
+        dbg: DebugImages | None,
     ) -> Params:
         self.detect_split(
             image,
@@ -488,6 +538,7 @@ class Filter:
             rotation_degrees=rotation_degrees,
             bw_threshold=bw_threshold,
             trim_area=trim_area,
+            dbg=dbg,
         )
         return self.get_params(page_id)
 
