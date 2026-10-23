@@ -2,7 +2,7 @@ Projects, PDF and defaults
 ==========================
 
 The project file, the default settings that new pages start from, batch runs and
-the PDF import and export.
+the PDF import and export, and the debug images a render records.
 
 Project
 -------
@@ -68,3 +68,8 @@ PDF worker pool
 ---------------
 
 .. automodule:: scantailor.core.pdf_pool
+
+Debug images
+------------
+
+.. automodule:: scantailor.core.debug_images
