@@ -572,7 +572,10 @@ class ThumbnailListWidget(QWidget):
         extra_orders (Sequence[PageOrderOption]): Further sort options, for
             orders that need stage data, shown after the built-in ones.
         thread_count (int): Worker threads.
-        parent (QWidget | None): Parent widget.
+        parent (QWidget): Owner that deletes the list with itself. The view
+            holds the list's bound method, so a parentless list waits for the
+            cycle collector, which can run on a render worker and drop the
+            wrapper while leaving the window alive.
 
     Signals:
         page_selected (PageId): The current page changed.
@@ -611,7 +614,8 @@ class ThumbnailListWidget(QWidget):
         single_column: bool = False,
         extra_orders: Sequence[PageOrderOption] = (),
         thread_count: int = 2,
-        parent: QWidget | None = None,
+        *,
+        parent: QWidget,
     ) -> None:
         """Initialise; arguments are described on the class."""
         super().__init__(parent)

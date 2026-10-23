@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QPoint
 from PySide6.QtGui import QColor, QImage
-from PySide6.QtWidgets import QCheckBox, QDialogButtonBox, QLabel
+from PySide6.QtWidgets import QCheckBox, QDialogButtonBox, QLabel, QWidget
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui import icons
@@ -13,6 +13,7 @@ from scantailor.app.ui.dialogs.remove_pages import RemovePagesDialog
 from scantailor.app.ui.thumbnails import ThumbnailListWidget
 from scantailor.core.models import ImageId, PageId
 from scantailor.core.project import ImageMetadata, Project
+from tests.ui.hosting import show_in_host
 
 
 def render(page: PageId, stage: str) -> QImage:
@@ -33,12 +34,9 @@ def project() -> Project:
 
 
 @pytest.fixture
-def widget(qtbot: QtBot, project: Project) -> ThumbnailListWidget:
-    thumbnails = ThumbnailListWidget(render, project, stage="page_split")
-    qtbot.addWidget(thumbnails)
-    thumbnails.resize(240, 700)
-    thumbnails.show()
-    qtbot.wait_exposed(thumbnails)
+def widget(qtbot: QtBot, host: QWidget, project: Project) -> ThumbnailListWidget:
+    thumbnails = ThumbnailListWidget(render, project, stage="page_split", parent=host)
+    show_in_host(qtbot, thumbnails, 240, 700)
     return thumbnails
 
 
@@ -155,10 +153,9 @@ def test_right_click_past_the_last_page_offers_insert_here(
 
 
 def test_no_menu_without_a_project(
-    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+    qtbot: QtBot, host: QWidget, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    thumbnails = ThumbnailListWidget(render)
-    qtbot.addWidget(thumbnails)
+    thumbnails = ThumbnailListWidget(render, parent=host)
     shown: list[object] = []
     monkeypatch.setattr(
         ThumbnailListWidget,

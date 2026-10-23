@@ -5,9 +5,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+import shiboken6
 from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QColor, QImage, QMouseEvent
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication, QMessageBox, QVBoxLayout, QWidget
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.thumbnails import (
@@ -20,6 +21,7 @@ from scantailor.app.ui.thumbnails.model import IsCurrentRole
 from scantailor.core.models import ImageId, PageId
 from scantailor.core.project import ImageMetadata, Project
 from scantailor.core.settings import ApplicationSettings
+from tests.ui.hosting import show_in_host
 
 WIDTHS = [900, 300, 600, 450]
 
@@ -60,13 +62,10 @@ def renderer() -> CountingRenderer:
 
 @pytest.fixture
 def widget(
-    qtbot: QtBot, project: Project, renderer: CountingRenderer
+    qtbot: QtBot, host: QWidget, project: Project, renderer: CountingRenderer
 ) -> ThumbnailListWidget:
-    thumbnails = ThumbnailListWidget(renderer, project, stage="page_split")
-    qtbot.addWidget(thumbnails)
-    thumbnails.resize(240, 700)
-    thumbnails.show()
-    qtbot.wait_exposed(thumbnails)
+    thumbnails = ThumbnailListWidget(renderer, project, stage="page_split", parent=host)
+    show_in_host(qtbot, thumbnails, 240, 700)
     return thumbnails
 
 
@@ -94,10 +93,9 @@ def test_one_item_per_page(widget: ThumbnailListWidget, project: Project) -> Non
 
 
 def test_empty_project_yields_no_items(
-    qtbot: QtBot, renderer: CountingRenderer
+    qtbot: QtBot, host: QWidget, renderer: CountingRenderer
 ) -> None:
-    thumbnails = ThumbnailListWidget(renderer, Project())
-    qtbot.addWidget(thumbnails)
+    thumbnails = ThumbnailListWidget(renderer, Project(), parent=host)
     assert thumbnails.model.rowCount() == 0
     assert thumbnails.selected_pages() == []
 
@@ -338,15 +336,14 @@ def test_sort_by_height_reorders_increasing(
 
 @pytest.mark.parametrize("order", [1, 2])
 def test_sort_puts_pages_of_unknown_size_last(
-    qtbot: QtBot, order: int, renderer: CountingRenderer
+    qtbot: QtBot, host: QWidget, order: int, renderer: CountingRenderer
 ) -> None:
     project = Project()
     project.add_image(ImageId(file_path=Path("unknown.png")), ImageMetadata())
     project.add_image(
         ImageId(file_path=Path("known.png")), ImageMetadata(width=500, height=700)
     )
-    thumbnails = ThumbnailListWidget(renderer, project, stage="page_split")
-    qtbot.addWidget(thumbnails)
+    thumbnails = ThumbnailListWidget(renderer, project, stage="page_split", parent=host)
     thumbnails.set_order(order)
     assert thumbnails.pages() == list(reversed(project.get_pages()))
 
@@ -373,11 +370,12 @@ def test_sort_keeps_selection_and_does_not_emit_page_selected(
 
 
 def test_extra_orders_appear_after_built_ins(
-    qtbot: QtBot, project: Project, renderer: CountingRenderer
+    qtbot: QtBot, host: QWidget, project: Project, renderer: CountingRenderer
 ) -> None:
     reverse = PageOrderOption("Reverse", lambda entry: -entry.position)
-    thumbnails = ThumbnailListWidget(renderer, project, extra_orders=[reverse])
-    qtbot.addWidget(thumbnails)
+    thumbnails = ThumbnailListWidget(
+        renderer, project, extra_orders=[reverse], parent=host
+    )
     assert thumbnails.order_combo.itemText(3) == "Reverse"
     thumbnails.order_combo.setCurrentIndex(3)
     assert thumbnails.pages() == list(reversed(project.get_pages()))
@@ -407,9 +405,9 @@ def test_set_current_page_emits_page_selected(
 
 
 def test_scroll_to_current_brings_last_page_into_view(
-    qtbot: QtBot, project: Project, renderer: CountingRenderer
+    qtbot: QtBot, host: QWidget, project: Project, renderer: CountingRenderer
 ) -> None:
-    thumbnails = _long_list(qtbot, project, renderer)
+    thumbnails = _long_list(qtbot, host, project, renderer)
     last = thumbnails.pages()[-1]
     thumbnails.set_current_page(last)
     viewport = thumbnails.view.viewport().rect()
@@ -417,25 +415,22 @@ def test_scroll_to_current_brings_last_page_into_view(
 
 
 def _long_list(
-    qtbot: QtBot, project: Project, renderer: CountingRenderer
+    qtbot: QtBot, host: QWidget, project: Project, renderer: CountingRenderer
 ) -> ThumbnailListWidget:
     for number in range(5, 30):
         project.add_image(
             ImageId(file_path=Path(f"page_{number}.png")),
             ImageMetadata(width=500, height=700),
         )
-    thumbnails = ThumbnailListWidget(renderer, project)
-    qtbot.addWidget(thumbnails)
-    thumbnails.resize(240, 400)
-    thumbnails.show()
-    qtbot.wait_exposed(thumbnails)
+    thumbnails = ThumbnailListWidget(renderer, project, parent=host)
+    show_in_host(qtbot, thumbnails, 240, 400)
     return thumbnails
 
 
 def test_programmatic_navigation_does_not_scroll_when_following_is_off(
-    qtbot: QtBot, project: Project, renderer: CountingRenderer
+    qtbot: QtBot, host: QWidget, project: Project, renderer: CountingRenderer
 ) -> None:
-    thumbnails = _long_list(qtbot, project, renderer)
+    thumbnails = _long_list(qtbot, host, project, renderer)
     thumbnails.set_follow_current(False)
 
     thumbnails.set_current_page(thumbnails.pages()[-1])
@@ -445,9 +440,9 @@ def test_programmatic_navigation_does_not_scroll_when_following_is_off(
 
 
 def test_programmatic_navigation_scrolls_when_following_is_on(
-    qtbot: QtBot, project: Project, renderer: CountingRenderer
+    qtbot: QtBot, host: QWidget, project: Project, renderer: CountingRenderer
 ) -> None:
-    thumbnails = _long_list(qtbot, project, renderer)
+    thumbnails = _long_list(qtbot, host, project, renderer)
     thumbnails.set_follow_current(True)
     last = thumbnails.pages()[-1]
 
@@ -493,16 +488,17 @@ def test_cache_hit_avoids_second_render(
 
 
 def test_changed_params_hash_triggers_rerender(
-    qtbot: QtBot, project: Project, renderer: CountingRenderer
+    qtbot: QtBot, host: QWidget, project: Project, renderer: CountingRenderer
 ) -> None:
     digest = {"value": 1}
     thumbnails = ThumbnailListWidget(
-        renderer, project, stage="deskew", params_hash=lambda _p, _s: digest["value"]
+        renderer,
+        project,
+        stage="deskew",
+        params_hash=lambda _p, _s: digest["value"],
+        parent=host,
     )
-    qtbot.addWidget(thumbnails)
-    thumbnails.resize(240, 700)
-    thumbnails.show()
-    qtbot.wait_exposed(thumbnails)
+    show_in_host(qtbot, thumbnails, 240, 700)
     thumbnails.view.viewport().repaint()
     wait_for_renders(qtbot, thumbnails, len(WIDTHS))
 
@@ -524,18 +520,17 @@ def test_stage_change_renders_that_stage(
     )
 
 
-def test_failed_render_is_not_retried_in_a_loop(qtbot: QtBot, project: Project) -> None:
+def test_failed_render_is_not_retried_in_a_loop(
+    qtbot: QtBot, host: QWidget, project: Project
+) -> None:
     attempts: list[PageId] = []
 
     def failing(page: PageId, stage: str) -> QImage:
         attempts.append(page)
         raise RuntimeError("boom")
 
-    thumbnails = ThumbnailListWidget(failing, project)
-    qtbot.addWidget(thumbnails)
-    thumbnails.resize(240, 700)
-    thumbnails.show()
-    qtbot.wait_exposed(thumbnails)
+    thumbnails = ThumbnailListWidget(failing, project, parent=host)
+    show_in_host(qtbot, thumbnails, 240, 700)
     thumbnails.view.viewport().repaint()
     thumbnails.model.wait_for_idle()
     qtbot.wait(100)
@@ -546,6 +541,7 @@ def test_failed_render_is_not_retried_in_a_loop(qtbot: QtBot, project: Project) 
 
 def _shown_with_disk_cache(
     qtbot: QtBot,
+    host: QWidget,
     project: Project,
     renderer: CountingRenderer,
     directory: Path,
@@ -558,44 +554,43 @@ def _shown_with_disk_cache(
         stage="s",
         file_digest=file_digest,
         cache_directory=directory,
+        parent=host,
     )
-    qtbot.addWidget(thumbnails)
-    thumbnails.resize(240, 700)
-    thumbnails.show()
-    qtbot.wait_exposed(thumbnails)
+    show_in_host(qtbot, thumbnails, 240, 700)
     thumbnails.view.viewport().repaint()
     wait_for_renders(qtbot, thumbnails, len(WIDTHS))
     return thumbnails
 
 
 def test_thumbnails_kept_on_disk_are_shown_by_a_new_list_without_rendering(
-    qtbot: QtBot, project: Project, tmp_path: Path
+    qtbot: QtBot, host: QWidget, project: Project, tmp_path: Path
 ) -> None:
     directory = tmp_path / "cache"
-    _shown_with_disk_cache(
-        qtbot, project, CountingRenderer(), directory, lambda _page, _stage: "d1"
+    first = _shown_with_disk_cache(
+        qtbot, host, project, CountingRenderer(), directory, lambda _page, _stage: "d1"
     )
     assert len(list(directory.glob("*.png"))) == len(WIDTHS)
+    shiboken6.delete(first)
 
     second = CountingRenderer()
     _shown_with_disk_cache(
-        qtbot, project, second, directory, lambda _page, _stage: "d1"
+        qtbot, host, project, second, directory, lambda _page, _stage: "d1"
     )
-
     assert second.calls == []
 
 
 def test_a_changed_digest_renders_again_and_replaces_the_stale_file(
-    qtbot: QtBot, project: Project, tmp_path: Path
+    qtbot: QtBot, host: QWidget, project: Project, tmp_path: Path
 ) -> None:
     directory = tmp_path / "cache"
-    _shown_with_disk_cache(
-        qtbot, project, CountingRenderer(), directory, lambda _page, _stage: "d1"
+    first = _shown_with_disk_cache(
+        qtbot, host, project, CountingRenderer(), directory, lambda _page, _stage: "d1"
     )
+    shiboken6.delete(first)
 
     second = CountingRenderer()
     _shown_with_disk_cache(
-        qtbot, project, second, directory, lambda _page, _stage: "d2"
+        qtbot, host, project, second, directory, lambda _page, _stage: "d2"
     )
 
     assert len(second.calls) == len(WIDTHS)
@@ -603,19 +598,19 @@ def test_a_changed_digest_renders_again_and_replaces_the_stale_file(
 
 
 def test_a_thumbnail_without_a_digest_is_rendered_but_not_written(
-    qtbot: QtBot, project: Project, tmp_path: Path
+    qtbot: QtBot, host: QWidget, project: Project, tmp_path: Path
 ) -> None:
     directory = tmp_path / "cache"
 
     _shown_with_disk_cache(
-        qtbot, project, CountingRenderer(), directory, lambda _page, _stage: None
+        qtbot, host, project, CountingRenderer(), directory, lambda _page, _stage: None
     )
 
     assert not directory.exists()
 
 
 def test_a_render_whose_digest_changed_meanwhile_is_not_written(
-    qtbot: QtBot, project: Project, tmp_path: Path
+    qtbot: QtBot, host: QWidget, project: Project, tmp_path: Path
 ) -> None:
     """The render drew from parameters that a detection or an edit replaced."""
     directory = tmp_path / "cache"
@@ -626,7 +621,9 @@ def test_a_render_whose_digest_changed_meanwhile_is_not_written(
         with lock:
             return str(next(digests))
 
-    _shown_with_disk_cache(qtbot, project, CountingRenderer(), directory, ever_changing)
+    _shown_with_disk_cache(
+        qtbot, host, project, CountingRenderer(), directory, ever_changing
+    )
 
     assert not directory.exists()
 
@@ -779,10 +776,15 @@ class TestImageList:
 
     @pytest.fixture
     def thumbnails(
-        self, qtbot: QtBot, spread_project: Project, renderer: CountingRenderer
+        self,
+        qtbot: QtBot,
+        host: QWidget,
+        spread_project: Project,
+        renderer: CountingRenderer,
     ) -> ThumbnailListWidget:
-        thumbnails = ThumbnailListWidget(renderer, spread_project, stage="2")
-        qtbot.addWidget(thumbnails)
+        thumbnails = ThumbnailListWidget(
+            renderer, spread_project, stage="2", parent=host
+        )
         return thumbnails
 
     @staticmethod
@@ -969,14 +971,17 @@ class TestCancelingSelectionQuestion:
         assert answers == []
 
     def test_nothing_is_asked_for_the_two_halves_of_one_image(
-        self, qtbot: QtBot, renderer: CountingRenderer, answers: list[str]
+        self,
+        qtbot: QtBot,
+        host: QWidget,
+        renderer: CountingRenderer,
+        answers: list[str],
     ) -> None:
         image = ImageId(file_path=Path("spread.png"))
         project = Project()
         project.add_image(image, ImageMetadata(width=2000, height=1400))
         project.images[0].num_sub_pages = 2
-        thumbnails = ThumbnailListWidget(renderer, project, stage="3")
-        qtbot.addWidget(thumbnails)
+        thumbnails = ThumbnailListWidget(renderer, project, stage="3", parent=host)
         left, right = thumbnails.pages()
         thumbnails.select_pages([left, right])
 
@@ -1013,3 +1018,24 @@ def test_a_thumbnail_file_that_cannot_be_replaced_is_left_and_logged(
     assert [path.name for path in (tmp_path / "d").iterdir()] == [
         f"{key.file_stem()}.png"
     ]
+
+
+def test_a_list_cannot_be_built_without_a_parent(renderer: CountingRenderer) -> None:
+    with pytest.raises(TypeError, match="parent"):
+        ThumbnailListWidget(renderer, Project())  # type: ignore[call-arg]
+
+
+def test_deleting_its_window_deletes_a_shown_list_with_it(
+    qtbot: QtBot, project: Project, renderer: CountingRenderer
+) -> None:
+    window = QWidget()
+    QVBoxLayout(window)
+    thumbnails = ThumbnailListWidget(renderer, project, parent=window)
+    show_in_host(qtbot, thumbnails, 240, 700)
+    destroyed: list[bool] = []
+    thumbnails.destroyed.connect(lambda: destroyed.append(True))
+
+    shiboken6.delete(window)
+
+    assert destroyed == [True]
+    assert not shiboken6.isValid(thumbnails)
