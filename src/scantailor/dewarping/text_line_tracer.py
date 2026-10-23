@@ -14,6 +14,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.core.models import Dpi
 from scantailor.dewarping.grid_filters import (
     directional_gradient,
@@ -26,6 +27,7 @@ from scantailor.dewarping.line_geometry import (
     grid_line_cells,
     line_bounded_by_rect,
     line_intersection,
+    lines_within_image,
     normal_vector,
     projection_dist,
     projection_point,
@@ -33,6 +35,7 @@ from scantailor.dewarping.line_geometry import (
 )
 from scantailor.dewarping.text_line_refiner import refine_text_lines
 from scantailor.dewarping.vert_content_bounds import detect_vert_content_bounds
+from scantailor.imageproc import debug_drawing as draw
 from scantailor.imageproc.binarize import binarize_wolf
 from scantailor.imageproc.filters import bgr_to_gray, stretch_gray_range
 
@@ -58,6 +61,8 @@ _MAX_END_GAP_FRACTION = 0.3
 _CURVATURE_ANGLE_DEG = 6.0
 _FLOAT_EPS = 1.1920929e-07
 _FLOAT_MAX = 3.4028235e38
+# Upstream's colour of the mid-line seeds in the debug image, as BGR.
+_SEED_PURPLE = (0x6D, 0, 0x2D)
 # Neighbour steps of a ridge walk, clockwise from the top left.
 _TRACE_DIRECTIONS = (
     (-1, -1),
@@ -109,6 +114,7 @@ def trace_text_lines(
     image: NDArray[np.uint8],
     dpi: Dpi | tuple[float, float] | float = 300.0,
     content_rect: tuple[int, int, int, int] | None = None,
+    dbg: DebugImages | None = None,
 ) -> TextLineResult:
     """Trace the text lines of a page.
 
@@ -121,6 +127,8 @@ def trace_text_lines(
         content_rect (tuple[int, int, int, int] | None): (x, y, width, height)
             of the content in ``image`` pixels; ink outside it is ignored. None
             takes the whole image.
+        dbg (DebugImages | None): Receives each step's image, at the
+            tracer's working resolution.
 
     Returns:
         TextLineResult: The traced lines and the vertical content bounds, in
@@ -131,6 +139,8 @@ def trace_text_lines(
     height, width = gray.shape
 
     downscaled = _downscale(gray, dpi_h, dpi_v)
+    if dbg is not None:
+        dbg.add(downscaled, "downscaled")
     scaled_height, scaled_width = downscaled.shape
     factor_x = scaled_width / width
     factor_y = scaled_height / height
@@ -140,21 +150,35 @@ def trace_text_lines(
     scaled_rect = _scale_rect(content_rect, factor_x, factor_y)
 
     ink = binarize_wolf(downscaled, _WOLF_WINDOW, k=_WOLF_K) == 0
+    if dbg is not None:
+        dbg.add(ink, "binarized")
     ink = _sanitize_binary_image(ink, scaled_rect)
-    bounds = detect_vert_content_bounds(ink)
+    if dbg is not None:
+        dbg.add(ink, "sanitized")
+    bounds = detect_vert_content_bounds(ink, dbg)
+    if dbg is not None:
+        dbg.add(_visualize_vertical_bounds(ink, bounds), "vertBounds")
 
-    polylines = _extract_text_lines(stretch_gray_range(downscaled, 0.0, 0.0), bounds)
+    polylines = _extract_text_lines(
+        stretch_gray_range(downscaled, 0.0, 0.0), bounds, dbg
+    )
     traced_count = len(polylines)
+    if dbg is not None:
+        dbg.add(_visualize_polylines(downscaled, polylines), "traced")
     polylines = _filter_short_curves(polylines, bounds)
     polylines = _filter_out_of_bounds_curves(polylines, bounds)
+    if dbg is not None:
+        dbg.add(_visualize_polylines(downscaled, polylines), "filtered1")
 
     down = _average_unit_vector(bounds)
     down_norm = math.hypot(*down)
     down = (down[0] / down_norm, down[1] / down_norm)
     if down[1] < 0:
         down = (-down[0], -down[1])
-    polylines = refine_text_lines(downscaled, polylines, down, _SNAKE_ITERATIONS)
+    polylines = refine_text_lines(downscaled, polylines, down, _SNAKE_ITERATIONS, dbg)
     polylines = [line for line in polylines if _is_curvature_consistent(line)]
+    if dbg is not None:
+        dbg.add(_visualize_polylines(downscaled, polylines), "filtered2")
 
     to_original = np.array([1.0 / factor_x, 1.0 / factor_y])
     return TextLineResult(
@@ -492,20 +516,25 @@ def _steps_towards(nx: float, ny: float) -> list[tuple[int, int]]:
 
 
 def _extract_text_lines(
-    stretched: NDArray[np.uint8], bounds: tuple[Line, Line]
+    stretched: NDArray[np.uint8],
+    bounds: tuple[Line, Line],
+    dbg: DebugImages | None = None,
 ) -> list[NDArray[np.float64]]:
     """Find ridges in the page and trace a line along each, from bound to bound."""
     direction = _average_unit_vector(bounds)
 
     # The ridge response is the second derivative along the text columns of the
     # image, taken from a blurred first derivative.
-    first = gauss_blur(
-        directional_gradient(stretched, direction),
-        _FIRST_DERIVATIVE_SIGMA,
-        _FIRST_DERIVATIVE_SIGMA,
-    )
+    first = directional_gradient(stretched, direction)
+    if dbg is not None:
+        dbg.add(draw.signed_overlay(stretched, first), "first_dir_deriv")
+    first = gauss_blur(first, _FIRST_DERIVATIVE_SIGMA, _FIRST_DERIVATIVE_SIGMA)
+    if dbg is not None:
+        dbg.add(draw.signed_overlay(stretched, first), "first_dir_deriv_blurred")
     grad_x, grad_y = sobel_xy(first)
     ridge = grad_x * np.float32(direction[0]) + grad_y * np.float32(direction[1])
+    if dbg is not None:
+        dbg.add(draw.signed_overlay(stretched, ridge), "second_dir_deriv")
 
     strongest = max(float(ridge.max()), 0.0)
     # Single precision, as the C++ code computes it: the threshold is compared
@@ -516,14 +545,25 @@ def _extract_text_lines(
         / np.float32(_RIDGE_THRESHOLD_DENOMINATOR)
     )
     initial = ridge > threshold
+    if dbg is not None:
+        dbg.add(initial, "initialBinarization")
 
     magnitude = np.abs(ridge)
+    if dbg is not None:
+        dbg.add(draw.signed_overlay(stretched, magnitude), "abs")
     blurred = gauss_blur(
         magnitude, _ABS_SECOND_DERIVATIVE_SIGMA, _ABS_SECOND_DERIVATIVE_SIGMA
     )
+    if dbg is not None:
+        dbg.add(draw.signed_overlay(stretched, blurred), "blurred")
     blurred += ridge - magnitude
+    if dbg is not None:
+        dbg.add(draw.signed_overlay(stretched, blurred), "+= diff")
     post = blurred > threshold
     obstacles = blurred < -threshold
+    if dbg is not None:
+        dbg.add(post, "postBinarization")
+        dbg.add(obstacles, "obstacles")
 
     closed = cv2.morphologyEx(
         initial.astype(np.uint8),
@@ -531,10 +571,20 @@ def _extract_text_lines(
         np.ones((_CLOSING_BRICK, _CLOSING_BRICK), dtype=np.uint8),
     ).astype(bool)
     initial = _seed_fill(initial, closed & ~obstacles, 4)
+    if dbg is not None:
+        dbg.add(initial, "initial_closed")
     post &= initial
+    if dbg is not None:
+        dbg.add(post, "post &&= initial")
 
     sedm = _squared_distance_map(post)
-    seeds = _find_mid_line_seeds(sedm, _mid_line(bounds[0], bounds[1]))
+    mid_line = _mid_line(bounds[0], bounds[1])
+    seeds = _find_mid_line_seeds(sedm, mid_line)
+    if dbg is not None:
+        dbg.add(
+            _visualize_mid_line_seeds(stretched, post, bounds, mid_line, seeds),
+            "seeds",
+        )
 
     first_bound = np.array(bounds[0], dtype=np.float64)
     second_bound = np.array(bounds[1], dtype=np.float64)
@@ -551,6 +601,74 @@ def _extract_text_lines(
         )
         lines.append(cells.astype(np.float64))
     return lines
+
+
+def _visualize_vertical_bounds(
+    ink: NDArray[np.bool_], bounds: tuple[Line, Line]
+) -> NDArray[np.uint8]:
+    """Draw the left and right content bounds over the binarised page.
+
+    Args:
+        ink (numpy.ndarray of numpy.bool): True for ink.
+        bounds (tuple[Line, Line]): The left and the right bound.
+
+    Returns:
+        numpy.ndarray of numpy.uint8: New ``(H, W, 3)`` BGR image.
+    """
+    canvas = draw.to_bgr(ink)
+    drawn = canvas.copy()
+    draw.draw_lines(drawn, bounds, draw.BLUE, 2.0)
+    draw.blend(canvas, drawn, 0.7)
+    return canvas
+
+
+def _visualize_polylines(
+    background: NDArray[np.uint8], polylines: list[NDArray[np.float64]]
+) -> NDArray[np.uint8]:
+    """Draw traced text lines over the page.
+
+    Args:
+        background (numpy.ndarray of numpy.uint8): Gray or BGR page.
+        polylines (list[numpy.ndarray of numpy.float64]): ``(n, 2)`` points of
+            each line.
+
+    Returns:
+        numpy.ndarray of numpy.uint8: New ``(H, W, 3)`` BGR image.
+    """
+    canvas = draw.to_bgr(background)
+    draw.draw_polylines(canvas, polylines, draw.BLUE, 3.0)
+    return canvas
+
+
+def _visualize_mid_line_seeds(
+    background: NDArray[np.uint8],
+    ridges: NDArray[np.bool_],
+    bounds: tuple[Line, Line],
+    mid_line: Line,
+    seeds: list[tuple[int, int]],
+) -> NDArray[np.uint8]:
+    """Draw the ridges, the bounds, the mid line and the seeds tracing starts from.
+
+    Args:
+        background (numpy.ndarray of numpy.uint8): Gray or BGR page.
+        ridges (numpy.ndarray of numpy.bool): Ridge pixels, tinted red.
+        bounds (tuple[Line, Line]): The left and the right content bound.
+        mid_line (Line): The line between them that seeds are taken on.
+        seeds (list[tuple[int, int]]): ``(x, y)`` of each seed.
+
+    Returns:
+        numpy.ndarray of numpy.uint8: New ``(H, W, 3)`` BGR image.
+    """
+    canvas = draw.to_bgr(background)
+    draw.tint(canvas, ridges, draw.RED, 120 / 255)
+    drawn = canvas.copy()
+    draw.draw_lines(drawn, lines_within_image(bounds, drawn.shape), draw.BLUE, 5.0)
+    draw.blend(canvas, drawn, 180 / 255)
+    drawn = canvas.copy()
+    draw.draw_lines(drawn, lines_within_image([mid_line], drawn.shape), draw.GREEN, 5.0)
+    draw.blend(canvas, drawn, 180 / 255)
+    draw.draw_knots(canvas, np.array(seeds, dtype=np.float64) + 0.5, _SEED_PURPLE, 7.0)
+    return canvas
 
 
 def _filter_short_curves(

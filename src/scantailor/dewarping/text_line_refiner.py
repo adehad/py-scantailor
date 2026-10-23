@@ -15,7 +15,9 @@ dynamic programmes step along the node index for all snakes at once.
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.dewarping.grid_filters import directional_gradient, gauss_blur
+from scantailor.imageproc import debug_drawing as draw
 
 # Blur of the first stage, in pixels of a 200 dpi page; the second stage halves it.
 _FIRST_BLUR_SIGMA = 4.0
@@ -43,6 +45,7 @@ def refine_text_lines(
     polylines: list[FloatArray],
     unit_down: tuple[float, float],
     iterations: int = 100,
+    dbg: DebugImages | None = None,
 ) -> list[FloatArray]:
     """Move traced lines onto the middle of the text they follow.
 
@@ -56,6 +59,8 @@ def refine_text_lines(
             along the text columns.
         iterations (int): Evolution steps granted to each snake over both blur
             stages.
+        dbg (DebugImages | None): Receives the snakes before evolving and
+            after each blur stage.
 
     Returns:
         list[numpy.ndarray of numpy.float64]: One refined line per input line, the nodes
@@ -66,13 +71,59 @@ def refine_text_lines(
         return []
     snakes = [_make_snake(polyline) for polyline in polylines]
     remaining = [iterations] * len(snakes)
+    if dbg is not None:
+        dbg.add(_visualize_snakes(gray, snakes, unit_down), "initial_snakes")
 
     sigma = _FIRST_BLUR_SIGMA
     gradient = _blurred_gradient(gray, unit_down, sigma)
     remaining = _evolve_snakes(snakes, gradient, unit_down, remaining, True)
+    if dbg is not None:
+        dbg.add(_visualize_snakes(gray, snakes, unit_down, gradient), "evolved_snakes1")
     gradient = _blurred_gradient(gray, unit_down, sigma * _BLUR_SIGMA_RATIO)
     _evolve_snakes(snakes, gradient, unit_down, remaining, False)
+    if dbg is not None:
+        dbg.add(_visualize_snakes(gray, snakes, unit_down, gradient), "evolved_snakes2")
     return [np.column_stack([cx, cy]) for cx, cy, _ in snakes]
+
+
+def _visualize_snakes(
+    gray: NDArray[np.uint8],
+    snakes: list[tuple[FloatArray, FloatArray, FloatArray]],
+    unit_down: tuple[float, float],
+    gradient: NDArray[np.float32] | None = None,
+) -> NDArray[np.uint8]:
+    """Draw each snake's top and bottom rib ends and its middle line.
+
+    Args:
+        gray (numpy.ndarray of numpy.uint8): The page the snakes lie on.
+        snakes (list[tuple[FloatArray, FloatArray, FloatArray]]): Centre x,
+            centre y and half rib length of each snake's knots.
+        unit_down (tuple[float, float]): Unit vector pointing down the page,
+            which orients the ribs.
+        gradient (numpy.ndarray of numpy.float32 | None): Tinted under the
+            snakes when given, as upstream shows the field they evolve in.
+
+    Returns:
+        numpy.ndarray of numpy.uint8: New ``(H, W, 3)`` BGR image.
+    """
+    if gradient is None:
+        canvas = draw.to_bgr(gray)
+    else:
+        canvas = draw.signed_overlay(gray, gradient)
+    for cx, cy, rib in snakes:
+        xs, ys = cx[None, :], cy[None, :]
+        _, normal = _frames(
+            xs, ys, _arc_lengths(xs, ys), np.array([len(cx)]), unit_down
+        )
+        middle = np.column_stack([cx, cy]) + 0.5
+        offset = normal[0] * rib[:, None]
+        draw.draw_polylines(canvas, [middle - offset], draw.BLUE, 1.5)
+        draw.draw_polylines(canvas, [middle + offset], draw.RED, 1.5)
+        draw.draw_polylines(canvas, [middle], draw.MAGENTA, 1.0)
+        knots = canvas.copy()
+        draw.draw_knots(knots, middle, draw.YELLOW, 7.0)
+        draw.blend(canvas, knots, 180 / 255)
+    return canvas
 
 
 def _blurred_gradient(

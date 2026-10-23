@@ -24,6 +24,7 @@ from enum import Enum
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.core.models import Dpi
 from scantailor.dewarping import DEFAULT_MIN_SPAN_PERCENT
 from scantailor.dewarping.distortion_model import Curve, DistortionModel
@@ -213,10 +214,12 @@ def detect_distortion_model(
     edge_gray: NDArray[np.uint8] | None = None,
     to_edge_image: NDArray[np.float64] | None = None,
     min_span_percent: float = DEFAULT_MIN_SPAN_PERCENT,
+    dbg: DebugImages | None = None,
 ) -> AutoModelResult:
     """Detect the page's curvature and report what the tracing found.
 
-    The arguments are those of ``build_auto_distortion_model``.
+    The arguments are those of ``build_auto_distortion_model``, and ``dbg``
+    receives the tracers' and the model builder's intermediate images.
 
     Returns:
         AutoModelResult: The model, or None with the reason in the metrics.
@@ -230,20 +233,20 @@ def detect_distortion_model(
         q_round(content_rect[2]),
         q_round(content_rect[3]),
     )
-    traced = trace_text_lines(gray, dpi, rect)
+    traced = trace_text_lines(gray, dpi, rect, dbg)
     lines_traced = traced.traced_count
     lines_kept = len(traced.lines)
     bounds = traced.vertical_bounds
     edges: list[NDArray[np.float64]] = []
     builder = DistortionModelBuilder((0.0, 1.0))
+    edge_image = gray if edge_gray is None else edge_gray
     if bounds is not None:
         builder.set_vertical_bounds(bounds.first, bounds.second)
         for line in traced.lines:
             builder.add_horizontal_curve(line)
         if to_edge_image is not None:
             builder.transform(to_edge_image)
-        edge_image = gray if edge_gray is None else edge_gray
-        edges = trace_top_bottom_edges(edge_image, builder.vertical_bounds())
+        edges = trace_top_bottom_edges(edge_image, builder.vertical_bounds(), dbg)
         for edge in edges:
             builder.add_horizontal_curve(edge)
 
@@ -270,7 +273,7 @@ def detect_distortion_model(
 
     if lines_traced == 0 and not edges:
         return result(ModelOutcome.NO_TEXT)
-    built = builder.build()
+    built = builder.build(dbg, edge_image)
     if built.top_index is None or built.bottom_index is None:
         if lines_kept + len(edges) < 2:
             return result(ModelOutcome.TOO_FEW_CURVES)

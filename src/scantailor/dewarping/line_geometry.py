@@ -11,6 +11,7 @@ unless a function says otherwise.
 
 import math
 import sys
+from collections.abc import Iterable
 
 Point = tuple[float, float]
 Line = tuple[Point, Point]
@@ -210,6 +211,21 @@ def line_bounded_by_rect(line: Line, rect: Rect) -> Line | None:
     if largest > smallest:
         return (point_at(line, smallest), point_at(line, largest))
     return None
+
+
+def lines_within_image(lines: Iterable[Line], shape: tuple[int, ...]) -> list[Line]:
+    """Clip infinite lines to an image, dropping those that miss it.
+
+    Args:
+        lines (Iterable[Line]): The lines.
+        shape (tuple[int, ...]): The image's shape, height first.
+
+    Returns:
+        list[Line]: The visible segments, in the order of ``lines``.
+    """
+    rect = (0.0, 0.0, float(shape[1]), float(shape[0]))
+    clipped = (line_bounded_by_rect(line, rect) for line in lines)
+    return [line for line in clipped if line is not None]
 
 
 def grid_line_cells(line: Line) -> list[tuple[int, int]]:

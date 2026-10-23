@@ -18,6 +18,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.dewarping.grid_filters import (
     SOBEL_GRAY_SCALE,
     gauss_blur,
@@ -29,6 +30,7 @@ from scantailor.dewarping.line_geometry import (
     line_bounded_by_rect,
     projection_point,
 )
+from scantailor.imageproc import debug_drawing as draw
 
 # Images up to this size are used as they are; larger ones are shrunk.
 _NO_DOWNSCALE_MAX_SIDE = 1500
@@ -77,7 +79,9 @@ _NEIGHBOUR_VECTORS = np.array(
 
 
 def trace_top_bottom_edges(
-    gray: NDArray[np.uint8], bounds: tuple[Line, Line]
+    gray: NDArray[np.uint8],
+    bounds: tuple[Line, Line],
+    dbg: DebugImages | None = None,
 ) -> list[NDArray[np.float64]]:
     """Find the curves that bound the page at its top and bottom.
 
@@ -85,6 +89,8 @@ def trace_top_bottom_edges(
         gray (numpy.ndarray of numpy.uint8): 2-D gray image.
         bounds (tuple[tuple, tuple]): The two vertical content bounds, as lines
             in the pixels of ``gray``.
+        dbg (DebugImages | None): Receives each step's image, at the
+            tracer's working resolution.
 
     Returns:
         list[numpy.ndarray of numpy.float64]:
@@ -112,6 +118,8 @@ def trace_top_bottom_edges(
         )
         factor_x = scaled_width / width
         factor_y = scaled_height / height
+        if dbg is not None:
+            dbg.add(scaled, "downscaled")
         first = _scale_line(first, factor_x, factor_y)
         second = _scale_line(second, factor_x, factor_y)
     scaled_height, scaled_width = scaled.shape
@@ -126,6 +134,8 @@ def trace_top_bottom_edges(
 
     avg_dir = _average_unit_vector(first, second)
     deriv = _directional_derivative(scaled, avg_dir)
+    if dbg is not None:
+        dbg.add(draw.signed_overlay(None, deriv), "gradient")
 
     starts = grid_line_cells(first)
     direction = _direction_from_point_to_line(
@@ -133,6 +143,11 @@ def trace_top_bottom_edges(
     )
     cost, previous = _propagate_shortest_paths(deriv, starts, direction)
     endpoints = _locate_best_path_endpoints(cost, grid_line_cells(second))
+    if dbg is not None:
+        dbg.add(
+            _visualize_paths(scaled, previous, (first, second), endpoints),
+            "best_paths_ltr",
+        )
 
     absolute = np.abs(deriv)
     blurred = gauss_blur(absolute, _BLUR_SIGMA, _BLUR_SIGMA)
@@ -142,17 +157,88 @@ def trace_top_bottom_edges(
         for snake in snakes
     ]
     snakes = _run_snakes(snakes, blurred, downs, uphill=False)
+    if dbg is not None:
+        background = draw.signed_overlay(None, blurred, negative=draw.RED)
+        dbg.add(
+            _visualize_snakes(background, snakes, (first, second)),
+            "down_the_hill_snakes",
+        )
 
     ups = []
     for snake in snakes:
         down = _down_the_hill_direction(scaled_width, scaled_height, snake, avg_dir)
         ups.append((-down[0], -down[1]))
+    refined_snakes = _run_snakes(snakes, absolute, ups, uphill=True)
+    if dbg is not None:
+        dbg.add(
+            _visualize_snakes(
+                draw.signed_overlay(None, deriv), refined_snakes, (first, second)
+            ),
+            "up_the_hill_snakes",
+        )
     result = []
-    for refined in _run_snakes(snakes, absolute, ups, uphill=True):
+    for refined in refined_snakes:
         if is_image_border(refined, scaled_height):
             continue
         result.append(refined * np.array([1.0 / factor_x, 1.0 / factor_y]))
     return result
+
+
+def _visualize_paths(
+    background: NDArray[np.uint8],
+    previous: NDArray[np.int8],
+    bounds: tuple[Line, Line],
+    endpoints: list[tuple[int, int]],
+) -> NDArray[np.uint8]:
+    """Paint every cell of the best paths red and draw the bounds.
+
+    Args:
+        background (numpy.ndarray of numpy.uint8): Gray or BGR grid image.
+        previous (numpy.ndarray of numpy.int8): Step each cell came from,
+            negative at a path's start, on a grid padded by one cell.
+        bounds (tuple[Line, Line]): The left and the right bound.
+        endpoints (list[tuple[int, int]]): ``(x, y)`` where each path ends.
+
+    Returns:
+        numpy.ndarray of numpy.uint8: New ``(H, W, 3)`` BGR image.
+    """
+    canvas = draw.to_bgr(background)
+    for x, y in endpoints:
+        while True:
+            canvas[y, x] = draw.RED
+            step = int(previous[y + 1, x + 1])
+            if step < 0:
+                break
+            dx, dy = _NEIGHBOUR_VECTORS[step]
+            x += int(dx)
+            y += int(dy)
+    draw.draw_lines(canvas, bounds, draw.BLUE, 1.0)
+    return canvas
+
+
+def _visualize_snakes(
+    canvas: NDArray[np.uint8],
+    snakes: list[NDArray[np.float64]],
+    bounds: tuple[Line, Line],
+) -> NDArray[np.uint8]:
+    """Draw the snakes and their knots over ``canvas``, in place, and return it.
+
+    Args:
+        canvas (numpy.ndarray of numpy.uint8): ``(H, W, 3)`` BGR image.
+        snakes (list[numpy.ndarray of numpy.float64]): ``(n, 2)`` knots of
+            each snake.
+        bounds (tuple[Line, Line]): The left and the right bound.
+
+    Returns:
+        numpy.ndarray of numpy.uint8: ``canvas``.
+    """
+    draw.draw_polylines(canvas, snakes, draw.GREEN, 1.5)
+    knots = canvas.copy()
+    for snake in snakes:
+        draw.draw_knots(knots, snake, draw.YELLOW, 7.0)
+    draw.blend(canvas, knots, 180 / 255)
+    draw.draw_lines(canvas, bounds, draw.BLUE, 1.5)
+    return canvas
 
 
 def is_image_border(curve: NDArray[np.float64], height: int) -> bool:
