@@ -15,6 +15,8 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
+from scantailor.imageproc import debug_drawing as draw
 from scantailor.imageproc.binarize import binarize_wolf
 from scantailor.imageproc.despeckle import despeckle
 
@@ -55,6 +57,15 @@ _INFINITE_DISTANCE = 65536.0
 _MIN_CONTENT_SIDE = 8
 _MAX_THIN_ASPECT = 20
 _THIN_CONTENT_WIDTH = 30
+
+# Colours and opacities of upstream's debug drawings, as BGR and alpha 0..255.
+_TRANSLUCENT_GRAY = ((0, 0, 0), 50)
+_KEPT_GREEN = ((0x57, 0xDF, 0x5F), 50)
+_REMOVED_RED = ((0x1E, 0x20, 0xFF), 50)
+_CONTENT_BLUE = (255, 0, 0)
+_PEAK_YELLOW = (0, 255, 255)
+_TEXT_GREEN = (0x62, 0xDD, 0x64)
+_CONTENT_SHADE = ((0, 0, 0), 0xE0)
 
 
 @dataclass(frozen=True)
@@ -104,6 +115,7 @@ _EMPTY = Rect(0, 0, -1, -1)
 def find_content_rect(
     gray: NDArray[np.uint8],
     page_rect: Rect | None = None,
+    dbg: DebugImages | None = None,
 ) -> Rect | None:
     """Find the content of a page scanned at 150 dpi.
 
@@ -113,35 +125,55 @@ def find_content_rect(
         page_rect (scantailor.filters.select_content.content_box_finder.Rect | None):
             Area of the page; everything outside it is
             treated as shadow.
+        dbg (DebugImages | None): Receives each step's mask and the trimming
+            decisions, under upstream's labels.
 
     Returns:
         scantailor.filters.select_content.content_box_finder.Rect | None:
             Box around the content in pixels of ``gray`` with one pixel
             of slack on every side, or None when no content was found.
     """
+    if dbg is not None:
+        dbg.add(gray, "gray150")
     ink = _binarize(gray)
+    if dbg is not None:
+        dbg.add(ink, "bw150")
     if page_rect is not None:
         outside = np.ones_like(ink)
         outside[page_rect.window()] = False
         ink |= outside
+    if dbg is not None:
+        dbg.add(ink, "page_mask_applied")
     if not ink.any():
         return None
 
-    garbage = _find_shadows(ink)
+    garbage = _find_shadows(ink, dbg)
     content = ink & ~garbage
-    despeckled = _despeckle(content)
+    if dbg is not None:
+        dbg.add(content, "content")
+    despeckled = _despeckle(content, dbg)
+    if dbg is not None:
+        dbg.add(despeckled, "despeckled")
 
-    blocks = _content_blocks(content, despeckled)
+    blocks = _content_blocks(content, despeckled, dbg)
     blocks = _remove_blocks_touching_borders(blocks)
-    text = _estimate_text_mask(content, blocks) & content
+    if dbg is not None:
+        dbg.add(blocks, "except_bordering")
+    text_mask = _estimate_text_mask(content, blocks, dbg)
+    if dbg is not None:
+        dbg.add(_text_mask_visualized(content, text_mask), "textMask")
+    text = text_mask & content
 
     rect = _bounding_box(blocks)
     vertical_garbage, horizontal_garbage = _segment_garbage(garbage)
+    if dbg is not None:
+        dbg.add(horizontal_garbage, "initial_hor_garbage")
+        dbg.add(vertical_garbage, "initial_vert_garbage")
     garbage_by_axis = (
         _Garbage(horizontal_garbage, True),
         _Garbage(vertical_garbage, False),
     )
-    rect = _trim_until_stable(content, blocks, text, rect, garbage_by_axis)
+    rect = _trim_until_stable(content, blocks, text, rect, garbage_by_axis, dbg)
     if rect.is_empty:
         return None
     return Rect(rect.left - 1, rect.top - 1, rect.right + 1, rect.bottom + 1)
@@ -203,17 +235,32 @@ def _open(
     return opened.view(bool)
 
 
-def _find_shadows(ink: NDArray[np.bool_]) -> NDArray[np.bool_]:
+def _find_shadows(
+    ink: NDArray[np.bool_], dbg: DebugImages | None = None
+) -> NDArray[np.bool_]:
     """Return the long dark structures of a page, which are not content."""
-    seeds = _open(ink, _HORIZONTAL_SHADOW_SEED, True) | _open(
-        ink, _VERTICAL_SHADOW_SEED, True
-    )
+    horizontal_seeds = _open(ink, _HORIZONTAL_SHADOW_SEED, True)
+    vertical_seeds = _open(ink, _VERTICAL_SHADOW_SEED, True)
+    seeds = horizontal_seeds | vertical_seeds
     dilated = cv2.dilate(ink.view(np.uint8), np.ones((3, 3), np.uint8)).view(bool)
-    shadows = _fill_from_seeds(seeds, dilated, 8) & ink
-    return _filter_shadows(shadows)
+    reached = _fill_from_seeds(seeds, dilated, 8)
+    shadows = reached & ink
+    if dbg is not None:
+        dbg.add(horizontal_seeds, "horShadowsSeed")
+        dbg.add(vertical_seeds, "verShadowsSeed")
+        dbg.add(seeds, "shadowsSeed")
+        dbg.add(dilated, "dilated")
+        dbg.add(reached, "shadowsDilated")
+        dbg.add(shadows, "shadows")
+    filtered = _filter_shadows(shadows, dbg)
+    if dbg is not None:
+        dbg.add(filtered, "filtered_shadows")
+    return filtered
 
 
-def _filter_shadows(shadows: NDArray[np.bool_]) -> NDArray[np.bool_]:
+def _filter_shadows(
+    shadows: NDArray[np.bool_], dbg: DebugImages | None = None
+) -> NDArray[np.bool_]:
     """Give back shadows that are really text, such as white letters on black.
 
     Shadows touching the border of the page are genuine and always kept.
@@ -222,31 +269,42 @@ def _filter_shadows(shadows: NDArray[np.bool_]) -> NDArray[np.bool_]:
     frame[0, :] = frame[-1, :] = frame[:, 0] = frame[:, -1] = True
     touching = _fill_from_seeds(frame, shadows, 8)
     inner = shadows & ~touching
+    if dbg is not None:
+        dbg.add(inner, "non_border_shadows")
     if inner.any():
         inverse = ~inner
         outside = _fill_from_seeds(frame, inverse, 8)
         solid = ~outside | inner
-        text = _estimate_text_mask(inverse, solid)
-        inner &= ~_fill_from_seeds(text, inner, 8)
+        if dbg is not None:
+            dbg.add(solid, "shadows_no_holes")
+        text = _estimate_text_mask(inverse, solid, dbg)
+        misclassified = _fill_from_seeds(text, inner, 8)
+        if dbg is not None:
+            dbg.add(misclassified, "misclassified_shadows")
+        inner &= ~misclassified
     return inner | touching
 
 
-def _despeckle(content: NDArray[np.bool_]) -> NDArray[np.bool_]:
+def _despeckle(
+    content: NDArray[np.bool_], dbg: DebugImages | None = None
+) -> NDArray[np.bool_]:
     """Remove the small components that are not near substantial ones."""
     black_on_white = np.where(content, 0, 255).astype(np.uint8)
-    cleaned = despeckle(black_on_white, PROCESSING_DPI, _NORMAL_DESPECKLE_LEVEL)
+    cleaned = despeckle(black_on_white, PROCESSING_DPI, _NORMAL_DESPECKLE_LEVEL, dbg)
     return cleaned == 0
 
 
 def _content_blocks(
     content: NDArray[np.bool_],
     despeckled: NDArray[np.bool_],
+    dbg: DebugImages | None = None,
 ) -> NDArray[np.bool_]:
     """Group content into blocks by cutting out the largest whitespace rectangles.
 
     Args:
         content (numpy.ndarray of numpy.bool): Ink without shadows.
         despeckled (numpy.ndarray of numpy.bool): ``content`` without small specks.
+        dbg (DebugImages | None): Receives the blocks after each cut and trim.
 
     Returns:
         numpy.ndarray of numpy.bool: Mask of the blocks, each trimmed to its ink.
@@ -259,11 +317,20 @@ def _content_blocks(
     tall = wide.with_powers(1, 2)
     _cut_whitespace(blocks, wide, _MAX_HORIZONTAL_BLOCKS, area_threshold, "height")
     _cut_whitespace(blocks, tall, _MAX_VERTICAL_BLOCKS, area_threshold, "width")
+    if dbg is not None:
+        dbg.add(blocks, "contentBlocks")
     blocks = _trim_blocks_to_content(despeckled, blocks)
+    if dbg is not None:
+        dbg.add(blocks, "initial_trimming")
 
     extra = WhitespaceSearch(content | ~blocks, 1, 1, _EXTRA_MIN_SIZE, _EXTRA_MIN_SIZE)
     _cut_whitespace(blocks, extra, _MAX_EXTRA_BLOCKS, area_threshold, None)
-    return _trim_blocks_to_content(despeckled, blocks)
+    if dbg is not None:
+        dbg.add(blocks, "more_whitespace")
+    blocks = _trim_blocks_to_content(despeckled, blocks)
+    if dbg is not None:
+        dbg.add(blocks, "more_trimming")
+    return blocks
 
 
 def _cut_whitespace(
@@ -474,6 +541,7 @@ def _best_valley(segment: NDArray[np.int64]) -> int | None:
 def _estimate_text_mask(
     content: NDArray[np.bool_],
     blocks: NDArray[np.bool_],
+    dbg: DebugImages | None = None,
 ) -> NDArray[np.bool_]:
     """Mark the parts of blocks that look like lines of text.
 
@@ -484,6 +552,8 @@ def _estimate_text_mask(
     Args:
         content (numpy.ndarray of numpy.bool): Ink.
         blocks (numpy.ndarray of numpy.bool): Candidate blocks.
+        dbg (DebugImages | None): Receives the ultimate eroded points drawn
+            over the content and the blocks.
 
     Returns:
         numpy.ndarray of numpy.bool: Mask of the block rows that are text.
@@ -492,9 +562,11 @@ def _estimate_text_mask(
     count, labels, stats, _ = cv2.connectedComponentsWithStats(
         blocks.view(np.uint8), connectivity=4
     )
-    if count == 1:
+    if count == 1 and dbg is None:
         return text
     peaks = _ultimate_eroded_points(content)
+    if dbg is not None:
+        dbg.add(_peaks_visualized(content, blocks, peaks), "ueps")
     for label in range(1, count):
         x, y, width, height = (int(v) for v in stats[label, :4])
         block = labels[y : y + height, x : x + width] == label
@@ -653,6 +725,7 @@ def _trim_until_stable(
     text: NDArray[np.bool_],
     rect: Rect,
     garbage: tuple[_Garbage, _Garbage],
+    dbg: DebugImages | None = None,
 ) -> Rect:
     """Trim each side in turn until no side changes any more.
 
@@ -664,6 +737,7 @@ def _trim_until_stable(
             Starting rectangle.
         garbage (tuple[_Garbage, _Garbage]): Horizontal and vertical garbage;
             grows while trimming.
+        dbg (DebugImages | None): Receives a drawing of every trimming decision.
 
     Returns:
         scantailor.filters.select_content.content_box_finder.Rect:
@@ -684,7 +758,7 @@ def _trim_until_stable(
                 continue
             sides.discard(side)
             used = vertical_garbage if side in ("left", "right") else horizontal_garbage
-            trimmed = _trim_side(side, content, blocks, text, rect, used)
+            trimmed = _trim_side(side, content, blocks, text, rect, used, dbg)
             if trimmed.is_empty:
                 return _EMPTY
             if trimmed != rect:
@@ -707,6 +781,7 @@ def _trim_side(
     text: NDArray[np.bool_],
     area: Rect,
     garbage: _Garbage,
+    dbg: DebugImages | None = None,
 ) -> Rect:
     """Cut whitespace and garbage-like blocks off one side of ``area``.
 
@@ -736,7 +811,7 @@ def _trim_side(
             return area
         if removed.is_empty:
             return kept
-        result, retry = _trim(content, blocks, text, area, kept, removed, garbage)
+        result, retry = _trim(content, blocks, text, area, kept, removed, garbage, dbg)
         if not retry:
             return result
         start = after
@@ -791,6 +866,7 @@ def _trim(
     kept: Rect,
     removed: Rect,
     garbage: _Garbage,
+    dbg: DebugImages | None = None,
 ) -> tuple[Rect, bool]:
     """Decide whether ``removed`` is garbage, by comparing distances.
 
@@ -809,6 +885,10 @@ def _trim(
         and removed.width >= _MIN_REMOVED_SIDE
         and removed.height >= _MIN_REMOVED_SIDE
     ):
+        if dbg is not None:
+            dbg.add(
+                _trim_visualized(blocks, area, (removed, kept), ()), "trim_too_much"
+            )
         return area, False
 
     vertical_cut = kept.top == area.top and kept.bottom == area.bottom
@@ -847,5 +927,65 @@ def _trim(
     to_others_sum = float(to_others_removed[in_blocks].sum())
     if to_garbage_sum * bias < to_others_sum * (1.0 - bias):
         garbage.add(content, removed)
+        if dbg is not None:
+            dbg.add(_trim_visualized(blocks, area, (kept,), (removed,)), "trimmed")
         return kept, False
+    if dbg is not None:
+        dbg.add(_trim_visualized(blocks, area, (removed, kept), ()), "not_trimmed")
     return area, bias < 0.85
+
+
+def _shade(
+    canvas: NDArray[np.uint8],
+    where: NDArray[np.bool_] | tuple[slice, slice],
+    color: tuple[tuple[int, int, int], int],
+) -> None:
+    """Blend one of upstream's translucent colours over part of a canvas."""
+    bgr, alpha = color
+    draw.tint(canvas, where, bgr, alpha / 255.0)
+
+
+def _trim_visualized(
+    blocks: NDArray[np.bool_],
+    area: Rect,
+    kept: tuple[Rect, ...],
+    removed: tuple[Rect, ...],
+) -> NDArray[np.uint8]:
+    """Draw a trimming decision over the blocks, as upstream does.
+
+    What lies outside ``area`` was rejected earlier and is grayed; ``kept``
+    rectangles are tinted green and ``removed`` ones red.
+    """
+    canvas = draw.to_bgr(blocks)
+    outside = np.ones(blocks.shape, dtype=bool)
+    outside[area.window()] = False
+    _shade(canvas, outside, _TRANSLUCENT_GRAY)
+    for rect in kept:
+        if not rect.is_empty:
+            _shade(canvas, rect.window(), _KEPT_GREEN)
+    for rect in removed:
+        if not rect.is_empty:
+            _shade(canvas, rect.window(), _REMOVED_RED)
+    return canvas
+
+
+def _peaks_visualized(
+    content: NDArray[np.bool_],
+    blocks: NDArray[np.bool_],
+    peaks: NDArray[np.bool_],
+) -> NDArray[np.uint8]:
+    """Draw content in blue and the peaks inside blocks in yellow over the blocks."""
+    canvas = draw.to_bgr(blocks)
+    canvas[content] = _CONTENT_BLUE
+    canvas[peaks & blocks] = _PEAK_YELLOW
+    return canvas
+
+
+def _text_mask_visualized(
+    content: NDArray[np.bool_], text_mask: NDArray[np.bool_]
+) -> NDArray[np.uint8]:
+    """Draw the text mask light green on white, the content shaded dark over it."""
+    canvas = np.full((*content.shape, 3), 255, dtype=np.uint8)
+    canvas[text_mask] = _TEXT_GREEN
+    _shade(canvas, content, _CONTENT_SHADE)
+    return canvas

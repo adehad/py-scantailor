@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.core.result_memo import ResultMemo, array_digest
 
 from .content_box import ContentBox
@@ -41,6 +42,7 @@ def find_content_box(
     page_box: ContentBox | None = None,
     outside: NDArray[np.bool_] | Callable[[], NDArray[np.bool_]] | None = None,
     outside_key: Hashable | None = None,
+    dbg: DebugImages | None = None,
 ) -> ContentDetectionResult:
     """Detect content boundaries in an image.
 
@@ -66,6 +68,9 @@ def find_content_box(
         outside_key (Hashable | None): Identifies the mask a callable
             ``outside`` returns for this image; equal keys must mean equal
             masks. Without it a callable is called at once.
+        dbg (DebugImages | None): Receives the finder's intermediate images.
+            The finder then runs even when its result is remembered, since a
+            remembered result has no images.
 
     Returns:
         ContentDetectionResult: The detected box and a confidence from 0 to 1;
@@ -117,23 +122,28 @@ def find_content_box(
             painted = scaled
             if made.any():
                 painted = scale(paint_outside_darkest(gray, made))
-            return find_content_rect(painted, page_rect)
+            return find_content_rect(painted, page_rect, dbg)
 
-        found = _CONTENT_MEMO.get_or_compute(
-            (array_digest(scaled), page_rect, outside_key), search
+        found = (
+            search()
+            if dbg is not None
+            else _CONTENT_MEMO.get_or_compute(
+                (array_digest(scaled), page_rect, outside_key), search
+            )
         )
     else:
         everything_outside = mask is not None and bool(mask.all())
         if mask is not None and mask.any() and not everything_outside:
             scaled = scale(paint_outside_darkest(gray, mask))
-        found = (
-            None
-            if everything_outside
-            else _CONTENT_MEMO.get_or_compute(
+        if everything_outside:
+            found = None
+        elif dbg is not None:
+            found = find_content_rect(scaled, page_rect, dbg)
+        else:
+            found = _CONTENT_MEMO.get_or_compute(
                 (array_digest(scaled), page_rect),
                 lambda: find_content_rect(scaled, page_rect),
             )
-        )
 
     if found is None:
         return ContentDetectionResult(

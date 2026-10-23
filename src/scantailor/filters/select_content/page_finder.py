@@ -15,6 +15,7 @@ import numpy as np
 from loguru import logger
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.imageproc.binarize import (
     binarize_mokji,
     binarize_otsu,
@@ -35,6 +36,15 @@ _BACKGROUND_SHARE = 0.95
 # background, so that specks of paper-coloured dust on the bed are crossed.
 _MAX_GAP = 10
 
+# Upstream's debug labels of the binarisations ``_binarisations`` returns, in order.
+_BINARISATION_LABELS = (
+    "peakThreshold",
+    "OtsuThreshold",
+    "MokjiThreshold",
+    "SauvolaThreshold",
+    "WolfThreshold",
+)
+
 # The C++ defaults of these binarisations, which differ from the Python ones.
 _SAUVOLA_K = 0.34
 _WOLF_K = 0.3
@@ -47,6 +57,7 @@ def find_page_box(
     expected_size_mm: tuple[float, float] = (0.0, 0.0),
     tolerance: float = 0.1,
     outside: NDArray[np.bool_] | None = None,
+    dbg: DebugImages | None = None,
 ) -> PageBox | None:
     """Find the paper in a scan that shows background around it.
 
@@ -71,6 +82,8 @@ def find_page_box(
         outside (numpy.ndarray of numpy.bool | None): Pixels of ``image`` with
             no source pixel behind them, such as the corners exposed by a
             rotation. They count as background.
+        dbg (DebugImages | None): Receives the 150 dpi gray page and every
+            binarisation of it, including those an unknown size leaves unused.
 
     Returns:
         PageBox | None: The page in pixels of ``image``, or None when no box was
@@ -93,16 +106,22 @@ def find_page_box(
         cv2.resize(gray, (scaled_w, scaled_h), interpolation=interpolation),
         dtype=np.uint8,
     )
-
     width_mm, height_mm = expected_size_mm
-    if width_mm <= 0 or height_mm <= 0:
+    sized = width_mm > 0 and height_mm > 0
+    binarisations = _binarisations(scaled) if sized or dbg is not None else []
+    if dbg is not None:
+        dbg.add(scaled, "gray150")
+        for label, black in zip(_BINARISATION_LABELS, binarisations, strict=True):
+            dbg.add(black, label)
+
+    if not sized:
         rect = _find_in(_sauvola(scaled), fine_tune)
     else:
         expected = (
             int(width_mm * _DETECTION_DPI / _MM_PER_INCH),
             int(height_mm * _DETECTION_DPI / _MM_PER_INCH),
         )
-        rect = _closest_to_size(scaled, expected, fine_tune, tolerance)
+        rect = _closest_to_size(binarisations, expected, fine_tune, tolerance)
     if rect is None or rect.is_empty:
         return None
     if rect == Rect(0, 0, scaled_w - 1, scaled_h - 1):
@@ -150,7 +169,7 @@ def _find_in(
 
 
 def _closest_to_size(
-    image: NDArray[np.uint8],
+    binarisations: list[NDArray[np.bool_]],
     expected: tuple[int, int],
     fine_tune: bool,
     tolerance: float,
@@ -163,7 +182,7 @@ def _closest_to_size(
     expected_w, expected_h = expected
     best_columns: tuple[float, int, int] | None = None
     best_rows: tuple[float, int, int] | None = None
-    for background in _binarisations(image):
+    for background in binarisations:
         rect = _find_in(background, fine_tune, expected, tolerance)
         width_error = abs(expected_w - rect.width) / max(expected_w, 1)
         height_error = abs(expected_h - rect.height) / max(expected_h, 1)
