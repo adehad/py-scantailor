@@ -12,8 +12,10 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.dewarping.line_geometry import Line, Point, line_intersection
 from scantailor.dewarping.qt_random import QtRandomGenerator
+from scantailor.imageproc import debug_drawing as draw
 
 # Segments whose direction differs less than this from a seed's are inliers.
 _COS_THRESHOLD = math.cos(math.radians(4.0))
@@ -34,12 +36,16 @@ class _Segment:
     vertical_extent: int
 
 
-def detect_vert_content_bounds(binary: NDArray[np.bool_]) -> tuple[Line, Line]:
+def detect_vert_content_bounds(
+    binary: NDArray[np.bool_], dbg: DebugImages | None = None
+) -> tuple[Line, Line]:
     """Find the left and right boundaries of the content.
 
     Args:
         binary (numpy.ndarray of numpy.bool): 2-D page, True for ink. Clutter and specks
             outside the content should be gone already.
+        dbg (DebugImages | None): Receives each side's envelope and the
+            segments its RANSAC line was fitted to.
 
     Returns:
         tuple[tuple, tuple]: The left and the right boundary as lines running from
@@ -59,9 +65,41 @@ def detect_vert_content_bounds(binary: NDArray[np.bool_]) -> tuple[Line, Line]:
         if has_ink[x]:
             right.process(x, int(tops[x]), int(bottoms[x]))
 
+    if dbg is not None:
+        dbg.add(left.visualize_envelope(binary), "left_envelope")
+        dbg.add(right.visualize_envelope(binary), "right_envelope")
+
     left_line = _translate(left.approximate_with_line(), -1.0)
+    if dbg is not None:
+        dbg.add(_visualize_segments(binary, left.inliers), "left_ransac_model")
     right_line = _translate(right.approximate_with_line(), 1.0)
+    if dbg is not None:
+        dbg.add(_visualize_segments(binary, right.inliers), "right_ransac_model")
     return _extend_line(left_line, height), _extend_line(right_line, height)
+
+
+def _visualize_segments(
+    binary: NDArray[np.bool_], segments: list[_Segment]
+) -> NDArray[np.uint8]:
+    """Draw the segments a content bound was fitted to over the binarised page.
+
+    Args:
+        binary (numpy.ndarray of numpy.bool): True for ink.
+        segments (list[_Segment]): The segments.
+
+    Returns:
+        numpy.ndarray of numpy.uint8: New ``(H, W, 3)`` BGR image.
+    """
+    canvas = draw.to_bgr(binary)
+    drawn = canvas.copy()
+    draw.draw_lines(
+        drawn,
+        [(segment.top, segment.bottom) for segment in segments],
+        draw.RED,
+        3.0,
+    )
+    draw.blend(canvas, drawn, 0.7)
+    return canvas
 
 
 def _vertical_ranges(
@@ -108,6 +146,8 @@ class _SideProcessor:
         )
         self._leading_top: tuple[int, int] = (0, 0)
         self._path: list[tuple[int, int]] = []
+        # The segments the last ``approximate_with_line`` fitted its line to.
+        self.inliers: list[_Segment] = []
 
     def process(self, x: int, top_y: int, bottom_y: int) -> None:
         """Add a column that has ink, from its first to its last ink row."""
@@ -170,6 +210,7 @@ class _SideProcessor:
         """
         segments = self._steep_segments()
         lead_x = self._leading_top[0]
+        self.inliers = []
         if not segments:
             return (
                 (float(lead_x), float(self._leading_top[1])),
@@ -206,9 +247,20 @@ class _SideProcessor:
             if total > best_total:
                 best_members, best_total = members, total
 
-        return self._interpolate(
-            [segments[i] for i in best_members],
-        )
+        self.inliers = [segments[i] for i in best_members]
+        return self._interpolate(self.inliers)
+
+    def visualize_envelope(self, binary: NDArray[np.bool_]) -> NDArray[np.uint8]:
+        """Draw the envelope path and its vertices over the page."""
+        canvas = draw.to_bgr(binary)
+        path = np.array(self._path, dtype=np.float64).reshape(-1, 2)
+        drawn = canvas.copy()
+        draw.draw_polylines(drawn, [path], draw.RED, 3.0)
+        draw.blend(canvas, drawn, 180 / 255)
+        drawn = canvas.copy()
+        draw.draw_knots(drawn, path + 0.5, draw.BLUE, 9.0)
+        draw.blend(canvas, drawn, 0.7)
+        return canvas
 
     def _steep_segments(self) -> list[_Segment]:
         segments = []

@@ -14,18 +14,26 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.dewarping.dewarper import CylindricalSurfaceDewarper
 from scantailor.dewarping.distortion_model import Curve, DistortionModel
 from scantailor.dewarping.line_geometry import (
     Line,
     Point,
     line_intersection,
+    lines_within_image,
     projection_dist,
     sides_of_line,
 )
 from scantailor.dewarping.qt_random import QtRandomGenerator
-from scantailor.dewarping.spline_fit import fit_extended_spline, lu_solve
+from scantailor.dewarping.spline_fit import (
+    FittedSpline,
+    fit_extended_spline,
+    lu_solve,
+)
 from scantailor.dewarping.text_line_tracer import TextLineResult, VerticalBounds
+from scantailor.imageproc import debug_drawing as draw
+from scantailor.math.spline import XSpline
 
 # Candidate pairs: this many outermost curves on each side are paired off.
 _EXTREME_CURVE_COUNT = 3
@@ -39,6 +47,10 @@ _VERTICAL_LINE_ERROR = 1000.0
 _DEWARPER_ERRORS = (ValueError, ArithmeticError, np.linalg.LinAlgError, IndexError)
 
 _AffineMatrix = NDArray[np.float64]
+
+# Upstream's debug colours, as BGR.
+_CHOSEN_CURVE_GREEN = (0x53, 0xFF, 0x45)
+_REVERSE_RUN_RED = (0x05, 0x28, 0xFF)
 
 
 @dataclass(frozen=True)
@@ -54,12 +66,14 @@ class TracedCurve:
         order (float): Position along the down direction; smaller values lie
             higher on the page.
         index (int): Position of the curve among those added to the builder.
+        spline (FittedSpline | None): The spline ``extended`` was sampled from.
     """
 
     trimmed: NDArray[np.float64]
     extended: NDArray[np.float64]
     order: float
     index: int
+    spline: FittedSpline | None = None
 
 
 @dataclass(frozen=True)
@@ -161,8 +175,19 @@ class DistortionModelBuilder:
         """
         return self.build().model
 
-    def build(self) -> BuiltModel:
+    def build(
+        self,
+        dbg: DebugImages | None = None,
+        background: NDArray[np.uint8] | None = None,
+    ) -> BuiltModel:
         """Build a model and tell which of the added curves it is made of.
+
+        Args:
+            dbg (DebugImages | None): Receives the trimmed curves and the
+                candidate model drawn over ``background``; nothing is recorded
+                without a background.
+            background (numpy.ndarray of numpy.uint8 | None): Gray or BGR
+                image in the coordinates the curves are in now.
 
         Returns:
             BuiltModel: The model, invalid under the conditions
@@ -200,6 +225,9 @@ class DistortionModelBuilder:
                 assessor.assess(i, j)
 
         best = assessor.best
+        if dbg is not None and background is not None:
+            dbg.add(self._visualize_trimmed(background, curves), "trimmed_polylines")
+            dbg.add(self._visualize_model(background, curves, best), "distortion_model")
         if best is None:
             return BuiltModel(DistortionModel())
         top, bottom = curves[best[0]], curves[best[1]]
@@ -236,7 +264,105 @@ class DistortionModelBuilder:
             extended=spline.to_polyline(),
             order=centroid[0] * self._down[0] + centroid[1] * self._down[1],
             index=index,
+            spline=spline,
         )
+
+    def _canvas_with_bounds(
+        self, background: NDArray[np.uint8]
+    ) -> tuple[NDArray[np.uint8], float]:
+        """Copy the background, draw the bounds, and return the stroke width.
+
+        Args:
+            background (numpy.ndarray of numpy.uint8): Gray or BGR page in the
+                curves' coordinates.
+
+        Returns:
+            tuple[numpy.ndarray of numpy.uint8, float]: A new ``(H, W, 3)`` BGR
+                image with the bounds drawn, and the stroke width in pixels
+                that scales with the image's diagonal.
+        """
+        canvas = draw.to_bgr(background)
+        height, width = canvas.shape[:2]
+        stroke = math.hypot(width, height) / 500
+        drawn = canvas.copy()
+        draw.draw_lines(
+            drawn,
+            lines_within_image((self._bound1, self._bound2), drawn.shape),
+            draw.BLUE,
+            stroke,
+        )
+        draw.blend(canvas, drawn, 180 / 255)
+        return canvas, stroke
+
+    def _visualize_trimmed(
+        self, background: NDArray[np.uint8], curves: Sequence[TracedCurve]
+    ) -> NDArray[np.uint8]:
+        """Draw the bounds and each curve trimmed to them, as ``trimmed_polylines``.
+
+        Args:
+            background (numpy.ndarray of numpy.uint8): Gray or BGR page in the
+                curves' coordinates.
+            curves (Sequence[TracedCurve]): The curves the builder holds.
+
+        Returns:
+            numpy.ndarray of numpy.uint8: New ``(H, W, 3)`` BGR image.
+        """
+        canvas, stroke = self._canvas_with_bounds(background)
+        drawn = canvas.copy()
+        draw.draw_polylines(drawn, [c.trimmed for c in curves], draw.BLUE, stroke)
+        draw.blend(canvas, drawn, 180 / 255)
+        for curve in curves:
+            draw.draw_knots(canvas, curve.trimmed, draw.MAGENTA, stroke)
+        return canvas
+
+    def _visualize_model(
+        self,
+        background: NDArray[np.uint8],
+        curves: Sequence[TracedCurve],
+        best: tuple[int, int] | None,
+    ) -> NDArray[np.uint8]:
+        """Draw every extended curve, the chosen pair in green.
+
+        Stretches that run against the curve's overall direction are drawn
+        orange, junction points magenta and control points red.
+
+        Args:
+            background (numpy.ndarray of numpy.uint8): Gray or BGR page in the
+                curves' coordinates.
+            curves (Sequence[TracedCurve]): The curves the builder holds.
+            best (tuple[int, int] | None): Positions in ``curves`` of the pair
+                the model was built from, or None when no pair qualified.
+
+        Returns:
+            numpy.ndarray of numpy.uint8: New ``(H, W, 3)`` BGR image.
+        """
+        canvas, stroke = self._canvas_with_bounds(background)
+        chosen = set() if best is None else set(best)
+        for position, curve in enumerate(curves):
+            extended = curve.extended
+            if len(extended) == 0:
+                continue
+            active = position in chosen
+            drawn = canvas.copy()
+            color = _CHOSEN_CURVE_GREEN if active else draw.BLUE
+            draw.draw_polylines(drawn, [extended], color, stroke)
+            draw.draw_polylines(
+                drawn, _reverse_runs(extended), _REVERSE_RUN_RED, stroke
+            )
+            draw.blend(canvas, drawn, (180 if active else 140) / 255)
+            if curve.spline is not None:
+                spline = XSpline()
+                for point, tension in zip(
+                    curve.spline.positions, curve.spline.tensions, strict=True
+                ):
+                    spline.append_control_point(point, float(tension))
+                junctions = [
+                    spline.point_at(spline.control_point_index_to_t(i))
+                    for i in range(spline.num_control_points)
+                ]
+                draw.draw_knots(canvas, np.array(junctions), draw.MAGENTA, stroke)
+                draw.draw_knots(canvas, curve.spline.positions, draw.RED, stroke)
+        return canvas
 
     def _front_back_bounds(self, polyline: NDArray[np.float64]) -> tuple[Line, Line]:
         """The bounds ordered to match the polyline, the first at its front."""
@@ -304,6 +430,21 @@ def _straightness_error(points: NDArray[np.float64]) -> float:
         return _VERTICAL_LINE_ERROR
     residual = y - (solution[0] * x + solution[1])
     return float(np.abs(residual).sum() / count)
+
+
+def _reverse_runs(polyline: NDArray[np.float64]) -> list[NDArray[np.float64]]:
+    """Runs of segments that point against the line from first to last point."""
+    steps = np.diff(polyline, axis=0)
+    backwards = steps @ (polyline[-1] - polyline[0]) < 0
+    runs: list[NDArray[np.float64]] = []
+    start = None
+    for index, reverse in enumerate([*backwards.tolist(), False]):
+        if reverse and start is None:
+            start = index
+        elif not reverse and start is not None:
+            runs.append(polyline[start : index + 1])
+            start = None
+    return runs
 
 
 def _centroid(polyline: NDArray[np.float64]) -> Point:
