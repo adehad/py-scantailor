@@ -31,9 +31,9 @@ def detections(monkeypatch: pytest.MonkeyPatch) -> list[tuple[int, int]]:
     seen: list[tuple[int, int]] = []
     real = content_finder.find_content_rect
 
-    def counting(gray, page_rect):
+    def counting(gray, page_rect, dbg=None):
         seen.append(gray.shape)
-        return real(gray, page_rect)
+        return real(gray, page_rect, dbg)
 
     monkeypatch.setattr(content_finder, "find_content_rect", counting)
     return seen

@@ -1,10 +1,12 @@
 """Select Content filter implementation."""
 
 from collections.abc import Callable, Hashable, Sequence
+from typing import NamedTuple
 
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.core.models import PageId
 
 from .content_box import ContentBox, PageBox, PhysicalSize
@@ -94,6 +96,20 @@ def _content_within_page(params: Params) -> bool:
     )
 
 
+class Settled(NamedTuple):
+    """What ``Filter.settle`` left the page with.
+
+    Attributes:
+        params (Params): The page's parameters.
+        page_detected (bool): Whether the page finder ran.
+        content_detected (bool): Whether the content finder ran.
+    """
+
+    params: Params
+    page_detected: bool
+    content_detected: bool
+
+
 class Filter:
     """Select Content filter for detecting content and page boundaries.
 
@@ -140,6 +156,7 @@ class Filter:
         outside: NDArray[np.bool_] | Callable[[], NDArray[np.bool_]] | None = None,
         page_box: ContentBox | None = None,
         outside_key: Hashable | None = None,
+        dbg: DebugImages | None = None,
     ) -> ContentDetectionResult:
         """Detect content boundaries in an image.
 
@@ -154,6 +171,8 @@ class Filter:
             page_box: Area of the page in pixels of ``image``.
             outside_key: Identifies a callable ``outside`` so that it is only
                 called when the detection is not already remembered.
+            dbg (DebugImages | None): Receives the content finder's
+                intermediate images.
 
         Returns:
             ContentDetectionResult with detected box and confidence.
@@ -165,6 +184,7 @@ class Filter:
             page_box=page_box,
             outside=outside,
             outside_key=outside_key,
+            dbg=dbg,
         )
 
         if store_result:
@@ -182,6 +202,7 @@ class Filter:
         dpi: float = 300.0,
         store_result: bool = True,
         outside: NDArray[np.bool_] | Callable[[], NDArray[np.bool_]] | None = None,
+        dbg: DebugImages | None = None,
     ) -> PageBox:
         """Detect page boundaries in an image.
 
@@ -197,6 +218,8 @@ class Filter:
             outside (numpy.ndarray of numpy.bool | None): Pixels of ``image``
                 with no source pixel behind them, or a function making them;
                 they count as background around the paper.
+            dbg (DebugImages | None): Receives the page finder's intermediate
+                images.
 
         Returns:
             PageBox: The detected page, or the whole image when none was found.
@@ -209,6 +232,7 @@ class Filter:
             expected_size_mm=self._settings.get_page_detection_box(),
             tolerance=self._settings.get_page_detection_tolerance(),
             outside=outside() if callable(outside) else outside,
+            dbg=dbg,
         )
         if page_box is None:
             h, w = image.shape[:2]
@@ -267,8 +291,40 @@ class Filter:
         page_outline: Sequence[tuple[float, float]] | None = None,
         view_transform: NDArray[np.float64] | None = None,
         image_size: tuple[int, int] | None = None,
+        dbg: DebugImages | None = None,
     ) -> Params:
-        """Process an image to detect content and page boundaries.
+        """Detect content and page boundaries where the modes ask for it.
+
+        Takes the arguments of ``settle`` and returns only its parameters.
+
+        Returns:
+            Params: The updated parameters.
+        """
+        return self.settle(
+            image,
+            page_id,
+            dpi,
+            outside,
+            outside_key,
+            page_outline,
+            view_transform,
+            image_size,
+            dbg,
+        ).params
+
+    def settle(
+        self,
+        image: NDArray[np.uint8] | Callable[[], NDArray[np.uint8]],
+        page_id: PageId,
+        dpi: float = 300.0,
+        outside: NDArray[np.bool_] | Callable[[], NDArray[np.bool_]] | None = None,
+        outside_key: Hashable | None = None,
+        page_outline: Sequence[tuple[float, float]] | None = None,
+        view_transform: NDArray[np.float64] | None = None,
+        image_size: tuple[int, int] | None = None,
+        dbg: DebugImages | None = None,
+    ) -> Settled:
+        """Detect content and page boundaries and tell which finders ran.
 
         Respects detection modes - only runs auto-detection when mode is AUTO.
         When ``page_outline`` is given, detection also runs only when the
@@ -280,27 +336,34 @@ class Filter:
         then clipped.
 
         Args:
-            image: Grayscale or color image, or a function making it. A
-                function is only called when detection must run.
-            page_id: Page identifier.
-            dpi: Image resolution.
-            outside: Mask of the pixels of ``image`` that have no source pixel
+            image (NDArray[np.uint8] | Callable[[], NDArray[np.uint8]]):
+                Grayscale or color image, or a function making it. A function
+                is only called when detection must run.
+            page_id (PageId): Page identifier.
+            dpi (float): Image resolution.
+            outside (NDArray[np.bool_] | Callable[[], NDArray[np.bool_]] | None):
+                Mask of the pixels of ``image`` that have no source pixel
                 behind them, or a function making it; content detection
                 treats them as shadow.
-            outside_key: Identifies the mask a function ``outside`` makes, so
-                that it is only made when detection must run.
-            page_outline: Outline of the page in the coordinates of ``image``;
-                remembered so that a later change of it can be told.
-            view_transform: 3x3 matrix from the source image's pixels to those
-                of ``image``; remembered so that hand-drawn boxes can follow a
-                later change of view.
-            image_size: (width, height) of the image a function ``image``
-                makes; required with a function, ignored with an array.
+            outside_key (Hashable | None): Identifies the mask a function
+                ``outside`` makes, so that it is only made when detection must
+                run.
+            page_outline (Sequence[tuple[float, float]] | None): Outline of
+                the page in the coordinates of ``image``; remembered so that a
+                later change of it can be told.
+            view_transform (NDArray[np.float64] | None): 3x3 matrix from the
+                source image's pixels to those of ``image``; remembered so that
+                hand-drawn boxes can follow a later change of view.
+            image_size (tuple[int, int] | None): (width, height) of the image a
+                function ``image`` makes; required with a function, ignored
+                with an array.
+            dbg (DebugImages | None): Receives the finders' intermediate
+                images when they run.
 
         Returns:
-            Updated parameters with detected/stored boxes. When the page's
-            parameters changed while it was processed, they are kept and
-            returned instead of the result.
+            Settled: Updated parameters with detected or stored boxes, and
+                which finders ran. When the page's parameters changed while it
+                was processed, they are kept and returned instead of the result.
 
         Raises:
             ValueError: If ``image`` is a function and ``image_size`` is None.
@@ -317,12 +380,20 @@ class Filter:
         outline = [] if page_outline is None else list(page_outline)
         to_new_view = _view_change(params.dependencies.view_transform, view_transform)
         update_content, update_page = self.update_needs(page_id, page_outline)
+        page_detected = False
+        content_detected = False
 
         # Handle page detection
         if params.is_page_auto():
             if update_page:
+                page_detected = True
                 page_box = self.detect_page(
-                    _made(image), page_id, dpi=dpi, store_result=False, outside=outside
+                    _made(image),
+                    page_id,
+                    dpi=dpi,
+                    store_result=False,
+                    outside=outside,
+                    dbg=dbg,
                 )
                 params = params.with_page_box(page_box, PageDetectionMode.AUTO)
                 update_content = update_content or not _content_within_page(params)
@@ -345,6 +416,7 @@ class Filter:
         # Handle content detection
         if params.is_content_auto():
             if update_content:
+                content_detected = True
                 result = self.detect_content(
                     _made(image),
                     page_id,
@@ -353,6 +425,7 @@ class Filter:
                     outside=outside,
                     page_box=params.page_box.to_content_box(),
                     outside_key=outside_key,
+                    dbg=dbg,
                 )
                 params = params.with_content_box(
                     result.content_box, ContentDetectionMode.AUTO
@@ -388,9 +461,9 @@ class Filter:
             }
         )
 
-        if self._settings.replace_params(page_id, started, params):
-            return params
-        return self.get_params(page_id)
+        if not self._settings.replace_params(page_id, started, params):
+            params = self.get_params(page_id)
+        return Settled(params, page_detected, content_detected)
 
     def set_manual_content(self, page_id: PageId, content_box: ContentBox) -> Params:
         """Set content box manually.
