@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QWidget
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui import icons
@@ -22,6 +23,7 @@ from scantailor.core.models import ImageId, PageId, SubPage
 from scantailor.core.project import ImageMetadata, Project
 from scantailor.core.settings import ApplicationSettings, ZoneCreationMode
 from scantailor.core.stage_sequence import FilterStage
+from tests.ui.hosting import show_in_host
 
 NEW_ICONS = (
     "pause",
@@ -74,14 +76,14 @@ def _blank_thumbnail(_page: PageId, _stage: str) -> QtGui.QImage:
 
 
 @pytest.fixture
-def thumbnails(qtbot: QtBot) -> ThumbnailListWidget:
+def thumbnails(qtbot: QtBot, host: QWidget) -> ThumbnailListWidget:
     widget = ThumbnailListWidget(
-        _blank_thumbnail, _thumbnail_project(), stage="page_split"
+        _blank_thumbnail,
+        _thumbnail_project(),
+        stage="page_split",
+        parent=host,
     )
-    qtbot.addWidget(widget)
-    widget.resize(240, 700)
-    widget.show()
-    qtbot.wait_exposed(widget)
+    show_in_host(qtbot, widget, 240, 700)
     return widget
 
 

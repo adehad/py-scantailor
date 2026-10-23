@@ -6,12 +6,14 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QColor, QImage
+from PySide6.QtWidgets import QWidget
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.thumbnails import ThumbnailListWidget
 from scantailor.core.models import ImageId, PageId
 from scantailor.core.project import ImageMetadata, Project
 from scantailor.core.settings import ApplicationSettings
+from tests.ui.hosting import show_in_host
 
 SOURCE_SIZE = QSize(800, 1200)
 
@@ -40,18 +42,16 @@ def project() -> Project:
 
 
 @pytest.fixture
-def widget(qtbot: QtBot, project: Project) -> ThumbnailListWidget:
+def widget(qtbot: QtBot, host: QWidget, project: Project) -> ThumbnailListWidget:
     thumbnails = ThumbnailListWidget(
         render,
         project,
         stage="s",
         thumbnail_size=QSize(100, 100),
         render_size=QSize(100, 100),
+        parent=host,
     )
-    qtbot.addWidget(thumbnails)
-    thumbnails.resize(700, 700)
-    thumbnails.show()
-    qtbot.wait_exposed(thumbnails)
+    show_in_host(qtbot, thumbnails, 700, 700)
     return thumbnails
 
 
@@ -150,7 +150,7 @@ class TestColumns:
         self, qtbot: QtBot, widget: ThumbnailListWidget
     ) -> None:
         widget.set_cell_size(QSize(250, 160))
-        widget.resize(widget.view.minimumWidth() + 40, 700)
+        widget.window().resize(widget.view.minimumWidth() + 40, 700)
         qtbot.wait(50)
 
         assert cell(widget, 0)[0] == cell(widget, 1)[0]

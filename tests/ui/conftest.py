@@ -117,6 +117,25 @@ def no_window_outlives_its_test(qapp: QtWidgets.QApplication) -> Iterator[None]:
     )
 
 
+@pytest.fixture
+def host(qtbot: QtBot) -> QtWidgets.QWidget:
+    """Return a top-level window to build the widgets under test in.
+
+    Qt deletes the window's children with it at teardown, so a widget built
+    with ``parent=host`` never outlives its test.
+
+    Args:
+        qtbot (QtBot): Closes and deletes the window at teardown.
+
+    Returns:
+        QtWidgets.QWidget: A hidden window whose layout has no margins.
+    """
+    window = QtWidgets.QWidget()
+    QtWidgets.QVBoxLayout(window).setContentsMargins(0, 0, 0, 0)
+    qtbot.addWidget(window)
+    return window
+
+
 @pytest.fixture(autouse=True)
 def no_translation_outlives_its_test(
     qapp: QtWidgets.QApplication,

@@ -7,8 +7,7 @@ import numpy as np
 import pytest
 from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QColor, QImage, QPainter
-from PySide6.QtWidgets import QStyleOptionViewItem
-from pytestqt.qtbot import QtBot
+from PySide6.QtWidgets import QStyleOptionViewItem, QWidget
 
 from scantailor.app.ui.thumbnails import ThumbnailListWidget
 from scantailor.app.ui.thumbnails.deviation import (
@@ -81,10 +80,9 @@ def _set_angles(sequence: StageSequence, pages: list[PageId], angles: list[float
 
 
 def _widget(
-    qtbot: QtBot, project: Project, sequence: StageSequence, renders: _Renders
+    host: QWidget, project: Project, sequence: StageSequence, renders: _Renders
 ) -> ThumbnailListWidget:
-    widget = ThumbnailListWidget(renders, project, stage=DESKEW)
-    qtbot.addWidget(widget)
+    widget = ThumbnailListWidget(renders, project, stage=DESKEW, parent=host)
     widget.bind_stage_sequence(sequence)
     return widget
 
@@ -264,12 +262,12 @@ class TestShortBookWithOneOutlier:
 
 class TestDeviationOrderAgreesWithTheMarks:
     def test_the_marked_pages_sort_first_in_a_short_book(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         # The mean of these angles is 2.0, so ranking from the mean would put
         # the marked 2.0 page last, below the four level pages.
         _set_angles(sequence, pages, [0.0, 0.0, 0.0, 0.0, 2.0, 10.0])
-        widget = _widget(qtbot, project, sequence, _Renders())
+        widget = _widget(host, project, sequence, _Renders())
 
         widget.set_order(1)
 
@@ -277,7 +275,7 @@ class TestDeviationOrderAgreesWithTheMarks:
         assert _flags(widget, widget.pages()) == [True, True] + [False] * 4
 
     def test_an_empty_content_box_sorts_with_the_marked_pages(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         for page in pages:
             sequence.select_content_filter.set_params(
@@ -288,9 +286,11 @@ class TestDeviationOrderAgreesWithTheMarks:
             )
         sequence.select_content_filter.set_params(pages[3], ContentParams())
         widget = ThumbnailListWidget(
-            _Renders(), project, stage=str(int(FilterStage.SELECT_CONTENT))
+            _Renders(),
+            project,
+            stage=str(int(FilterStage.SELECT_CONTENT)),
+            parent=host,
         )
-        qtbot.addWidget(widget)
         widget.bind_stage_sequence(sequence)
 
         widget.set_order(widget.order_names().index("Order by decreasing deviation"))
@@ -299,18 +299,18 @@ class TestDeviationOrderAgreesWithTheMarks:
 
 
 class TestList:
-    def test_the_outlying_page_is_flagged(self, qtbot, project, sequence, pages):
+    def test_the_outlying_page_is_flagged(self, qtbot, host, project, sequence, pages):
         _set_angles(sequence, pages, [0.0, 0.1, 0.0, 0.1, 0.0, 6.0])
 
-        widget = _widget(qtbot, project, sequence, _Renders())
+        widget = _widget(host, project, sequence, _Renders())
 
         assert _flags(widget, pages) == [False] * 5 + [True]
 
     def test_a_changed_page_moves_the_flags_of_the_others(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         _set_angles(sequence, pages, [0.0, 0.1, 0.0, 0.1, 0.0, 6.0])
-        widget = _widget(qtbot, project, sequence, _Renders())
+        widget = _widget(host, project, sequence, _Renders())
 
         sequence.deskew_filter.settings.set_params(
             pages[5], DeskewParams(deskew_angle_deg=0.1)
@@ -323,10 +323,10 @@ class TestList:
         assert _flags(widget, pages) == [True] + [False] * 5
 
     def test_refreshing_the_marks_asks_for_no_new_thumbnail(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         _set_angles(sequence, pages, [0.0, 0.1, 0.0, 0.1, 0.0, 6.0])
-        widget = _widget(qtbot, project, sequence, _Renders())
+        widget = _widget(host, project, sequence, _Renders())
         changed_roles: list[int] = []
         widget.model.dataChanged.connect(
             lambda _first, _last, roles: changed_roles.extend(roles)
@@ -365,19 +365,19 @@ def _red_pixels(image: QImage) -> int:
 
 class TestAsterisk:
     def test_a_deviating_page_carries_a_red_asterisk(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         _set_angles(sequence, pages, [0.0, 0.1, 0.0, 0.1, 0.0, 6.0])
-        widget = _widget(qtbot, project, sequence, _Renders())
+        widget = _widget(host, project, sequence, _Renders())
 
         assert _red_pixels(_cell(widget, pages[5])) > 50
         assert _red_pixels(_cell(widget, pages[0])) == 0
 
     def test_no_asterisk_while_highlighting_is_off(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         ApplicationSettings.get_instance().highlight_deviation = False
         _set_angles(sequence, pages, [0.0, 0.1, 0.0, 0.1, 0.0, 6.0])
-        widget = _widget(qtbot, project, sequence, _Renders())
+        widget = _widget(host, project, sequence, _Renders())
 
         assert _red_pixels(_cell(widget, pages[5])) == 0

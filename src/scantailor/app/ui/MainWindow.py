@@ -657,6 +657,7 @@ class MainWindowManager:
             params_hash=self._thumbnail_digest,
             file_digest=self._thumbnail_file_digest,
             thumbnail_size=THUMBNAIL_SIZE,
+            parent=self.ui,
         )
         self.thumbnails.apply_settings(ApplicationSettings.get_instance())
         self.thumbnails.page_selected.connect(self.page_selected)

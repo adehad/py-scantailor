@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QColor, QImage, QPainter
-from PySide6.QtWidgets import QStyleOptionViewItem
+from PySide6.QtWidgets import QStyleOptionViewItem, QWidget
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.thumbnails import ThumbnailListWidget
@@ -27,6 +27,7 @@ from scantailor.filters.page_split.page_layout import PageLayout
 from scantailor.filters.page_split.params import Params as SplitParams
 from scantailor.filters.select_content.content_box import PhysicalSize
 from scantailor.filters.select_content.params import Params as ContentParams
+from tests.ui.hosting import show_in_host
 
 COUNT = 5
 
@@ -64,16 +65,14 @@ def _names(sequence: StageSequence, stage: FilterStage) -> list[str]:
 
 def _widget(
     qtbot: QtBot,
+    host: QWidget,
     project: Project,
     sequence: StageSequence,
     stage: FilterStage,
 ) -> ThumbnailListWidget:
-    widget = ThumbnailListWidget(_renderer, project, stage=str(int(stage)))
-    qtbot.addWidget(widget)
+    widget = ThumbnailListWidget(_renderer, project, stage=str(int(stage)), parent=host)
     widget.bind_stage_sequence(sequence)
-    widget.resize(240, 700)
-    widget.show()
-    qtbot.waitExposed(widget)
+    show_in_host(qtbot, widget, 240, 700)
     return widget
 
 
@@ -115,14 +114,14 @@ class TestOptionsOfEachStage:
 
 class TestDeviationOrder:
     def test_pages_furthest_from_the_median_angle_come_first(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         angles = [0.0, 5.0, 0.5, -4.0, 0.0]
         for page, angle in zip(pages, angles):
             sequence.deskew_filter.settings.set_params(
                 page, DeskewParams(deskew_angle_deg=angle)
             )
-        widget = _widget(qtbot, project, sequence, FilterStage.DESKEW)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.DESKEW)
 
         widget.set_order(1)
 
@@ -131,24 +130,26 @@ class TestDeviationOrder:
         expected = sorted(pages, key=lambda page: -deviations[page])
         assert widget.pages() == expected
 
-    def test_pages_without_a_result_go_last(self, qtbot, project, sequence, pages):
+    def test_pages_without_a_result_go_last(
+        self, qtbot, host, project, sequence, pages
+    ):
         for page, angle in zip(pages[:3], (0.0, 6.0, 1.0)):
             sequence.deskew_filter.settings.set_params(
                 page, DeskewParams(deskew_angle_deg=angle)
             )
-        widget = _widget(qtbot, project, sequence, FilterStage.DESKEW)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.DESKEW)
 
         widget.set_order(1)
 
         assert widget.pages()[-2:] == pages[3:]
         assert widget.pages()[0] == pages[1]
 
-    def test_ties_keep_the_natural_order(self, qtbot, project, sequence, pages):
+    def test_ties_keep_the_natural_order(self, qtbot, host, project, sequence, pages):
         for page in pages:
             sequence.deskew_filter.settings.set_params(
                 page, DeskewParams(deskew_angle_deg=1.0)
             )
-        widget = _widget(qtbot, project, sequence, FilterStage.DESKEW)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.DESKEW)
 
         widget.set_order(1)
 
@@ -157,7 +158,7 @@ class TestDeviationOrder:
 
 class TestSplitTypeOrder:
     def test_pages_are_grouped_by_type_with_undecided_ones_after(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         types = [
             LayoutType.TWO_PAGES,
@@ -170,20 +171,20 @@ class TestSplitTypeOrder:
             sequence.page_split_filter.set_params(
                 page, SplitParams(layout_type=layout_type)
             )
-        widget = _widget(qtbot, project, sequence, FilterStage.PAGE_SPLIT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.PAGE_SPLIT)
 
         widget.set_order(1)
 
         assert widget.pages() == [pages[1], pages[4], pages[3], pages[0], pages[2]]
 
     def test_reversing_a_split_type_order_reverses_pages_of_one_type_too(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         for page in pages:
             sequence.page_split_filter.set_params(
                 page, SplitParams(layout_type=LayoutType.SINGLE_PAGE_UNCUT)
             )
-        widget = _widget(qtbot, project, sequence, FilterStage.PAGE_SPLIT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.PAGE_SPLIT)
         widget.set_order(1)
 
         widget.set_sort_reversed(True)
@@ -191,7 +192,7 @@ class TestSplitTypeOrder:
         assert widget.pages() == list(reversed(pages))
 
     def test_the_type_of_the_layout_wins_over_the_requested_one(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         spread = PageLayout.two_pages(500, 700, 250)
         sequence.page_split_filter.set_params(
@@ -201,7 +202,7 @@ class TestSplitTypeOrder:
         sequence.page_split_filter.set_params(
             pages[1], SplitParams(layout_type=LayoutType.SINGLE_PAGE_UNCUT)
         )
-        widget = _widget(qtbot, project, sequence, FilterStage.PAGE_SPLIT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.PAGE_SPLIT)
 
         widget.set_order(1)
 
@@ -210,7 +211,7 @@ class TestSplitTypeOrder:
 
 class TestSizeOrders:
     def test_select_content_pages_are_ordered_by_content_width_then_height(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         sizes = [(120, 90), (80, 200), (100, 50), (80, 150), (90, 10)]
         for page, (width, height) in zip(pages, sizes):
@@ -220,7 +221,7 @@ class TestSizeOrders:
                     content_size_mm=PhysicalSize(width_mm=width, height_mm=height)
                 ),
             )
-        widget = _widget(qtbot, project, sequence, FilterStage.SELECT_CONTENT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.SELECT_CONTENT)
 
         widget.set_order(1)
         by_width = widget.pages()
@@ -230,7 +231,9 @@ class TestSizeOrders:
         assert by_width == [pages[1], pages[3], pages[4], pages[2], pages[0]]
         assert by_height == [pages[4], pages[2], pages[0], pages[3], pages[1]]
 
-    def test_a_page_without_a_size_goes_last(self, qtbot, project, sequence, pages):
+    def test_a_page_without_a_size_goes_last(
+        self, qtbot, host, project, sequence, pages
+    ):
         for page, width in zip(pages[1:], (30.0, 20.0, 10.0, 40.0)):
             sequence.select_content_filter.set_params(
                 page,
@@ -238,14 +241,14 @@ class TestSizeOrders:
                     content_size_mm=PhysicalSize(width_mm=width, height_mm=10)
                 ),
             )
-        widget = _widget(qtbot, project, sequence, FilterStage.SELECT_CONTENT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.SELECT_CONTENT)
 
         widget.set_order(1)
 
         assert widget.pages()[-1] == pages[0]
 
     def test_page_layout_adds_the_hard_margins_to_the_content_size(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         from scantailor.core.models import Margins
 
@@ -260,7 +263,7 @@ class TestSizeOrders:
                 }
             )
             sequence.page_layout_filter.set_params(page, params)
-        widget = _widget(qtbot, project, sequence, FilterStage.PAGE_LAYOUT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.PAGE_LAYOUT)
 
         widget.set_order(1)
 
@@ -285,9 +288,11 @@ class TestIncompletePages:
             sequence, stage, pages[0]
         )
 
-    def test_the_model_flags_incomplete_pages(self, qtbot, project, sequence, pages):
+    def test_the_model_flags_incomplete_pages(
+        self, qtbot, host, project, sequence, pages
+    ):
         sequence.deskew_filter.settings.set_params(pages[2], DeskewParams())
-        widget = _widget(qtbot, project, sequence, FilterStage.DESKEW)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.DESKEW)
         model = widget.model
 
         flags = [
@@ -298,9 +303,9 @@ class TestIncompletePages:
         assert flags == [True, True, False, True, True]
 
     def test_a_page_leaves_the_incomplete_state_when_its_result_arrives(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
-        widget = _widget(qtbot, project, sequence, FilterStage.DESKEW)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.DESKEW)
         model = widget.model
         row = model.row_of(pages[1])
         assert model.data(model.index(row), IncompleteRole)
@@ -311,22 +316,22 @@ class TestIncompletePages:
         assert not model.data(model.index(model.row_of(pages[1])), IncompleteRole)
 
     def test_the_output_order_puts_incomplete_pages_last(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         for page in pages[2:4]:
             sequence.output_filter.set_params(
                 page, sequence.output_filter.get_params(page)
             )
-        widget = _widget(qtbot, project, sequence, FilterStage.OUTPUT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.OUTPUT)
 
         widget.set_order(1)
 
         assert widget.pages() == [pages[2], pages[3], pages[0], pages[1], pages[4]]
 
     def test_an_order_that_depends_on_results_follows_them(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
-        widget = _widget(qtbot, project, sequence, FilterStage.OUTPUT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.OUTPUT)
         widget.set_order(1)
         assert widget.pages() == pages
 
@@ -338,9 +343,9 @@ class TestIncompletePages:
         assert widget.pages()[0] == pages[3]
 
     def test_a_row_that_moves_keeps_its_selection(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
-        widget = _widget(qtbot, project, sequence, FilterStage.OUTPUT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.OUTPUT)
         widget.set_order(1)
         widget.set_current_page(pages[3])
         widget.select_pages([pages[3]])
@@ -383,10 +388,10 @@ class TestMarker:
         return int(((red > green + 20) & (red > blue + 20)).sum())
 
     def test_an_incomplete_page_is_marked_with_a_question_mark(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         sequence.deskew_filter.settings.set_params(pages[0], DeskewParams())
-        widget = _widget(qtbot, project, sequence, FilterStage.DESKEW)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.DESKEW)
 
         complete = self._cell(widget, pages[0])
         incomplete = self._cell(widget, pages[1])
@@ -395,12 +400,14 @@ class TestMarker:
         assert self._reddish(complete) == 0
 
     def test_the_mark_is_drawn_over_a_placeholder_too(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         widget = ThumbnailListWidget(
-            _renderer, project, stage=str(int(FilterStage.DESKEW))
+            _renderer,
+            project,
+            stage=str(int(FilterStage.DESKEW)),
+            parent=host,
         )
-        qtbot.addWidget(widget)
         widget.bind_stage_sequence(sequence)
 
         image = self._cell(widget, pages[1])
@@ -409,20 +416,24 @@ class TestMarker:
 
 
 class TestDirection:
-    def test_reversing_flips_the_natural_order(self, qtbot, project, sequence, pages):
-        widget = _widget(qtbot, project, sequence, FilterStage.OUTPUT)
+    def test_reversing_flips_the_natural_order(
+        self, qtbot, host, project, sequence, pages
+    ):
+        widget = _widget(qtbot, host, project, sequence, FilterStage.OUTPUT)
 
         widget.set_sort_reversed(True)
 
         assert widget.pages() == list(reversed(pages))
         assert widget.sort_reversed
 
-    def test_reversing_flips_the_chosen_order(self, qtbot, project, sequence, pages):
+    def test_reversing_flips_the_chosen_order(
+        self, qtbot, host, project, sequence, pages
+    ):
         for page, angle in zip(pages, (0.0, 5.0, 0.5, -4.5, 2.0)):
             sequence.deskew_filter.settings.set_params(
                 page, DeskewParams(deskew_angle_deg=angle)
             )
-        widget = _widget(qtbot, project, sequence, FilterStage.DESKEW)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.DESKEW)
         widget.set_order(1)
         forward = widget.pages()
 
@@ -431,29 +442,33 @@ class TestDirection:
         assert widget.pages() == list(reversed(forward))
 
     def test_ties_stay_in_natural_order_when_reversed(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
         for page in pages:
             sequence.deskew_filter.settings.set_params(
                 page, DeskewParams(deskew_angle_deg=1.0)
             )
-        widget = _widget(qtbot, project, sequence, FilterStage.DESKEW)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.DESKEW)
         widget.set_order(1)
 
         widget.set_sort_reversed(True)
 
         assert widget.pages() == pages
 
-    def test_reversing_back_restores_the_order(self, qtbot, project, sequence, pages):
-        widget = _widget(qtbot, project, sequence, FilterStage.OUTPUT)
+    def test_reversing_back_restores_the_order(
+        self, qtbot, host, project, sequence, pages
+    ):
+        widget = _widget(qtbot, host, project, sequence, FilterStage.OUTPUT)
 
         widget.set_sort_reversed(True)
         widget.set_sort_reversed(False)
 
         assert widget.pages() == pages
 
-    def test_the_selection_survives_reversing(self, qtbot, project, sequence, pages):
-        widget = _widget(qtbot, project, sequence, FilterStage.OUTPUT)
+    def test_the_selection_survives_reversing(
+        self, qtbot, host, project, sequence, pages
+    ):
+        widget = _widget(qtbot, host, project, sequence, FilterStage.OUTPUT)
         widget.set_current_page(pages[1])
         widget.select_pages([pages[1], pages[2]])
 
@@ -463,9 +478,9 @@ class TestDirection:
         assert set(widget.selected_pages()) == {pages[1], pages[2]}
 
     def test_pausing_the_sorting_shows_the_natural_order_whatever_the_direction(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
-        widget = _widget(qtbot, project, sequence, FilterStage.OUTPUT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.OUTPUT)
         widget.set_sort_reversed(True)
 
         widget.set_sorting_paused(True)
@@ -475,9 +490,9 @@ class TestDirection:
 
 class TestStageSwitch:
     def test_switching_the_stage_offers_that_stages_options(
-        self, qtbot, project, sequence
+        self, qtbot, host, project, sequence
     ):
-        widget = _widget(qtbot, project, sequence, FilterStage.OUTPUT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.OUTPUT)
         assert widget.order_names() == ["Natural order", "Order by completeness"]
 
         with qtbot.waitSignal(widget.orders_changed):
@@ -487,9 +502,9 @@ class TestStageSwitch:
         assert widget.order_combo.count() == 2
 
     def test_a_stage_without_options_leaves_an_empty_combo(
-        self, qtbot, project, sequence
+        self, qtbot, host, project, sequence
     ):
-        widget = _widget(qtbot, project, sequence, FilterStage.OUTPUT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.OUTPUT)
 
         widget.set_stage(str(int(FilterStage.FIX_ORIENTATION)))
 
@@ -497,9 +512,9 @@ class TestStageSwitch:
         assert widget.order_combo.count() == 0
 
     def test_a_new_stage_starts_with_its_first_order(
-        self, qtbot, project, sequence, pages
+        self, qtbot, host, project, sequence, pages
     ):
-        widget = _widget(qtbot, project, sequence, FilterStage.OUTPUT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.OUTPUT)
         widget.set_order(1)
 
         widget.set_stage(str(int(FilterStage.DESKEW)))
@@ -507,9 +522,11 @@ class TestStageSwitch:
         assert widget.order_combo.currentIndex() == 0
         assert widget.pages() == pages
 
-    def test_incomplete_pages_follow_the_stage(self, qtbot, project, sequence, pages):
+    def test_incomplete_pages_follow_the_stage(
+        self, qtbot, host, project, sequence, pages
+    ):
         sequence.deskew_filter.settings.set_params(pages[0], DeskewParams())
-        widget = _widget(qtbot, project, sequence, FilterStage.FIX_ORIENTATION)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.FIX_ORIENTATION)
         model = widget.model
         assert not model.data(model.index(0), IncompleteRole)
 
@@ -518,9 +535,8 @@ class TestStageSwitch:
         assert not model.data(model.index(model.row_of(pages[0])), IncompleteRole)
         assert model.data(model.index(model.row_of(pages[1])), IncompleteRole)
 
-    def test_without_a_sequence_the_built_in_orders_stay(self, qtbot, project):
-        widget = ThumbnailListWidget(_renderer, project, stage="1")
-        qtbot.addWidget(widget)
+    def test_without_a_sequence_the_built_in_orders_stay(self, qtbot, host, project):
+        widget = ThumbnailListWidget(_renderer, project, stage="1", parent=host)
 
         assert widget.order_names() == [
             "Natural order",
@@ -534,9 +550,9 @@ class TestStageSwitch:
 
 class TestOrderRememberedPerStage:
     def test_coming_back_to_a_stage_restores_its_chosen_order(
-        self, qtbot, project, sequence
+        self, qtbot, host, project, sequence
     ):
-        widget = _widget(qtbot, project, sequence, FilterStage.SELECT_CONTENT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.SELECT_CONTENT)
         widget.set_order(2)
 
         widget.set_stage(str(int(FilterStage.DESKEW)))
@@ -544,8 +560,8 @@ class TestOrderRememberedPerStage:
 
         assert widget.order_combo.currentIndex() == 2
 
-    def test_each_stage_keeps_its_own_choice(self, qtbot, project, sequence):
-        widget = _widget(qtbot, project, sequence, FilterStage.SELECT_CONTENT)
+    def test_each_stage_keeps_its_own_choice(self, qtbot, host, project, sequence):
+        widget = _widget(qtbot, host, project, sequence, FilterStage.SELECT_CONTENT)
         widget.set_order(2)
 
         widget.set_stage(str(int(FilterStage.PAGE_LAYOUT)))
@@ -556,12 +572,14 @@ class TestOrderRememberedPerStage:
         widget.set_stage(str(int(FilterStage.PAGE_LAYOUT)))
         assert widget.order_combo.currentIndex() == 1
 
-    def test_the_restored_order_sorts_the_pages(self, qtbot, project, sequence, pages):
+    def test_the_restored_order_sorts_the_pages(
+        self, qtbot, host, project, sequence, pages
+    ):
         for page, angle in zip(pages, (0.0, 5.0, 0.5, -4.5, 2.0), strict=True):
             sequence.deskew_filter.settings.set_params(
                 page, DeskewParams(deskew_angle_deg=angle)
             )
-        widget = _widget(qtbot, project, sequence, FilterStage.DESKEW)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.DESKEW)
         widget.set_order(1)
         sorted_pages = widget.pages()
 
@@ -572,9 +590,9 @@ class TestOrderRememberedPerStage:
         assert sorted_pages != pages
 
     def test_a_new_stage_sequence_starts_every_stage_on_its_first_order(
-        self, qtbot, project, sequence
+        self, qtbot, host, project, sequence
     ):
-        widget = _widget(qtbot, project, sequence, FilterStage.SELECT_CONTENT)
+        widget = _widget(qtbot, host, project, sequence, FilterStage.SELECT_CONTENT)
         widget.set_order(2)
 
         widget.bind_stage_sequence(StageSequence())
