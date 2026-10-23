@@ -25,6 +25,7 @@ from loguru import logger
 from numpy.typing import NDArray
 
 from scantailor.core.black_on_white_estimator import is_black_on_white
+from scantailor.core.debug_images import DebugImages
 from scantailor.core.models import Dpi, PageId, SubPage, page_name
 from scantailor.core.page_geometry import (
     page_crop_area,
@@ -166,6 +167,10 @@ class PipelineOptions:
         black_on_white_detection: Whether Deskew and Select Content invert a
             page of light content on a dark background before detecting on it,
             and whether Output takes that polarity.
+        debug_images: Receives the intermediate images of ``end_stage`` only,
+            as upstream's debug mode records just the stage on screen. A
+            detecting stage whose parameters are already stored detects once
+            more without storing the result, so that its images are recorded.
     """
 
     start_stage: FilterStage = FilterStage.FIX_ORIENTATION
@@ -179,6 +184,11 @@ class PipelineOptions:
     black_on_white_detection: BlackOnWhiteDetection = field(
         default_factory=BlackOnWhiteDetection
     )
+    debug_images: DebugImages | None = None
+
+    def debug_images_for(self, stage: FilterStage) -> DebugImages | None:
+        """Return where ``stage`` records its intermediate images, or None."""
+        return self.debug_images if stage == self.end_stage else None
 
 
 class _PageState:
@@ -202,6 +212,7 @@ class _PageState:
         self._source_dpi = transformation_dpi(dpi, rotation_degrees)
         self._view: NDArray[np.uint8] | None = None
         self._black_on_white: bool | None = None
+        self._polarity_recorded = False
         self.source = source
         self.xform = self._new_transformation(source)
         # Content rectangle in source coordinates, set by the page layout stage;
@@ -239,6 +250,7 @@ class _PageState:
         self.trim_area = None
         self._view = None
         self._black_on_white = None
+        self._polarity_recorded = False
 
     def view(self) -> NDArray[np.uint8]:
         """Return the source resampled through the current transformation."""
@@ -246,19 +258,33 @@ class _PageState:
             self._view = render_transformed(self.source, self.xform)
         return self._view
 
-    def is_black_on_white(self) -> bool:
-        """Tell whether the page inside the pre-crop area has dark content on light."""
-        if self._black_on_white is None:
-            self._black_on_white = is_black_on_white(self.source, self.xform)
+    def is_black_on_white(self, dbg: DebugImages | None = None) -> bool:
+        """Tell whether the page inside the pre-crop area has dark content on light.
+
+        Args:
+            dbg (DebugImages | None): Receives the estimator's images. The
+                answer is cached, so the first call given a collector measures
+                again to record them; later ones reuse the answer.
+
+        Returns:
+            bool: True for dark content on a light background.
+        """
+        record = dbg is not None and not self._polarity_recorded
+        if self._black_on_white is None or record:
+            self._black_on_white = is_black_on_white(self.source, self.xform, dbg)
+            self._polarity_recorded = self._polarity_recorded or record
         return self._black_on_white
 
-    def detection_view(self, detection: BlackOnWhiteDetection) -> NDArray[np.uint8]:
+    def detection_view(
+        self, detection: BlackOnWhiteDetection, dbg: DebugImages | None = None
+    ) -> NDArray[np.uint8]:
         """Return ``view``, inverted when it shows light content on a dark page.
 
         The source is inverted before it is resampled, so the area with no
-        source pixel stays white, as it is in ``view``.
+        source pixel stays white, as it is in ``view``. ``dbg`` receives the
+        polarity estimator's images.
         """
-        if not detection.enabled or self.is_black_on_white():
+        if not detection.enabled or self.is_black_on_white(dbg):
             return self.view()
         return render_transformed(255 - self.source, self.xform)
 
@@ -275,6 +301,7 @@ class _PageState:
         self.xform.set_pre_crop_area(self.xform.orig_polygon_to_pre_crop_space(area))
         self._view = None
         self._black_on_white = None
+        self._polarity_recorded = False
 
     def apply_deskew(self, filter_: DeskewFilter, params: DeskewParams) -> None:
         """Rotate by the deskew angle, then shear by the oblique angle."""
@@ -651,16 +678,30 @@ def _process_page_split(
 ) -> dict:
     """Process the Page Split stage, cropping to this page's region."""
     filter_ = sequence.page_split_filter
+    dbg = options.debug_images_for(FilterStage.PAGE_SPLIT)
+    rotation_degrees = sequence.fix_orientation_filter.get_rotation(
+        page_id.image_id
+    ).degrees
 
+    detected = False
     if detect:
-        filter_.process(
+        detected = filter_.settle(
             state.source,
             page_id,
             dpi=state.source_dpi,
-            rotation_degrees=sequence.fix_orientation_filter.get_rotation(
-                page_id.image_id
-            ).degrees,
+            rotation_degrees=rotation_degrees,
             trim_area=state.trim_area,
+            dbg=dbg,
+        ).detected
+    if dbg is not None and not detected:
+        filter_.detect_split(
+            state.source,
+            page_id,
+            dpi=state.source_dpi,
+            store_result=False,
+            rotation_degrees=rotation_degrees,
+            trim_area=state.trim_area,
+            dbg=dbg,
         )
 
     params = filter_.get_params(page_id)
@@ -717,13 +758,23 @@ def _process_deskew(
         sequence.fix_orientation_filter.get_rotation(page_id.image_id).degrees,
     )
 
+    dbg = options.debug_images_for(FilterStage.DESKEW)
     skew = None
     if detect and filter_.needs_detection(page_id, dependencies):
         skew = filter_.detect_skew(
-            state.detection_view(options.black_on_white_detection),
+            state.detection_view(options.black_on_white_detection, dbg),
             page_id,
             dependencies=dependencies,
             dpi=state.dpi,
+            dbg=dbg,
+        )
+    elif dbg is not None:
+        filter_.detect_skew(
+            state.detection_view(options.black_on_white_detection, dbg),
+            page_id,
+            store_result=False,
+            dpi=state.dpi,
+            dbg=dbg,
         )
 
     params = filter_.get_params(page_id)
@@ -781,9 +832,11 @@ def _process_select_content(
     boxes are used as they are.
     """
     filter_ = sequence.select_content_filter
+    dbg = options.debug_images_for(FilterStage.SELECT_CONTENT)
+    page_detected = content_detected = False
     if detect:
-        params = filter_.process(
-            lambda: state.detection_view(options.black_on_white_detection),
+        params, page_detected, content_detected = filter_.settle(
+            lambda: state.detection_view(options.black_on_white_detection, dbg),
             page_id,
             dpi=float(state.dpi.horizontal),
             outside=lambda: _outside_source_mask(state),
@@ -791,9 +844,20 @@ def _process_select_content(
             page_outline=_polygon_points(state.xform.resulting_pre_crop_area),
             view_transform=state.xform.transform,
             image_size=state.view_size(),
+            dbg=dbg,
         )
     else:
         params = filter_.get_params(page_id)
+    if dbg is not None and not (page_detected and content_detected):
+        _debug_select_content(
+            state,
+            page_id,
+            sequence,
+            options,
+            dbg,
+            page=not page_detected,
+            content=not content_detected,
+        )
 
     box = params.content_box
     page_box = params.page_box
@@ -813,6 +877,37 @@ def _process_select_content(
             "height": page_box.height,
         },
     }
+
+
+def _debug_select_content(
+    state: _PageState,
+    page_id: PageId,
+    sequence: StageSequence,
+    options: PipelineOptions,
+    dbg: DebugImages,
+    *,
+    page: bool,
+    content: bool,
+) -> None:
+    """Run the finders that did not run for their images, storing nothing."""
+    filter_ = sequence.select_content_filter
+    view = state.detection_view(options.black_on_white_detection, dbg)
+    dpi = float(state.dpi.horizontal)
+    outside = _outside_source_mask(state)
+    if page:
+        filter_.detect_page(
+            view, page_id, dpi=dpi, store_result=False, outside=outside, dbg=dbg
+        )
+    if content:
+        filter_.detect_content(
+            view,
+            page_id,
+            dpi=dpi,
+            store_result=False,
+            outside=outside,
+            page_box=filter_.get_params(page_id).page_box.to_content_box(),
+            dbg=dbg,
+        )
 
 
 def _process_page_layout(
@@ -966,6 +1061,7 @@ def _process_output(
         fill_zones=_view_zones(state, params.fill_zones),
         source_outline=source_outline,
         keep_despeckle_source=options.keep_output_extras,
+        dbg=options.debug_images_for(FilterStage.OUTPUT),
     )
 
     metadata["is_binary"] = result.is_binary
@@ -1018,7 +1114,8 @@ def _settled_polarity(
     """
     settings = sequence.output_filter.settings
     if options.black_on_white_detection.output and not options.detect_only:
-        settings.set_detected_black_on_white(page_id, state.is_black_on_white())
+        dbg = options.debug_images_for(FilterStage.OUTPUT)
+        settings.set_detected_black_on_white(page_id, state.is_black_on_white(dbg))
     return settings.get_params(page_id)
 
 
@@ -1087,6 +1184,7 @@ def _detected_model(
     spine_on_right: bool,
     params: Params,
     state: _PageState,
+    dbg: DebugImages | None,
 ) -> tuple[DistortionModel | None, DewarpMetrics]:
     """Fit the page curvature to its text lines and page edges.
 
@@ -1111,6 +1209,7 @@ def _detected_model(
         edge_gray=source_gray if params.black_on_white else 255 - source_gray,
         to_edge_image=to_source[:2],
         min_span_percent=params.dewarp_min_span_percent,
+        dbg=dbg,
     )
     model = detected.model
     if model is None or model.top_curve is None or model.bottom_curve is None:
@@ -1203,17 +1302,18 @@ def _dewarper_source(
             float(high[1] - low[1]),
         )
 
+    dbg = options.debug_images_for(FilterStage.OUTPUT)
     if mode == DewarpingMode.AUTO:
         dpi = (params.output_dpi.horizontal, params.output_dpi.vertical)
         spine_on_right = page_id.sub_page != SubPage.RIGHT_PAGE
         return lambda gray: found.dewarper_for_detected(
-            _detected_model(gray, dpi, content, spine_on_right, params, state),
+            _detected_model(gray, dpi, content, spine_on_right, params, state, dbg),
             depth,
         )
     if mode == DewarpingMode.MARGINAL:
         spine_on_right = page_id.sub_page != SubPage.RIGHT_PAGE
         return lambda gray: found.dewarper_for(
-            build_marginal_model(gray, content, spine_on_right), depth
+            build_marginal_model(gray, content, spine_on_right, dbg=dbg), depth
         )
     return None
 

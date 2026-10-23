@@ -13,6 +13,7 @@ import numpy as np
 from loguru import logger
 from numpy.typing import NDArray
 
+from scantailor.core.debug_images import DebugImages
 from scantailor.core.models import Dpi, PageId
 from scantailor.core.transformation import ImageTransformation
 from scantailor.filters.deskew.dependencies import Dependencies
@@ -165,6 +166,7 @@ class Filter:
         store_result: bool = True,
         dependencies: Dependencies | None = None,
         dpi: Dpi | None = None,
+        dbg: DebugImages | None = None,
     ) -> SkewResult:
         """Detect the skew angle for an image.
 
@@ -184,6 +186,8 @@ class Filter:
                 based skew and the oblique angle are measured; the top edge is
                 always found on the page as it is. None measures the page
                 uncleaned throughout.
+            dbg (DebugImages | None): Receives the binarised page and, with
+                ``dpi``, the page after the shadow cleanup.
 
         Returns:
             SkewResult with detected angle and confidence.
@@ -202,6 +206,8 @@ class Filter:
 
         # Binarize for better skew detection
         binary = binarize_otsu(gray)
+        if dbg is not None:
+            dbg.add(binary, "bw_rotated")
 
         result = None
         if not self.content_based:
@@ -215,6 +221,8 @@ class Filter:
             )
         if dpi is not None:
             binary = remove_horizontal_shadows(binary, dpi)
+            if dbg is not None:
+                dbg.add(binary, "after_cleanup")
         if result is None or not result.is_confident():
             if result is not None:
                 logger.debug(
