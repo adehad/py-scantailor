@@ -78,6 +78,7 @@ from scantailor.app.ui.thumbnails import ThumbnailListWidget
 from scantailor.app.ui.thumbnails.stage_orders import is_page_incomplete
 from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.app.ui.utils import get_cwidget
+from scantailor.app.ui.widgets.debug_image_tabs import DebugImageTabs
 from scantailor.app.ui.widgets.error_widget import ErrorWidget, load_failure_message
 from scantailor.app.ui.widgets.processing_indicator import ProcessingIndicator
 from scantailor.app.ui.widgets.stage_list_view import StageListView
@@ -97,6 +98,7 @@ from scantailor.core.batch import (
     output_file_names,
     rename_split_outputs,
 )
+from scantailor.core.debug_images import DebugImages
 from scantailor.core.default_params import apply_default_params
 from scantailor.core.default_params_profiles import (
     CUSTOM_PROFILE,
@@ -400,6 +402,7 @@ class MainWindowManager:
         self.renderer.render_done.connect(self._on_render_done)
         self.renderer.distortion_model_found.connect(self._on_distortion_model_found)
         self.renderer.output_extras_found.connect(self._on_output_extras_found)
+        self.renderer.debug_images_found.connect(self._on_debug_images_found)
         self.renderer.render_failed.connect(self._on_render_failed)
         self._source_sizes = _SourceSizeRelay(self.ui)
         # Queued, so the project is only changed on the GUI thread.
@@ -578,6 +581,8 @@ class MainWindowManager:
             lambda _link: self.showRelinkingDialog()
         )
         self.imageFrameLayout.addWidget(self.load_error_widget)
+        self.debug_image_tabs = DebugImageTabs()
+        self.imageFrameLayout.addWidget(self.debug_image_tabs)
         self._translate_own_text()
         self.processing_indicator = ProcessingIndicator()
         self.units_provider = UnitsProvider.get_instance()
@@ -592,6 +597,7 @@ class MainWindowManager:
         self.actionFirstPage.triggered.connect(self.goFirstPage)
         self.actionLastPage.triggered.connect(self.goLastPage)
         self.actionPrevPage.triggered.connect(self.goPrevPage)
+        self.actionDebug.toggled.connect(self._on_debug_toggled)
         self.actionNextPage.triggered.connect(self.goNextPage)
         self.actionPrevPageQ.triggered.connect(self.goPrevPage)
         self.actionNextPageW.triggered.connect(self.goNextPage)
@@ -1422,6 +1428,7 @@ class MainWindowManager:
         self.status_panel.set_page_size(None, 0.0)
         self.status_panel.set_cursor_position(None)
         self.status_panel.set_zone_creation_mode(None)
+        self._hide_debug_images()
         for widget, layout in (
             (panels.options, self.optionsFrameLayout),
             (panels.view, self.imageFrameLayout),
@@ -1441,6 +1448,7 @@ class MainWindowManager:
         if self._failed_image is not None:
             self._failed_image = None
             self._show_not_ready(False)
+        self._hide_debug_images()
         panels.set_page(self._current_page)
         self._show_source_image_info()
         self._request_render()
@@ -1485,6 +1493,7 @@ class MainWindowManager:
             self._dpi_overrides,
             pixels=at_output,
             extras=at_output,
+            debug=self.debug,
             tag=(
                 self._thumbnail_digest(self._current_page, str(int(panels.stage)))
                 if at_output
@@ -1528,7 +1537,7 @@ class MainWindowManager:
         elif not_ready:
             widget = self.not_ready_widget
         else:
-            widget = panels.view
+            widget = self._stage_image_widget(panels)
         self.imageFrameLayout.setCurrentWidget(widget)
 
     def _on_source_failed(self, image_id: ImageId) -> None:
@@ -1596,6 +1605,68 @@ class MainWindowManager:
                 return
         if self._panels is not None and page_id == self._current_page:
             self._panels.show_image(image)  # type: ignore[arg-type]
+
+    def _stage_image_widget(self, panels: StagePanels) -> QWidget:
+        """Return the stage view, or the debug tabs while they hold it.
+
+        Args:
+            panels (StagePanels): The panels of the stage on screen.
+
+        Returns:
+            QWidget: The widget that belongs in the image frame.
+        """
+        if self.debug_image_tabs.main is panels.view:
+            return self.debug_image_tabs
+        return panels.view
+
+    def _on_debug_toggled(self, enabled: bool) -> None:
+        """Turn debug mode on or off and render the current page again.
+
+        Like upstream, the mode lasts for the session and is not saved.
+
+        Args:
+            enabled (bool): Whether the Debug Mode action is now checked.
+        """
+        self.debug = enabled
+        if not enabled:
+            self._hide_debug_images()
+        self._request_render()
+
+    def _on_debug_images_found(self, page_id: PageId, images: DebugImages) -> None:
+        """Show the stage view beside the images of its render, or close them.
+
+        Args:
+            page_id (PageId): The page the render was for.
+            images (DebugImages): The render's images; this method owns them
+                from now on and closes them when they are not shown.
+        """
+        panels = self._panels
+        if (
+            panels is None
+            or page_id != self._current_page
+            or not self.debug
+            or not images.images
+        ):
+            images.close()
+            if panels is not None and page_id == self._current_page:
+                self._hide_debug_images()
+            return
+        showing = self.imageFrameLayout.currentWidget() is panels.view
+        if self.debug_image_tabs.main is not panels.view:
+            self.imageFrameLayout.removeWidget(panels.view)
+        self.debug_image_tabs.show_images(panels.view, images)
+        if showing:
+            self.imageFrameLayout.setCurrentWidget(self.debug_image_tabs)
+
+    def _hide_debug_images(self) -> None:
+        """Close the debug images and put the stage view back on its own."""
+        showing = self.imageFrameLayout.currentWidget() is self.debug_image_tabs
+        view = self.debug_image_tabs.take_main()
+        if view is None:
+            return
+        self.imageFrameLayout.addWidget(view)
+        if showing:
+            self.imageFrameLayout.setCurrentWidget(view)
 
     def _on_output_extras_found(self, page_id: PageId, extras: OutputExtras) -> None:
         if self._panels is not None and page_id == self._current_page:
@@ -3195,6 +3266,7 @@ class MainWindowManager:
     def _close_project_without_saving(self) -> None:
         """Drop the project and reset the window to its empty state."""
         self._discard_panels()
+        self.renderer.release_debug_images()
         self.renderer.sources.clear()
         release_thumbnail_memory()
         self._thumbnail_epoch += 1
@@ -3253,6 +3325,8 @@ class MainWindowManager:
         """
         if not self._close_project_interactive():
             return False
+        self._hide_debug_images()
+        self.renderer.release_debug_images()
         save_window_geometry(self.ui, self.settings)
         return True
 

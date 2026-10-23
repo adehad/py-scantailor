@@ -20,6 +20,7 @@ from scantailor.app.ui.thumbnails.render_memo import (
     reduced_copy,
 )
 from scantailor.core import pipeline
+from scantailor.core.debug_images import DebugImages
 from scantailor.core.image_io import ImageLoadError
 from scantailor.core.models import Dpi, ImageId, PageId, page_name
 from scantailor.core.page_source import (
@@ -144,6 +145,7 @@ def render_page_with_model(
     on_extras: Callable[[OutputExtras], None] | None = None,
     should_cancel: Callable[[], bool] | None = None,
     on_source: Callable[[LoadedPage], None] | None = None,
+    debug_images: DebugImages | None = None,
 ) -> tuple[NDArray[np.uint8], DistortionModelSpec | None]:
     """Render a page like ``render_page`` and return the dewarping model it built.
 
@@ -167,6 +169,8 @@ def render_page_with_model(
             stops the render with ``pipeline.PipelineCancelled``.
         on_source (Callable[[LoadedPage], None] | None): Called with the
             decoded source before the pipeline runs; it must not modify it.
+        debug_images (DebugImages | None): Receives the intermediate images of
+            ``end_stage``.
 
     Returns:
         tuple[NDArray[np.uint8], DistortionModelSpec | None]: The display image
@@ -189,6 +193,7 @@ def render_page_with_model(
         should_cancel=should_cancel,
         render_image=pixels,
         black_on_white_detection=ApplicationSettings.get_instance().polarity_detection,
+        debug_images=debug_images,
     )
     result = pipeline.process_page(page.pixels, page_id, sequence, options)
     if on_extras is not None and result.output_extras is not None:
@@ -583,7 +588,15 @@ class _RenderSignals(QtCore.QObject):
     done = QtCore.Signal(int, object, object)
     model_found = QtCore.Signal(int, object, object)
     extras_found = QtCore.Signal(int, object, object)
+    debug_found = QtCore.Signal(int, object, object)
     failed = QtCore.Signal(int, object, str)
+
+    def __init__(self, parent: QtCore.QObject | None = None) -> None:
+        super().__init__(parent)
+        # Collectors sent through ``debug_found`` that the GUI thread has not
+        # received yet, so that they can be closed if it never does.
+        self.debug_in_flight: set[DebugImages] = set()
+        self.debug_lock = threading.Lock()
 
 
 class _RenderTask(QtCore.QRunnable):
@@ -601,6 +614,7 @@ class _RenderTask(QtCore.QRunnable):
         pixels: bool,
         finished: Callable[[_RenderTask], None],
         extras: bool = False,
+        debug: bool = False,
     ) -> None:
         super().__init__()
         self.setAutoDelete(True)
@@ -617,6 +631,7 @@ class _RenderTask(QtCore.QRunnable):
         # reference to the renderer and destroys it there.
         self._finished = weakref.WeakMethod(finished)
         self._extras = extras
+        self._debug = debug
         self.image: NDArray[np.uint8] | None = None
 
     def run(self) -> None:
@@ -635,6 +650,28 @@ class _RenderTask(QtCore.QRunnable):
             self._signals.extras_found.emit(self._generation, self._page_id, extras)
 
     def _render_and_report(self) -> None:
+        debug_images = DebugImages() if self._debug else None
+        try:
+            self._render_and_report_into(debug_images)
+        finally:
+            if debug_images is not None and not self._handed_over(debug_images):
+                debug_images.close()
+
+    def _handed_over(self, debug_images: DebugImages) -> bool:
+        """Send the images of a finished render to the GUI thread.
+
+        Returns:
+            bool: True when they were sent and the GUI thread owns their files;
+                False for a cancelled or failed render, whose caller closes them.
+        """
+        if self.cancelled.is_set() or self.image is None:
+            return False
+        with self._signals.debug_lock:
+            self._signals.debug_in_flight.add(debug_images)
+        self._signals.debug_found.emit(self._generation, self._page_id, debug_images)
+        return True
+
+    def _render_and_report_into(self, debug_images: DebugImages | None) -> None:
         try:
             image, model = render_page_with_model(
                 self._page_id,
@@ -645,6 +682,7 @@ class _RenderTask(QtCore.QRunnable):
                 pixels=self._pixels,
                 on_extras=self._report_extras if self._extras else None,
                 should_cancel=self.cancelled.is_set,
+                debug_images=debug_images,
             )
         except pipeline.PipelineCancelled:
             return
@@ -690,10 +728,14 @@ class PageRenderer(QtCore.QObject):
         output_extras_found: A render asked for the pictures of the Output
             view's tabs and made them, emitted just before ``render_done``.
             Args: page_id (PageId), extras (OutputExtras).
+        debug_images_found: A render asked for debug images, emitted after
+            ``render_done``. The receiver owns the files and must close the
+            collector. Args: page_id (PageId), images (DebugImages).
     """
 
     render_done = QtCore.Signal(object, object)
     output_extras_found = QtCore.Signal(object, object)
+    debug_images_found = QtCore.Signal(object, object)
     distortion_model_found = QtCore.Signal(object, object)
     render_failed = QtCore.Signal(object, str)
 
@@ -710,6 +752,7 @@ class PageRenderer(QtCore.QObject):
         self._signals.done.connect(self._on_done)
         self._signals.model_found.connect(self._on_model_found)
         self._signals.extras_found.connect(self._on_extras_found)
+        self._signals.debug_found.connect(self._on_debug_found)
         self._signals.failed.connect(self._on_failed)
         self._generation = 0
         self._sources = SourceCache()
@@ -736,6 +779,7 @@ class PageRenderer(QtCore.QObject):
         pixels: bool = True,
         extras: bool = False,
         tag: Hashable | None = None,
+        debug: bool = False,
     ) -> None:
         """Start rendering a page, cancelling any render still pending.
 
@@ -754,6 +798,8 @@ class PageRenderer(QtCore.QObject):
                 with. A tagged render's image is kept, and ``rendered`` hands it
                 out for the same page, stage and tag until the next request
                 or cancel.
+            debug (bool): True to record the intermediate images of ``stage``
+                and report them through ``debug_images_found``.
         """
         self.cancel()
         task = _RenderTask(
@@ -767,6 +813,7 @@ class PageRenderer(QtCore.QObject):
             pixels,
             self._on_task_finished,
             extras,
+            debug,
         )
         with self._state:
             self._task = task
@@ -806,6 +853,21 @@ class PageRenderer(QtCore.QObject):
         if task is not None:
             task.cancelled.set()
         self._generation += 1
+
+    def release_debug_images(self) -> None:
+        """Cancel the pending render and close debug images not yet delivered.
+
+        For a window or project that closes. Collectors already delivered
+        through ``debug_images_found`` belong to their receiver.
+        """
+        self.cancel()
+        with self._signals.debug_lock:
+            in_flight, self._signals.debug_in_flight = (
+                self._signals.debug_in_flight,
+                set(),
+            )
+        for images in in_flight:
+            images.close()
 
     def wait_until_idle(self, timeout: float = THUMBNAIL_YIELD_SECONDS) -> bool:
         """Block until no render that the user waits for is running.
@@ -857,6 +919,19 @@ class PageRenderer(QtCore.QObject):
     ) -> None:
         if generation == self._generation:
             self.output_extras_found.emit(page_id, extras)
+
+    @QtCore.Slot(int, object, object)
+    def _on_debug_found(
+        self, generation: int, page_id: PageId, images: DebugImages
+    ) -> None:
+        with self._signals.debug_lock:
+            if images not in self._signals.debug_in_flight:
+                return
+            self._signals.debug_in_flight.discard(images)
+        if generation == self._generation:
+            self.debug_images_found.emit(page_id, images)
+        else:
+            images.close()
 
     @QtCore.Slot(int, object, str)
     def _on_failed(self, generation: int, page_id: PageId, message: str) -> None:
