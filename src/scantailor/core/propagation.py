@@ -7,6 +7,7 @@ The ``apply_*`` functions implement "Apply to..." for each stage.
 """
 
 from collections.abc import Collection, Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any
 
@@ -171,13 +172,19 @@ def set_page_count(project: Project, image_id: ImageId, count: int) -> bool:
     for info in project.images:
         if info.id != image_id:
             continue
-        if count == 2 and info.left_half_removed != info.right_half_removed:
-            count = 1
+        count = _allowed_page_count(info, count)
         if count == info.num_sub_pages:
             return False
         info.num_sub_pages = count
         return True
     return False
+
+
+def _allowed_page_count(info: ImageInfo, count: int) -> int:
+    """An image with exactly one half removed holds one page whatever is asked."""
+    if count == 2 and info.left_half_removed != info.right_half_removed:
+        return 1
+    return count
 
 
 def adopt_requested_page_counts(
@@ -222,30 +229,149 @@ def adopt_stored_page_counts(
     Returns:
         list[ImageId]: Images whose page count changed.
     """
-    split = stages.page_split_filter
-    rotations = stages.fix_orientation_filter.settings
     metadata_of = {info.id: info.metadata for info in project.images}
     changed: list[ImageId] = []
     for image_id in images:
         metadata = metadata_of.get(image_id)
-        params = split.get_params(PageId(image_id=image_id))
-        if metadata is None or params.page_layout is None:
-            continue
-        rotation = rotations.get_rotation_for(image_id)
-        width, height = rotation.rotate_dimensions(metadata.width, metadata.height)
-        current = SplitDependencies(
-            image_size=(round(width), round(height)),
-            rotation_degrees=rotation.degrees,
-            layout_type=params.layout_type,
+        count = (
+            None if metadata is None else _stored_page_count(stages, image_id, metadata)
         )
-        if not params.dependencies.is_compatible_with(
-            current, manual_split_line=params.is_manual()
-        ):
-            continue
-        layout = correct_page_layout_type(params.page_layout)
-        if set_page_count(project, image_id, layout.num_sub_pages):
+        if count is not None and set_page_count(project, image_id, count):
             changed.append(image_id)
     return changed
+
+
+def pages_after_split(
+    project: Project, stages: StageSequence, pages: Sequence[PageId]
+) -> list[PageId]:
+    """List the pages a batch carries past Page Split, from the stored layouts.
+
+    This is the page list ``adopt_stored_page_counts`` would give, worked out
+    without changing the project, so a batch thread can call it while the
+    project belongs to the GUI thread. An image whose page count changes is
+    replaced, where it first appears in ``pages``, by all of its new pages;
+    every other page stays as and where it is.
+
+    Args:
+        project (Project): The project the pages belong to; left unchanged.
+        stages (StageSequence): Holds the layouts Page Split stored.
+        pages (Sequence[PageId]): The batch's pages, in order.
+
+    Returns:
+        list[PageId]: The pages to process through the later stages, in order.
+    """
+    info_of = {info.id: info for info in project.images}
+    regrown: dict[ImageId, list[PageId]] = {}
+    for image_id in dict.fromkeys(page.image_id for page in pages):
+        info = info_of.get(image_id)
+        if info is None:
+            continue
+        stored = _stored_page_count(stages, image_id, info.metadata)
+        if stored is None:
+            continue
+        count = _allowed_page_count(info, stored)
+        if count != info.num_sub_pages:
+            resized = info.model_copy(update={"num_sub_pages": count})
+            regrown[image_id] = project.pages_of_image(resized)
+    listed: list[PageId] = []
+    placed: set[ImageId] = set()
+    for page in pages:
+        if page.image_id not in regrown:
+            listed.append(page)
+        elif page.image_id not in placed:
+            placed.add(page.image_id)
+            listed.extend(regrown[page.image_id])
+    return listed
+
+
+def split_is_settled(
+    project: Project, stages: StageSequence, image_id: ImageId
+) -> bool:
+    """Whether Page Split would keep an image's stored layout without its pixels.
+
+    The image's size comes from the project, so a replaced file whose new
+    size the project has not recorded yet counts by its old size.
+
+    Args:
+        project (Project): Holds the image's size.
+        stages (StageSequence): Holds its orientation, trim and stored layout.
+        image_id (ImageId): The image to check.
+
+    Returns:
+        bool: True when Page Split would neither detect nor adapt the layout.
+    """
+    info = next((info for info in project.images if info.id == image_id), None)
+    if info is None or not (info.metadata.width and info.metadata.height):
+        return False
+    orientation = stages.fix_orientation_filter
+    rotation = orientation.get_rotation(image_id)
+    width, height = rotation.rotate_dimensions(
+        info.metadata.width, info.metadata.height
+    )
+    oriented = (round(width), round(height))
+    return stages.page_split_filter.keeps_stored_layout(
+        PageId(image_id=image_id),
+        oriented,
+        rotation.degrees,
+        orientation.trim_crop_area(image_id, oriented),
+    )
+
+
+@dataclass(frozen=True)
+class ProjectPageLister:
+    """Answers a batch's Page Split questions from a project, without changing it.
+
+    Attributes:
+        project: The project the batch's pages belong to.
+        stages: The project's stages, which the batch updates.
+    """
+
+    project: Project
+    stages: StageSequence
+
+    def is_settled(self, image_id: ImageId) -> bool:
+        """Whether the image can skip the batch's Page Split pass.
+
+        Args:
+            image_id (ImageId): The image to check.
+
+        Returns:
+            bool: As ``split_is_settled``.
+        """
+        return split_is_settled(self.project, self.stages, image_id)
+
+    def pages_after_split(self, pages: Sequence[PageId]) -> list[PageId]:
+        """List the pages past Page Split.
+
+        Args:
+            pages (Sequence[PageId]): The batch's pages, in order.
+
+        Returns:
+            list[PageId]: As ``pages_after_split``.
+        """
+        return pages_after_split(self.project, self.stages, pages)
+
+
+def _stored_page_count(
+    stages: StageSequence, image_id: ImageId, metadata: ImageMetadata
+) -> int | None:
+    """Pages in the image's stored Page Split layout; None without a valid one."""
+    split = stages.page_split_filter
+    params = split.get_params(PageId(image_id=image_id))
+    if params.page_layout is None:
+        return None
+    rotation = stages.fix_orientation_filter.settings.get_rotation_for(image_id)
+    width, height = rotation.rotate_dimensions(metadata.width, metadata.height)
+    current = SplitDependencies(
+        image_size=(round(width), round(height)),
+        rotation_degrees=rotation.degrees,
+        layout_type=params.layout_type,
+    )
+    if not params.dependencies.is_compatible_with(
+        current, manual_split_line=params.is_manual()
+    ):
+        return None
+    return correct_page_layout_type(params.page_layout).num_sub_pages
 
 
 def propagate_content_boxes(project: Project, stages: StageSequence) -> None:

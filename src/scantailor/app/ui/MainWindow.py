@@ -92,6 +92,7 @@ from scantailor.core.batch import (
     BatchResult,
     PageDetected,
     PageDone,
+    PagesListed,
     ProgressEvent,
     RenderInfo,
     erase_output_files,
@@ -417,6 +418,7 @@ class MainWindowManager:
         self._removed_halves: dict[ImageId, tuple[bool, bool]] = {}
         self.batch_runner = BatchRunner(self.ui)
         self.batch_runner.detected.connect(self._on_batch_detected)
+        self.batch_runner.pages_listed.connect(self._on_batch_pages_listed)
         self.batch_runner.progress.connect(self._on_batch_progress)
         self.batch_runner.finished.connect(self._on_batch_finished)
         self.batch_runner.failed.connect(self._on_batch_failed)
@@ -2107,6 +2109,7 @@ class MainWindowManager:
             file_labels=project.output_file_label_map(),
             end_stage=end_stage,
             output_records=project.output_record_map(),
+            page_lister=propagation.ProjectPageLister(project, self.stages),
         )
 
     def stopBatchProcessing(self) -> None:
@@ -2150,6 +2153,10 @@ class MainWindowManager:
         if not self._batch_renders:
             self._invalidate_thumbnails(event.page)
 
+    def _on_batch_pages_listed(self, event: PagesListed) -> None:
+        if self.batch_dialog is not None:
+            self.batch_dialog.set_total(len(event.pages))
+
     def _on_batch_progress(self, event: ProgressEvent) -> None:
         if isinstance(event, PageDone) and event.info is not None:
             size = event.info.source_size
@@ -2163,6 +2170,7 @@ class MainWindowManager:
         self.last_batch_result = result
         self._render_info.update(result.render_info)
         if self.project is not None:
+            self.project.forget_output_records(result.replaced)
             self.project.set_output_records(result.output_records)
             for page, info in result.render_info.items():
                 self.project.set_text_geometry(
@@ -2182,9 +2190,7 @@ class MainWindowManager:
             return
         if result.detected or result.written or result.failed:
             self.modified = True
-        self._adopt_stored_page_counts(
-            dict.fromkeys(page.image_id for page in (*result.written, *result.failed))
-        )
+        self._adopt_stored_page_counts(result.reached_images())
         self._invalidate_thumbnails()
         self._remember_aggregate_size()
         self._request_render()

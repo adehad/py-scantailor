@@ -9,8 +9,8 @@ from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui import MainWindow
 from scantailor.app.ui.dialogs.batch_progress import BatchProgressDialog
-from scantailor.core.batch import BatchResult, PageDetected, PageFailed
-from scantailor.core.models import ImageId, PageId
+from scantailor.core.batch import BatchResult, PageDetected, PageFailed, PagesListed
+from scantailor.core.models import ImageId, PageId, SubPage
 from scantailor.core.stage_sequence import FilterStage
 
 
@@ -107,6 +107,33 @@ class TestPlayButtonStage:
 
         assert dialog.phase == "detecting"
         assert _status(dialog) == f"Detecting {len(pages)}/{len(pages)}"
+
+    def test_a_batch_without_stored_layouts_keeps_its_pages_past_page_split(
+        self,
+        project_window: MainWindow.MainWindowManager,
+        started: list[dict[str, Any]],
+    ):
+        project_window.startBatchProcessing()
+
+        pages = project_window.pages()
+        assert started[0]["page_lister"].pages_after_split(pages) == pages
+
+    @pytest.mark.usefixtures("started")
+    def test_pages_listed_by_page_split_become_the_progress_total(
+        self, project_window: MainWindow.MainWindowManager
+    ):
+        project_window._select_stage_row(int(FilterStage.OUTPUT))
+        project_window.startBatchProcessing()
+        dialog = project_window.batch_dialog
+        assert dialog is not None
+        halves = tuple(
+            PageId(image_id=ImageId(file_path=Path("spread.png")), sub_page=sub)
+            for sub in (SubPage.LEFT_PAGE, SubPage.RIGHT_PAGE)
+        )
+
+        project_window.batch_runner.pages_listed.emit(PagesListed(halves))
+
+        assert _status(dialog) == "Detecting 0/2"
 
     def test_export_pdf_processes_missing_pages_through_output(
         self,

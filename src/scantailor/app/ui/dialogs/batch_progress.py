@@ -100,6 +100,20 @@ class BatchProgressDialog(QtWidgets.QDialog):
         """Return the per-page result lines in report order."""
         return [self._results.item(row).text() for row in range(self._results.count())]
 
+    def set_total(self, listed: int) -> None:
+        """Count a different number of pages, once Page Split has listed them.
+
+        Pages already reported, which can only be failures at this point,
+        stay in the total, since the bar counts them.
+
+        Args:
+            listed (int): Number of pages the later stages now process.
+        """
+        total = listed + self._results.count()
+        self._total = total
+        self._bar.setRange(0, max(total, 1))
+        self._update_status()
+
     def add_detected(self, event: PageDetected) -> None:
         """Count a page whose geometry was measured.
 

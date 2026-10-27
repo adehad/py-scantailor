@@ -19,6 +19,15 @@ out wrong, then batch from Output to render everything.
 The batch processes the pages in the order the thumbnail list shows them, with
 any sort order. It includes every page, not only the selected ones.
 
+A batch past Split Pages first splits each scan it has not split yet, and each
+scan whose size, rotation or requested layout has changed since. The later
+stages start after that.
+A scan found to hold two pages then goes on as its left and right page, each
+written to its own file, and the page list shows both when the batch ends.
+``scantailor-cli run`` does the same and saves both pages in the project. The
+batch deletes the file it wrote earlier for the whole scan, so the output folder
+holds each page once.
+
 Progress window
 ---------------
 
@@ -35,7 +44,8 @@ A batch from an earlier stage has only the first one:
      - The batch measures each page up to the selected stage, at most the split,
        deskew, content box and margins. The results go into the project's
        settings, so the parameters of every page are known before any page is
-       written.
+       written. ``N`` changes when Split Pages finds a different number of
+       pages in a scan.
    * - Rendering ``n/N``
      - Output only. The batch renders each page and writes it as a TIFF file in
        the output folder.
