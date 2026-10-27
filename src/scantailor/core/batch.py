@@ -1043,12 +1043,19 @@ def run_batch(
             ready = _keep_unchanged_outputs(
                 ready, output_records or {}, names, out_dir, params_hash, report, result
             )
+            # The workers hold only the pages they render and would size them
+            # against each other alone; held at the batch's page size, a page
+            # rendered again matches the pages that were kept.
+            defaults = collect_stage_defaults(stages)
+            defaults["page_layout_frozen_aggregate_size"] = aggregate_mm().model_dump(
+                mode="json"
+            )
             _render_ready_pages(
                 ready,
                 _PhaseConfig(
                     token=uuid.uuid4().hex,
                     stage_params=collect_effective_stage_params(stages, ready),
-                    defaults=collect_stage_defaults(stages),
+                    defaults=defaults,
                     default_dpi=default_dpi,
                     tiff_compressions=compressions,
                     black_on_white_detection=polarity,

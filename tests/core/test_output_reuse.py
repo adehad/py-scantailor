@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from PIL import Image
 
 from scantailor.core.batch import PageDone, run_batch, spawn_pool
 from scantailor.core.image_io import write_image
@@ -405,6 +406,22 @@ class TestBatchKeepsUnchangedOutput:
         second, _ = self._run(stages, pages, out, pool, first.output_records)
 
         assert second.reused == []
+
+    def test_page_rendered_again_keeps_the_shared_page_size(
+        self, tmp_path, stages, pages, pool
+    ):
+        out = tmp_path / "out"
+        first, _ = self._run(stages, pages, out, pool, {})
+
+        # Smaller than the other page's box, so the shared page size stays.
+        stages.select_content_filter.set_manual_content(
+            pages[0], ContentBox(x=100, y=150, width=60, height=50)
+        )
+        second, _ = self._run(stages, pages, out, pool, first.output_records)
+
+        assert second.reused == [pages[1]]
+        sizes = {p: Image.open(path).size for p, path in second.written.items()}
+        assert sizes[pages[0]] == sizes[pages[1]]
 
     def test_deleted_output_file_is_rendered_again(self, tmp_path, stages, pages, pool):
         out = tmp_path / "out"

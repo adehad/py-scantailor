@@ -181,6 +181,10 @@ A page with no record, such as every page of a project saved by an earlier
 version, is rendered. To force every page to render again, delete the output
 files.
 
+A page rendered again is sized against the shared page size of every aligned
+page in the project, not only the pages rendered with it, so it comes out the
+size of the pages that were kept.
+
 The interactive Output view always renders the page in memory and never reads or
 writes the output files.
 
