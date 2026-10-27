@@ -217,6 +217,8 @@ class _PageState:
         self.xform = self._new_transformation(source)
         # Content rectangle in source coordinates, set by the page layout stage;
         # kept there because the later transformation changes the view's frame.
+        # Without content it is Page Layout's stand-in, a speck at the page's
+        # centre, which tells Output to leave the page blank.
         self.content_polygon_source: NDArray[np.float64] | None = None
         # Region Fix Orientation's manual trim keeps, in source coordinates.
         self.trim_area: NDArray[np.float64] | None = None
@@ -952,9 +954,7 @@ def _process_page_layout(
             (aggregate.width_mm, aggregate.height_mm),
         )
     )
-    state.content_polygon_source = (
-        None if content_rect.is_empty() else content_polygon_source
-    )
+    state.content_polygon_source = content_polygon_source
 
     margins = params.hard_margins_mm
     final_rect = state.xform.resulting_rect

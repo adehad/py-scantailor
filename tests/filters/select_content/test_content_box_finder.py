@@ -229,18 +229,22 @@ class TestPageBox:
 
 
 class TestNoContent:
-    """Pages without content fall back to the inset full image."""
+    """Pages without content get an empty box, as upstream's finder returns."""
 
     @pytest.mark.parametrize("level", [0, 255])
-    def test_flat_page_reports_zero_confidence(self, level: int) -> None:
+    def test_flat_page_gets_an_empty_box_with_zero_confidence(self, level: int) -> None:
         page = np.full((300, 200), level, dtype=np.uint8)
 
-        result = find_content_box(page, dpi=150.0, margin=10)
+        result = find_content_box(page, dpi=150.0)
 
         assert result.confidence == 0.0
-        assert (result.content_box.x, result.content_box.y) == (10, 10)
-        assert result.content_box.width == 180
-        assert result.content_box.height == 280
+        assert result.content_box.is_empty()
+
+    def test_a_dark_band_along_the_edge_is_no_content(self) -> None:
+        page = np.full((300, 200), 230, dtype=np.uint8)
+        page[:, :10] = 30
+
+        assert find_content_box(page, dpi=150.0).content_box.is_empty()
 
 
 class TestFindContentRect:

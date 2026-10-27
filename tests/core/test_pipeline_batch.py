@@ -98,6 +98,27 @@ class TestBatchAggregateSize:
             assert result.image.shape[0] == pytest.approx(300, abs=1)
             assert result.image.shape[1] == pytest.approx(350, abs=1)
 
+    def test_a_page_without_content_comes_out_blank_at_the_batch_size(self) -> None:
+        """No content leaves the aggregate alone and the page white, as upstream."""
+        sequence = StageSequence()
+        text = _page(sequence, "text", (150, 100, 200, 300))
+        empty_id = _page_id("empty")
+        sequence.page_split_filter.set_layout_type(
+            empty_id, LayoutType.SINGLE_PAGE_UNCUT
+        )
+        sequence.deskew_filter.set_manual_angle(empty_id, 0.0)
+        # Only the edge of the book, which Select Content takes for shadow.
+        empty = np.full((500, 500), BACKGROUND, dtype=np.uint8)
+        empty[:, :12] = INK
+
+        results = process_batch(
+            [text, (empty, empty_id)], sequence, PipelineOptions(dpi=DPI)
+        )
+
+        # Content 200 x 300 px + 2 * 100 px wide, + 2 * 50 px high.
+        assert [result.image.shape for result in results] == [(400, 400)] * 2
+        assert (results[1].image == 255).all()
+
     def test_first_page_of_a_rerun_matches_the_batch(self) -> None:
         """Processing a page alone afterwards reproduces its batch output."""
         sequence = StageSequence()

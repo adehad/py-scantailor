@@ -233,12 +233,19 @@ class TestFilterProcess:
         """process should calculate physical size in mm."""
         filter = Filter()
         page_id = make_page_id("test")
-        image = np.zeros((300, 300), dtype=np.uint8)
+        # Three lines of words on a light page.
+        image = np.full((300, 300), 245, dtype=np.uint8)
+        for top in (100, 130, 160):
+            for left in (60, 110, 160, 210):
+                image[top : top + 12, left : left + 40] = 30
 
         result = filter.process(image, page_id, dpi=300.0)
 
-        # At 300 DPI, 300 pixels should be about 25.4 mm
+        # At 300 DPI, 300 pixels are 25.4 mm.
         assert result.content_size_mm.width_mm > 0
+        assert result.content_size_mm.width_mm == pytest.approx(
+            result.content_box.width * 25.4 / 300
+        )
 
     def test_an_image_function_is_not_called_when_nothing_is_detected(self):
         filter = Filter()
