@@ -14,6 +14,7 @@ from scantailor.core import diagnostics
 from scantailor.core.models import Dpi, Margins
 from scantailor.core.settings import ApplicationSettings, Units
 from scantailor.core.stage_sequence import FilterStage
+from tests.ui.locale_numbers import shown_numbers, without_numbers
 
 
 def test_main_window_opens(qtbot: QtBot):
@@ -750,17 +751,21 @@ class TestStatusBar:
         panel = project_window.status_panel
         self._wait_for_size(qtbot, project_window)
 
+        def shown_size() -> tuple[list[float], str]:
+            text = panel.phys_size_label.text()
+            return shown_numbers(text), without_numbers(text)
+
         project_window.actionInches.trigger()
-        assert panel.phys_size_label.text() == "2 x 2.7 in"
+        assert shown_size() == (pytest.approx([2, 2.7]), " x  in")
 
         project_window.actionCentimetres.trigger()
-        assert panel.phys_size_label.text() == "5.1 x 6.8 cm"
+        assert shown_size() == (pytest.approx([5.1, 6.8]), " x  cm")
 
         project_window.actionPixels.trigger()
-        assert panel.phys_size_label.text() == "600 x 800 px"
+        assert shown_size() == ([600, 800], " x  px")
 
         project_window.actionMilimeters.trigger()
-        assert panel.phys_size_label.text() == "51 x 68 mm"
+        assert shown_size() == ([51, 68], " x  mm")
         project_window.renderer.wait_for_done()
 
     def test_status_bar_shows_the_size_again_after_the_stage_changes(
@@ -796,7 +801,7 @@ class TestStatusBar:
 
         # The page is centred in the view: 300 x 400 pixels is 25.4 x 33.9 mm.
         label = window.status_panel.mouse_pos_label
-        x, y = (float(part) for part in label.text().split(","))
+        x, y = shown_numbers(label.text())
         assert x == pytest.approx(25.4, abs=1.5)
         assert y == pytest.approx(33.9, abs=1.5)
 

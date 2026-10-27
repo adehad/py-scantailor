@@ -5,6 +5,7 @@ from PySide6 import QtWidgets
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.image_views.deskew import format_angle
+from tests.ui.locale_numbers import shown_numbers
 
 
 @pytest.mark.parametrize(
@@ -23,4 +24,4 @@ def test_view_label_matches_the_spin_box_text(qtbot: QtBot, angle: float):
 
 
 def test_a_tie_rounds_away_from_zero_like_the_spin_box():
-    assert format_angle(0.125) == "0.13°"
+    assert shown_numbers(format_angle(0.125)) == pytest.approx([0.13])

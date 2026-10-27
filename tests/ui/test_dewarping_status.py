@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from PySide6 import QtWidgets
+from PySide6 import QtCore, QtWidgets
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.options_widgets.output import (
@@ -19,6 +19,7 @@ from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.output.dewarping_options import DewarpingMode, DewarpingOptions
 from scantailor.filters.output.filter import Filter
 from scantailor.filters.output.params import Params
+from tests.ui.locale_numbers import shown_numbers, without_numbers
 
 PAGE = PageId(
     image_id=ImageId(file_path=Path("page.tif")), sub_page=SubPage.SINGLE_PAGE
@@ -33,6 +34,11 @@ def _params(
             mode=mode, post_deskew=post_deskew, post_deskew_angle=angle
         )
     )
+
+
+def _words_and_numbers(text: str | None) -> tuple[str, list[float]]:
+    assert text is not None
+    return without_numbers(text), shown_numbers(text)
 
 
 def _status_label(options: QtWidgets.QWidget) -> QtWidgets.QLabel:
@@ -62,17 +68,26 @@ class TestStatusText:
     ) -> None:
         options = DewarpingOptions(mode=DewarpingMode.MANUAL, post_deskew_angle=1.234)
 
-        assert dewarping_status_text(options) == "Manual (deskew: -1.23°)"
+        assert _words_and_numbers(dewarping_status_text(options)) == (
+            "Manual (deskew: °)",
+            pytest.approx([-1.23]),
+        )
 
     def test_marginal_mode_shows_the_angle_too(self) -> None:
         options = DewarpingOptions(mode=DewarpingMode.MARGINAL, post_deskew_angle=-0.5)
 
-        assert dewarping_status_text(options) == "Marginal (deskew: 0.5°)"
+        assert _words_and_numbers(dewarping_status_text(options)) == (
+            "Marginal (deskew: °)",
+            pytest.approx([0.5]),
+        )
 
     def test_a_tiny_angle_rounds_to_zero_without_a_minus_sign(self) -> None:
         options = DewarpingOptions(mode=DewarpingMode.MANUAL, post_deskew_angle=0.001)
 
-        assert dewarping_status_text(options) == "Manual (deskew: 0°)"
+        text = dewarping_status_text(options)
+
+        assert _words_and_numbers(text) == ("Manual (deskew: °)", [0.0])
+        assert QtCore.QLocale().negativeSign() not in str(text)
 
     def test_post_deskew_turned_off_says_so_instead_of_an_angle(self) -> None:
         options = DewarpingOptions(
@@ -94,7 +109,10 @@ class TestOptionsPanel:
 
         label = _status_label(widget)
         assert label.isVisibleTo(widget)
-        assert label.text() == "Manual (deskew: 2.5°)"
+        assert _words_and_numbers(label.text()) == (
+            "Manual (deskew: °)",
+            pytest.approx([2.5]),
+        )
 
     def test_an_auto_page_hides_the_status_line(
         self, make_options: Callable[[Params], tuple[OptionsWidget, Filter]]
@@ -125,7 +143,7 @@ class TestOptionsPanel:
 
         label = _status_label(widget)
         assert label.isVisibleTo(widget)
-        assert label.text() == "Manual (deskew: 0°)"
+        assert _words_and_numbers(label.text()) == ("Manual (deskew: °)", [0.0])
 
 
 def test_a_render_that_measures_the_angle_updates_the_status_line(
@@ -141,4 +159,7 @@ def test_a_render_that_measures_the_angle_updates_the_status_line(
         OutputExtras(np.full((100, 80), 200, dtype=np.uint8), None, 300)
     )
 
-    assert _status_label(panels.options).text() == "Manual (deskew: 1.75°)"
+    assert _words_and_numbers(_status_label(panels.options).text()) == (
+        "Manual (deskew: °)",
+        pytest.approx([1.75]),
+    )
