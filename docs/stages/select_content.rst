@@ -39,6 +39,9 @@ down to the image.
      - Uses the whole image as the box.
    * - **Auto**
      - Finds the box from the page's content, or from the paper edge for the page box.
+       A page with no content, such as a blank page or one with only the edge of the
+       book, gets no content box: Margins centres it, and with **Fill margins** on
+       Output leaves it white.
    * - **Manual**
      - Uses the box you drew by hand.
 

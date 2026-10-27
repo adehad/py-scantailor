@@ -38,7 +38,6 @@ _CONTENT_MEMO = ResultMemo[Rect | None](capacity=32)
 def find_content_box(
     image: NDArray[np.uint8],
     dpi: float = _DEFAULT_DPI,
-    margin: int = 10,
     page_box: ContentBox | None = None,
     outside: NDArray[np.bool_] | Callable[[], NDArray[np.bool_]] | None = None,
     outside_key: Hashable | None = None,
@@ -55,8 +54,6 @@ def find_content_box(
         image (numpy.ndarray of numpy.uint8): Gray or BGR image, dark content on a light
             page. Not modified.
         dpi (float): Image resolution in DPI.
-        margin (int): Inset from the image edges of the box returned when no
-            content is found, in pixels of ``image``.
         page_box (ContentBox | None): Area of the page in pixels of ``image``;
             anything outside it counts as shadow.
         outside (numpy.ndarray of numpy.bool | None): Pixels of ``image`` with no source
@@ -73,8 +70,9 @@ def find_content_box(
             remembered result has no images.
 
     Returns:
-        ContentDetectionResult: The detected box and a confidence from 0 to 1;
-            the confidence is 0 when no content was found.
+        ContentDetectionResult: The detected box and a confidence from 0 to 1.
+            When no content is found, the box is empty and the confidence 0, as
+            upstream; Page Layout then centres the page and Output leaves it blank.
     """
     gray = np.asarray(
         cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image,
@@ -146,15 +144,7 @@ def find_content_box(
             )
 
     if found is None:
-        return ContentDetectionResult(
-            content_box=ContentBox(
-                x=float(margin),
-                y=float(margin),
-                width=float(max(0, w - 2 * margin)),
-                height=float(max(0, h - 2 * margin)),
-            ),
-            confidence=0.0,
-        )
+        return ContentDetectionResult(content_box=ContentBox(), confidence=0.0)
 
     left = max(0.0, found.left * x_scale)
     top = max(0.0, found.top * y_scale)

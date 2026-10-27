@@ -32,6 +32,28 @@ def polygon_mask(
     return mask.astype(bool)
 
 
+def encloses_no_pixel(
+    polygon: Sequence[tuple[float, float]] | NDArray[np.float64],
+) -> bool:
+    """Tell whether a polygon is too small to cover a pixel.
+
+    Its bounding box, rounded to whole pixels as upstream rounds the content
+    area, is empty. Fewer than three vertices is no polygon at all, which
+    ``polygon_mask`` takes for the whole image, so it is not too small.
+
+    Args:
+        polygon (Sequence[tuple[float, float]] | NDArray[np.float64]): Vertices
+            in pixel coordinates, as pairs or an (N, 2) array.
+
+    Returns:
+        bool: True when the polygon covers no pixel.
+    """
+    if len(polygon) < _MIN_POLYGON_VERTICES:
+        return False
+    width, height = np.ptp(np.asarray(polygon, dtype=np.float64), axis=0)
+    return round(width) == 0 or round(height) == 0
+
+
 def fill_masked(
     image: NDArray[np.uint8],
     mask: NDArray[np.bool_],

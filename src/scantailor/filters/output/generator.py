@@ -66,7 +66,7 @@ from .mixed import (
 )
 from .params import Params
 from .picture_shape import PictureShape
-from .raster import fill_masked, polygon_mask
+from .raster import encloses_no_pixel, fill_masked, polygon_mask
 from .render_params import RenderParams
 from .split_output import SplitImages, split_mixed_output
 
@@ -212,8 +212,10 @@ def generate_output(
             Defaults to ``params.color_common``.
         content_polygon (Sequence[tuple[float, float]] | None):
             Content area as (x, y) vertices.
-            Margins outside it are filled when ``fill_margins`` is set. None
-            means the whole image is content.
+            Margins outside it are filled when ``fill_margins`` is set, and then
+            an area too small to cover a pixel, which Page Layout gives a page
+            without content, makes the page blank, as in upstream. None means
+            the whole image is content.
         page_outline (Sequence[tuple[float, float]] | None):
             Outline of the page as (x, y) vertices.
             What lies outside it is filled when ``fill_offcut`` is set. None
@@ -239,6 +241,12 @@ def generate_output(
     color_options = color_options or params.color_common
     params = params.with_color_common(color_options)
     render = RenderParams.from_params(params)
+    if (
+        render.fill_margins
+        and content_polygon is not None
+        and encloses_no_pixel(content_polygon)
+    ):
+        return _blank_output(image.shape[:2], render)
 
     layout = _PageLayout.build(
         image.shape[:2], render, content_polygon, page_outline, source_outline
@@ -282,6 +290,29 @@ def generate_output(
     result.auto_picture_zones = auto_zones
     if render.split_output and result.picture_mask is not None:
         result.split = _split_layers(result, params, render)
+    return result
+
+
+def _blank_output(shape: tuple[int, int], render: RenderParams) -> OutputResult:
+    """A white page, as upstream writes when no content is kept.
+
+    Args:
+        shape (tuple[int, int]): (height, width) of the page.
+        render (RenderParams): Decides whether the page is split into layers.
+
+    Returns:
+        OutputResult: The page, binary, and split into white layers when split
+            output is on.
+    """
+    blank = np.full(shape, _WHITE, dtype=np.uint8)
+    result = OutputResult(image=blank, is_binary=True)
+    if render.split_output:
+        result.split = split_mixed_output(
+            blank,
+            render,
+            np.ones(shape, dtype=np.bool_),
+            np.zeros(shape, dtype=np.bool_),
+        )
     return result
 
 

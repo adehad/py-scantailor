@@ -20,24 +20,20 @@ class TestFindContentBox:
         assert hasattr(result, "content_box")
         assert hasattr(result, "confidence")
 
-    def test_empty_image_returns_full_area(self):
-        """Empty image should return full area minus margin."""
+    def test_black_image_returns_an_empty_box(self):
+        """A page that is all shadow holds no content."""
         image = np.zeros((100, 100), dtype=np.uint8)
-        result = find_content_box(image, margin=10)
+        result = find_content_box(image)
 
-        # No content found, should return full image minus margin
-        assert result.content_box.x == 10
-        assert result.content_box.y == 10
-        assert result.content_box.width == 80
-        assert result.content_box.height == 80
+        assert result.content_box.is_empty()
         assert result.confidence == 0.0
 
-    def test_white_image_returns_full_area(self):
-        """All-white image should return full area minus margin."""
+    def test_white_image_returns_an_empty_box(self):
+        """A blank page holds no content."""
         image = np.ones((100, 100), dtype=np.uint8) * 255
-        result = find_content_box(image, margin=10)
+        result = find_content_box(image)
 
-        # No content (all white), should return full image minus margin
+        assert result.content_box.is_empty()
         assert result.confidence == 0.0
 
     def test_detects_centered_content(self):

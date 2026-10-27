@@ -68,8 +68,7 @@ class TestOutsideMask:
         assert result.content_box.x == pytest.approx(150, abs=4)
 
     def test_mask_is_optional(self) -> None:
-        page = np.full((HEIGHT, WIDTH), 245, dtype=np.uint8)
-        page[200:216, 100:300] = 30
+        page = _page_with_shadow_behind_an_exposed_strip()
 
         params = Filter().process(page, _page_id(), dpi=150.0)
 
