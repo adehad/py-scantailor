@@ -8,6 +8,7 @@ from PySide6 import QtCore, QtWidgets
 from scantailor.app.ui.icons import icon
 from scantailor.app.ui.theme.fonts import tabular
 from scantailor.app.ui.units_provider import UnitsProvider
+from scantailor.app.ui.utils import coordinate_separator, format_number
 from scantailor.core.models import Dpi, PageId, SubPage
 from scantailor.core.settings import Units, ZoneCreationMode
 from scantailor.core.units import convert_length, units_suffix
@@ -21,11 +22,6 @@ _ZONE_MODE_GLYPHS = {
     ZoneCreationMode.LASSO: "lasso",
     ZoneCreationMode.RECTANGULAR: "square-dashed",
 }
-
-
-def _number(value: float) -> str:
-    """Format a rounded measurement without trailing zeros."""
-    return f"{value:.10g}"
 
 
 def _round_half_up(value: float) -> float:
@@ -246,9 +242,8 @@ class StatusBarPanel(QtWidgets.QWidget):
                 width, height = (_round_half_up(v * 10) / 10 for v in (width, height))
             else:
                 width, height = _round_half_up(width), _round_half_up(height)
-            self.phys_size_label.setText(
-                f"{_number(width)} x {_number(height)} {units_suffix(units)}"
-            )
+            numbers = f"{format_number(width)} x {format_number(height)}"
+            self.phys_size_label.setText(f"{numbers} {units_suffix(units)}")
         else:
             self.phys_size_label.clear()
         if cursor is not None and known_dpi:
@@ -258,7 +253,9 @@ class StatusBarPanel(QtWidgets.QWidget):
                 x, y = math.ceil(x), math.ceil(y)
             else:
                 x, y = math.ceil(x * 10) / 10, math.ceil(y * 10) / 10
-            self.mouse_pos_label.setText(f"{_number(x)}, {_number(y)}")
+            self.mouse_pos_label.setText(
+                format_number(x) + coordinate_separator() + format_number(y)
+            )
         else:
             self.mouse_pos_label.clear()
         self._sync_visibility()

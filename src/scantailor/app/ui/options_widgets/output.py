@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 )
 
 from scantailor.app.ui.icons import icon
+from scantailor.app.ui.utils import format_number
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
 from scantailor.app.ui.widgets.help_icon import HELP_GROUP_PROPERTY
 from scantailor.app.ui.widgets.ticked_slider import TickedSlider
@@ -115,7 +116,7 @@ def dewarping_status_text(options: DewarpingOptions) -> str | None:
     # Adding 0.0 turns a rounded -0.0 into 0.0, which formats without a sign.
     angle = -round(options.post_deskew_angle, 2) + 0.0
     deskew = QtCore.QCoreApplication.translate("output::OptionsWidget", "deskew")
-    return f"{mode} ({deskew}: {angle:g}°)"
+    return f"{mode} ({deskew}: {format_number(angle)}°)"
 
 
 _METHOD_LABELS = {
@@ -317,7 +318,7 @@ def _despeckle_tooltip(strength: float) -> str:
     note = QtCore.QCoreApplication.translate(
         "output::OptionsWidget",
         "Strength %1, from a project that stores values between the steps",
-    ).replace("%1", f"{strength:g}")
+    ).replace("%1", format_number(strength))
     return f"{help_text}\n{note}"
 
 
@@ -1246,7 +1247,8 @@ class OptionsWidget(QWidget):
         )
         self._depth_slider.setValue(2 * _DEPTH_PERCEPTION_SCALE)
         depth_control_layout.addWidget(self._depth_slider)
-        self._depth_label = QLabel("2.0")
+        self._depth_label = QLabel(format_number(2.0, 1))
+        self._depth_label.setObjectName("depthPerceptionLabel")
         self._depth_label.setMinimumWidth(30)
         depth_control_layout.addWidget(self._depth_label)
         self._depth_group.setVisible(False)
@@ -2186,7 +2188,7 @@ class OptionsWidget(QWidget):
         self._depth_slider.setValue(
             round(params.depth_perception * _DEPTH_PERCEPTION_SCALE)
         )
-        self._depth_label.setText(f"{params.depth_perception:.1f}")
+        self._depth_label.setText(format_number(params.depth_perception, 1))
 
     def _on_dpi_changed(self, value: int) -> None:
         self._edit(lambda p: p.with_output_dpi(Dpi.uniform(value)))
@@ -2302,7 +2304,7 @@ class OptionsWidget(QWidget):
         )
 
     def _on_depth_changed(self, value: int) -> None:
-        self._depth_label.setText(f"{value / _DEPTH_PERCEPTION_SCALE:.1f}")
+        self._depth_label.setText(format_number(value / _DEPTH_PERCEPTION_SCALE, 1))
         if self._dewarping_tab_active or not self._depth_slider.isSliderDown():
             self._commit_depth()
 
