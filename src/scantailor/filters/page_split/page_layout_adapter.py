@@ -7,11 +7,16 @@ split line when the image size or orientation changes.
 
 import math
 
+from scantailor.dewarping.line_geometry import projection_dist
+
 from .page_layout import PageLayout, PageLayoutType
 
 Point = tuple[float, float]
 Line = tuple[Point, Point]
 Rect = tuple[float, float, float, float]
+
+_COINCIDENT_PX = 1.0
+"""Cutters closer than this everywhere bound a page under one pixel wide."""
 
 
 def adapt_page_layout(layout: PageLayout, outline: Rect) -> PageLayout:
@@ -58,7 +63,8 @@ def correct_page_layout_type(layout: PageLayout) -> PageLayout:
 
     Cutters are compared on the whole-pixel grid, like the outline: a cutter
     lying on the left or right edge cuts nothing, and neither do two cutters
-    that cross inside the outline or start at the same point.
+    that cross inside the outline or lie on one line, whatever their direction
+    or start point.
 
     Args:
         layout (PageLayout): The layout to check.
@@ -80,16 +86,37 @@ def correct_page_layout_type(layout: PageLayout) -> PageLayout:
         line2 = _rounded(_cutter(layout, 1))
         uncut = on_side_edge(line1) and on_side_edge(line2)
         crossing = _intersection(line1, line2)
-        if crossing is None:
-            uncut = uncut or line1[0] == line2[0]
-        elif top < crossing[1] < bottom:
-            uncut = True
+        crossing_inside = crossing is not None and top < crossing[1] < bottom
+        uncut = uncut or crossing_inside or _coincide(line1, line2)
     elif layout.layout_type == PageLayoutType.TWO_PAGES:
         uncut = on_side_edge(_rounded(_cutter(layout, 0)))
 
     if not uncut:
         return layout
     return layout.with_type(PageLayoutType.SINGLE_PAGE_UNCUT)
+
+
+def _coincide(line1: Line, line2: Line) -> bool:
+    """Whether two cutters lie on one line, whatever their direction or extent.
+
+    Each endpoint of either cutter must be within :data:`_COINCIDENT_PX` of the
+    infinite line through the other. Both ways are tested because a slight
+    angle that keeps a short cutter's ends on a long cutter's line can still
+    carry the long cutter's ends off the short one's. A zero-length cutter has
+    no line of its own, so only its point is tested against the other's line.
+    """
+    with_a_line = [
+        (line, other)
+        for line, other in ((line1, line2), (line2, line1))
+        if line[0] != line[1]
+    ]
+    if not with_a_line:
+        return math.dist(line1[0], line2[0]) < _COINCIDENT_PX
+    return all(
+        projection_dist(line, point) < _COINCIDENT_PX
+        for line, other in with_a_line
+        for point in other
+    )
 
 
 def _cutter(layout: PageLayout, index: int) -> Line:
