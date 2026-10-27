@@ -10,6 +10,7 @@ from scantailor.app.ui.units_provider import UnitsProvider
 from scantailor.app.ui.widgets.status_bar_panel import StatusBarPanel
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 from scantailor.core.settings import Units, ZoneCreationMode
+from tests.ui.locale_numbers import shown_numbers, without_numbers
 
 LONG_NAME = "abcdefghijklmnopqrstuvwxyz.png"
 
@@ -84,21 +85,28 @@ class TestPage:
 
 class TestSize:
     @pytest.mark.parametrize(
-        ("units", "text"),
+        ("units", "size", "words"),
         [
-            (Units.PIXELS, "600 x 800 px"),
-            (Units.MILLIMETERS, "51 x 68 mm"),
-            (Units.CENTIMETERS, "5.1 x 6.8 cm"),
-            (Units.INCHES, "2 x 2.7 in"),
+            (Units.PIXELS, [600, 800], " x  px"),
+            (Units.MILLIMETERS, [51, 68], " x  mm"),
+            (Units.CENTIMETERS, [5.1, 6.8], " x  cm"),
+            (Units.INCHES, [2, 2.7], " x  in"),
         ],
     )
     def test_size_is_rounded_for_the_unit(
-        self, panel: StatusBarPanel, provider: UnitsProvider, units: Units, text: str
+        self,
+        panel: StatusBarPanel,
+        provider: UnitsProvider,
+        units: Units,
+        size: list[float],
+        words: str,
     ) -> None:
         provider.set_units(units)
         panel.set_page_size(QtCore.QSizeF(600, 800), 300)
 
-        assert panel.phys_size_label.text() == text
+        text = panel.phys_size_label.text()
+        assert shown_numbers(text) == pytest.approx(size)
+        assert without_numbers(text) == words
 
     def test_changing_the_unit_updates_a_shown_size(
         self, panel: StatusBarPanel, provider: UnitsProvider
@@ -107,7 +115,7 @@ class TestSize:
 
         provider.set_units(Units.INCHES)
 
-        assert panel.phys_size_label.text() == "2 x 2.7 in"
+        assert shown_numbers(panel.phys_size_label.text()) == pytest.approx([2, 2.7])
 
     def test_an_unknown_resolution_hides_the_size_and_the_position(
         self, panel: StatusBarPanel
@@ -128,23 +136,27 @@ class TestSize:
 
 class TestCursor:
     @pytest.mark.parametrize(
-        ("units", "text"),
+        ("units", "position"),
         [
-            (Units.PIXELS, "301, 401"),
-            (Units.MILLIMETERS, "26, 34"),
-            (Units.INCHES, "1.1, 1.4"),
-            (Units.CENTIMETERS, "2.6, 3.4"),
+            (Units.PIXELS, [301, 401]),
+            (Units.MILLIMETERS, [26, 34]),
+            (Units.INCHES, [1.1, 1.4]),
+            (Units.CENTIMETERS, [2.6, 3.4]),
         ],
     )
     def test_position_is_rounded_up_for_the_unit(
-        self, panel: StatusBarPanel, provider: UnitsProvider, units: Units, text: str
+        self,
+        panel: StatusBarPanel,
+        provider: UnitsProvider,
+        units: Units,
+        position: list[float],
     ) -> None:
         provider.set_units(units)
         panel.set_page_size(QtCore.QSizeF(600, 800), 300)
 
         panel.set_cursor_position(QtCore.QPointF(300.4, 400.2))
 
-        assert panel.mouse_pos_label.text() == text
+        assert shown_numbers(panel.mouse_pos_label.text()) == pytest.approx(position)
 
     def test_leaving_the_view_clears_the_position(self, panel: StatusBarPanel) -> None:
         panel.set_page_size(QtCore.QSizeF(600, 800), 300)

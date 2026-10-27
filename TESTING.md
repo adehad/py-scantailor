@@ -11,6 +11,16 @@ pdm run cov                                  # coverage report in dist/cov/
 
 Qt tests need no display: CI sets `QT_QPA_PLATFORM=offscreen`, and the same works locally.
 
+## Locale
+
+`--qt-locale=sv_SE` makes a Qt locale the default for the whole run, as a user's system locale would. Tests compare the numbers a widget shows, read back with `tests/ui/locale_numbers.py`, not the formatted text, so they pass under any locale. Run the UI tests under a decimal-comma locale after changing how a label or a test formats numbers:
+
+```bash
+pdm run pytest --qt-locale=sv_SE tests/ui
+```
+
+`tests/ui/test_decimal_comma_locale.py` switches to Swedish itself, so every run checks that labels follow the locale.
+
 ## Markers
 
 | Marker            | Meaning                                                                      |

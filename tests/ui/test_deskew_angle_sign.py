@@ -17,6 +17,7 @@ from scantailor.filters.deskew.params import (
     shown_deskew_angle,
     stored_deskew_angle,
 )
+from tests.ui.locale_numbers import shown_numbers
 
 
 def _page(name: str = "page") -> PageId:
@@ -84,7 +85,7 @@ class TestTypedAngleRoundTrip:
         widget.set_current_page(_page("other"))
         widget.set_current_page(_page())
         assert _angle(widget).value() == pytest.approx(1.5)
-        assert _angle(widget).text() == "1.50°"
+        assert shown_numbers(_angle(widget).text()) == pytest.approx([1.5])
 
     def test_the_project_json_keeps_the_stored_clockwise_angle(
         self, widget: OptionsWidget, filter_: Filter
@@ -105,7 +106,7 @@ class TestTypedAngleRoundTrip:
         widget.refresh()
 
         assert _angle(widget).value() == pytest.approx(-3.0)
-        assert _angle(widget).text() == "-3.00°"
+        assert shown_numbers(_angle(widget).text()) == pytest.approx([-3.0])
 
 
 class TestEditingInAuto:
@@ -180,7 +181,7 @@ class TestUnknownAngle:
         _detect(filter_, 0.5)
         widget.refresh()
 
-        assert _angle(widget).text() == "-0.50°"
+        assert shown_numbers(_angle(widget).text()) == pytest.approx([-0.5])
         assert _angle(widget).isEnabled()
 
     def test_a_detected_angle_at_the_limit_is_shown_as_a_number(
@@ -191,7 +192,7 @@ class TestUnknownAngle:
         widget.refresh()
 
         assert _angle(widget).value() == pytest.approx(-45.0)
-        assert _angle(widget).text() == "-45.00°"
+        assert shown_numbers(_angle(widget).text()) == pytest.approx([-45.0])
 
     def test_showing_the_question_mark_does_not_store_an_angle(
         self, widget: OptionsWidget, filter_: Filter

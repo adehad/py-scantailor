@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 from _pytest.faulthandler import fault_handler_stderr_fd_key
 from loguru import logger
+from PySide6 import QtCore
 
 from scantailor.core import diagnostics
 from scantailor.core.settings import ApplicationSettings
@@ -24,6 +25,34 @@ def quiet_loguru() -> None:
     """
     logger.remove()
     logger.add(sys.stderr, level="WARNING", diagnose=False)
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Add --qt-locale, which runs the suite as a user of that locale would.
+
+    Args:
+        parser (pytest.Parser): pytest's command line parser.
+    """
+    parser.addoption(
+        "--qt-locale",
+        default=None,
+        help=(
+            "Qt locale name, such as sv_SE, to make QLocale's default for the "
+            "whole run. Use a decimal-comma locale to catch tests that compare "
+            "formatted numbers."
+        ),
+    )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Make the --qt-locale locale Qt's default before any test or widget runs.
+
+    Args:
+        config (pytest.Config): The run's configuration.
+    """
+    name = config.getoption("--qt-locale")
+    if name:
+        QtCore.QLocale.setDefault(QtCore.QLocale(name))
 
 
 @pytest.fixture(autouse=True, scope="session")

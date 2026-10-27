@@ -12,6 +12,7 @@ from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.output.filter import Filter
 from scantailor.filters.output.params import Params
+from tests.ui.locale_numbers import shown_numbers
 
 PAGE = PageId(image_id=ImageId(file_path=Path("a.tif")), sub_page=SubPage.SINGLE_PAGE)
 
@@ -107,7 +108,7 @@ def test_a_stored_in_between_strength_shows_its_nearest_step_and_names_itself(
     panel.widget.set_current_page(PAGE)
 
     assert panel.slider.value() == 2
-    assert "2.3" in panel.help_text.splitlines()[-1]
+    assert shown_numbers(panel.help_text.splitlines()[-1]) == pytest.approx([2.3])
     assert panel.filter.get_params(PAGE).despeckle_strength == 2.3
 
 
