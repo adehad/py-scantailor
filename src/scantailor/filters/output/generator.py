@@ -39,6 +39,7 @@ from scantailor.imageproc.binarize import (
     binarize_window,
     binarize_wolf,
 )
+from scantailor.imageproc.binary_morphology import hit_miss_replace_all_directions
 from scantailor.imageproc.despeckle import despeckle as despeckle_image
 from scantailor.imageproc.filters import (
     bgr_to_gray,
@@ -84,6 +85,18 @@ _WHITE = 255
 # smaller output DPI: (largest DPI of the band, window, degree).
 _SMOOTHING_BANDS = ((200, 5, 3), (400, 7, 4), (800, 11, 4))
 _SMOOTHING_ABOVE_BANDS = (11, 2)
+# Upstream morphologicalSmoothInPlace, in its order, each applied in all four
+# directions: X black, space white, ? either, - black made white, + white made
+# black. The first three remove bumps one pixel high and one to three long,
+# shortest first; the rest fill notches of the same size.
+_EDGE_SMOOTHING_PATTERNS = (
+    ("XXX", " - ", "   "),
+    ("X ?", "X  ", "X- ", "X- ", "X  ", "X ?"),
+    ("X ?", "X ?", "X  ", "X- ", "X- ", "X- ", "X  ", "X ?", "X ?"),
+    ("XX?", "XX?", "XX ", "X+ ", "X+ ", "X+ ", "XX ", "XX?", "XX?"),
+    ("XX?", "XX ", "X+ ", "X+ ", "XX ", "XX?"),
+    ("   ", "X+X", "XXX"),
+)
 _BILEVEL_GRAY_SPLIT = 128
 _COLOR_CHANNELS = 3
 
@@ -1255,26 +1268,23 @@ def _despeckle(
 def _morphological_smooth(
     binary: NDArray[np.uint8], dbg: DebugImages | None = None
 ) -> NDArray[np.uint8]:
-    """Apply morphological smoothing to a binary image.
+    """Smooth the edges of the ink as upstream ``morphologicalSmoothInPlace`` does.
 
-    This helps smooth jagged edges.
+    Only edge pixels change, so a stroke keeps its width. A 3 x 3 opening and
+    closing would instead erase every stroke under three pixels wide, which at
+    300 DPI is the thin part of most letters.
 
     Args:
-        binary (NDArray[np.uint8]): Binary input image.
+        binary (NDArray[np.uint8]): Binary image, 0 is ink. Not modified.
         dbg (DebugImages | None): Receives the smoothed image.
 
     Returns:
-        NDArray[np.uint8]: Smoothed binary image.
+        NDArray[np.uint8]: New binary image, 0 for ink and 255 for background.
     """
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-
-    # Opening removes small protrusions
-    result = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
-
-    # Closing fills small holes
-    result = cv2.morphologyEx(result, cv2.MORPH_CLOSE, kernel)
-
-    smoothed = np.asarray(result, dtype=np.uint8)
+    black = binary == 0
+    for pattern in _EDGE_SMOOTHING_PATTERNS:
+        black = hit_miss_replace_all_directions(black, pattern)
+    smoothed = np.where(black, 0, 255).astype(np.uint8)
     if dbg is not None:
         dbg.add(smoothed, "edges_smoothed")
     return smoothed
