@@ -177,3 +177,22 @@ def test_cutters_that_cross_inside_the_page_leave_the_whole_image_uncropped():
 
     assert xform.resulting_rect.width == pytest.approx(WIDTH)
     assert xform.resulting_rect.height == pytest.approx(HEIGHT)
+
+
+def test_one_slanted_cutter_stored_twice_in_opposite_directions_keeps_the_whole_image():
+    page = _page()
+    coincident = PageLayout(
+        outline=(0, 0, WIDTH, HEIGHT),
+        layout_type=PageLayoutType.SINGLE_PAGE_CUT,
+        cutter1=((200, 0), (260, HEIGHT)),
+        cutter2=((260, HEIGHT), (200, 0)),
+    )
+    sequence = StageSequence()
+    sequence.page_split_filter.set_params(page, SplitParams(page_layout=coincident))
+
+    xform = build_transformation(
+        sequence, page, (WIDTH, HEIGHT), DPI, FilterStage.PAGE_SPLIT
+    )
+
+    assert xform.resulting_rect.width == pytest.approx(WIDTH)
+    assert xform.resulting_rect.height == pytest.approx(HEIGHT)

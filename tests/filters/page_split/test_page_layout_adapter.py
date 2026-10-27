@@ -13,6 +13,7 @@ from scantailor.filters.page_split.filter import Filter
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.page_split.page_layout import PageLayout, PageLayoutType
 from scantailor.filters.page_split.page_layout_adapter import (
+    Line,
     adapt_page_layout,
     correct_page_layout_type,
 )
@@ -168,6 +169,104 @@ class TestCorrectPageLayoutType:
         corrected = correct_page_layout_type(layout)
 
         assert corrected.cutter1 == layout.cutter1
+
+
+def _cut(cutter1: Line, cutter2: Line) -> PageLayout:
+    return PageLayout(
+        outline=(0, 0, 1000, 3000),
+        layout_type=PageLayoutType.SINGLE_PAGE_CUT,
+        cutter1=cutter1,
+        cutter2=cutter2,
+    )
+
+
+class TestCoincidentCutters:
+    def test_a_zero_length_cutter_on_the_other_cutters_line_becomes_uncut(self):
+        layout = _cut(((500, 1500), (500, 1500)), ((500, 0), (500, 3000)))
+
+        assert (
+            correct_page_layout_type(layout).layout_type
+            is PageLayoutType.SINGLE_PAGE_UNCUT
+        )
+
+    def test_two_zero_length_cutters_at_one_point_become_uncut(self):
+        layout = _cut(((500, 1500), (500, 1500)), ((500, 1500), (500, 1500)))
+
+        assert (
+            correct_page_layout_type(layout).layout_type
+            is PageLayoutType.SINGLE_PAGE_UNCUT
+        )
+
+    def test_vertical_cutters_on_one_line_stored_in_opposite_directions_become_uncut(
+        self,
+    ):
+        layout = _cut(((500, 0), (500, 3000)), ((500, 3000), (500, 0)))
+
+        assert (
+            correct_page_layout_type(layout).layout_type
+            is PageLayoutType.SINGLE_PAGE_UNCUT
+        )
+
+    def test_vertical_cutters_on_one_line_with_different_start_points_become_uncut(
+        self,
+    ):
+        layout = _cut(((500, 0), (500, 3000)), ((500, -100), (500, 2900)))
+
+        assert (
+            correct_page_layout_type(layout).layout_type
+            is PageLayoutType.SINGLE_PAGE_UNCUT
+        )
+
+    def test_slanted_cutters_on_one_line_stored_in_opposite_directions_become_uncut(
+        self,
+    ):
+        layout = _cut(((400, 0), (700, 3000)), ((700, 3000), (400, 0)))
+
+        assert (
+            correct_page_layout_type(layout).layout_type
+            is PageLayoutType.SINGLE_PAGE_UNCUT
+        )
+
+    def test_slanted_cutters_on_one_line_with_different_start_points_become_uncut(
+        self,
+    ):
+        layout = _cut(((400, 0), (700, 3000)), ((410, 100), (690, 2900)))
+
+        assert (
+            correct_page_layout_type(layout).layout_type
+            is PageLayoutType.SINGLE_PAGE_UNCUT
+        )
+
+    def test_cutters_that_start_at_the_same_point_on_one_line_become_uncut(self):
+        layout = _cut(((500, 0), (500, 3000)), ((500, 0), (500, 3000)))
+
+        assert (
+            correct_page_layout_type(layout).layout_type
+            is PageLayoutType.SINGLE_PAGE_UNCUT
+        )
+
+    def test_distinct_parallel_cutters_stay_cut(self):
+        layout = _cut(((300, 0), (300, 3000)), ((700, 3000), (700, 0)))
+
+        assert correct_page_layout_type(layout) is layout
+
+    def test_parallel_cutters_one_pixel_apart_stay_cut(self):
+        layout = _cut(((500, 0), (500, 3000)), ((501, 0), (501, 3000)))
+
+        assert correct_page_layout_type(layout) is layout
+
+    def test_cutters_that_cross_inside_the_outline_become_uncut(self):
+        layout = _cut(((300, 0), (700, 3000)), ((700, 0), (300, 3000)))
+
+        assert (
+            correct_page_layout_type(layout).layout_type
+            is PageLayoutType.SINGLE_PAGE_UNCUT
+        )
+
+    def test_cutters_that_would_cross_below_the_outline_stay_cut(self):
+        layout = _cut(((300, 0), (400, 3000)), ((700, 0), (600, 3000)))
+
+        assert correct_page_layout_type(layout) is layout
 
 
 class TestFilterKeepsManualLayouts:
