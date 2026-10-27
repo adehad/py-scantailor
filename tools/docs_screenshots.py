@@ -80,7 +80,18 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     environment = {**os.environ, OUT_ENV_VAR: str(args.out.resolve())}
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", "-m", "docs_screenshot", "tests/docs"],
+        # The screenshot tests form two xdist groups, so more workers than two
+        # only add start-up time; -n auto would start one per core.
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-m",
+            "docs_screenshot",
+            "-n",
+            "2",
+            "tests/docs",
+        ],
         cwd=REPO_ROOT,
         env=environment,
         check=False,
