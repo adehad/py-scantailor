@@ -8,7 +8,14 @@ import shiboken6
 from loguru import logger
 from PySide6 import QtCore
 
-from scantailor.core.batch import BatchEvent, BatchResult, PageDetected, run_batch
+from scantailor.core.batch import (
+    BatchEvent,
+    BatchResult,
+    PageDetected,
+    PageLister,
+    PagesListed,
+    run_batch,
+)
 from scantailor.core.models import PageId
 from scantailor.core.page_source import DpiOverrides
 from scantailor.core.project import LayoutDirection, PageOutputRecord
@@ -17,6 +24,7 @@ from scantailor.core.stage_sequence import FilterStage, StageSequence
 
 class _BatchWorker(QtCore.QObject):
     detected = QtCore.Signal(object)
+    pages_listed = QtCore.Signal(object)
     progress = QtCore.Signal(object)
     finished = QtCore.Signal(object)
     failed = QtCore.Signal(str)
@@ -34,6 +42,7 @@ class _BatchWorker(QtCore.QObject):
         end_stage: FilterStage,
         worker_limit: Callable[[], int | None],
         output_records: Mapping[PageId, PageOutputRecord] | None,
+        page_lister: PageLister | None,
     ) -> None:
         super().__init__()
         self._arguments = (stages, pages, output_dir)
@@ -45,10 +54,13 @@ class _BatchWorker(QtCore.QObject):
         self._end_stage = end_stage
         self._worker_limit = worker_limit
         self._output_records = output_records
+        self._page_lister = page_lister
 
     def _on_event(self, event: BatchEvent) -> None:
         if isinstance(event, PageDetected):
             self.detected.emit(event)
+        elif isinstance(event, PagesListed):
+            self.pages_listed.emit(event)
         else:
             self.progress.emit(event)
 
@@ -71,6 +83,7 @@ class _BatchWorker(QtCore.QObject):
                     end_stage=self._end_stage,
                     worker_limit=self._worker_limit,
                     output_records=self._output_records,
+                    page_lister=self._page_lister,
                 )
             except Exception as error:
                 logger.exception("Batch processing failed")
@@ -87,12 +100,15 @@ class BatchRunner(QtCore.QObject):
 
     Signals:
         detected: A page's geometry was measured. Args: event (PageDetected).
+        pages_listed: Page Split changed the batch's pages. Args: event
+            (PagesListed).
         progress: A page ended. Args: event (ProgressEvent).
         finished: The batch ended, possibly cancelled. Args: result (BatchResult).
         failed: The batch could not run at all. Args: message (str).
     """
 
     detected = QtCore.Signal(object)
+    pages_listed = QtCore.Signal(object)
     progress = QtCore.Signal(object)
     finished = QtCore.Signal(object)
     failed = QtCore.Signal(str)
@@ -138,6 +154,7 @@ class BatchRunner(QtCore.QObject):
         file_labels: Mapping[Path, int] | None = None,
         end_stage: FilterStage = FilterStage.OUTPUT,
         output_records: Mapping[PageId, PageOutputRecord] | None = None,
+        page_lister: PageLister | None = None,
     ) -> None:
         """Start a batch on a new thread.
 
@@ -155,6 +172,9 @@ class BatchRunner(QtCore.QObject):
             output_records (Mapping[PageId, PageOutputRecord] | None): Stored
                 records of earlier output; pages that still match them are
                 not rendered again.
+            page_lister (PageLister | None): Answers the batch's Page Split
+                questions, as ``run_batch`` takes it. It runs on the batch
+                thread, so it must only read.
 
         Raises:
             RuntimeError: If a batch is already running.
@@ -176,11 +196,13 @@ class BatchRunner(QtCore.QObject):
             end_stage,
             lambda: self._worker_limit,
             output_records,
+            page_lister,
         )
         thread = QtCore.QThread(self)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
         worker.detected.connect(self.detected)
+        worker.pages_listed.connect(self.pages_listed)
         worker.progress.connect(self.progress)
         worker.finished.connect(self._on_outcome)
         worker.failed.connect(self._on_outcome)

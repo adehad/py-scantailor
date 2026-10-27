@@ -22,7 +22,7 @@ from contextlib import ExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Event
-from typing import Any
+from typing import Any, Protocol
 
 import cv2
 import numpy as np
@@ -168,8 +168,31 @@ class PageFailed:
     error: str
 
 
+@dataclass(frozen=True)
+class PagesListed:
+    """Page Split changed which pages the batch carries through later stages.
+
+    Attributes:
+        pages: Every page the batch now processes past Page Split, in order.
+    """
+
+    pages: tuple[PageId, ...]
+
+
+class PageLister(Protocol):
+    """What a batch asks about Page Split, answered from the project."""
+
+    def is_settled(self, image_id: ImageId) -> bool:
+        """Whether Page Split would keep the image's stored layout as it is."""
+        ...
+
+    def pages_after_split(self, pages: Sequence[PageId]) -> list[PageId]:
+        """List the pages the stored layouts give, in the order of ``pages``."""
+        ...
+
+
 ProgressEvent = PageDone | PageFailed
-BatchEvent = PageDetected | PageDone | PageFailed
+BatchEvent = PageDetected | PagesListed | PageDone | PageFailed
 
 
 @dataclass
@@ -185,6 +208,9 @@ class BatchResult:
             from, to store in the project for the next batch.
         failed: Error text of every page that failed.
         cancelled: Pages that were never started because of cancellation.
+        replaced: Pages that Page Split replaced with a different number of
+            pages of the same image; their output files were deleted, and
+            their records are for ``Project.forget_output_records``.
         source_sizes: Width and height each worker decoded an image's source
             to, before Fix Orientation, for images whose file may have been
             replaced since the project recorded its size.
@@ -197,7 +223,20 @@ class BatchResult:
     output_records: dict[PageId, PageOutputRecord] = field(default_factory=dict)
     failed: dict[PageId, str] = field(default_factory=dict)
     cancelled: list[PageId] = field(default_factory=list)
+    replaced: list[PageId] = field(default_factory=list)
     source_sizes: dict[ImageId, tuple[int, int]] = field(default_factory=dict)
+
+    def reached_images(self) -> list[ImageId]:
+        """List each image with a page the batch measured, wrote or failed.
+
+        These are the images whose stored Page Split layout the batch may have
+        changed, for ``propagation.adopt_stored_page_counts``.
+
+        Returns:
+            list[ImageId]: Each image once, measured ones first.
+        """
+        pages = (*self.detected, *self.written, *self.failed)
+        return list(dict.fromkeys(page.image_id for page in pages))
 
 
 def output_file_names(
@@ -825,8 +864,16 @@ def run_batch(
     worker_limit: Callable[[], int | None] | None = None,
     output_records: Mapping[PageId, PageOutputRecord] | None = None,
     black_on_white_detection: BlackOnWhiteDetection | None = None,
+    page_lister: PageLister | None = None,
 ) -> BatchResult:
     """Process pages through the pipeline up to ``end_stage``.
+
+    With ``page_lister``, a batch that goes past Page Split first runs Fix
+    Orientation and Page Split once on each image whose split is not settled,
+    then asks it for the pages the stored layouts give, so a detected spread
+    goes on as its two halves.
+    A ``PagesListed`` event reports a list that differs from ``pages``, and
+    the output files of the pages that left it are deleted.
 
     Geometry detection runs per page on the worker pool and fills ``stages``
     with each page's detected parameters. When ``end_stage`` is Output,
@@ -875,6 +922,10 @@ def run_batch(
             workers measure each page's polarity, handed to them as plain
             data; the application settings as they are when the batch starts
             when None.
+        page_lister (PageLister | None): Tells which images need the Page
+            Split pass and which pages follow it, as
+            ``propagation.ProjectPageLister`` does. Called on the calling
+            thread. The pages stay as given when None.
 
     Returns:
         BatchResult: Written, failed and never-started pages.
@@ -953,22 +1004,42 @@ def run_batch(
         )
     with ExitStack() as stack:
         pool = executor or stack.enter_context(spawn_pool(workers))
-        ready = _detect_geometry(
-            stages,
-            pages,
-            default_dpi,
-            dpi_overrides,
-            pool,
-            workers,
-            worker_limit,
-            cancel,
-            report,
-            result,
-            end_stage,
-            polarity,
+
+        def detect(
+            batch_pages: Sequence[PageId],
+            last_stage: FilterStage,
+            sink: Callable[[BatchEvent], None],
+        ) -> list[PageId]:
+            return _detect_geometry(
+                stages,
+                batch_pages,
+                default_dpi,
+                dpi_overrides,
+                pool,
+                workers,
+                worker_limit,
+                cancel,
+                sink,
+                result,
+                last_stage,
+                polarity,
+            )
+
+        # Labels follow the pages as given, so a same-named source that the
+        # Page Split pass drops does not move the labels of the others.
+        labels = assign_output_file_labels(
+            (page.image_id.file_path for page in pages), file_labels
         )
+        if page_lister is not None and end_stage > FilterStage.PAGE_SPLIT:
+            given = pages
+            pages = _split_images(pages, page_lister, detect, report, result)
+            if result.replaced:
+                _erase_replaced_outputs(
+                    result.replaced, given, pages, out_dir, layout_direction, labels
+                )
+        ready = detect(pages, end_stage, report)
         if end_stage == FilterStage.OUTPUT:
-            names = output_file_names(pages, layout_direction, file_labels)
+            names = output_file_names(pages, layout_direction, labels)
             ready = _keep_unchanged_outputs(
                 ready, output_records or {}, names, out_dir, params_hash, report, result
             )
@@ -997,6 +1068,90 @@ def run_batch(
             "batch end: {}", _batch_summary(result, time.perf_counter() - started)
         )
     return result
+
+
+def _split_images(
+    pages: Sequence[PageId],
+    page_lister: PageLister,
+    detect: Callable[
+        [Sequence[PageId], FilterStage, Callable[[BatchEvent], None]], list[PageId]
+    ],
+    report: Callable[[BatchEvent], None],
+    result: BatchResult,
+) -> list[PageId]:
+    """Run Page Split on each unsettled image and list the pages that follow.
+
+    One page of each image whose split is not settled is decoded; settled
+    images are not. Only failures are reported from this pass, once for each
+    of the failed image's pages; the full detection pass reports every page
+    it measures.
+    An image never started goes to ``result.cancelled`` with all its pages.
+
+    Returns:
+        list[PageId]: The pages the later stages process, in order.
+    """
+    pages_of: dict[ImageId, list[PageId]] = {}
+    for page in pages:
+        pages_of.setdefault(page.image_id, []).append(page)
+
+    def report_failures(event: BatchEvent) -> None:
+        if isinstance(event, PageFailed):
+            for page in pages_of[event.page.image_id]:
+                report(PageFailed(page, event.error))
+
+    unsettled = [
+        image_id for image_id in pages_of if not page_lister.is_settled(image_id)
+    ]
+    first_cancelled = len(result.cancelled)
+    split = detect(
+        [pages_of[image_id][0] for image_id in unsettled],
+        FilterStage.PAGE_SPLIT,
+        report_failures,
+    )
+    result.cancelled[first_cancelled:] = [
+        page
+        for unstarted in result.cancelled[first_cancelled:]
+        for page in pages_of[unstarted.image_id]
+    ]
+    dropped = set(unsettled) - {page.image_id for page in split}
+    kept = [page for page in pages if page.image_id not in dropped]
+    listed = page_lister.pages_after_split(kept)
+    if listed != kept:
+        still_listed = set(listed)
+        result.replaced = [page for page in kept if page not in still_listed]
+        report(PagesListed(tuple(listed)))
+    return listed
+
+
+def _erase_replaced_outputs(
+    replaced: Sequence[PageId],
+    given: Sequence[PageId],
+    pages: Sequence[PageId],
+    output_dir: Path,
+    layout_direction: LayoutDirection,
+    file_labels: Mapping[Path, int] | None,
+) -> None:
+    """Delete the output files of pages Page Split replaced, sparing the new pages'.
+
+    ``erase_output_files`` tries every name a removed page could have had,
+    which includes the names of its image's new pages, so those files and
+    the source images are passed as ``keep``. ``given`` is the batch's page
+    list before Page Split and ``pages`` the list after it.
+    """
+    new_names = output_file_names(pages, layout_direction, file_labels).values()
+    folders = (output_dir, *(output_dir / layer for layer in _SPLIT_LAYER_DIRS))
+    keep = [folder / name for folder in folders for name in new_names]
+    keep += [page.image_id.file_path for page in given]
+    deleted = erase_output_files(
+        replaced,
+        output_dir,
+        given,
+        layout_direction,
+        keep=keep,
+        file_labels=file_labels,
+    )
+    for path in deleted:
+        logger.info("deleted {}: Page Split replaced its page", path)
 
 
 def _keep_unchanged_outputs(

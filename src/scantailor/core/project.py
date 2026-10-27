@@ -319,7 +319,7 @@ class Project(BaseModel):
         Returns:
             list[PageId]: All pages in display order.
         """
-        return [page for info in self.images for page in self._pages_of_image(info)]
+        return [page for info in self.images for page in self.pages_of_image(info)]
 
     def get_image_pages(self) -> list[PageId]:
         """Get one page per image, for the stages that work on whole images.
@@ -328,10 +328,18 @@ class Project(BaseModel):
             list[PageId]: The first page of each image, in display order. It
                 stands for the whole image, so a two-page spread appears once.
         """
-        return [self._pages_of_image(info)[0] for info in self.images]
+        return [self.pages_of_image(info)[0] for info in self.images]
 
-    def _pages_of_image(self, image_info: ImageInfo) -> list[PageId]:
-        """List the pages one image contributes, in display order."""
+    def pages_of_image(self, image_info: ImageInfo) -> list[PageId]:
+        """List the pages one image contributes, in display order.
+
+        Args:
+            image_info (ImageInfo): The image; it need not be in the project,
+                so a copy with another page count shows what that count gives.
+
+        Returns:
+            list[PageId]: One page, or the two halves in reading order.
+        """
         if image_info.num_sub_pages == 1:
             if image_info.left_half_removed:
                 sub_page = SubPage.RIGHT_PAGE
@@ -405,7 +413,7 @@ class Project(BaseModel):
                 update={"left_half_removed": False, "right_half_removed": False}
             )
         self.images.insert(position, image_info)
-        return self._pages_of_image(image_info)
+        return self.pages_of_image(image_info)
 
     def insert_images(
         self,
@@ -461,7 +469,7 @@ class Project(BaseModel):
 
         remaining: list[ImageInfo] = []
         for info in self.images:
-            image_pages = self._pages_of_image(info)
+            image_pages = self.pages_of_image(info)
             kept = [page for page in image_pages if page not in doomed_set]
             if len(kept) == len(image_pages):
                 remaining.append(info)
@@ -565,7 +573,7 @@ class Project(BaseModel):
                 }
             )
             self.images[position] = restored
-            return self._pages_of_image(restored)
+            return self.pages_of_image(restored)
         return []
 
     def set_text_geometry(self, page: PageId, geometry: dict[str, Any]) -> None:
@@ -598,6 +606,18 @@ class Project(BaseModel):
         """
         kept = [entry for entry in self.output_records if entry.page not in records]
         self.output_records = [*kept, *records.values()]
+
+    def forget_output_records(self, pages: Iterable[PageId]) -> None:
+        """Drop the output records of pages that no longer exist.
+
+        Args:
+            pages (Iterable[PageId]): Pages whose records go, such as
+                ``BatchResult.replaced``.
+        """
+        gone = set(pages)
+        self.output_records = [
+            entry for entry in self.output_records if entry.page not in gone
+        ]
 
     def most_common_dpi(self) -> Dpi | None:
         """Return the resolution most of the project's images were scanned at.

@@ -29,6 +29,34 @@ def test_dialog_starts_in_the_detecting_phase(qtbot: QtBot):
     assert _status(dialog) == "Detecting 0/3"
 
 
+def test_a_new_total_from_page_split_keeps_the_detecting_phase_until_all_are_measured(
+    qtbot: QtBot,
+):
+    dialog = BatchProgressDialog(1)
+    qtbot.addWidget(dialog)
+
+    dialog.set_total(2)
+    dialog.add_detected(PageDetected(_page("spread.png")))
+
+    assert dialog.phase == "detecting"
+    assert _status(dialog) == "Detecting 1/2"
+
+
+def test_a_page_that_failed_before_page_split_listed_the_pages_stays_in_the_total(
+    qtbot: QtBot,
+):
+    dialog = BatchProgressDialog(2)
+    qtbot.addWidget(dialog)
+    dialog.add_result(PageFailed(_page("unreadable.png"), "unreadable"))
+
+    dialog.set_total(2)
+
+    bar = dialog.findChild(QtWidgets.QProgressBar)
+    assert bar is not None
+    assert bar.maximum() == 3
+    assert _status(dialog) == "Detecting 0/3"
+
+
 def test_each_detected_page_advances_the_detecting_count(qtbot: QtBot):
     dialog = BatchProgressDialog(3)
     qtbot.addWidget(dialog)

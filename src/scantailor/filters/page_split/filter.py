@@ -497,12 +497,12 @@ class Filter:
         current = self._dependencies_of(
             requested, image.shape, rotation_degrees, _trim_rect(trim_area, image.shape)
         )
+        if _keeps_layout(params, current):
+            return Settled(params, detected=False)
         if params.dependencies.is_compatible_with(
             current, manual_split_line=params.is_manual()
         ):
             new_layout = correct_page_layout_type(layout)
-            if new_layout.layout_type == layout.layout_type:
-                return Settled(params, detected=False)
         elif requested == LayoutType.AUTO_LAYOUT_TYPE:
             return detect()
         else:
@@ -520,6 +520,38 @@ class Filter:
         if self._settings.replace_params(page_id, params, new_params):
             return Settled(new_params, detected=False)
         return Settled(self.get_params(page_id), detected=False)
+
+    def keeps_stored_layout(
+        self,
+        page_id: PageId,
+        oriented_size: tuple[int, int],
+        rotation_degrees: int,
+        trim_area: NDArray[np.float64] | None = None,
+    ) -> bool:
+        """Whether ``settle`` would leave the stored parameters exactly as they are.
+
+        This is ``settle``'s own test, answered from the image's size instead
+        of its pixels, so a caller can skip decoding an image whose split is
+        already settled.
+
+        Args:
+            page_id (PageId): The page to check.
+            oriented_size (tuple[int, int]): Width and height of the image
+                after Fix Orientation's rotation.
+            rotation_degrees (int): That rotation.
+            trim_area (NDArray[np.float64] | None): Corners of Fix
+                Orientation's manual trim in oriented pixels; None without one.
+
+        Returns:
+            bool: False when ``settle`` would detect or adapt the layout.
+        """
+        params = self.get_params(page_id)
+        width, height = oriented_size
+        shape = (height, width)
+        current = self._dependencies_of(
+            params.layout_type, shape, rotation_degrees, _trim_rect(trim_area, shape)
+        )
+        return _keeps_layout(params, current)
 
     def _detect(
         self,
@@ -606,6 +638,18 @@ _LAYOUT_TYPES = {
     LayoutType.PAGE_PLUS_OFFCUT: PageLayoutType.SINGLE_PAGE_CUT,
     LayoutType.TWO_PAGES: PageLayoutType.TWO_PAGES,
 }
+
+
+def _keeps_layout(params: Params, current: Dependencies) -> bool:
+    """Whether stored parameters hold, unchanged, for an image with ``current``."""
+    layout = params.page_layout
+    if layout is None or _conflicts(params.layout_type, layout):
+        return False
+    if not params.dependencies.is_compatible_with(
+        current, manual_split_line=params.is_manual()
+    ):
+        return False
+    return correct_page_layout_type(layout).layout_type == layout.layout_type
 
 
 def _conflicts(requested: LayoutType, layout: PageLayout) -> bool:

@@ -25,6 +25,7 @@ from scantailor.core.propagation import (
     apply_orientation,
     apply_output,
     apply_select_content,
+    pages_after_split,
     propagate_content_boxes,
     propagate_page_orientations,
     select_pages,
@@ -830,3 +831,70 @@ class TestAdoptStoredPageCounts:
 
         assert adopt_stored_page_counts(project, stages, [image_id]) == []
         assert project.images[0].num_sub_pages == 1
+
+
+class TestPagesAfterSplit:
+    """A batch lists the pages the stored layouts give, leaving the project alone."""
+
+    @staticmethod
+    def _store_two_pages(stages: StageSequence, image_id: ImageId) -> None:
+        stages.page_split_filter.set_params(
+            PageId(image_id=image_id),
+            SplitParams(
+                page_layout=PageLayout.two_pages(1200, 800, 600),
+                dependencies=SplitDependencies(image_size=(1200, 800)),
+            ),
+        )
+
+    def test_a_detected_spread_is_replaced_in_place_by_its_two_halves(self):
+        project = _project((800, 1200), (1200, 800), (800, 1200))
+        stages = StageSequence()
+        spread = project.images[1].id
+        self._store_two_pages(stages, spread)
+
+        listed = pages_after_split(project, stages, project.get_pages())
+
+        assert listed == [
+            _page("p0"),
+            PageId(image_id=spread, sub_page=SubPage.LEFT_PAGE),
+            PageId(image_id=spread, sub_page=SubPage.RIGHT_PAGE),
+            _page("p2"),
+        ]
+
+    def test_the_project_keeps_its_page_count(self):
+        project = _project((1200, 800))
+        stages = StageSequence()
+        self._store_two_pages(stages, project.images[0].id)
+
+        pages_after_split(project, stages, project.get_pages())
+
+        assert project.images[0].num_sub_pages == 1
+
+    def test_a_right_to_left_project_lists_the_right_half_first(self):
+        project = _project((1200, 800))
+        project.layout_direction = "RTL"
+        stages = StageSequence()
+        spread = project.images[0].id
+        self._store_two_pages(stages, spread)
+
+        listed = pages_after_split(project, stages, project.get_pages())
+
+        assert [page.sub_page for page in listed] == [
+            SubPage.RIGHT_PAGE,
+            SubPage.LEFT_PAGE,
+        ]
+
+    def test_an_image_with_one_half_removed_keeps_its_single_page(self):
+        project = _project((1200, 800))
+        project.images[0].left_half_removed = True
+        stages = StageSequence()
+        self._store_two_pages(stages, project.images[0].id)
+        pages = project.get_pages()
+
+        assert pages_after_split(project, stages, pages) == pages
+
+    def test_pages_without_a_stored_layout_stay_as_given(self):
+        project = _project((1200, 800), (800, 1200))
+        pages = list(reversed(project.get_pages()))
+
+        assert pages_after_split(project, StageSequence(), pages) == pages

@@ -25,6 +25,7 @@ from scantailor.core.models import PageId, page_name
 from scantailor.core.page_source import dpi_overrides_of
 from scantailor.core.pdf_export import BilevelCodec, export_pdf
 from scantailor.core.project import Project
+from scantailor.core.propagation import ProjectPageLister, adopt_stored_page_counts
 from scantailor.core.stage_params import apply_stage_defaults, collect_stage_defaults
 from scantailor.core.stage_sequence import StageSequence
 
@@ -106,10 +107,12 @@ def set_option(project_path: Path, name: str, raw_value: str) -> OptionsReport:
 def run_project(project_path: Path, max_workers: int | None) -> BatchReport:
     """Process every page of a project through all stages and save the result.
 
-    Pages that fail are reported and left out of the output. A page whose
-    settings, source file and output files are unchanged since the last run
-    keeps its output file. The project is saved either way, so detected
-    parameters and the record of what was written are kept for the next run.
+    An image that Page Split finds to hold two pages is processed and saved
+    as its two halves. Pages that fail are reported and left out of the
+    output. A page whose settings, source file and output files are unchanged
+    since the last run keeps its output file. The project is saved either
+    way, so detected parameters and the record of what was written are kept
+    for the next run.
 
     Args:
         project_path (pathlib.Path): The project JSON file.
@@ -130,7 +133,10 @@ def run_project(project_path: Path, max_workers: int | None) -> BatchReport:
         dpi_overrides=dpi_overrides_of(project),
         file_labels=project.output_file_label_map(),
         output_records=project.output_record_map(),
+        page_lister=ProjectPageLister(project, stages),
     )
+    adopt_stored_page_counts(project, stages, result.reached_images())
+    project.forget_output_records(result.replaced)
     project.set_output_records(result.output_records)
     for image_id, (width, height) in result.source_sizes.items():
         project.store_source_size(image_id, width, height)
