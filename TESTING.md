@@ -11,6 +11,17 @@ pdm run cov                                  # coverage report in dist/cov/
 
 Qt tests need no display: CI sets `QT_QPA_PLATFORM=offscreen`, and the same works locally.
 
+## Workers
+
+The default run uses `-n auto`, one worker per CPU core, which is what CI wants. On a machine you are using at the same time, cap it with pytest-xdist's `PYTEST_XDIST_AUTO_NUM_WORKERS`, which every `-n auto` run reads, the docs screenshots included:
+
+```bash
+export PYTEST_XDIST_AUTO_NUM_WORKERS=2       # PowerShell: $env:PYTEST_XDIST_AUTO_NUM_WORKERS = 2
+unset PYTEST_XDIST_AUTO_NUM_WORKERS          # back to one per core
+```
+
+An explicit `-n N` on the command line wins over the variable.
+
 ## Locale
 
 `--qt-locale=sv_SE` makes a Qt locale the default for the whole run, as a user's system locale would. Tests compare the numbers a widget shows, read back with `tests/ui/locale_numbers.py`, not the formatted text, so they pass under any locale. Run the UI tests under a decimal-comma locale after changing how a label or a test formats numbers:
