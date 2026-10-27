@@ -181,6 +181,12 @@ The status bar shows the resolution of the current page's image, for example
 follows in brackets, as in ``600 dpi (most pages 300 dpi)``, so a page scanned at
 a different setting stands out.
 
+Numbers in the status bar, the labels and the number boxes use the operating
+system's number format, whichever language the program is shown in. On a Swedish
+system the page size reads ``5,1 x 6,8 cm``, and a semicolon separates the two
+pointer coordinates, as in ``2,6; 3,4``, so the decimal comma is not mistaken
+for a separator.
+
 The stage list
 --------------
 
