@@ -1,9 +1,11 @@
 """Fixtures shared by every test package."""
 
 import faulthandler
+import importlib.util
 import pathlib
 import sys
 from collections.abc import Iterator
+from types import ModuleType
 from typing import Any
 
 import pytest
@@ -56,6 +58,33 @@ def no_process_diagnostics(
 
     monkeypatch.setattr(diagnostics, "configure_logging", fake_configure_logging)
     return calls
+
+
+@pytest.fixture(scope="session")
+def sample_book_tool() -> ModuleType:
+    """``tools/sample_book.py``, imported by path since ``tools/`` is not a package."""
+    path = pathlib.Path(__file__).resolve().parents[1] / "tools" / "sample_book.py"
+    spec = importlib.util.spec_from_file_location("sample_book", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture(scope="session")
+def sample_book(
+    sample_book_tool: ModuleType, tmp_path_factory: pytest.TempPathFactory
+) -> Any:
+    """The sample book's pages and PDF, written once per test session.
+
+    Tests must treat the files as read-only, since every test that asks for this
+    fixture shares them. Copy a page before handing it to anything that writes
+    beside its input.
+
+    Returns:
+        Any: The tool's ``SampleBook``: ``pages`` in sample order and ``pdf``.
+    """
+    return sample_book_tool.write_sample_book(tmp_path_factory.mktemp("sample_book"))
 
 
 @pytest.fixture
