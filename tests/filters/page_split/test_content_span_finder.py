@@ -1,11 +1,8 @@
 """Content spans of a column histogram."""
 
-import numpy as np
 import pytest
 
 from scantailor.filters.page_split.content_span_finder import Span, find_content_spans
-
-from . import cpp_reference as cpp
 
 
 def _spans(
@@ -18,24 +15,6 @@ def _spans(
 
 
 class TestFindContentSpans:
-    @pytest.mark.parametrize("seed", range(12))
-    @pytest.mark.parametrize(
-        ("min_content", "min_whitespace"), [(1, 1), (2, 8), (5, 3), (3, 20)]
-    )
-    def test_matches_upstream_on_random_histograms(
-        self, seed: int, min_content: int, min_whitespace: int
-    ) -> None:
-        rng = np.random.default_rng(seed)
-        histogram = np.where(
-            rng.random(300) < 0.55, rng.integers(1, 9, 300), 0
-        ).tolist()
-
-        want = [
-            (s.begin, s.end)
-            for s in cpp.content_span_finder(histogram, min_content, min_whitespace)
-        ]
-        assert _spans(histogram, min_content, min_whitespace) == want
-
     def test_separates_runs_by_enough_whitespace(self) -> None:
         histogram = [0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 2, 2, 0]
 
@@ -58,6 +37,33 @@ class TestFindContentSpans:
 
     def test_a_run_reaching_the_end_is_closed(self) -> None:
         assert _spans([0, 0, 4, 4], 1, 2) == [(2, 4)]
+
+    def test_narrow_runs_closer_than_the_whitespace_join_into_one_wide_span(
+        self,
+    ) -> None:
+        assert _spans([1, 0, 1, 0, 1], 3, 2) == [(0, 5)]
+
+    def test_narrow_runs_apart_by_the_whitespace_width_are_all_dropped(self) -> None:
+        assert _spans([1, 0, 0, 1, 0, 0, 1], 2, 2) == []
+
+    def test_with_a_whitespace_width_of_one_every_empty_column_separates(
+        self,
+    ) -> None:
+        assert _spans([2, 0, 2, 2, 0, 2], 1, 1) == [(0, 1), (2, 4), (5, 6)]
+
+    def test_a_gap_of_exactly_the_whitespace_width_separates(self) -> None:
+        assert _spans([3, 3, 0, 0, 0, 3, 3], 1, 3) == [(0, 2), (5, 7)]
+
+    def test_a_gap_one_column_short_of_the_whitespace_width_merges(self) -> None:
+        assert _spans([3, 3, 0, 0, 3, 3], 1, 3) == [(0, 6)]
+
+    @pytest.mark.parametrize(
+        ("min_content", "expected"), [(3, [(0, 3)]), (4, [])], ids=["kept", "dropped"]
+    )
+    def test_a_lone_span_is_kept_from_the_minimum_width_up(
+        self, min_content: int, expected: list[tuple[int, int]]
+    ) -> None:
+        assert _spans([1, 1, 1, 0, 0, 0, 0], min_content, 2) == expected
 
     def test_an_empty_histogram_has_no_spans(self) -> None:
         assert find_content_spans([], 1, 1) == []

@@ -54,6 +54,11 @@ _OFFCUT_GAP: Final = 22
 _OFFCUT_STRIP_WIDTH: Final = 52
 _OFFCUT_TEXT_REACH: Final = 10
 _PDF_FONT_POINTS: Final = 9.0
+SPREAD_SPINE_X: Final = BED_MARGIN + PAPER_WIDTH
+OFFCUT_PAGE_RIGHT: Final = BED_MARGIN + _OFFCUT_MAIN_WIDTH
+OFFCUT_STRIP_LEFT: Final = OFFCUT_PAGE_RIGHT + _OFFCUT_GAP
+SHADOW_WIDTH: Final = 60
+_SHADOW_DEPTH: Final = 0.13
 
 _SENTENCES: Final = (
     "The mill stood where the river bent north, and its wheel turned through every "
@@ -466,7 +471,7 @@ def _render_spread(
     canvas = _bed(2 * PAPER_WIDTH + 2 * BED_MARGIN, PAPER_HEIGHT + 2 * BED_MARGIN)
     lines = _place(canvas, left, BED_MARGIN, BED_MARGIN)
     lines += _place(canvas, right, BED_MARGIN + PAPER_WIDTH, BED_MARGIN)
-    seam = BED_MARGIN + PAPER_WIDTH
+    seam = SPREAD_SPINE_X
     if black_gutter:
         _shade_spine(canvas, seam, ramp=70, depth=0.10)
     else:
@@ -490,8 +495,8 @@ def _render_offcut() -> tuple[NDArray[np.uint8], tuple[TextLine, ...]]:
     neighbour = _text_sheet(_rng_for(name, stage=1), None, 4, 5)
     canvas = _bed(width, height)
     lines = _place(canvas, main, BED_MARGIN, BED_MARGIN)
-    main_right = BED_MARGIN + _OFFCUT_MAIN_WIDTH
-    strip_left = main_right + _OFFCUT_GAP
+    main_right = OFFCUT_PAGE_RIGHT
+    strip_left = OFFCUT_STRIP_LEFT
     strip_right = strip_left + _OFFCUT_STRIP_WIDTH
     canvas[:, main_right:strip_left] = _BED_RGB
     neighbour_left = strip_left + _OFFCUT_TEXT_REACH - _TEXT_LEFT
@@ -731,6 +736,120 @@ def render_sample_page(name: str) -> SamplePage:
     """
     canvas, lines = _render_scan(name)
     return SamplePage(name, canvas, lines)
+
+
+_UNMOVED_SHEET_LEFTS: Final[dict[str, tuple[int, ...]]] = {
+    "01_single_page": (BED_MARGIN,),
+    "02_spread_light_gutter": (BED_MARGIN, SPREAD_SPINE_X),
+    "03_spread_black_gutter": (BED_MARGIN, SPREAD_SPINE_X),
+    "04_offcut": (BED_MARGIN,),
+}
+
+
+def text_block_columns(name: str) -> tuple[tuple[int, int], ...]:
+    """Return the image columns each sheet's text block may reach, left to right.
+
+    The neighbour's strip on ``04_offcut`` is not a sheet of its own and is left
+    out.
+
+    Args:
+        name (str): A page whose sheets are placed flat and upright:
+            ``01_single_page``, ``02_spread_light_gutter``,
+            ``03_spread_black_gutter`` or ``04_offcut``.
+
+    Returns:
+        tuple[tuple[int, int], ...]: ``(left, right)`` of each text block. Lines
+        end ragged, so ink stays inside these columns without filling them.
+
+    Raises:
+        KeyError: For any other page.
+    """
+    return tuple(
+        (left + _TEXT_LEFT, left + _TEXT_LEFT + _TEXT_WIDTH)
+        for left in _UNMOVED_SHEET_LEFTS[name]
+    )
+
+
+def render_spread_at(dpi: float, black_gutter: bool) -> tuple[NDArray[np.uint8], float]:
+    """Render a sample spread resampled from 150 dpi to another resolution.
+
+    Not part of the book: tests use it to check that results do not depend on the
+    scan resolution.
+
+    Args:
+        dpi (float): Resolution of the returned image.
+        black_gutter (bool): True for ``03_spread_black_gutter``, False for
+            ``02_spread_light_gutter``.
+
+    Returns:
+        tuple[NDArray[np.uint8], float]: The (H, W, 3) RGB scan, and the column
+        of its spine in the returned image's pixels.
+    """
+    name = "03_spread_black_gutter" if black_gutter else "02_spread_light_gutter"
+    canvas = render_sample_page(name).image
+    factor = dpi / SAMPLE_DPI
+    if factor == 1.0:
+        return canvas, float(SPREAD_SPINE_X)
+    height, width = canvas.shape[:2]
+    size = (round(width * factor), round(height * factor))
+    interpolation = cv2.INTER_AREA if factor < 1.0 else cv2.INTER_CUBIC
+    resized = np.asarray(cv2.resize(canvas, size, interpolation=interpolation))
+    return resized.astype(np.uint8), SPREAD_SPINE_X * factor
+
+
+def _plain_single_canvas() -> tuple[NDArray[np.uint8], tuple[TextLine, ...]]:
+    """The scan of ``01_single_page``, ready for a defect to be applied.
+
+    Returns:
+        tuple[NDArray[np.uint8], tuple[TextLine, ...]]: The scan and its text.
+    """
+    sheet = _text_sheet(_rng_for("01_single_page"), _HEADINGS[0], 4, 1)
+    return _single_canvas(sheet)
+
+
+def render_skewed_page(degrees: float) -> NDArray[np.uint8]:
+    """Render ``01_single_page`` turned about its centre by a chosen angle.
+
+    Not part of the book: tests use it to check skew detection over a range of
+    angles.
+
+    Args:
+        degrees (float): Rotation, counter-clockwise on screen for a positive angle.
+
+    Returns:
+        NDArray[np.uint8]: The (H, W, 3) RGB scan.
+    """
+    canvas, lines = _plain_single_canvas()
+    return _skew(canvas, lines, degrees)[0]
+
+
+def render_shadowed_edge_page(side: str) -> NDArray[np.uint8]:
+    """Render ``01_single_page`` with a dark shadow along one side edge.
+
+    The shadow is ``SHADOW_WIDTH`` pixels wide from the image edge, covering the
+    scanner bed and the outer part of the paper margin but none of the text, as
+    where a book's binding lifts the page off the glass.
+
+    Not part of the book: tests use it to check how a shadowed edge is split.
+
+    Args:
+        side (str): ``"left"`` or ``"right"``.
+
+    Returns:
+        NDArray[np.uint8]: The (H, W, 3) RGB scan.
+
+    Raises:
+        ValueError: When ``side`` is neither.
+    """
+    canvas, _lines = _plain_single_canvas()
+    if side == "left":
+        band = canvas[:, :SHADOW_WIDTH]
+    elif side == "right":
+        band = canvas[:, -SHADOW_WIDTH:]
+    else:
+        raise ValueError(f"side must be 'left' or 'right', got {side!r}")
+    band[...] = (band.astype(np.float32) * _SHADOW_DEPTH).astype(np.uint8)
+    return canvas
 
 
 def _pdf_string(text: str) -> str:
