@@ -54,9 +54,6 @@ test = [
     "pytest-xdist>=3.8",
     "pytest-timeout>=2.4",
     "pymupdf>=1.26",
-    # Only the page split C++ oracle in tests/filters/page_split/cpp_reference.py
-    # uses it; the application does not.
-    "numba>=0.68",
 ]
 
 docs = [
