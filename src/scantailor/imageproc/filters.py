@@ -8,6 +8,8 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.imageproc.row_bands import RowBand, map_row_bands
+
 _VARIANCE_EPSILON = 1e-6
 # Added before truncating to 8 bits so that a value that is an integer up to
 # floating-point error (99.99999999999999) does not drop to the level below.
@@ -27,6 +29,12 @@ _GRAY_FROM_BGR = (
 _GRAY_FROM_BGRA = (
     np.array([[_LUMA_B, _LUMA_G, _LUMA_R, 0, -15.5]], dtype=np.float32) / _LUMA_SCALE
 )
+# Bytes of float temporaries per pixel of a band: the float64 pixels, their two
+# box sums, the mean, variance, gain and filtered values, and the masks.
+_WIENER_BYTES_PER_PIXEL = 72
+# The float32 input and output of each axis pass and the float64 copy and
+# result that the separable filter works in.
+_SAVGOL_BYTES_PER_PIXEL = 48
 
 
 def gaussian_blur(
@@ -183,26 +191,40 @@ def wiener_filter(
     if image.size == 0:
         return image.copy()
 
-    pixels = image.astype(np.float64)
     box = {
         "ksize": (width, height),
         "anchor": (width // 2, height // 2),
         "normalize": False,
         "borderType": cv2.BORDER_CONSTANT,
     }
-    area = _samples_in_window(image.shape[0], height)[:, None] * _samples_in_window(
-        image.shape[1], width
-    )
-    mean = cv2.boxFilter(pixels, cv2.CV_64F, **box) / area
-    variance = cv2.boxFilter(pixels * pixels, cv2.CV_64F, **box) / area - mean * mean
+    row_area = _samples_in_window(image.shape[0], height)
+    column_area = _samples_in_window(image.shape[1], width)
+    noise_variance = noise_sigma * noise_sigma
+    result = np.empty_like(image)
 
-    active = variance > _VARIANCE_EPSILON
-    gain = np.maximum(variance - noise_sigma * noise_sigma, 0.0) / np.where(
-        active, variance, 1.0
+    def band(rows: RowBand) -> None:
+        # Box sums of whole numbers are exact, so a band that reads a window's
+        # height of rows beyond its own gives the whole image's values.
+        padded = image[rows.padded].astype(np.float64)
+        pixels = padded[rows.inside]
+        area = row_area[rows.rows, None] * column_area
+        mean = cv2.boxFilter(padded, cv2.CV_64F, **box)[rows.inside] / area
+        squares = cv2.boxFilter(padded * padded, cv2.CV_64F, **box)[rows.inside]
+        variance = squares / area - mean * mean
+        active = variance > _VARIANCE_EPSILON
+        gain = np.maximum(variance - noise_variance, 0.0) / np.where(
+            active, variance, 1.0
+        )
+        filtered = np.clip(
+            mean + (pixels - mean) * gain + _TRUNCATION_GUARD, 0.0, 255.0
+        )
+        # npd: ok the Wiener gain needs float64
+        result[rows.rows] = np.where(active, filtered, pixels).astype(np.uint8)
+
+    map_row_bands(
+        image.shape[0], height, image.shape[1] * _WIENER_BYTES_PER_PIXEL, band
     )
-    filtered = np.clip(mean + (pixels - mean) * gain + _TRUNCATION_GUARD, 0.0, 255.0)
-    # npd: ok the Wiener gain needs float64
-    return np.where(active, filtered, pixels).astype(np.uint8)
+    return result
 
 
 def wiener_color_filter(
@@ -382,9 +404,21 @@ def savgol_filter_2d(
     if width > image.shape[1] or height > image.shape[0]:
         return image.copy()
 
-    smooth = _savgol_axis(image.astype(np.float32), width, hor_degree, axis=1)
-    smooth = _savgol_axis(smooth, height, vert_degree, axis=0)
-    return np.clip(np.floor(smooth + 0.5), 0, 255).astype(np.uint8)
+    result = np.empty_like(image)
+
+    def band(rows: RowBand) -> None:
+        # Rows within half a window of the padded block's ends are evaluated
+        # off centre; a halo of a whole window keeps them out of the band.
+        smooth = _savgol_axis(
+            image[rows.padded].astype(np.float32), width, hor_degree, axis=1
+        )
+        smooth = _savgol_axis(smooth, height, vert_degree, axis=0)[rows.inside]
+        result[rows.rows] = np.clip(np.floor(smooth + 0.5), 0, 255).astype(np.uint8)
+
+    map_row_bands(
+        image.shape[0], height, image.shape[1] * _SAVGOL_BYTES_PER_PIXEL, band
+    )
+    return result
 
 
 def stretch_gray_range(

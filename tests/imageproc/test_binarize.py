@@ -1,9 +1,11 @@
 """Tests for binarization algorithms."""
 
 import numpy as np
+import pytest
 from numpy.typing import NDArray
 
 from scantailor.imageproc.binarize import (
+    _ink_below_level,
     binarize_bradley,
     binarize_edge_div,
     binarize_mokji,
@@ -407,3 +409,24 @@ class TestEdgeDivFractionalDelta:
         whole = binarize_edge_div(image, kep=0.0, kbd=0.0, delta=1.0)
 
         np.testing.assert_array_equal(fractional, whole)
+
+
+class TestInkBelowLevel:
+    """A gray level is ink when strictly below the threshold, at any threshold."""
+
+    @pytest.mark.parametrize("level", [-5, 0, 1, 30, 128, 255, 256, 300])
+    def test_matches_a_comparison_for_every_level(self, level: int) -> None:
+        image = np.arange(256, dtype=np.uint8).reshape(16, 16)
+
+        result = _ink_below_level(image, level)
+
+        assert np.array_equal(result, np.where(image < level, 0, 255))
+        assert result.dtype == np.uint8
+
+    def test_otsu_threshold_keeps_pixels_at_the_threshold_as_background(self) -> None:
+        image = np.array([[99, 100, 101, 200]], dtype=np.uint8)
+        threshold = 100
+
+        result = binarize_otsu(image, adjustment=0, bounds=(threshold, threshold))
+
+        assert result.tolist() == [[0, 255, 255, 255]]
