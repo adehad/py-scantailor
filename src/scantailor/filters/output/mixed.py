@@ -235,11 +235,15 @@ def compose_mixed(
             and white become 1 and 254.
     """
     result = _reserve_black_and_white(layer, ~text_region)
-    levels = np.where(ink, _PURE_BLACK, _PURE_WHITE).astype(np.uint8)
+    levels = np.where(ink, np.uint8(_PURE_BLACK), np.uint8(_PURE_WHITE))
     if result.ndim == 2:
-        result[text_region] = levels[text_region]
+        np.copyto(result, levels, where=text_region)
     else:
-        result[text_region, :_COLOR_CHANNELS] = levels[text_region][:, None]
+        np.copyto(
+            result[..., :_COLOR_CHANNELS],
+            levels[..., None],
+            where=text_region[..., None],
+        )
     return result
 
 

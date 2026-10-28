@@ -26,6 +26,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, BinaryIO, Final
 
+import cv2
 import numpy as np
 from loguru import logger
 from numpy.typing import NDArray
@@ -411,16 +412,20 @@ def _to_array(image: Image.Image) -> NDArray[np.uint8]:
     mode = image.mode
     if mode in ("I;16", "I;16L", "I;16B", "I"):
         # Mode I is signed 32-bit; negative samples would wrap as unsigned.
-        samples = np.clip(np.asarray(image, dtype=np.int64), 0, _MAX_SAMPLE_16)
-        return ((samples * 255 + 32767) // _MAX_SAMPLE_16).astype(np.uint8)
+        samples = np.clip(np.asarray(image), 0, _MAX_SAMPLE_16).astype(np.uint32)
+        samples *= 255
+        samples += 32767
+        samples //= _MAX_SAMPLE_16
+        return samples.astype(np.uint8)  # npd: ok 65535 * 255 needs 32 bits
     if mode == "F":
         return _float_to_gray(np.array(image, dtype=np.float32))
     if mode in ("1", "L", "LA"):
         return np.asarray(image.convert("L"), dtype=np.uint8)
     if mode in ("P", "PA") and _has_gray_palette(image):
         return np.asarray(image.convert("L"), dtype=np.uint8)
-    rgb = np.asarray(image.convert("RGB"), dtype=np.uint8)
-    return np.ascontiguousarray(rgb[..., ::-1])
+    rgb = image if mode == "RGB" else image.convert("RGB")
+    bgr = cv2.cvtColor(np.asarray(rgb, dtype=np.uint8), cv2.COLOR_RGB2BGR)
+    return np.asarray(bgr, dtype=np.uint8)
 
 
 def load_image(

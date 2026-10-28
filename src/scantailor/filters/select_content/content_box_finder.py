@@ -289,7 +289,7 @@ def _despeckle(
     content: NDArray[np.bool_], dbg: DebugImages | None = None
 ) -> NDArray[np.bool_]:
     """Remove the small components that are not near substantial ones."""
-    black_on_white = np.where(content, 0, 255).astype(np.uint8)
+    black_on_white = np.where(content, np.uint8(0), np.uint8(255))
     cleaned = despeckle(black_on_white, PROCESSING_DPI, _NORMAL_DESPECKLE_LEVEL, dbg)
     return cleaned == 0
 

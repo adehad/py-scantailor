@@ -382,4 +382,5 @@ def _paint_pieces(
 
 def _rounded_mean(sums: NDArray, sizes: NDArray[np.int64]) -> NDArray[np.uint8]:
     """Mean per piece, halves rounded up; exact because the sums are integers."""
+    # npd: ok one value per piece, not per pixel
     return ((2 * sums.astype(np.int64) + sizes) // (2 * sizes)).astype(np.uint8)

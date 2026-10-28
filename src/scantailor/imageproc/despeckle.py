@@ -237,6 +237,7 @@ def _visualized(nodes: NDArray[np.int32]) -> NDArray[np.uint8]:
     reversed_bits = np.zeros_like(labels)
     for bit in range(int(bits.max(initial=1))):
         reversed_bits |= ((labels >> bit) & 1) << np.maximum(bits - 1 - bit, 0)
+    # npd: ok one hue per label, for debug images
     hue = np.round(0.99 * 179 * reversed_bits / ((1 << bits) - 1)).astype(np.uint8)
     hsv = np.full((labels.size, 1, 3), 255, dtype=np.uint8)
     hsv[:, 0, 0] = hue

@@ -67,6 +67,7 @@ def as_displayable(image: NDArray) -> NDArray[np.uint8]:
     low, high = float(values.min()), float(values.max())
     if high <= low:
         return np.zeros(values.shape, dtype=np.uint8)
+    # npd: ok debug images only
     return np.round((values - low) * (255.0 / (high - low))).astype(np.uint8)
 
 

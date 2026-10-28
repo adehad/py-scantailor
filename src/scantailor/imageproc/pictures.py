@@ -57,9 +57,11 @@ def detect_pictures(
         stretched, window, borderType=cv2.BORDER_CONSTANT, borderValue=255
     )
     # Dark where a neighbourhood holds both very dark and very light pixels.
-    gradient = (
-        255 - (255 - darkest.astype(np.uint32)) * lightest.astype(np.uint32) // 255
-    ).astype(np.uint8)
+    gradient = np.subtract(255, darkest, dtype=np.uint16)
+    gradient *= lightest
+    gradient //= 255
+    np.subtract(255, gradient, out=gradient)
+    gradient = gradient.astype(np.uint8)  # npd: ok the product needs 16 bits
     if dbg is not None:
         dbg.add(stretched, "stretched")
         dbg.add(darkest, "eroded")

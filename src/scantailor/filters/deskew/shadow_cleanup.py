@@ -77,10 +77,15 @@ def _from_150_dpi(size: int, target_dpi: int) -> int:
 
 
 def _halve_keeping_two_of_four(ink: NDArray[np.uint8]) -> NDArray[np.uint8]:
-    """Halve both sides; a pixel is ink when at least two of its four sources are."""
+    """Halve both sides; a pixel is ink when at least two of its four sources are.
+
+    ``ink`` holds 0 and 1, so the uint8 count of four never overflows.
+    """
     height, width = ink.shape[0] // 2 * 2, ink.shape[1] // 2 * 2
-    blocks = ink[:height, :width].reshape(height // 2, 2, width // 2, 2)
-    return (blocks.sum(axis=(1, 3)) >= 2).astype(np.uint8)
+    count = ink[0:height:2, 0:width:2] + ink[0:height:2, 1:width:2]
+    count += ink[1:height:2, 0:width:2]
+    count += ink[1:height:2, 1:width:2]
+    return (count >= 2).view(np.uint8)
 
 
 def _upscale_integer_times(
