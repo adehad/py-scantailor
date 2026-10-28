@@ -9,6 +9,8 @@ pdm run pytest -n0 tests/file.py::test_name  # one test, serially, for debugging
 pdm run cov                                  # coverage report in dist/cov/
 ```
 
+CI runs `pdm run cov -m "not docs_screenshot"`: every test, the slow ones included, in one job, with the 30 slowest listed at the end.
+
 Qt tests need no display: CI sets `QT_QPA_PLATFORM=offscreen`, and the same works locally.
 
 ## Workers

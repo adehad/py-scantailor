@@ -520,6 +520,7 @@ def _open_output_view(qtbot: QtBot, window: MainWindowManager) -> OutputImageVie
     return view
 
 
+@pytest.mark.slow
 def test_a_drawn_zone_is_stored_in_source_pixels(
     qtbot: QtBot, project_window: MainWindowManager
 ):
@@ -555,6 +556,7 @@ def test_a_drawn_zone_is_stored_in_source_pixels(
     assert project_window.modified
 
 
+@pytest.mark.slow
 def test_stored_zones_stay_on_their_source_pixels_when_the_margins_change(
     qtbot: QtBot, project_window: MainWindowManager
 ):

@@ -223,6 +223,7 @@ def test_incompressible_data_stays_inside_output_buffer(tmp_path: Path) -> None:
     _assert_both_decoders(images, tmp_path)
 
 
+@pytest.mark.slow
 def test_concurrent_encoding_matches_serial_output() -> None:
     images = [noise(60 + i, 70 + 3 * i, 0.1 + 0.05 * (i % 10), seed=i) for i in range(64)]
     serial = [encode_file(img, dpi=(300, 300)) for img in images]

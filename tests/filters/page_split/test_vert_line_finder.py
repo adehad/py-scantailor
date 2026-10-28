@@ -30,7 +30,6 @@ def _page_with_lines(
     return page
 
 
-@pytest.mark.slow
 @pytest.mark.parametrize(
     "factory",
     [
@@ -47,17 +46,14 @@ def test_lines_match_upstream_at_300_dpi(factory) -> None:
     _assert_same_lines(factory(), 300.0)
 
 
-@pytest.mark.slow
 def test_lines_match_upstream_at_150_dpi() -> None:
     _assert_same_lines(pages.spread_with_folding_line(750, 500), 150.0)
 
 
-@pytest.mark.slow
 def test_lines_match_upstream_at_a_resolution_that_is_no_multiple_of_100() -> None:
     _assert_same_lines(_page_with_lines([300]), 210.0)
 
 
-@pytest.mark.slow
 def test_a_skewed_page_gives_the_same_tilted_line() -> None:
     page = pages.skewed_spread(2.0)
     page[:, 740:748] = np.minimum(page[:, 740:748], 45)

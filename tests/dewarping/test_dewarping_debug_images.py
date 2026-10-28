@@ -13,6 +13,9 @@ from scantailor.dewarping.text_line_tracer import trace_text_lines
 from scantailor.dewarping.top_bottom_edge_tracer import trace_top_bottom_edges
 from tests.dewarping.book_pages import BentPage, bent_book_page
 
+# One worker builds the module's bent page and debug run once for every test.
+pytestmark = pytest.mark.xdist_group("dewarping-debug-images")
+
 DPI = 200
 CONTENT = (160.0, 200.0, 890.0, 1090.0)
 

@@ -73,6 +73,7 @@ class TestBentPages:
         assert model.top_curve is not None
         assert model.top_curve.polyline[0, 0] < model.top_curve.polyline[-1, 0]
 
+    @pytest.mark.slow
     def test_the_result_is_repeatable(self) -> None:
         page = bent_book_page()
 
@@ -147,6 +148,7 @@ class TestPagesWithoutAModel:
 
 
 class TestOtherEdgeImage:
+    @pytest.mark.slow
     def test_a_model_expressed_in_the_pixels_of_another_image(self) -> None:
         page = bent_book_page(45.0, -25.0)
         large = cv2.resize(
