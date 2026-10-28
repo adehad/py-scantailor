@@ -506,7 +506,11 @@ def _run_stages(
     Returns:
         PipelineResult for the stages from options.start_stage on.
     """
-    state = _PageState(image.copy(), options.dpi)
+    # Stages read the source and never write it, so a read-only view stands in
+    # for a copy of the caller's page.
+    source = image.view()
+    source.flags.writeable = False
+    state = _PageState(source, options.dpi)
     stages_completed: list[FilterStage] = []
     metadata: dict = {}
     output_image: NDArray[np.uint8] | None = None

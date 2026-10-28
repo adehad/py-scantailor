@@ -7,6 +7,8 @@ same scan lands on the same pixels.
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.imageproc.filters import qgray
+
 _GRAY_LEVELS = 256
 
 
@@ -22,9 +24,12 @@ def to_gray(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
     """
     if image.ndim == 2:
         return image
+    if image.dtype == np.uint8 and image.shape[2] in (3, 4):
+        return qgray(image)
     blue = image[..., 0].astype(np.int32)
     green = image[..., 1].astype(np.int32)
     red = image[..., 2].astype(np.int32)
+    # npd: ok input wider than uint8
     return ((red * 11 + green * 16 + blue * 5) // 32).astype(np.uint8)
 
 

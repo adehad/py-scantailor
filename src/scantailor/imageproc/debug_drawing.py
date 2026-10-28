@@ -129,6 +129,7 @@ def signed_overlay(
         np.array(negative, dtype=np.float32),
     )
     mixed = tint * alpha + canvas * (1.0 - alpha)
+    # npd: ok debug images only
     return np.clip(np.round(mixed), 0, 255).astype(np.uint8)
 
 
@@ -149,4 +150,5 @@ def tint(
     """
     part = canvas[where].astype(np.float32)
     mixed = part * (1.0 - alpha) + np.array(color, dtype=np.float32) * alpha
+    # npd: ok debug images only
     canvas[where] = np.clip(np.round(mixed), 0, 255).astype(np.uint8)

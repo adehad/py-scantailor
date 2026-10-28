@@ -164,7 +164,7 @@ def binarize_mokji(
             elsewhere.
     """
     threshold = mokji_threshold(image, max_edge_width, min_edge_magnitude)
-    return np.where(image < threshold, 0, 255).astype(np.uint8)
+    return np.where(image < threshold, np.uint8(0), np.uint8(255))
 
 
 def binarize_otsu(
@@ -350,11 +350,12 @@ def binarize_edge_div(
         result = np.where(edgenorm > 0, img_float / edgenorm, img_float)
 
     # Clip to valid range and convert back to uint8
+    # npd: ok the edge division needs float
     result = np.clip(result, 0, 255).astype(np.uint8)
 
     histogram = gray_histogram(result)
     threshold = int(np.clip(int(otsu_threshold(histogram) + delta), 0, _GRAY_LEVELS))
-    return np.where(result < threshold, 0, 255).astype(np.uint8)
+    return np.where(result < threshold, np.uint8(0), np.uint8(255))
 
 
 def binarize_bradley(
@@ -567,7 +568,7 @@ def _ink_within_bounds(
 ) -> NDArray[np.uint8]:
     """Ink below ``lower_bound``, or at most ``upper_bound`` and below ``threshold``."""
     ink = (image < lower_bound) | ((image <= upper_bound) & (image < threshold))
-    return np.where(ink, 0, 255).astype(np.uint8)
+    return np.where(ink, np.uint8(0), np.uint8(255))
 
 
 def _ink_below(
@@ -575,7 +576,7 @@ def _ink_below(
     threshold: NDArray[np.floating],
 ) -> NDArray[np.uint8]:
     """Return 0 where ``image`` is strictly below ``threshold`` and 255 elsewhere."""
-    return np.where(image < threshold, 0, 255).astype(np.uint8)
+    return np.where(image < threshold, np.uint8(0), np.uint8(255))
 
 
 # Fewest rows worth a thread of their own in the banded window statistics.

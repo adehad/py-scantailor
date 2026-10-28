@@ -43,7 +43,7 @@ def build_sausage_mask(mask: NDArray[np.uint8]) -> NDArray[np.uint8]:
     columns = np.arange(width)[None, :]
     filled = (columns >= left[:, None]) & (columns < (left + length)[:, None])
     filled &= (counts > 0)[:, None]
-    return np.where(filled, _BLACK, _WHITE).astype(np.uint8)
+    return np.where(filled, np.uint8(_BLACK), np.uint8(_WHITE))
 
 
 def rotate_mask(mask: NDArray[np.uint8], degrees: float) -> NDArray[np.uint8]:
@@ -80,7 +80,7 @@ def rotate_mask(mask: NDArray[np.uint8], degrees: float) -> NDArray[np.uint8]:
         borderMode=cv2.BORDER_CONSTANT,
         borderValue=_WHITE,
     )
-    return np.where(rotated > _BINARY_THRESHOLD, _WHITE, _BLACK).astype(np.uint8)
+    return np.where(rotated > _BINARY_THRESHOLD, np.uint8(_WHITE), np.uint8(_BLACK))
 
 
 def _invert(mask: NDArray[np.uint8]) -> NDArray[np.uint8]:

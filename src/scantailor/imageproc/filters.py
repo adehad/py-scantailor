@@ -17,6 +17,16 @@ _LUMA_R = 11
 _LUMA_G = 16
 _LUMA_B = 5
 _LUMA_SCALE = 32
+# floor(S / 32) of the weighted sum S, as cv2.transform's rounding of
+# (S - 15.5) / 32: S is an integer, so the fraction never reaches 0.5 and every
+# term is exact in float32. The last column is the offset; the BGRA matrix gives
+# alpha a zero weight.
+_GRAY_FROM_BGR = (
+    np.array([[_LUMA_B, _LUMA_G, _LUMA_R, -15.5]], dtype=np.float32) / _LUMA_SCALE
+)
+_GRAY_FROM_BGRA = (
+    np.array([[_LUMA_B, _LUMA_G, _LUMA_R, 0, -15.5]], dtype=np.float32) / _LUMA_SCALE
+)
 
 
 def gaussian_blur(
@@ -87,7 +97,10 @@ def sobel_magnitude(
 
 
 def bgr_to_gray(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
-    """Convert BGR(A) to gray with integer weights 11/16/5 over 32.
+    """Convert BGR(A) to gray with integer weights 11/16/5 over 32, as ``qGray``.
+
+    Each pixel is ``(11 R + 16 G + 5 B) // 32``, from one ``cv2.transform``
+    pass that allocates only the result.
 
     Args:
         image (NDArray[np.uint8]): 2-D gray or (H, W, 3|4) BGR(A) image.
@@ -97,11 +110,25 @@ def bgr_to_gray(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
     """
     if image.ndim == 2:
         return image
-    blue = image[..., 0].astype(np.uint16)
-    green = image[..., 1].astype(np.uint16)
-    red = image[..., 2].astype(np.uint16)
-    luma = (_LUMA_R * red + _LUMA_G * green + _LUMA_B * blue) // _LUMA_SCALE
-    return luma.astype(np.uint8)
+    return qgray(image)
+
+
+def qgray(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
+    """Gray of a BGR(A) uint8 image: ``(11 R + 16 G + 5 B) // 32`` per pixel.
+
+    Args:
+        image (NDArray[np.uint8]): (H, W, 3|4) BGR(A) image; alpha is ignored.
+            Any strides; read-only views are fine.
+
+    Returns:
+        NDArray[np.uint8]: (H, W) gray image, new.
+    """
+    if image.size == 0:
+        # cv2.transform returns None for an empty image.
+        return np.zeros(image.shape[:2], dtype=np.uint8)
+    matrix = _GRAY_FROM_BGRA if image.shape[2] == 4 else _GRAY_FROM_BGR
+    gray = cv2.transform(image, matrix).reshape(image.shape[:2])
+    return np.asarray(gray, dtype=np.uint8)
 
 
 def _window_shape(window_size: int | tuple[int, int]) -> tuple[int, int]:
@@ -174,6 +201,7 @@ def wiener_filter(
         active, variance, 1.0
     )
     filtered = np.clip(mean + (pixels - mean) * gain + _TRUNCATION_GUARD, 0.0, 255.0)
+    # npd: ok the Wiener gain needs float64
     return np.where(active, filtered, pixels).astype(np.uint8)
 
 
@@ -223,6 +251,7 @@ def _apply_scale(
 ) -> NDArray[np.uint8]:
     """Return ``channels * scale + delta`` clipped to 0..255 and rounded."""
     value = channels.astype(np.float32) * scale + delta
+    # npd: ok the per-pixel scale is fractional
     return (np.clip(value, 0.0, 255.0) + 0.5).astype(np.uint8)
 
 
@@ -390,7 +419,7 @@ def stretch_gray_range(
 
     levels = np.arange(256)
     if low >= high:
-        mapping = np.where(levels <= (low + high) // 2, 0, 255)
+        mapping = np.where(levels <= (low + high) // 2, np.uint8(0), np.uint8(255))
     else:
         span = high - low
         mapping = (255 * (np.clip(levels, low, high) - low) + span // 2) // span

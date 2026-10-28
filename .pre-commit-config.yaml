@@ -44,6 +44,11 @@ repos:
         files: \.(yaml|yml)$
   - repo: local
     hooks:
+      - id: check-numpy-dtypes
+        name: check NumPy temporaries in pixel code
+        language: python
+        entry: python tools/check_numpy_dtypes.py
+        files: ^src/scantailor/(imageproc|filters|core|app)/.*\.py$
       - id: typecheck
         name: typecheck (pyrefly)
         language: system

@@ -143,10 +143,12 @@ class HoughLineDetector:
         if highest == 0:
             gray = np.zeros(self._histogram.shape, dtype=np.uint8)
         else:
+            # npd: ok histogram-sized debug image
             gray = np.floor(self._histogram * (255.0 / highest) + 0.5).astype(np.uint8)
         visual = np.asarray(cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR), dtype=np.uint8)
         peaks = _find_histogram_peaks(self._histogram, quality_lower_bound)
         red = np.array([0, 0, 255], dtype=np.float64)
+        # npd: ok histogram-sized debug image
         visual[peaks] = np.round((visual[peaks] + red) / 2).astype(np.uint8)
         return visual
 

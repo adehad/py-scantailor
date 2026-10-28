@@ -192,9 +192,12 @@ class Filter:
             image_id: The image ID to look up the rotation.
 
         Returns:
-            The rotated image.
+            The rotated image, new; a read-only view of ``image`` when no
+            rotation is stored.
         """
         rotation = self.get_rotation(image_id)
         if rotation.degrees == 0:
-            return image.copy()
+            unturned = image.view()
+            unturned.flags.writeable = False
+            return unturned
         return rotate_orthogonal(image, rotation.degrees)

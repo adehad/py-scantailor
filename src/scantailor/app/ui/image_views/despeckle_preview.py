@@ -77,7 +77,7 @@ def _tint_around(image: NDArray[np.uint8], specks: NDArray[np.bool_], dpi: int) 
     """Blend red into the pixels near specks, leaving black pixels alone."""
     if specks.any():
         radius = _HALO_RADIUS_AT_600_DPI * dpi / _REFERENCE_DPI
-        away_from_specks = np.where(specks, 0, 1).astype(np.uint8)
+        away_from_specks = np.where(specks, np.uint8(0), np.uint8(1))
         distance = cv2.distanceTransform(
             away_from_specks, cv2.DIST_L2, cv2.DIST_MASK_PRECISE
         )
@@ -88,6 +88,7 @@ def _tint_around(image: NDArray[np.uint8], specks: NDArray[np.bool_], dpi: int) 
     tinted = (alpha > 0) & ~specks & ~black
     weight = alpha[tinted][:, None]
     red = np.array(SPECKLE_RGB, dtype=np.float32)
+    # npd: ok blends only the tinted pixels
     image[tinted] = (image[tinted] * (1.0 - weight) + red * weight).astype(np.uint8)
 
 

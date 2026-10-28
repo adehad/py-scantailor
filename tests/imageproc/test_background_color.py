@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from scantailor.imageproc import background_color
 from scantailor.imageproc.background_color import (
     dominant_background_color,
     dominant_level,
@@ -117,3 +118,73 @@ class TestDominantBackgroundColor:
         dominant_background_color(page)
 
         assert np.array_equal(page, before)
+
+
+def _reference_background(
+    image: np.ndarray, mask: np.ndarray | None = None
+) -> int | tuple[int, ...]:
+    """Gathered pixels: each channel's dominant level above the gray Otsu split."""
+    if mask is None or not mask.any():
+        mask = np.ones(image.shape[:2], dtype=bool)
+    if image.ndim == 2:
+        gray = image
+    else:
+        wide = image.astype(np.int64)
+        gray = (
+            (11 * wide[..., 2] + 16 * wide[..., 1] + 5 * wide[..., 0]) // 32
+        ).astype(np.uint8)
+    background = mask & (gray >= otsu_threshold(np.bincount(gray[mask], minlength=256)))
+    if not background.any():
+        background = mask
+    if image.ndim == 2:
+        return dominant_level(np.bincount(image[background], minlength=256))
+    levels = [
+        dominant_level(np.bincount(image[..., c][background], minlength=256))
+        for c in range(min(3, image.shape[2]))
+    ]
+    return (*levels, 255) if image.shape[2] == 4 else tuple(levels)
+
+
+class TestMatchesTheGatherDefinition:
+    """Counting with a masked histogram gives the gathered pixels' answer."""
+
+    @pytest.mark.parametrize("channels", [None, 3, 4], ids=["gray", "bgr", "bgra"])
+    @pytest.mark.parametrize("masked", [False, True], ids=["whole", "masked"])
+    def test_random_pages_give_the_same_colour(
+        self, channels: int | None, masked: bool
+    ) -> None:
+        """Noisy two-tone pages, with and without a mask, agree channel by channel."""
+        rng = np.random.default_rng(17)
+        shape = (90, 70) if channels is None else (90, 70, channels)
+        ink = rng.random((90, 70)) < 0.3
+        if channels is not None:
+            ink = ink[..., None]
+        image = np.clip(rng.normal(200, 25, shape) - 150 * ink, 0, 255).astype(np.uint8)
+        mask = rng.random(shape[:2]) < 0.6 if masked else None
+
+        assert dominant_background_color(image, mask) == _reference_background(
+            image, mask
+        )
+
+    def test_counting_in_small_chunks_gives_the_same_colour(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Chunk edges inside rows' worth of pixels drop or double nothing."""
+        rng = np.random.default_rng(23)
+        image = rng.integers(0, 256, (61, 47, 3), dtype=np.uint8)
+        mask = rng.random((61, 47)) < 0.7
+        whole = dominant_background_color(image, mask)
+
+        monkeypatch.setattr(background_color, "_MAX_CHUNK_PIXELS", 47 * 5 + 3)
+
+        assert dominant_background_color(image, mask) == whole
+        assert whole == _reference_background(image, mask)
+
+    def test_two_equally_common_light_levels_resolve_to_the_lower_one(self) -> None:
+        """A tie between two dense background windows picks the first one."""
+        image = np.full((40, 40), 50, dtype=np.uint8)
+        image[:, 20:30] = 220
+        image[:, 30:] = 240
+
+        assert dominant_background_color(image) == 220
+        assert _reference_background(image) == 220

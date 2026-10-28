@@ -270,7 +270,7 @@ def _bilevel_if_needed(
     """Reduce a layer to 2-D 0/255 when it is stored as binary."""
     if foreground_type != ForegroundType.BINARY:
         return image
-    return np.where(_luma(image) < _BILEVEL_SPLIT, _BLACK, _WHITE).astype(np.uint8)
+    return np.where(_luma(image) < _BILEVEL_SPLIT, np.uint8(_BLACK), np.uint8(_WHITE))
 
 
 def _fill_where(

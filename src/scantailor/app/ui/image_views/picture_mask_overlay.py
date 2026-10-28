@@ -232,10 +232,11 @@ def _tinted(alpha: NDArray[np.uint8], color: QColor) -> QImage:
     """Return an image of a colour whose opacity is ``alpha``."""
     height, width = alpha.shape
     premultiplied = np.empty((height, width, 4), dtype=np.uint8)
+    scaled = np.empty((height, width), dtype=np.uint16)
     for channel, value in enumerate((color.red(), color.green(), color.blue(), 255)):
-        premultiplied[..., channel] = (alpha.astype(np.uint16) * value // 255).astype(
-            np.uint8
-        )
+        np.multiply(alpha, value, out=scaled, dtype=np.uint16)
+        scaled //= 255
+        premultiplied[..., channel] = scaled
     return QImage(
         premultiplied.data,
         width,

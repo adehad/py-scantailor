@@ -1,5 +1,6 @@
 """Dominant background colour of a page."""
 
+import cv2
 import numpy as np
 from numpy.typing import NDArray
 
@@ -8,6 +9,8 @@ from .filters import bgr_to_gray
 _LEVELS = 256
 # Width of the histogram window that is searched for the densest cluster of levels.
 _CLUSTER_WIDTH = 10
+# Each cv2.calcHist call counts at most this many pixels.
+_MAX_CHUNK_PIXELS = 1 << 23
 
 
 def otsu_threshold(hist: NDArray[np.int64]) -> int:
@@ -83,21 +86,51 @@ def dominant_background_color(
     if mask is not None and mask.shape != image.shape[:2]:
         msg = "image and mask have different sizes"
         raise ValueError(msg)
-    if mask is None or not mask.any():
-        mask = np.ones(image.shape[:2], dtype=bool)
+    if mask is not None and not mask.any():
+        mask = None
 
     gray = bgr_to_gray(image)
-    gray_hist = np.bincount(gray[mask], minlength=_LEVELS)
-    background = mask & (gray >= otsu_threshold(gray_hist))
+    background = gray >= otsu_threshold(_histogram(gray, 0, mask))
+    if mask is not None:
+        background &= mask
     if not background.any():
         background = mask
 
     if image.ndim == 2:
-        return dominant_level(np.bincount(image[background], minlength=_LEVELS))
+        return dominant_level(_histogram(image, 0, background))
     channels = [
-        dominant_level(np.bincount(image[..., c][background], minlength=_LEVELS))
-        for c in range(min(3, image.shape[2]))
+        dominant_level(_histogram(image, channel, background))
+        for channel in range(min(3, image.shape[2]))
     ]
     if image.shape[2] == 4:
         channels.append(255)
     return tuple(channels)
+
+
+def _histogram(
+    image: NDArray[np.uint8], channel: int, mask: NDArray[np.bool_] | None
+) -> NDArray[np.int64]:
+    """Count the levels of one channel of the pixels inside ``mask``.
+
+    ``cv2.calcHist`` counts in float32, which is exact only up to 2^24, so the
+    image is counted in chunks of rows below that and the counts summed as
+    integers.
+
+    Args:
+        image (NDArray[np.uint8]): 2-D gray or (H, W, C) image.
+        channel (int): Channel to count; 0 for gray.
+        mask (NDArray[np.bool_] | None): Pixels to count; None counts all.
+
+    Returns:
+        NDArray[np.int64]: Pixel count per level, length 256.
+    """
+    hist = np.zeros(_LEVELS, dtype=np.int64)
+    rows_per_chunk = max(1, _MAX_CHUNK_PIXELS // max(1, image.shape[1]))
+    for top in range(0, image.shape[0], rows_per_chunk):
+        rows = slice(top, top + rows_per_chunk)
+        chunk_mask = None if mask is None else mask[rows].view(np.uint8)
+        counts = cv2.calcHist(
+            [image[rows]], [channel], chunk_mask, [_LEVELS], [0, _LEVELS]
+        )
+        hist += counts.ravel().astype(np.int64)
+    return hist

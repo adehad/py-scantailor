@@ -868,9 +868,9 @@ def _generate_mixed_output(
     if render.need_binarization:
         ink = raw_ink
         if keep_despeckle_source:
-            source = np.where(raw_ink & text_region, 0, 255).astype(np.uint8)
+            source = np.where(raw_ink & text_region, np.uint8(0), np.uint8(255))
         if params.despeckle_strength > 0.0:
-            speckled = np.where(ink, 0, 255).astype(np.uint8)
+            speckled = np.where(ink, np.uint8(0), np.uint8(255))
             ink = _despeckle(speckled, params.despeckle_strength, dpi, dbg) == 0
         result = _compose_text(
             layer, ink, text_region, params, render, layout, dpi_pair, dbg
@@ -1078,7 +1078,6 @@ def _invert_polarity(image: NDArray[np.uint8]) -> NDArray[np.uint8]:
 _WEIGHT_R = 11
 _WEIGHT_G = 16
 _WEIGHT_B = 5
-_WEIGHT_SCALE = 32
 
 
 def _with_brightness(
@@ -1105,6 +1104,11 @@ def _replace_brightness(
 ) -> NDArray[np.uint8]:
     """Give a colour image a new luma while keeping its colour differences.
 
+    Each channel ``c`` becomes ``clip(c + b - round(S / 32), 0, 255)``, with
+    ``S = 5 B + 16 G + 11 R`` and halves rounded down, which is
+    ``c + b - ((S + 15) >> 5)``. The arithmetic stays in int16: S is at most
+    8160 and the unclipped value lies between -255 and 510.
+
     Args:
         image (numpy.ndarray of numpy.uint8): BGR(A) image. Not modified.
         brightness (numpy.ndarray of numpy.uint8): Target luma, same height and width.
@@ -1114,14 +1118,20 @@ def _replace_brightness(
             New image; an alpha channel is carried over unchanged.
     """
     result = image.copy()
-    color = image[..., :3].astype(np.float32)
-    luma = (
-        _WEIGHT_R * color[..., 2]
-        + _WEIGHT_G * color[..., 1]
-        + _WEIGHT_B * color[..., 0]
-    ) / _WEIGHT_SCALE
-    shifted = color + (brightness.astype(np.float32) - luma)[..., None]
-    result[..., :3] = np.clip(np.floor(shifted + 0.5), 0, 255).astype(np.uint8)
+    shift = image[..., 0].astype(np.int16)
+    shift *= _WEIGHT_B
+    term = np.empty_like(shift)
+    np.multiply(image[..., 1], _WEIGHT_G, out=term, dtype=np.int16)
+    shift += term
+    np.multiply(image[..., 2], _WEIGHT_R, out=term, dtype=np.int16)
+    shift += term
+    shift += 15
+    shift >>= 5
+    np.subtract(brightness, shift, out=shift, dtype=np.int16)
+    for channel in range(3):
+        np.add(image[..., channel], shift, out=term, dtype=np.int16)
+        np.clip(term, 0, 255, out=term)
+        result[..., channel] = term
     return result
 
 

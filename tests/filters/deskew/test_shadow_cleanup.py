@@ -3,10 +3,14 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 from scantailor.filters.deskew.filter import Filter
-from scantailor.filters.deskew.shadow_cleanup import remove_horizontal_shadows
+from scantailor.filters.deskew.shadow_cleanup import (
+    _halve_keeping_two_of_four,
+    remove_horizontal_shadows,
+)
 from scantailor.imageproc.analysis import SkewResult
 from tests.filters.deskew.synthetic_pages import text_page
 
@@ -149,3 +153,21 @@ class TestDetectSkewWithShadows:
         filter_.detect_skew(page, PAGE, dpi=DPI_300)
 
         assert (seen[0][-45:-5] == WHITE).all()
+
+
+@pytest.mark.parametrize("shape", [(2, 2), (7, 9), (64, 33), (1, 5), (5, 1)])
+def test_halving_marks_ink_where_two_of_four_sources_are_ink(
+    shape: tuple[int, int],
+) -> None:
+    """An output pixel is 1 when two of its 2 x 2 sources are; odd edges drop."""
+    ink = np.random.default_rng(shape[0] * 100 + shape[1]).integers(
+        0, 2, shape, dtype=np.uint8
+    )
+    height, width = shape[0] // 2 * 2, shape[1] // 2 * 2
+    blocks = ink[:height, :width].reshape(height // 2, 2, width // 2, 2)
+    expected = (blocks.astype(np.int64).sum(axis=(1, 3)) >= 2).astype(np.uint8)
+
+    halved = _halve_keeping_two_of_four(ink)
+
+    assert halved.dtype == np.uint8
+    np.testing.assert_array_equal(halved, expected)
