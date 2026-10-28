@@ -1,22 +1,23 @@
 """Compression and speed of the encoder against CCITT G4 from Pillow (libtiff)."""
 
 import io
+import sys
 import time
 from collections.abc import Callable
+from types import CodeType, FrameType
 
 import numpy as np
 import pytest
 from PIL import Image
 from sample_images import scanned_page, text_page
 
-from jbig2 import encode_pdf_stream
+from jbig2 import encode_pdf_stream, mq_coder
 
-# libtiff's G4 coder is a tight C loop over run lengths while the MQ coder
-# here is a Python loop over runs of equal decisions in every non-typical row,
-# so parity is not expected. The page measures about 25 times G4; the factor
-# guards against regressions such as coding each decision on its own, which
-# about doubles the time.
-_MAX_SLOWDOWN_VS_G4 = 40.0
+# Inside a run of equal decisions the coder codes every decision up to the
+# next renormalisation with one subtraction, so its loop runs about a dozen
+# lines per run on a text page; coding each decision on its own takes twice as
+# many.
+_MAX_ENCODE_LINES_PER_RUN = 16
 
 
 def _g4_strip(image: np.ndarray) -> bytes:
@@ -58,7 +59,50 @@ def test_stream_is_smaller_than_ccitt_g4(make_page, report_measurement) -> None:
     assert len(jbig2) < len(g4)
 
 
-def test_encode_time_is_within_a_factor_of_g4(text_page_2100x3000, report_measurement) -> None:
+def _lines_run_in(code: CodeType, function: Callable[[], object]) -> int:
+    """Count the source lines ``function`` executes inside ``code``."""
+    lines = 0
+
+    def count_lines(_frame: FrameType, event: str, _arg: object) -> object:
+        nonlocal lines
+        if event == "line":
+            lines += 1
+        return count_lines
+
+    def enter(frame: FrameType, _event: str, _arg: object) -> object:
+        return count_lines if frame.f_code is code else None
+
+    sys.settrace(enter)
+    try:
+        function()
+    finally:
+        sys.settrace(None)
+    return lines
+
+
+def test_the_mq_coder_runs_a_few_lines_per_run_of_equal_decisions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    image = text_page(700, 1000)
+    runs = 0
+    split = mq_coder._runs
+
+    def counting(contexts: np.ndarray, bits: np.ndarray):
+        nonlocal runs
+        found = split(contexts, bits)
+        runs += len(found[0])
+        return found
+
+    monkeypatch.setattr(mq_coder, "_runs", counting)
+
+    lines = _lines_run_in(mq_coder.MQEncoder.encode.__code__, lambda: encode_pdf_stream(image))
+
+    assert runs > 10_000
+    assert lines <= _MAX_ENCODE_LINES_PER_RUN * runs
+
+
+@pytest.mark.benchmark
+def test_encode_time_against_g4(text_page_2100x3000, report_measurement) -> None:
     image = text_page_2100x3000
 
     jbig2_seconds = _best_time(lambda: encode_pdf_stream(image))
@@ -69,4 +113,3 @@ def test_encode_time_is_within_a_factor_of_g4(text_page_2100x3000, report_measur
         f"JBIG2 {jbig2_seconds * 1000:.1f} ms, "
         f"Pillow G4 {g4_seconds * 1000:.1f} ms, ratio {jbig2_seconds / g4_seconds:.1f}"
     )
-    assert jbig2_seconds < _MAX_SLOWDOWN_VS_G4 * g4_seconds

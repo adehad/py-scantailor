@@ -1,12 +1,12 @@
 """Tests for the largest obstacle-free rectangle search."""
 
 import json
-import time
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+from scantailor.filters.select_content import max_whitespace
 from scantailor.filters.select_content.content_box_finder import _block_found
 from scantailor.filters.select_content.max_whitespace import (
     WhitespaceRect,
@@ -419,20 +419,24 @@ class _RescanningFinder:
         self._map[top:bottom, left:right] = True
 
 
-class TestWhitespaceSearchSpeed:
-    def test_block_cutting_loop_is_much_faster_than_rescanning(self) -> None:
+class TestWhitespaceSearchScansOnce:
+    def test_a_block_cutting_loop_scans_the_map_once_and_matches_rescanning(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         obstacles = _page_like_map(np.random.default_rng(5))
-
-        start = time.perf_counter()
         expected = _cut_sequence(_RescanningFinder, obstacles)
-        rescan_time = time.perf_counter() - start
-        start = time.perf_counter()
+        scans: list[tuple[int, ...]] = []
+
+        def counting(found_obstacles: np.ndarray) -> np.ndarray:
+            scans.append(found_obstacles.shape)
+            return _maximal_rectangles(found_obstacles)
+
+        monkeypatch.setattr(max_whitespace, "_maximal_rectangles", counting)
         actual = _cut_sequence(lambda m: WhitespaceSearch(m, 2, 1), obstacles)
-        incremental_time = time.perf_counter() - start
 
         assert actual == expected
         assert len(actual) > 20
-        assert rescan_time / incremental_time >= 3
+        assert scans == [obstacles.shape]
 
 
 def _cuts(ink: np.ndarray, search: str) -> list[list[int]]:

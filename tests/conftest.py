@@ -55,6 +55,29 @@ def pytest_configure(config: pytest.Config) -> None:
         QtCore.QLocale.setDefault(QtCore.QLocale(name))
 
 
+def pytest_terminal_summary(terminalreporter: pytest.TerminalReporter) -> None:
+    """List the timings benchmark tests recorded with ``record_property``.
+
+    Only properties named ``benchmark_*`` are listed. They travel in the test
+    reports, so they reach the summary from xdist workers too.
+
+    Args:
+        terminalreporter (pytest.TerminalReporter): pytest's reporter.
+    """
+    lines = [
+        f"{report.nodeid}: {name} = {value:.3f}"
+        for reports in terminalreporter.stats.values()
+        for report in reports
+        if getattr(report, "when", None) == "call"
+        for name, value in getattr(report, "user_properties", ())
+        if name.startswith("benchmark_")
+    ]
+    if lines:
+        terminalreporter.section("benchmarks")
+        for line in lines:
+            terminalreporter.write_line(line)
+
+
 @pytest.fixture(autouse=True, scope="session")
 def quiet_stderr_logging() -> None:
     """Keep loguru's stderr output to warnings and errors for the whole run."""

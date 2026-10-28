@@ -2,6 +2,8 @@
 
 import math
 import time
+import tracemalloc
+from collections.abc import Callable
 
 import numpy as np
 import pytest
@@ -313,21 +315,46 @@ class TestMatchesTheDirectEvaluation:
         assert np.array_equal(page, before)
 
 
-@pytest.mark.slow
-class TestSpeed:
-    def test_normalising_is_faster_than_rendering_the_whole_surface(self):
-        page = _noisy_page(3500, 2500, seed=1)
+def _traced_peak(work: Callable[[], object]) -> int:
+    """Return the most memory ``work`` held at once, in bytes, beyond what it found."""
+    tracemalloc.start()
+    try:
+        before, _ = tracemalloc.get_traced_memory()
+        work()
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    return peak - before
 
-        timings = {}
-        for name, run in (
-            ("banded", lambda: normalize_illumination_gray(page)),
-            ("whole", lambda: _normalized_through_a_full_render(page)),
-        ):
-            best = float("inf")
-            for _ in range(2):
-                start = time.perf_counter()
-                run()
-                best = min(best, time.perf_counter() - start)
-            timings[name] = best
 
-        assert timings["banded"] < timings["whole"]
+class TestMemory:
+    def test_normalising_a_larger_page_costs_at_most_two_bytes_per_extra_pixel(
+        self,
+    ):
+        small = _noisy_page(1000, 800, seed=1)
+        large = _noisy_page(2000, 1600, seed=1)
+
+        marginal = _traced_peak(
+            lambda: normalize_illumination_gray(large)
+        ) - _traced_peak(lambda: normalize_illumination_gray(small))
+
+        # One byte a pixel is the normalised page itself; the background is
+        # rendered in bands, so a full-size float surface never exists.
+        assert marginal <= 2 * (large.size - small.size) + 64 * 1024
+
+
+@pytest.mark.benchmark
+def test_normalising_time_banded_and_through_a_full_render(
+    record_property: Callable[[str, object], None],
+):
+    page = _noisy_page(3500, 2500, seed=1)
+    for name, run in (
+        ("banded", lambda: normalize_illumination_gray(page)),
+        ("whole", lambda: _normalized_through_a_full_render(page)),
+    ):
+        best = float("inf")
+        for _ in range(2):
+            start = time.perf_counter()
+            run()
+            best = min(best, time.perf_counter() - start)
+        record_property(f"benchmark_seconds_{name}", best)

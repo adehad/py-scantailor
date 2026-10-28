@@ -20,6 +20,7 @@ from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.page_split.page_layout import PageLayout
 from scantailor.filters.page_split.params import AutoManualMode
+from tests.ui.conftest import settle
 
 SKEW_DEGREES = 3.0
 DETECTION_TOLERANCE_DEG = 1.0
@@ -33,8 +34,7 @@ def _switch_stage(window: MainWindowManager, stage: FilterStage) -> None:
 def split_window(qtbot: QtBot, project_window: MainWindowManager) -> MainWindowManager:
     """A project window showing Page Split with its first render delivered."""
     _switch_stage(project_window, FilterStage.PAGE_SPLIT)
-    project_window.renderer.wait_for_done()
-    qtbot.wait(50)
+    settle(project_window)
     return project_window
 
 

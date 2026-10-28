@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-from PySide6 import QtWidgets
+from PySide6 import QtCore, QtWidgets
 from pytestqt.qtbot import QtBot
 
 from scantailor.app.ui.options_widgets.output import OptionsWidget
@@ -26,6 +26,23 @@ class _Panel:
         self.widget.set_current_page(PAGE)
         self.changed: list[PageId] = []
         self.widget.params_changed.connect(self.changed.append)
+        self.timer_starts = 0
+        timer = self.reload_timer
+        start = timer.start
+
+        def counted_start(*args: object) -> None:
+            self.timer_starts += 1
+            start(*args)
+
+        timer.start = counted_start  # type: ignore[method-assign]
+
+    @property
+    def reload_timer(self) -> QtCore.QTimer:
+        return self.widget._reload_timer
+
+    def let_the_delay_pass(self) -> None:
+        assert self.reload_timer.isActive()
+        self.reload_timer.timeout.emit()
 
     def find[T: QtWidgets.QWidget](self, kind: type[T], name: str) -> T:
         found = self.widget.findChild(kind, name)
@@ -33,18 +50,11 @@ class _Panel:
         return found
 
 
-@pytest.fixture
-def short_delay(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(OptionsWidget, "RELOAD_DELAY_MS", 30)
-
-
 def test_the_delay_matches_upstream():
     assert OptionsWidget.RELOAD_DELAY_MS == 750
 
 
-def test_a_burst_of_edits_renders_once_after_it_settles(
-    qtbot: QtBot, short_delay: None
-):
+def test_a_burst_of_edits_renders_once_after_it_settles(qtbot: QtBot):
     panel = _Panel(qtbot)
     spin = panel.find(QtWidgets.QSpinBox, "windowSizeSpinBox")
     combo = panel.find(QtWidgets.QComboBox, "methodCombo")
@@ -55,36 +65,35 @@ def test_a_burst_of_edits_renders_once_after_it_settles(
         spin.setValue(value)
 
     assert panel.changed == []
-    qtbot.waitUntil(lambda: panel.changed != [], timeout=2000)
-    qtbot.wait(100)
+    assert panel.reload_timer.interval() == OptionsWidget.RELOAD_DELAY_MS
+    panel.let_the_delay_pass()
     assert panel.changed == [PAGE]
+    assert not panel.reload_timer.isActive()
     assert panel.filter.get_params(PAGE).binarization.window_size == 150
 
 
-def test_each_edit_restarts_the_wait(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(OptionsWidget, "RELOAD_DELAY_MS", 300)
+def test_each_edit_restarts_the_wait(qtbot: QtBot):
     panel = _Panel(qtbot, Params(color_mode=ColorMode.COLOR_GRAYSCALE))
     spin = panel.find(QtWidgets.QSpinBox, "wienerWindowSpinBox")
 
-    spin.setValue(5)
-    qtbot.wait(180)
-    spin.setValue(7)
-    qtbot.wait(180)
+    spin.setValue(spin.value() + 2)
+    spin.setValue(spin.value() + 2)
 
+    assert panel.timer_starts == 2
     assert panel.changed == []
-    qtbot.waitUntil(lambda: panel.changed == [PAGE], timeout=2000)
+    panel.let_the_delay_pass()
+    assert panel.changed == [PAGE]
 
 
-def test_an_immediate_edit_sends_the_waiting_one_with_it(
-    qtbot: QtBot, short_delay: None
-):
+def test_an_immediate_edit_sends_the_waiting_one_with_it(qtbot: QtBot):
     panel = _Panel(qtbot, Params(color_mode=ColorMode.COLOR_GRAYSCALE))
     panel.find(QtWidgets.QSpinBox, "wienerWindowSpinBox").setValue(9)
 
     panel.find(QtWidgets.QCheckBox, "fillMarginsCB").click()
 
     assert panel.changed == [PAGE]
-    qtbot.wait(100)
+    assert not panel.reload_timer.isActive()
+    QtCore.QCoreApplication.processEvents()
     assert panel.changed == [PAGE]
 
 

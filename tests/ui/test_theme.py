@@ -10,6 +10,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from scantailor.app.ui import theme
 from scantailor.app.ui.theme import fonts, stylesheet
 from scantailor.app.ui.theme.tokens import DARK, LIGHT
+from tests.ui.conftest import flush_events
 
 SRC_ROOT = pathlib.Path(theme.__file__).resolve().parents[3]
 
@@ -412,7 +413,7 @@ def test_dock_splitters_always_show_a_grip(app, qtbot, scheme):
     window.resize(600, 400)
     window.show()
     qtbot.waitExposed(window)
-    qtbot.wait(50)
+    flush_events()
 
     gutter = QtCore.QRect(
         dock.geometry().right() + 1, 0, stylesheet.SPACE_S, window.height()

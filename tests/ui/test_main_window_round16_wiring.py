@@ -8,12 +8,12 @@ from pytestqt.qtbot import QtBot
 from scantailor.app.ui.MainWindow import MainWindowManager
 from scantailor.core.models import SubPage
 from scantailor.core.stage_sequence import FilterStage
+from tests.ui.conftest import settle
 
 
 @pytest.fixture
 def settled_window(qtbot: QtBot, project_window: MainWindowManager):
-    project_window.renderer.wait_for_done()
-    qtbot.wait(50)
+    settle(project_window)
     return project_window
 
 

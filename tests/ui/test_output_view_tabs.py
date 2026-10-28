@@ -17,6 +17,7 @@ from scantailor.core.models import Dpi
 from scantailor.core.transformation import ImageTransformation
 from scantailor.filters.output.despeckle import DespeckleLevel
 from scantailor.filters.output.params import DistortionModelSpec
+from tests.ui.conftest import flush_events
 
 IMAGE_WIDTH = 600
 IMAGE_HEIGHT = 800
@@ -446,9 +447,8 @@ class TestDespecklingTab:
         view.set_tabs(ALL_TABS, ImageViewTab.OUTPUT)
 
         view.set_despeckle_source(self._binary(), 300, DespeckleLevel.AGGRESSIVE)
-        qtbot.wait(300)
-        QtCore.QThreadPool.globalInstance().waitForDone(10000)
-        qtbot.wait(100)
+        assert QtCore.QThreadPool.globalInstance().waitForDone(10000)
+        flush_events()
 
         assert self._pixel(view, 20, 20) == (255, 255, 255)
         view.set_current_tab(ImageViewTab.DESPECKLING)

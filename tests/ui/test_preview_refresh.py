@@ -11,8 +11,8 @@ from scantailor.core.stage_sequence import FilterStage
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.select_content.content_box import ContentBox
+from tests.ui.conftest import RENDER_TIMEOUT_MS, settle
 
-RENDER_TIMEOUT_MS = 60_000
 PAINT_TIMEOUT_MS = 2_000
 CONTENT_BOX = ContentBox(x=100, y=200, width=300, height=400)
 
@@ -64,7 +64,7 @@ def _open_stage(
         timeout=RENDER_TIMEOUT_MS,
     )
     # Let the first paint and the full-quality redraw pass before counting.
-    qtbot.wait(ImageViewBase.HQ_TRANSFORM_DELAY_MS * 2)
+    settle(window, view._hq_timer)
     return view
 
 
@@ -125,7 +125,7 @@ def test_switching_an_output_tab_repaints_the_view(
     assert isinstance(view, OutputImageView)
     if view.current_tab() == tab:
         view.set_current_tab(ImageViewTab.FILL_ZONES)
-        qtbot.wait(ImageViewBase.HQ_TRANSFORM_DELAY_MS * 2)
+        settle(settled_window, view._hq_timer)
     counter = PaintCounter(view.viewport())
 
     view.set_current_tab(tab)

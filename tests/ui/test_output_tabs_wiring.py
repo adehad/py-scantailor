@@ -19,8 +19,7 @@ from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.core.transformation import ImageTransformation
 from scantailor.filters.output.params import ColorMode, DistortionModelSpec
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
-
-RENDER_TIMEOUT_MS = 60_000
+from tests.ui.conftest import RENDER_TIMEOUT_MS
 
 
 def test_a_model_mapped_into_the_view_and_back_is_unchanged() -> None:

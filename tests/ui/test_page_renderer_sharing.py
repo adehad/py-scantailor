@@ -18,8 +18,7 @@ from scantailor.core.models import Dpi, ImageId, PageId
 from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.select_content.content_box import ContentBox
-
-RENDER_TIMEOUT_MS = 30_000
+from tests.ui.conftest import RENDER_TIMEOUT_MS
 
 
 def _page(path: Path) -> PageId:

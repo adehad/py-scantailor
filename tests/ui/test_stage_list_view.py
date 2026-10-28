@@ -8,6 +8,7 @@ from scantailor.app.ui import theme
 from scantailor.app.ui.theme.tokens import DARK, LIGHT
 from scantailor.app.ui.widgets.stage_list_view import StageListView
 from scantailor.core.stage_sequence import StageSequence
+from tests.ui.conftest import flush_events
 
 
 @pytest.fixture
@@ -53,7 +54,7 @@ def test_rows_and_the_play_button_grow_with_the_font(stage_list, qtbot):
     font = stage_list.font()
     font.setPointSizeF(font.pointSizeF() + 4)
     stage_list.setFont(font)
-    qtbot.wait(10)
+    flush_events()
 
     assert stage_list.rowHeight(0) > row_before
     assert button.height() > button_before
@@ -89,7 +90,7 @@ def test_the_selected_stage_is_a_neutral_fill_with_an_accent_bar(themed, qtbot, 
     view.show()
     qtbot.waitExposed(view)
     view.selectRow(3)
-    qtbot.wait(10)
+    flush_events()
 
     image = view.viewport().grab().toImage()
     row = view.rowViewportPosition(3) + view.rowHeight(3) // 2

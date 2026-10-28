@@ -1,11 +1,13 @@
 """Tests for the page split detection entry point."""
 
 import time
+from collections.abc import Callable
 
 import cv2
 import numpy as np
 import pytest
 
+from scantailor.filters.page_split import page_layout_estimator
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.page_split.page_layout import PageLayoutType
 from scantailor.filters.page_split.split_finder import SplitResult, detect_split
@@ -76,17 +78,49 @@ class TestDetectSplit:
         assert result.layout.get_split_line_x() == 750.0
 
 
-@pytest.mark.slow
+_REDUCED_KERNELS = ("open_brick", "seed_fill", "h_shear", "find_skew_binary")
+
+
 @pytest.mark.parametrize(
     "layout_type", [LayoutType.AUTO_LAYOUT_TYPE, LayoutType.TWO_PAGES]
 )
-def test_an_a4_spread_at_300_dpi_is_analysed_in_a_few_seconds(
-    layout_type: LayoutType,
+def test_an_a4_spread_at_300_dpi_reaches_the_morphology_at_a_quarter_of_its_pixels(
+    monkeypatch: pytest.MonkeyPatch, layout_type: LayoutType
 ) -> None:
     page = pages.two_page_spread(3508, 2480)
-    detect_split(page[:300, :500], layout_type)  # compile kernels before timing
+    largest: dict[str, int] = {}
+
+    def spy(name: str) -> None:
+        kernel = getattr(page_layout_estimator, name)
+
+        def measured(*args: object, **kwargs: object) -> object:
+            arrays = (a for a in (*args, *kwargs.values()) if isinstance(a, np.ndarray))
+            sizes = [a.size for a in arrays]
+            largest[name] = max(largest.get(name, 0), *sizes, 0)
+            return kernel(*args, **kwargs)
+
+        monkeypatch.setattr(page_layout_estimator, name, measured)
+
+    for name in _REDUCED_KERNELS:
+        spy(name)
+
+    detect_split(page, layout_type, dpi=300.0)
+
+    assert largest, "no morphology kernel ran"
+    assert max(largest.values()) <= page.shape[0] * page.shape[1] // 4
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "layout_type", [LayoutType.AUTO_LAYOUT_TYPE, LayoutType.TWO_PAGES]
+)
+def test_an_a4_spread_at_300_dpi_analysis_time(
+    layout_type: LayoutType, record_property: Callable[[str, object], None]
+) -> None:
+    page = pages.two_page_spread(3508, 2480)
+    detect_split(page[:300, :500], layout_type)
 
     started = time.perf_counter()
     detect_split(page, layout_type, dpi=300.0)
 
-    assert time.perf_counter() - started < 5.0
+    record_property("benchmark_seconds", time.perf_counter() - started)

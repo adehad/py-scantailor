@@ -1,6 +1,8 @@
 """Tests for proximity-aware despeckling of bilevel images."""
 
+import threading
 import time
+from collections.abc import Callable
 
 import numpy as np
 import pytest
@@ -194,21 +196,56 @@ class TestDpiScaling:
         assert np.array_equal(despeckle(page, 0, NORMAL), despeckle(page, 300, NORMAL))
 
 
-@pytest.mark.slow
-class TestPerformance:
-    def test_full_page_with_twenty_thousand_specks_is_fast(self) -> None:
-        rng = np.random.default_rng(0)
-        page = _page(3000, 2100)
-        for top in range(200, 2800, 80):
-            for left in range(150, 1950, 40):
-                _ink(page, top, left, 24, 12)
-        page[rng.integers(0, 3000, 20000), rng.integers(0, 2100, 20000)] = 0
+def _text_page_with_specks(specks: int) -> np.ndarray:
+    rng = np.random.default_rng(0)
+    page = _page(3000, 2100)
+    for top in range(200, 2800, 80):
+        for left in range(150, 1950, 40):
+            _ink(page, top, left, 24, 12)
+    page[rng.integers(0, 3000, specks), rng.integers(0, 2100, specks)] = 0
+    return page
 
-        elapsed = float("inf")
-        for _ in range(2):
-            start = time.perf_counter()
-            result = despeckle(page, 300, NORMAL)
-            elapsed = min(elapsed, time.perf_counter() - start)
 
-        assert elapsed < 4.0  # loose: ~1.3 s idle, must not flake under CPU load
-        assert (result == 0).sum() < (page == 0).sum()
+def _profiler_events(work: Callable[[], object]) -> int:
+    """Count the Python and C function calls ``work`` makes, on every thread."""
+    events = 0
+
+    def count(_frame: object, event: str, _arg: object) -> None:
+        nonlocal events
+        if event in ("call", "c_call"):
+            events += 1
+
+    threading.setprofile_all_threads(count)
+    try:
+        work()
+    finally:
+        threading.setprofile_all_threads(None)
+    return events
+
+
+class TestWorkPerSpeck:
+    def test_ten_times_the_specks_make_no_more_function_calls(self) -> None:
+        few = _text_page_with_specks(2_000)
+        many = _text_page_with_specks(20_000)
+
+        few_calls = _profiler_events(lambda: despeckle(few, 300, NORMAL))
+        many_calls = _profiler_events(lambda: despeckle(many, 300, NORMAL))
+
+        # The page takes about 23,000 calls whatever its specks. One call per
+        # speck would add 18,000; 5 % is under 1,200.
+        assert many_calls <= few_calls * 1.05
+
+
+@pytest.mark.benchmark
+def test_full_page_with_twenty_thousand_specks_time(
+    record_property: Callable[[str, object], None],
+) -> None:
+    page = _text_page_with_specks(20_000)
+    elapsed = float("inf")
+    for _ in range(2):
+        start = time.perf_counter()
+        result = despeckle(page, 300, NORMAL)
+        elapsed = min(elapsed, time.perf_counter() - start)
+
+    record_property("benchmark_seconds", elapsed)
+    assert (result == 0).sum() < (page == 0).sum()

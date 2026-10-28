@@ -10,14 +10,14 @@ from scantailor.core.models import Dpi, Margins
 from scantailor.core.propagation import ApplyScope
 from scantailor.core.stage_sequence import FilterStage
 from scantailor.filters.fix_orientation.image_trim import ImageTrim
+from tests.ui.conftest import settle
 
 
 @pytest.fixture
 def settled_window(
     qtbot: QtBot, project_window: MainWindowManager
 ) -> MainWindowManager:
-    project_window.renderer.wait_for_done()
-    qtbot.wait(50)
+    settle(project_window)
     return project_window
 
 
@@ -158,8 +158,7 @@ class TestTrim:
     ):
         window = settled_window
         _switch_stage(window, FilterStage.FIX_ORIENTATION)
-        window.renderer.wait_for_done()
-        qtbot.wait(300)
+        settle(window)
         current = window.current_page
         assert current is not None
 

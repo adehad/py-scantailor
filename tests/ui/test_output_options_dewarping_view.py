@@ -13,6 +13,7 @@ from scantailor.app.ui.image_views.output import DewarpingImageView
 from scantailor.core.models import Dpi
 from scantailor.core.transformation import ImageTransformation
 from scantailor.filters.output.params import DistortionModelSpec
+from tests.ui.conftest import settle
 
 IMAGE_WIDTH = 600
 IMAGE_HEIGHT = 800
@@ -43,6 +44,10 @@ def view(qtbot: QtBot) -> DewarpingImageView:
         ),
     )
     return widget
+
+
+def _settle_depth_redraw(view: DewarpingImageView) -> None:
+    settle(None, view._editor._depth_redraw)
 
 
 def _widget_pos(view: DewarpingImageView, x: float, y: float) -> QtCore.QPointF:
@@ -146,7 +151,7 @@ class TestShowingAModel:
         self, qtbot: QtBot, view: DewarpingImageView
     ):
         view.set_depth_perception(2.5)
-        qtbot.wait(10)
+        _settle_depth_redraw(view)
 
         assert view.grid() is None
 
@@ -208,8 +213,7 @@ class TestShowingAModel:
 
         for depth in (1.2, 1.6, 2.4, 2.9):
             view.set_depth_perception(depth)
-        qtbot.waitUntil(lambda: bool(drawn))
-        qtbot.wait(20)
+        _settle_depth_redraw(view)
 
         assert drawn == [2.9]
 
@@ -228,7 +232,7 @@ class TestShowingAModel:
         monkeypatch.setattr(DewarpEditor, "_compute_grid", counting)
 
         view.set_distortion_model(CURVED, 2.5)
-        qtbot.wait(20)
+        _settle_depth_redraw(view)
 
         assert drawn == [2.5]
 

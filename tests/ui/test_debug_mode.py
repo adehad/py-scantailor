@@ -11,8 +11,8 @@ from scantailor.app.ui.MainWindow import MainWindowManager
 from scantailor.app.ui.widgets.debug_image_tabs import DebugImageTab, DebugImageTabs
 from scantailor.core.debug_images import DebugImages
 from scantailor.core.stage_sequence import FilterStage
+from tests.ui.conftest import RENDER_TIMEOUT_MS
 
-RENDER_TIMEOUT_MS = 60_000
 DESKEW_LABELS = ["Main", "bw_rotated", "after_cleanup"]
 
 
