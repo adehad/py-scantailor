@@ -1,6 +1,7 @@
 # pyScanTailor
 
 [![Documentation Status](https://readthedocs.org/projects/py-scantailor/badge/?version=latest)](https://py-scantailor.readthedocs.io/en/latest/)
+[![codecov](https://codecov.io/gh/adehad/py-scantailor/graph/badge.svg)](https://codecov.io/gh/adehad/py-scantailor)
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/adehad/py-scantailor)
 [![Dev Containers: Open](https://img.shields.io/static/v1?label=Dev%20Containers&message=Open&color=blue&logo=visualstudiocode)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/adehad/py-scantailor)
 
