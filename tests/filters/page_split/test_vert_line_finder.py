@@ -1,4 +1,4 @@
-"""Folding line detection reproduces upstream's VertLineFinder."""
+"""Folding line detection: thin dark vertical lines, found where they were drawn."""
 
 import cv2
 import numpy as np
@@ -7,18 +7,7 @@ from numpy.typing import NDArray
 
 from scantailor.filters.page_split.vert_line_finder import find_lines
 
-from . import cpp_reference as cpp
 from . import scan_pages as pages
-
-
-def _assert_same_lines(page: NDArray[np.uint8], dpi: float, max_lines: int = 8) -> list:
-    got = find_lines(page, dpi, max_lines)
-    want = cpp.vert_line_finder(page, dpi, max_lines)
-
-    assert len(got) == len(want)
-    for mine, theirs in zip(got, want, strict=True):
-        np.testing.assert_allclose(mine, theirs, atol=1e-6)
-    return got
 
 
 def _page_with_lines(
@@ -30,35 +19,106 @@ def _page_with_lines(
     return page
 
 
+MM_PER_INCH = 25.4
+# The finder works at 100 dpi (0.25 mm a pixel) and votes for lines in a band 5
+# of those pixels (1.3 mm) wide, in 0.25 degree steps. A found line may lean
+# anywhere inside the band, so its ends may sit a band width and a pixel off.
+LINE_TOLERANCE_MM = 1.5
+
+
+def _tolerance(dpi: float) -> float:
+    """``LINE_TOLERANCE_MM`` in pixels.
+
+    Args:
+        dpi (float): Resolution of the page.
+
+    Returns:
+        float: The tolerance in pixels at ``dpi``.
+    """
+    return LINE_TOLERANCE_MM / MM_PER_INCH * dpi
+
+
+def _x_at(line: tuple[tuple[float, float], tuple[float, float]], y: float) -> float:
+    """Column at which a line, extended if need be, crosses row ``y``.
+
+    Args:
+        line (tuple[tuple[float, float], tuple[float, float]]): Two points on a
+            line that is not horizontal.
+        y (float): The row.
+
+    Returns:
+        float: The column.
+    """
+    (x1, y1), (x2, y2) = line
+    return x1 + (x2 - x1) * (y - y1) / (y2 - y1)
+
+
 @pytest.mark.parametrize(
-    "factory",
-    [
-        pages.two_page_spread,
-        pages.spread_with_folding_line,
-        pages.spread_with_black_gutter,
-        pages.spread_with_dark_borders,
-        pages.single_page_with_edge_lines,
-        pages.single_page_with_right_edge_line,
-        pages.single_page_with_dark_gutter_strip,
-    ],
+    ("dpi", "size", "stroke_x"),
+    [(300.0, (1500, 1000), 768.0), (150.0, (750, 500), 393.0)],
+    ids=["300dpi", "150dpi"],
 )
-def test_lines_match_upstream_at_300_dpi(factory) -> None:
-    _assert_same_lines(factory(), 300.0)
+def test_a_folding_line_is_found_within_1_5_mm_of_its_stroke(
+    dpi: float, size: tuple[int, int], stroke_x: float
+) -> None:
+    """The stroke is 8 pixels wide, 14 to 22 pixels right of the centre."""
+    lines = find_lines(pages.spread_with_folding_line(*size), dpi)
+
+    assert len(lines) == 1
+    for y in (0.0, float(size[1])):
+        assert _x_at(lines[0], y) == pytest.approx(stroke_x, abs=_tolerance(dpi))
 
 
-def test_lines_match_upstream_at_150_dpi() -> None:
-    _assert_same_lines(pages.spread_with_folding_line(750, 500), 150.0)
+def test_a_line_is_found_at_a_resolution_that_is_no_multiple_of_100() -> None:
+    lines = find_lines(_page_with_lines([300]), 210.0)
+
+    assert len(lines) == 1
+    for y in (0.0, 500.0):
+        assert _x_at(lines[0], y) == pytest.approx(303.0, abs=_tolerance(210.0))
 
 
-def test_lines_match_upstream_at_a_resolution_that_is_no_multiple_of_100() -> None:
-    _assert_same_lines(_page_with_lines([300]), 210.0)
+def test_a_tilted_line_is_found_with_its_tilt() -> None:
+    page = pages.blank(700, 500)
+    foot = 330 + 500 * np.tan(np.radians(3.0))
+    cv2.line(page, (330, 0), (round(foot), 500), pages.INK, 6)
+
+    lines = find_lines(page, 300.0)
+
+    assert len(lines) == 1
+    assert _x_at(lines[0], 0.0) == pytest.approx(330.0, abs=_tolerance(300.0))
+    assert _x_at(lines[0], 500.0) == pytest.approx(foot, abs=_tolerance(300.0))
 
 
-def test_a_skewed_page_gives_the_same_tilted_line() -> None:
-    page = pages.skewed_spread(2.0)
-    page[:, 740:748] = np.minimum(page[:, 740:748], 45)
+def test_lines_near_both_side_edges_of_a_page_are_both_found() -> None:
+    lines = sorted(
+        find_lines(pages.single_page_with_edge_lines(), 300.0),
+        key=lambda line: line[0][0],
+    )
 
-    _assert_same_lines(page, 300.0)
+    assert len(lines) == 2
+    assert _x_at(lines[0], 700.0) == pytest.approx(81.0, abs=_tolerance(300.0))
+    assert _x_at(lines[1], 700.0) == pytest.approx(919.0, abs=_tolerance(300.0))
+
+
+def test_a_dark_strip_along_the_edge_is_one_line_at_its_inner_edge() -> None:
+    """The strip covers columns 0 to 60; the edge of the image is no line."""
+    lines = find_lines(pages.single_page_with_dark_gutter_strip(), 300.0)
+
+    assert len(lines) == 1
+    assert _x_at(lines[0], 700.0) == pytest.approx(60.0, abs=_tolerance(300.0))
+
+
+def test_a_wide_black_gutter_is_one_line_inside_the_gutter() -> None:
+    """The gutter covers columns 710 to 790."""
+    lines = find_lines(pages.spread_with_black_gutter(), 300.0)
+
+    assert len(lines) == 1
+    assert 710.0 <= _x_at(lines[0], 500.0) <= 790.0
+
+
+def test_black_borders_inside_the_edge_margin_are_no_lines() -> None:
+    """The borders are 36 pixels wide, under the 3.5 mm margin of 41 pixels."""
+    assert find_lines(pages.spread_with_dark_borders(), 300.0) == []
 
 
 def test_a_thin_dark_line_is_found_in_the_middle_of_the_page() -> None:

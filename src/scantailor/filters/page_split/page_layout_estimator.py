@@ -472,11 +472,6 @@ def _content_boxes(img: NDArray[np.bool_]) -> NDArray[np.int32]:
     return boxes[keep]
 
 
-def _content_columns(img: NDArray[np.bool_]) -> NDArray[np.int64]:
-    """Count, per column, the content components whose bounding box covers it."""
-    return _box_columns(_content_boxes(img), img.shape[1])
-
-
 def _box_columns(boxes: NDArray[np.int32], width: int) -> NDArray[np.int64]:
     """Count, per column, the boxes covering it.
 
