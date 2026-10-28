@@ -92,6 +92,14 @@ pages finish, and a higher one the next time a page starts. The program saves
 the count and uses it for every later batch. At the full core count it saves
 nothing, so a later move to a computer with more cores uses them all.
 
+The batch also runs no more pages at once than fit in three quarters of the
+computer's memory, whatever the slider says. It prices each page by its colour
+mode and its pixel count at the output resolution, and sizes the count for the
+costliest page. Mixed mode costs the most. One page always runs, even when it
+needs more memory than that. If the program cannot read the computer's memory
+size, the slider alone sets the count. The log's ``batch start`` line gives the
+count memory allows.
+
 On Windows at most 61 pages run at once, the most worker processes one pool can
 hold. A 32-bit build allows at most two.
 

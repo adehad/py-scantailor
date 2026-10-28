@@ -8,6 +8,7 @@ their own settings, so no lock-holding object is pickled.
 """
 
 import functools
+import math
 import multiprocessing
 import os
 import statistics
@@ -30,7 +31,12 @@ from loguru import logger
 from numpy.typing import NDArray
 
 from scantailor.core.dewarp_spec import DewarpSpec
-from scantailor.core.image_io import tiff_compressions_in_use, write_image
+from scantailor.core.image_io import (
+    ImageLoadError,
+    list_image_pages,
+    tiff_compressions_in_use,
+    write_image,
+)
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage, page_name
 from scantailor.core.output_reuse import build_record, is_reusable, output_params_hash
 from scantailor.core.page_source import DpiOverrides, load_page
@@ -41,6 +47,7 @@ from scantailor.core.pipeline import (
     process_page,
 )
 from scantailor.core.project import (
+    ImageMetadata,
     LayoutDirection,
     PageOutputRecord,
     StageParamsEntry,
@@ -59,12 +66,14 @@ from scantailor.core.stage_params import (
     collect_stage_params,
 )
 from scantailor.core.stage_sequence import FilterStage, StageSequence
+from scantailor.core.system_memory import process_rss_bytes, total_ram_bytes
 from scantailor.core.transformation import ImageTransformation
 from scantailor.core.worker_log import (
     WorkerLogging,
     start_worker_logging,
     worker_logging,
 )
+from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.generator import applied_post_deskew_angle
 from scantailor.filters.output.params import AutoPictureZones, DistortionModelSpec
 from scantailor.filters.output.params import Params as OutputParams
@@ -412,6 +421,95 @@ def pool_size(max_workers: int | None) -> int:
     if sys.platform == "win32":
         workers = min(workers, _MAX_WINDOWS_WORKERS)
     return workers
+
+
+# Ceiling on the memory Python allocates while one page goes through every
+# stage at one OpenCV thread, in bytes per source pixel, over every despeckle
+# level of each mode. Smaller pages cost more per pixel, since the row bands of
+# despeckle and the filters have a fixed height; these hold from 2400 x 1800 up.
+PAGE_BYTES_PER_PIXEL: dict[ColorMode, float] = {
+    ColorMode.BLACK_AND_WHITE: 28.0,
+    ColorMode.COLOR_GRAYSCALE: 16.0,
+    ColorMode.MIXED: 38.0,
+}
+# Resident memory of a spawned worker besides its page: about 75 MB idle with
+# the pipeline imported, plus room for OpenCV's own buffers and the allocator.
+WORKER_BASE_BYTES = 150 << 20
+# Share of physical memory the batch may fill, leaving the rest to the system
+# and the user's other programs.
+_RAM_SHARE = 0.75
+
+
+def memory_worker_limit(workers: int, page_bytes: int) -> int:
+    """Pages that fit in memory at once, at most ``workers``.
+
+    ``floor((0.75 * RAM - this process's RSS) / (WORKER_BASE_BYTES + page_bytes))``,
+    and at least one. Without a reading of the machine's memory it is ``workers``.
+
+    Args:
+        workers (int): Pool size.
+        page_bytes (int): Peak memory of the costliest page, beyond a worker's
+            base; see ``PAGE_BYTES_PER_PIXEL``.
+
+    Returns:
+        int: Pages to run at once, between 1 and ``workers``.
+    """
+    ram = total_ram_bytes()
+    if ram is None:
+        return workers
+    available = _RAM_SHARE * ram - (process_rss_bytes() or 0)
+    fit = math.floor(available / (WORKER_BASE_BYTES + page_bytes))
+    return max(1, min(workers, fit))
+
+
+def largest_page_bytes(
+    stages: StageSequence,
+    pages: Sequence[PageId],
+    default_dpi: float = DEFAULT_DPI,
+    dpi_overrides: DpiOverrides | None = None,
+) -> int:
+    """Peak memory of the costliest page to render, from its file's header.
+
+    Output resamples the page to its output resolution, so a page whose output
+    resolution exceeds its source's is priced at the upscaled pixel count. The
+    page's content box is not known before detection, so the whole source is.
+
+    Args:
+        stages (StageSequence): Stages whose Output colour mode and resolution
+            price each page.
+        pages (Sequence[PageId]): Pages of the batch.
+        default_dpi (float): Source resolution assumed when neither
+            ``dpi_overrides`` nor the file defines one.
+        dpi_overrides (Mapping[ImageId, Dpi] | None): Project resolutions that
+            win over the file's.
+
+    Returns:
+        int: ``PAGE_BYTES_PER_PIXEL`` of the page's mode times its pixel count
+            at the larger of its source and output resolutions, the largest
+            over ``pages``; 0 when no source can be read.
+    """
+    overrides = dpi_overrides or {}
+    sources: dict[ImageId, ImageMetadata] = {}
+    for path in {page.image_id.file_path for page in pages}:
+        try:
+            sources.update(list_image_pages(path))
+        except OSError, ImageLoadError:
+            continue
+    largest = 0.0
+    for page in pages:
+        source = sources.get(page.image_id)
+        if source is None:
+            continue
+        params = stages.output_filter.get_params(page)
+        dpi = overrides.get(page.image_id) or source.dpi
+        if dpi.is_null():
+            dpi = Dpi.uniform(round(default_dpi))
+        upscale = max(1.0, params.output_dpi.horizontal / dpi.horizontal) * max(
+            1.0, params.output_dpi.vertical / dpi.vertical
+        )
+        pixels = source.width * source.height * upscale
+        largest = max(largest, PAGE_BYTES_PER_PIXEL[params.color_mode] * pixels)
+    return math.ceil(largest)
 
 
 def configure_worker_threads() -> None:
@@ -913,8 +1011,9 @@ def run_batch(
             sources, as in ``output_file_names``.
         end_stage (FilterStage): Last stage to run. Only Output renders.
         worker_limit (Callable[[], int | None] | None): Asked before each page is
-            started for how many pages may run at once, at most ``max_workers``.
-            None, as the argument or the answer, means ``max_workers``.
+            started for how many pages may run at once, at most ``max_workers``
+            and at most as many as fit in memory (``memory_worker_limit``).
+            None, as the argument or the answer, means as many as fit.
         output_records (Mapping[PageId, PageOutputRecord] | None): Records of
             an earlier batch, as stored in ``Project.output_records``; every
             page is rendered when None.
@@ -994,13 +1093,25 @@ def run_batch(
             on_progress(event)
 
     workers = pool_size(max_workers)
+
+    def fit_in_memory(batch_pages: Sequence[PageId]) -> int:
+        page_bytes = largest_page_bytes(stages, batch_pages, default_dpi, dpi_overrides)
+        return memory_worker_limit(workers, page_bytes)
+
+    memory_limit = fit_in_memory(pages)
+
+    def running_limit() -> int:
+        asked = None if worker_limit is None else worker_limit()
+        return memory_limit if asked is None else min(asked, memory_limit)
+
     started = time.perf_counter()
     with logger.contextualize(stage="batch"):
         logger.info(
-            "batch start: {} pages to {}, {} workers",
+            "batch start: {} pages to {}, {} workers, {} at once by memory",
             len(pages),
             end_stage.name.lower(),
             workers,
+            memory_limit,
         )
     with ExitStack() as stack:
         pool = executor or stack.enter_context(spawn_pool(workers))
@@ -1017,7 +1128,7 @@ def run_batch(
                 dpi_overrides,
                 pool,
                 workers,
-                worker_limit,
+                running_limit,
                 cancel,
                 sink,
                 result,
@@ -1033,6 +1144,8 @@ def run_batch(
         if page_lister is not None and end_stage > FilterStage.PAGE_SPLIT:
             given = pages
             pages = _split_images(pages, page_lister, detect, report, result)
+            if pages != given:
+                memory_limit = fit_in_memory(pages)
             if result.replaced:
                 _erase_replaced_outputs(
                     result.replaced, given, pages, out_dir, layout_direction, labels
@@ -1065,7 +1178,7 @@ def run_batch(
                 dpi_overrides or {},
                 pool,
                 workers,
-                worker_limit,
+                running_limit,
                 cancel,
                 report,
                 result,

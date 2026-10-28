@@ -8,6 +8,7 @@ from collections.abc import Iterator
 from types import ModuleType
 from typing import Any
 
+import cv2
 import pytest
 from _pytest.faulthandler import fault_handler_stderr_fd_key
 from loguru import logger
@@ -216,3 +217,18 @@ def pytest_timeout_cancel_timer(item: pytest.Item) -> bool:
     """
     faulthandler.cancel_dump_traceback_later()
     return True
+
+
+@pytest.fixture
+def one_opencv_thread() -> Iterator[None]:
+    """Run OpenCV on one thread, as batch workers do, then restore the count.
+
+    Banded kernels hold one band per thread, so memory budgets are stated for
+    one thread.
+    """
+    previous = cv2.getNumThreads()
+    cv2.setNumThreads(1)
+    try:
+        yield
+    finally:
+        cv2.setNumThreads(previous)

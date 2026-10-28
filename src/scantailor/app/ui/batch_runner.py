@@ -130,6 +130,8 @@ class BatchRunner(QtCore.QObject):
     def worker_limit(self) -> int | None:
         """Pages processed at once, or None for one per worker process.
 
+        Either way the batch runs no more pages than fit in memory.
+
         A running batch picks up a new value the next time it starts a page.
         """
         return self._worker_limit
