@@ -50,6 +50,13 @@ reviews:
       instructions: |
         Apply all guidelines from AGENTS.md in the repository root.
         Focus on the "Code Review Focus" section - review what linters cannot catch.
+    - path: "tests/**/*.py"
+      instructions: |
+        tests/ruff.toml extends pyproject.toml and ignores ruff's D rules here.
+        Don't ask for docstring formatting, annotations or Args sections on
+        test_* functions or test classes. Helpers and fixtures keep type hints.
+        Ask for a one-line docstring only where a test's name doesn't make
+        clear what it tests. Review whether each test checks a stated outcome.
 
   abort_on_close: true
   disable_cache: false
@@ -74,9 +81,10 @@ reviews:
     ast-grep:
       essential_rules: true
 
+    # No config_file: it would apply the root config to every file and hide
+    # tests/ruff.toml, which turns off the D rules in tests.
     ruff:
       enabled: true
-      config_file: "pyproject.toml"
 
     # DISABLE irrelevant language-specific tools
     eslint:
