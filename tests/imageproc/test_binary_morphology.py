@@ -1,10 +1,10 @@
 """Opening by rectangles and seed fill on black-and-white images."""
 
+import cv2
 import numpy as np
 import pytest
 
 from scantailor.imageproc.binary_morphology import open_brick, seed_fill
-from tests.filters.page_split import cpp_reference as cpp
 
 
 def _blobs(height: int, width: int, seed: int) -> np.ndarray:
@@ -26,16 +26,43 @@ class TestOpenBrick:
     @pytest.mark.parametrize(
         ("width", "height"), [(4, 1), (1, 4), (7, 3), (20, 6), (6, 20), (3, 3), (1, 1)]
     )
-    def test_matches_upstream(
+    def test_opening_never_adds_pixels_and_a_second_opening_changes_nothing(
         self, width: int, height: int, black_surroundings: bool
     ) -> None:
         image = _blobs(70, 90, seed=width * 31 + height)
 
+        once = open_brick(image, width, height, black_surroundings=black_surroundings)
+        twice = open_brick(once, width, height, black_surroundings=black_surroundings)
+
+        assert not (once & ~image).any()
+        np.testing.assert_array_equal(twice, once)
+
+    @pytest.mark.parametrize("black_surroundings", [False, True])
+    def test_every_pixel_kept_lies_in_a_brick_that_fits_the_black(
+        self, black_surroundings: bool
+    ) -> None:
+        width, height = 7, 3
+        image = _blobs(70, 90, seed=5)
+        padded = np.pad(
+            image,
+            ((height, height), (width, width)),
+            constant_values=black_surroundings,
+        )
+        fits = np.zeros_like(padded)
+        for y in range(padded.shape[0] - height + 1):
+            for x in range(padded.shape[1] - width + 1):
+                if padded[y : y + height, x : x + width].all():
+                    fits[y : y + height, x : x + width] = True
+        expected = fits[height:-height, width:-width] & image
+
         got = open_brick(image, width, height, black_surroundings=black_surroundings)
 
-        np.testing.assert_array_equal(
-            got, cpp.open_brick(image, width, height, black_surroundings)
-        )
+        np.testing.assert_array_equal(got, expected)
+
+    def test_a_brick_of_one_pixel_keeps_the_image(self) -> None:
+        image = _blobs(30, 40, seed=2)
+
+        np.testing.assert_array_equal(open_brick(image, 1, 1), image)
 
     def test_a_bar_shorter_than_the_brick_disappears(self) -> None:
         image = np.zeros((5, 20), dtype=bool)
@@ -64,14 +91,33 @@ class TestOpenBrick:
 
 class TestSeedFill:
     @pytest.mark.parametrize("seed", range(4))
-    def test_matches_upstream(self, seed: int) -> None:
+    def test_fills_whole_components_that_hold_a_seed_and_nothing_else(
+        self, seed: int
+    ) -> None:
         mask = _blobs(60, 70, seed=seed)
         rng = np.random.default_rng(seed)
         seeds = rng.random(mask.shape) < 0.01
 
         got = seed_fill(seeds, mask)
 
-        np.testing.assert_array_equal(got, cpp.seed_fill_8(seeds, mask))
+        assert not (got & ~mask).any()
+        assert (got[seeds & mask]).all()
+        _, labels = cv2.connectedComponents(mask.astype(np.uint8), connectivity=8)
+        for label in np.unique(labels[mask]):
+            component = labels == label
+            assert got[component].all() == (seeds & component).any()
+            assert got[component].any() == got[component].all()
+
+    def test_a_diagonal_only_link_joins_two_blocks(self) -> None:
+        mask = np.zeros((6, 6), dtype=bool)
+        mask[0:3, 0:3] = True
+        mask[3:6, 3:6] = True
+        seeds = np.zeros_like(mask)
+        seeds[0, 0] = True
+
+        got = seed_fill(seeds, mask)
+
+        np.testing.assert_array_equal(got, mask)
 
     def test_keeps_whole_components_and_joins_diagonal_neighbours(self) -> None:
         mask = np.zeros((4, 6), dtype=bool)

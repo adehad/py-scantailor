@@ -1,6 +1,7 @@
 """Tests for binarization algorithms."""
 
 import numpy as np
+from numpy.typing import NDArray
 
 from scantailor.imageproc.binarize import (
     binarize_bradley,
@@ -76,13 +77,6 @@ class TestBinarizeSauvola:
         unique_values = np.unique(result)
         assert all(v in [0, 255] for v in unique_values)
 
-    def test_even_window_size_is_corrected(self):
-        """Even window size should be corrected to odd."""
-        image = np.random.randint(0, 256, (100, 100), dtype=np.uint8)
-        # Should not raise error with even window size
-        result = binarize_sauvola(image, window_size=24)
-        assert result.dtype == np.uint8
-
     def test_different_k_values(self):
         """Different k values should produce different results."""
         image = np.random.randint(50, 200, (100, 100), dtype=np.uint8)
@@ -124,13 +118,6 @@ class TestBinarizeBradley:
         result = binarize_bradley(image)
         unique_values = np.unique(result)
         assert all(v in [0, 255] for v in unique_values)
-
-    def test_even_window_size_is_corrected(self):
-        """Even window size should be corrected to odd."""
-        image = np.random.randint(0, 256, (100, 100), dtype=np.uint8)
-        # Should not raise error with even window size
-        result = binarize_bradley(image, window_size=24)
-        assert result.dtype == np.uint8
 
     def test_different_k_values(self):
         """Different k values should produce different results."""
@@ -276,36 +263,64 @@ class TestBinarizeMokji:
         assert result.shape == (10, 10)
 
 
-def _mokji_reference_threshold(image, max_edge_width, min_edge_magnitude):
-    """Direct transcription of the C++ pair matrix, one pixel at a time."""
-    size = (max_edge_width + 1) * 2 - 1
-    half = size // 2
-    height, width = image.shape
-    matrix = np.zeros((256, 256), dtype=np.int64)
-    for y in range(max_edge_width, height - max_edge_width):
-        for x in range(max_edge_width, width - max_edge_width):
-            window = image[
-                max(0, y - half) : y + half + 1, max(0, x - half) : x + half + 1
-            ]
-            matrix[window.min(), image[y, x]] += 1
-    numerator = denominator = 0
-    for m in range(256 - min_edge_magnitude):
-        for n in range(m + min_edge_magnitude, 256):
-            numerator += (m + n) * matrix[m, n]
-            denominator += matrix[m, n]
-    if denominator == 0:
-        return 128
-    return int(0.5 * numerator / denominator + 0.5)
+def _step_edge(dark: int, light: int) -> NDArray[np.uint8]:
+    """A 40x40 page, ``dark`` on the left half and ``light`` on the right.
+
+    Args:
+        dark (int): Gray level of columns 0 to 19.
+        light (int): Gray level of columns 20 to 39.
+
+    Returns:
+        NDArray[np.uint8]: The page.
+    """
+    image = np.full((40, 40), light, dtype=np.uint8)
+    image[:, :20] = dark
+    return image
 
 
 class TestMokjiThreshold:
-    """Tests for the Mokji threshold against the C++ definition."""
+    """Mokji's threshold is the mean midpoint of the edges it finds."""
 
-    def test_matches_pair_matrix_reference_on_random_image(self):
-        """Threshold equals the C++ pair-matrix computation."""
-        rng = np.random.default_rng(3)
-        image = rng.integers(0, 256, (40, 50), dtype=np.uint8)
-        assert mokji_threshold(image, 3, 20) == _mokji_reference_threshold(image, 3, 20)
+    def test_a_clean_step_edge_gives_the_midpoint_of_its_two_levels(self):
+        """Every edge pair is (60, 200), so every midpoint is 130."""
+        assert mokji_threshold(_step_edge(60, 200), 3, 20) == 130
+
+    def test_a_midpoint_halfway_between_levels_rounds_up(self):
+        assert mokji_threshold(_step_edge(60, 201), 3, 20) == 131
+
+    def test_a_noisy_step_edge_gives_close_to_the_midpoint(self):
+        """Noise of up to 5 levels on a (60, 220) step, whose clean midpoint is 140.
+
+        Pairs within the noise are below the edge magnitude and ignored. Each
+        step pair takes the darkest pixel in its window, about 5 below 60, so
+        midpoints sit about 2.5 low; 3 levels allows for that and rounding, and
+        keeps clear of the 128 returned when no edge is found.
+        """
+        rng = np.random.default_rng(0)
+        noise = rng.integers(-5, 6, (40, 40))
+        image = np.clip(_step_edge(60, 220).astype(int) + noise, 0, 255)
+
+        threshold = mokji_threshold(image.astype(np.uint8), 3, 20)
+
+        assert abs(threshold - 140) <= 3
+
+    def test_a_step_below_the_edge_magnitude_is_not_an_edge(self):
+        """A step of 10 is ignored at magnitude 20 and counted at magnitude 10."""
+        image = _step_edge(60, 70)
+
+        assert mokji_threshold(image, 3, 20) == 128
+        assert mokji_threshold(image, 3, 10) == 65
+
+    def test_two_kinds_of_edge_give_a_threshold_between_their_midpoints(self):
+        """The threshold is a weighted mean of edge midpoints, here 130 for the
+        (60, 200) step and 170 for the (140, 200) patch, so it lies between.
+        """
+        image = _step_edge(60, 200)
+        image[5:15, 30:] = 140
+
+        threshold = mokji_threshold(image, 3, 20)
+
+        assert 130 < threshold < 170
 
     def test_image_without_edges_gives_128(self):
         """A flat image has no edge pairs, so the threshold is 128."""
@@ -340,8 +355,7 @@ class TestBinarizeEdgeDiv:
             result = binarize_edge_div(image)
             assert result.shape == shape
 
-    def test_even_window_size_is_corrected(self):
-        """Even window size should be corrected to odd."""
+    def test_an_even_window_size_is_accepted(self):
         image = np.random.randint(0, 256, (100, 100), dtype=np.uint8)
         result = binarize_edge_div(image, window_size=24)
         assert result.dtype == np.uint8

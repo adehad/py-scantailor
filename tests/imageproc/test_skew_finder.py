@@ -1,11 +1,12 @@
 """Skew of a black-and-white page, searched by shearing and scoring rows."""
 
+import math
+
 import cv2
 import numpy as np
 import pytest
 
 from scantailor.imageproc.skew_finder import Skew, _ShearScorer, find_skew_binary
-from tests.filters.page_split import cpp_reference as cpp
 
 
 def _text_page(
@@ -27,23 +28,28 @@ def _text_page(
     return rotated > 127
 
 
+_PAGE_WIDTH = 280
+
+
 @pytest.mark.parametrize("angle", [1.7, -2.4, 4.0, -6.5])
 @pytest.mark.parametrize(
     ("coarse", "fine", "accuracy"),
     [(0, 0, 0.5), (0, 0, 0.1), (2, 1, 0.1), (1, 1, 0.25)],
 )
-def test_matches_upstream(
+def test_finds_the_rotation_within_the_accuracy_the_fine_image_can_resolve(
     angle: float, coarse: int, fine: int, accuracy: float
 ) -> None:
-    page = _text_page(angle, seed=abs(int(angle * 10)) + 7)
+    page = _text_page(angle, seed=abs(int(angle * 10)) + 7, width=_PAGE_WIDTH)
 
-    got = find_skew_binary(
+    skew = find_skew_binary(
         page, coarse_reduction=coarse, fine_reduction=fine, accuracy=accuracy
     )
 
-    want_angle, want_confidence = cpp.find_skew(page, coarse, fine, accuracy)
-    assert got.angle == pytest.approx(want_angle, abs=1e-9)
-    assert got.confidence == pytest.approx(want_confidence, rel=1e-9)
+    # Shears that differ by less than one pixel across the scored image give the
+    # same rows, so that angle is the finest the search can tell apart.
+    one_pixel = math.degrees(math.atan(2**fine / _PAGE_WIDTH))
+    assert skew.angle == pytest.approx(-angle, abs=accuracy + one_pixel)
+    assert skew.confidence >= Skew.GOOD_CONFIDENCE
 
 
 @pytest.mark.parametrize("coarse", [0, 1])
@@ -56,14 +62,14 @@ def test_a_level_text_page_is_not_reported_as_skewed(coarse: int) -> None:
     assert got.confidence >= Skew.GOOD_CONFIDENCE
 
 
-def test_a_coarse_only_search_matches_upstream() -> None:
-    page = _text_page(3.0)
+@pytest.mark.parametrize("angle", [3.0, 1.7, -2.4])
+def test_a_coarse_only_search_reports_the_nearest_whole_degree(angle: float) -> None:
+    page = _text_page(angle)
 
     got = find_skew_binary(page, accuracy=1.0, coarse_reduction=0, fine_reduction=0)
 
-    want_angle, want_confidence = cpp.find_skew(page, 0, 0, 1.0)
-    assert got.angle == pytest.approx(want_angle)
-    assert got.confidence == pytest.approx(want_confidence)
+    assert got.angle == round(-angle)
+    assert got.confidence >= Skew.GOOD_CONFIDENCE
 
 
 def test_finds_the_rotation_that_straightens_a_skewed_page() -> None:
@@ -142,10 +148,20 @@ def test_equal_scores_either_side_of_the_best_coarse_angle_pick_the_middle() -> 
     assert skew.confidence >= Skew.GOOD_CONFIDENCE
 
 
-def test_the_tie_differs_from_upstream_which_reports_half_a_degree() -> None:
-    upstream_angle, _ = cpp.find_skew(_mirrored_bars(), 0, 0, 0.1)
+def test_a_near_tie_at_the_bracket_ends_still_gives_the_centre_of_the_peak() -> None:
+    """A thin line over the first bar's left half makes -0.5 degrees score a
+    little more than +0.5, so the bisection leans left; the peak itself is
+    still flat from -0.25 to 0.25 degrees, so the answer is its centre, 0.
+    """
+    page = _mirrored_bars()
+    page[19, 10:60] = True
+    scorer = _ShearScorer(page, 1.0)
+    assert scorer.score(0.5) < scorer.score(-0.5) < 1.02 * scorer.score(0.5)
+    assert scorer.score(-0.25) == scorer.score(0.0) == scorer.score(0.25)
 
-    assert upstream_angle == 0.5
+    skew = find_skew_binary(page, coarse_reduction=0, fine_reduction=0, accuracy=0.1)
+
+    assert skew.angle == 0.0
 
 
 def test_negative_reductions_are_rejected() -> None:

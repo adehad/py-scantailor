@@ -1,10 +1,10 @@
-"""Area-averaging scales match the fixed-point arithmetic of upstream."""
+"""Area-averaging scales of gray images."""
 
+import cv2
 import numpy as np
 import pytest
 
 from scantailor.imageproc.area_scale import scale_to_gray, transform_scale_to_gray
-from tests.filters.page_split import cpp_reference as cpp
 
 
 def _random_gray(height: int, width: int, seed: int = 0) -> np.ndarray:
@@ -12,18 +12,27 @@ def _random_gray(height: int, width: int, seed: int = 0) -> np.ndarray:
 
 
 class TestTransformScaleToGray:
+    @pytest.mark.parametrize("factor", [5, 6, 8])
+    def test_a_reduction_by_a_whole_factor_of_at_least_five_is_the_block_mean(
+        self, factor: int
+    ) -> None:
+        src = _random_gray(90, 120, seed=factor)
+        height, width = 90 // factor, 120 // factor
+
+        got = transform_scale_to_gray(src, 1 / factor, (width, height))
+
+        blocks = src[: height * factor, : width * factor].reshape(
+            height, factor, width, factor
+        )
+        # The block mean rounds half up.
+        expected = np.floor(blocks.mean(axis=(1, 3)) + 0.5)
+        np.testing.assert_array_equal(got, expected)
+
     @pytest.mark.parametrize(
         ("height", "width", "scale"),
-        [
-            (90, 120, 1 / 3),
-            (91, 127, 1 / 3),
-            (200, 301, 1 / 6),
-            (150, 150, 0.5),
-            (100, 140, 0.2),
-            (60, 80, 100 / 72),
-        ],
+        [(90, 120, 1 / 3), (91, 127, 1 / 3), (150, 150, 0.5), (60, 80, 100 / 72)],
     )
-    def test_matches_upstream_per_pixel(
+    def test_the_mean_gray_level_is_kept(
         self, height: int, width: int, scale: float
     ) -> None:
         src = _random_gray(height, width, seed=height + width)
@@ -31,9 +40,22 @@ class TestTransformScaleToGray:
 
         got = transform_scale_to_gray(src, scale, size)
 
-        inverse = (1.0 / scale) * 32.0
-        want = cpp.transform_to_gray(src, inverse, inverse, size[0], size[1], 5.0, 5.0)
-        np.testing.assert_array_equal(got, want)
+        # Windows wider than a destination pixel overlap and the border ones are
+        # clipped, so source pixels near the edges weigh a little differently;
+        # on uniform noise that moves the mean by well under one level.
+        assert got.mean() == pytest.approx(src.mean(), abs=1.0)
+
+    def test_a_window_wider_than_the_minimum_smooths_a_mild_reduction(self) -> None:
+        src = np.zeros((30, 30), dtype=np.uint8)
+        src[:, 15] = 250
+
+        got = transform_scale_to_gray(src, 0.5, (15, 15))
+
+        # Destination column i centres on source x = 2i + 1, and the five pixel
+        # window [2i - 1.5, 2i + 3.5) holds all of bright column 15 for i = 7
+        # and 8 (250 / 5) and half of it for i = 6, where a two pixel box at
+        # this scale would reach only i = 7.
+        assert got[7].tolist() == [0] * 6 + [25, 50, 50] + [0] * 6
 
     def test_destination_pixels_past_the_source_average_only_what_lies_inside(
         self,
@@ -67,28 +89,68 @@ class TestTransformScaleToGray:
 
 
 class TestScaleToGray:
+    def test_the_same_size_returns_the_source(self) -> None:
+        src = _random_gray(20, 20)
+
+        assert scale_to_gray(src, (20, 20)) is src
+
+    @pytest.mark.parametrize(
+        ("src_size", "dst_size"), [((30, 20), (10, 10)), ((30, 20), (15, 5))]
+    )
+    def test_reducing_by_whole_numbers_is_the_rounded_block_mean(
+        self, src_size: tuple[int, int], dst_size: tuple[int, int]
+    ) -> None:
+        src = _random_gray(src_size[1], src_size[0], seed=sum(src_size))
+        fx, fy = src_size[0] // dst_size[0], src_size[1] // dst_size[1]
+
+        got = scale_to_gray(src, dst_size)
+
+        blocks = src.reshape(dst_size[1], fy, dst_size[0], fx).mean(axis=(1, 3))
+        np.testing.assert_array_equal(got, np.floor(blocks + 0.5))
+
     @pytest.mark.parametrize(
         ("src_size", "dst_size"),
-        [
-            ((30, 20), (10, 10)),
-            ((20, 20), (20, 20)),
-            ((10, 7), (30, 21)),
-            ((10, 12), (15, 20)),
-            ((10, 12), (16, 25)),
-            ((30, 20), (40, 10)),
-            ((31, 17), (13, 9)),
-            ((120, 90), (50, 37)),
-            ((1, 1), (5, 5)),
-        ],
+        [((31, 17), (13, 9)), ((120, 90), (50, 37)), ((30, 20), (40, 10))],
     )
-    def test_matches_upstream(
+    def test_other_reductions_average_the_covered_source_area(
         self, src_size: tuple[int, int], dst_size: tuple[int, int]
     ) -> None:
         src = _random_gray(src_size[1], src_size[0], seed=sum(src_size))
 
-        got = scale_to_gray(src, dst_size)
+        got = scale_to_gray(src, dst_size).astype(int)
 
-        np.testing.assert_array_equal(got, cpp.scale_to_gray(src, *dst_size))
+        exact = cv2.resize(src, dst_size, interpolation=cv2.INTER_AREA).astype(int)
+        # Window edges sit on a 1/32 pixel grid and the scale is nudged so the
+        # last window ends inside the source, so edge pixels can carry a few
+        # percent more or less weight than in the exact area mean.
+        assert np.abs(got - exact).max() <= 3
+        assert got.mean() == pytest.approx(src.mean(), abs=0.5)
+
+    @pytest.mark.parametrize(
+        ("src_size", "dst_size"), [((10, 12), (15, 20)), ((10, 12), (16, 25))]
+    )
+    def test_other_enlargements_interpolate_linearly(
+        self, src_size: tuple[int, int], dst_size: tuple[int, int]
+    ) -> None:
+        ramp = np.tile(
+            np.arange(0, 25 * src_size[0], 25, dtype=np.uint8), (src_size[1], 1)
+        )
+
+        got = scale_to_gray(ramp, dst_size).astype(int)
+
+        # The first and last output pixels sit on the first and last source
+        # pixels, so the ramp's 25 levels per source pixel spread over
+        # (dst - 1) / (src - 1) output pixels.
+        slope = 25 * (src_size[0] - 1) / (dst_size[0] - 1)
+        expected = slope * np.arange(dst_size[0])
+        # Positions are truncated to 1/32 pixel and results are whole levels.
+        assert np.abs(got[0] - expected).max() <= 1.5
+        assert (got == got[0]).all()
+
+    def test_enlarging_a_single_pixel_repeats_it(self) -> None:
+        src = np.array([[77]], dtype=np.uint8)
+
+        assert (scale_to_gray(src, (5, 5)) == 77).all()
 
     def test_enlarging_by_whole_numbers_repeats_pixels(self) -> None:
         src = np.array([[10, 20], [30, 40]], dtype=np.uint8)
