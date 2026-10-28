@@ -21,8 +21,7 @@ from scantailor.app.ui.options_widgets import (
 )
 from scantailor.core.stage_sequence import FilterStage
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
-
-RENDER_TIMEOUT_MS = 60_000
+from tests.ui.conftest import RENDER_TIMEOUT_MS, settle
 
 OPTIONS_WIDGET_TYPES = {
     FilterStage.FIX_ORIENTATION: fix_orientation.OptionsWidget,
@@ -194,12 +193,11 @@ def test_changing_page_cancels_a_slow_render(
             assert release.wait(timeout=30)
         return real_process_page(image, page_id, *args, **kwargs)
 
-    project_window.renderer.wait_for_done()
+    settle(project_window)
     monkeypatch.setattr(page_renderer.pipeline, "process_page", slow_process_page)
     project_window.renderer.render_done.connect(
         lambda page_id, _image: delivered.append(page_id)
     )
-    qtbot.wait(50)
     delivered.clear()
 
     project_window._request_render()
@@ -210,8 +208,7 @@ def test_changing_page_cancels_a_slow_render(
     ):
         project_window.goNextPage()
     release.set()
-    project_window.renderer.wait_for_done()
-    qtbot.wait(50)
+    settle(project_window)
 
     assert delivered == [second_page]
     assert project_window.current_page == second_page
@@ -246,8 +243,7 @@ def test_switching_stage_cancels_a_pending_render(
     ):
         _switch_stage(project_window, FilterStage.PAGE_SPLIT)
     release.set()
-    project_window.renderer.wait_for_done()
-    qtbot.wait(50)
+    settle(project_window)
 
     assert len(delivered) == 1
 
@@ -261,7 +257,7 @@ def test_a_page_that_cannot_be_decoded_is_logged_once_and_does_not_break_the_win
         project_window.renderer.render_failed, timeout=RENDER_TIMEOUT_MS
     ):
         project_window._request_render()
-    qtbot.wait(50)
+    settle(project_window)
 
     failures = [message for message in log_messages if "Cannot render" in message]
     assert len(failures) == 1

@@ -1,16 +1,19 @@
 """Filters that split their work between threads give the values of one thread."""
 
 import time
+from collections.abc import Callable
 
 import cv2
 import numpy as np
 import pytest
 from numpy.typing import NDArray
 
+from scantailor.imageproc import binarize
 from scantailor.imageproc.binarize import (
     _ink_below_level,
     binarize_otsu,
     binarize_wolf,
+    run_in_row_bands,
 )
 from scantailor.imageproc.filters import savgol_filter_2d
 
@@ -94,12 +97,37 @@ class TestInkBelowLevel:
         assert result.tolist() == [[0, 0, 255, 255]]
 
 
-@pytest.mark.slow
-@pytest.mark.skipif(cv2.getNumThreads() < 4, reason="needs several cores")
-def test_wolf_is_faster_on_threads_than_on_one_for_a_full_page(
+def test_wolf_on_a_full_page_runs_several_bands_and_gives_the_one_thread_pixels(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Measured against the same call restricted to one thread in this test."""
+    image = _gray_page(2400, 1700)
+    with monkeypatch.context() as single:
+        single.setattr(cv2, "getNumThreads", lambda: 1)
+        expected = binarize_wolf(image, 25)
+    bands: list[tuple[int, int]] = []
+
+    def recording(rows: int, band: Callable[[int, int], None]) -> None:
+        def recorded(first: int, stop: int) -> None:
+            bands.append((int(first), int(stop)))
+            band(first, stop)
+
+        run_in_row_bands(rows, recorded)
+
+    monkeypatch.setattr(binarize, "run_in_row_bands", recording)
+    monkeypatch.setattr(cv2, "getNumThreads", lambda: 8)
+
+    threaded = binarize_wolf(image, 25)
+
+    assert len(bands) > 1
+    assert sorted(bands)[0][0] == 0 and sorted(bands)[-1][1] == image.shape[0]
+    assert np.array_equal(threaded, expected)
+
+
+@pytest.mark.benchmark
+def test_wolf_full_page_time_on_threads_and_on_one(
+    monkeypatch: pytest.MonkeyPatch,
+    record_property: Callable[[str, object], None],
+) -> None:
     image = _gray_page(5983, 4280)
 
     def best_of_three() -> float:
@@ -110,9 +138,7 @@ def test_wolf_is_faster_on_threads_than_on_one_for_a_full_page(
             times.append(time.perf_counter() - start)
         return min(times)
 
-    threaded = best_of_three()
+    record_property("benchmark_seconds_threaded", best_of_three())
     with monkeypatch.context() as single:
         single.setattr(cv2, "getNumThreads", lambda: 1)
-        serial = best_of_three()
-
-    assert threaded < serial
+        record_property("benchmark_seconds_one_thread", best_of_three())

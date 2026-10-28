@@ -6,17 +6,14 @@ from pytestqt.qtbot import QtBot
 from scantailor.app.ui.MainWindow import MainWindowManager
 from scantailor.core.models import Dpi
 from scantailor.filters.output.color_mode import ColorMode
-from tests.ui.test_image_views_interaction import (
-    RENDER_TIMEOUT_MS,
-    _open_output_view,
-)
+from tests.ui.conftest import RENDER_TIMEOUT_MS, flush_events, settle
+from tests.ui.test_image_views_interaction import _open_output_view
 
 
 def _rerender_after(qtbot: QtBot, window: MainWindowManager, edit) -> None:
     with qtbot.waitSignal(window.renderer.render_done, timeout=RENDER_TIMEOUT_MS):
         edit()
-    window.renderer.wait_for_done()
-    qtbot.wait(50)
+    settle(window)
 
 
 @pytest.mark.slow
@@ -70,7 +67,7 @@ def test_scroll_position_survives_a_rerender_that_keeps_the_image_size(
 ):
     view = _open_output_view(qtbot, project_window)
     view.set_zoom(3.0)
-    qtbot.wait(50)
+    flush_events()
     bar = view.verticalScrollBar()
     bar.setValue(bar.minimum() + (bar.maximum() - bar.minimum()) // 3)
     before = view.verticalScrollBar().value()

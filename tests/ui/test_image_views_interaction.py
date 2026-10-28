@@ -28,8 +28,8 @@ from scantailor.core.zones import PictureLayer
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.select_content.content_box import ContentBox
+from tests.ui.conftest import RENDER_TIMEOUT_MS, settle
 
-RENDER_TIMEOUT_MS = 60_000
 PAGE_WIDTH = 600
 PAGE_HEIGHT = 800
 MM_PER_INCH = 25.4
@@ -252,8 +252,7 @@ def test_a_dragged_split_line_stays_where_it_was_dropped_after_the_rerender(
     _drag_and_rerender(
         qtbot, project_window, view, top_handle, top_handle + QtCore.QPointF(40, 0)
     )
-    project_window.renderer.wait_for_done()
-    qtbot.wait(50)
+    settle(project_window)
 
     stored = project_window.stages.page_split_filter.get_params(page).page_layout
     assert np.array(view.page_layout.cutter1) == pytest.approx(np.array(stored.cutter1))
@@ -619,8 +618,7 @@ def test_zooming_changes_the_view_transform_but_not_the_stored_parameters(
         qtbot.waitUntil(lambda: view.image is not None, timeout=RENDER_TIMEOUT_MS)
     else:
         view = _open_stage(qtbot, project_window, stage)
-    project_window.renderer.wait_for_done()
-    qtbot.wait(100)
+    settle(project_window)
 
     def snapshot() -> tuple[object, ...]:
         return (
@@ -660,8 +658,7 @@ def test_zoom_survives_the_rerender_that_follows_an_edit(
         inside + QtCore.QPointF(10, 10),
         modifier=QtCore.Qt.KeyboardModifier.ShiftModifier,
     )
-    project_window.renderer.wait_for_done()
-    qtbot.wait(50)
+    settle(project_window)
 
     assert view.zoom_level == pytest.approx(zoomed)
 

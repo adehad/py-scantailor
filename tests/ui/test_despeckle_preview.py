@@ -12,6 +12,7 @@ from scantailor.app.ui.image_views.despeckle_preview import (
 )
 from scantailor.filters.output.despeckle import DespeckleLevel, DespeckleStrength
 from scantailor.imageproc.despeckle import despeckle
+from tests.ui.conftest import flush_events
 
 DPI = 300
 SPECK = (slice(20, 22), slice(20, 22))
@@ -114,7 +115,7 @@ class TestPreviewer:
         previewer.request(_page(), DPI, DespeckleLevel.AGGRESSIVE)
         QThreadPool.globalInstance().waitForDone(10000)
         qtbot.waitUntil(lambda: bool(delivered), timeout=5000)
-        qtbot.wait(100)
+        flush_events()
 
         assert len(delivered) == 1
         assert np.all(delivered[0][SPECK] == SPECKLE_RGB)

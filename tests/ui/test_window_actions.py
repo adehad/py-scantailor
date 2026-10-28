@@ -33,9 +33,9 @@ from scantailor.filters.page_split.page_layout import PageLayout
 from scantailor.filters.page_split.params import Params as SplitParams
 from scantailor.filters.select_content.content_box import ContentBox, PageBox
 from scantailor.filters.select_content.params import Params as SelectContentParams
+from tests.ui.conftest import RENDER_TIMEOUT_MS, settle
 
 BATCH_TIMEOUT_MS = 300_000
-RENDER_TIMEOUT_MS = 60_000
 _BATCH_THREADS_KEY = "settings/batch_processing_threads"
 
 
@@ -109,8 +109,7 @@ def settled_window(
     qtbot: QtBot, project_window: MainWindowManager
 ) -> MainWindowManager:
     """A project window whose first render has been delivered."""
-    project_window.renderer.wait_for_done()
-    qtbot.wait(50)
+    settle(project_window)
     return project_window
 
 
@@ -254,8 +253,7 @@ class TestBatchProcessing:
     ):
         window = settled_window
         _switch_stage(window, FilterStage.SELECT_CONTENT)
-        window.renderer.wait_for_done()
-        qtbot.wait(50)
+        settle(window)
         page = window.current_page
         assert page is not None
         stored_before = window.stages.select_content_filter.get_params(page)
@@ -648,8 +646,7 @@ class TestApplyTo:
         polarity.click()
         # The renders started so far measure the printed pages as black on
         # white; they all end before Apply, as a loaded machine can make them.
-        qtbot.waitUntil(lambda: window.renderer.wait_for_done(0), timeout=60_000)
-        qtbot.wait(50)
+        settle(window)
         before = {page: output.get_params(page) for page in pages}
         button = window.filterOptions.findChild(
             QtWidgets.QPushButton, "apply_processing_btn"

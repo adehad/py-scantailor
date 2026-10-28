@@ -8,6 +8,7 @@ from scantailor.app.ui import theme
 from scantailor.app.ui.theme import stylesheet
 from scantailor.app.ui.theme.tokens import LIGHT
 from scantailor.app.ui.widgets.collapsible_group_box import CollapsibleGroupBox
+from tests.ui.conftest import flush_events
 
 
 @pytest.fixture
@@ -137,14 +138,14 @@ def test_space_on_the_focused_header_toggles_the_group(card, qtbot):
 def test_a_collapsed_group_shows_just_its_title(card, qtbot):
     group, body = card
     group.set_collapsed(True)
-    qtbot.wait(10)
+    flush_events()
     assert not body.isVisible()
     assert group.header().isVisible()
     assert group.title() == "Binarization"
     expected = group.header().geometry().bottom() + 1 + stylesheet.SPACE_XS
     assert group.height() == expected
     group.set_collapsed(False)
-    qtbot.wait(10)
+    flush_events()
     assert body.isVisible()
     assert group.height() > expected
 

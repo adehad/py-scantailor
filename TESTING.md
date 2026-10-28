@@ -9,7 +9,7 @@ pdm run pytest -n0 tests/file.py::test_name  # one test, serially, for debugging
 pdm run cov                                  # coverage report in dist/cov/
 ```
 
-CI runs `pdm run cov -m "not docs_screenshot"`: every test, the slow ones included, in one job, with the 30 slowest listed at the end.
+CI runs `pdm run cov -m "not benchmark and not docs_screenshot"`: every test, the slow ones included, in one job, with the 30 slowest listed at the end.
 
 Qt tests need no display: CI sets `QT_QPA_PLATFORM=offscreen`, and the same works locally.
 
@@ -40,6 +40,7 @@ pdm run pytest --qt-locale=sv_SE tests/ui
 | ----------------- | ---------------------------------------------------------------------------- |
 | `slow`            | Takes more than about 2 s. Excluded from the default run.                    |
 | `docs_screenshot` | Drives the window to save the manual's PNGs. Run with `-m docs_screenshot`. |
+| `benchmark`       | Reports a timing in the run's summary and never fails on it. Excluded from the default run. Run with `-m benchmark -n0` on an idle machine. |
 
 ## Layout
 

@@ -13,6 +13,7 @@ from scantailor.app.ui.thumbnails import ThumbnailListWidget
 from scantailor.core.models import ImageId, PageId
 from scantailor.core.project import ImageMetadata, Project
 from scantailor.core.settings import ApplicationSettings
+from tests.ui.conftest import flush_events
 from tests.ui.hosting import show_in_host
 
 SOURCE_SIZE = QSize(800, 1200)
@@ -151,7 +152,7 @@ class TestColumns:
     ) -> None:
         widget.set_cell_size(QSize(250, 160))
         widget.window().resize(widget.view.minimumWidth() + 40, 700)
-        qtbot.wait(50)
+        flush_events()
 
         assert cell(widget, 0)[0] == cell(widget, 1)[0]
 

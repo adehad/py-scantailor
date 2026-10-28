@@ -21,11 +21,11 @@ from scantailor.filters.output.dewarping_options import DewarpingMode, Dewarping
 from scantailor.filters.output.filter import Filter
 from scantailor.filters.output.params import Params
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
+from tests.ui.conftest import RENDER_TIMEOUT_MS
 
 PAGE = PageId(
     image_id=ImageId(file_path=Path("page.tif")), sub_page=SubPage.SINGLE_PAGE
 )
-RENDER_TIMEOUT_MS = 60_000
 OTHER_PAGE = PageId(
     image_id=ImageId(file_path=Path("other.tif")), sub_page=SubPage.SINGLE_PAGE
 )

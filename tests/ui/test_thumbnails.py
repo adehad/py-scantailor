@@ -21,6 +21,7 @@ from scantailor.app.ui.thumbnails.model import IsCurrentRole
 from scantailor.core.models import ImageId, PageId
 from scantailor.core.project import ImageMetadata, Project
 from scantailor.core.settings import ApplicationSettings
+from tests.ui.conftest import flush_events
 from tests.ui.hosting import show_in_host
 
 WIDTHS = [900, 300, 600, 450]
@@ -483,7 +484,7 @@ def test_cache_hit_avoids_second_render(
     widget.invalidate()
     widget.view.viewport().repaint()
     widget.model.wait_for_idle()
-    qtbot.wait(50)
+    flush_events()
     assert len(renderer.calls) == rendered
 
 
@@ -533,7 +534,7 @@ def test_failed_render_is_not_retried_in_a_loop(
     show_in_host(qtbot, thumbnails, 240, 700)
     thumbnails.view.viewport().repaint()
     thumbnails.model.wait_for_idle()
-    qtbot.wait(100)
+    flush_events()
     thumbnails.view.viewport().repaint()
     thumbnails.model.wait_for_idle()
     assert len(attempts) == len(WIDTHS)
@@ -755,7 +756,7 @@ def test_queued_renders_of_a_stage_that_is_no_longer_shown_are_skipped(
     model.set_stage("output")
     release.set()
     model.wait_for_idle()
-    qtbot.wait(50)
+    flush_events()
 
     assert [stage for _page, stage in calls] == ["page_split"]
 

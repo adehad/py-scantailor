@@ -19,8 +19,7 @@ from tests.dewarping.synthetic import (
     PAGE_WIDTH,
     curved_text_page,
 )
-
-RENDER_TIMEOUT_MS = 20_000
+from tests.ui.conftest import RENDER_TIMEOUT_MS
 
 
 def _curved_page(tmp_path: Path, mode: DewarpingMode) -> tuple[PageId, StageSequence]:

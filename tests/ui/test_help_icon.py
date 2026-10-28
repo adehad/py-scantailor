@@ -24,6 +24,7 @@ from scantailor.app.ui.widgets.help_icon import (
     install_help_icons,
 )
 from scantailor.core.stage_sequence import StageSequence
+from tests.ui.conftest import flush_events
 
 OPTION_CONTROLS = (
     QtWidgets.QAbstractButton,
@@ -224,7 +225,7 @@ def test_a_help_group_gets_one_button_and_its_buttons_keep_their_own_tooltips(
     install_help_icons(root)
 
     modes[0].setToolTip("Off, reworded.")
-    qtbot.wait(10)
+    flush_events()
 
     assert [button.control for button in root.findChildren(HelpButton)] == [row]
     assert modes[0].toolTip() == "Off, reworded."

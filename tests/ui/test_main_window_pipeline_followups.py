@@ -15,6 +15,7 @@ from scantailor.core.default_params import DefaultParams, PageLayoutDefaults
 from scantailor.core.models import Margins, PageId, SubPage
 from scantailor.core.settings import ApplicationSettings
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
+from tests.ui.conftest import settle
 
 
 @pytest.fixture
@@ -28,8 +29,7 @@ def auto_save_enabled():
 
 @pytest.fixture
 def settled_window(qtbot: QtBot, project_window: MainWindowManager):
-    project_window.renderer.wait_for_done()
-    qtbot.wait(50)
+    settle(project_window)
     return project_window
 
 

@@ -102,7 +102,7 @@ typecheck = "pyrefly check"
 # After a worker crashes, loadgroup never hands out the tests it held and the run
 # waits forever, so a crash ends the run instead (the worker's stack dump is in
 # the log).
-addopts = "-m 'not slow and not docs_screenshot' -n auto --dist loadgroup --max-worker-restart=0"
+addopts = "-m 'not slow and not docs_screenshot and not benchmark' -n auto --dist loadgroup --max-worker-restart=0"
 # The slowest default test takes about 10 s and the slowest slow one about 35 s. A
 # test past the limit dumps every thread's stack and ends its worker, failing the run
 # (see pytest_timeout_set_timer in tests/conftest.py). Mark longer tests with
@@ -111,6 +111,7 @@ timeout = 120
 markers = [
     "slow: takes more than about 2 s; excluded from the default run",
     "docs_screenshot: drives the window to save the manual's PNGs; run with pytest -m docs_screenshot",
+    "benchmark: reports a timing and never fails on it; run with pytest -m benchmark -n0",
 ]
 
 [tool.pyrefly]

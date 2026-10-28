@@ -14,11 +14,11 @@ from scantailor.core.image_io import list_image_pages
 from scantailor.core.project import Project
 from scantailor.core.recent_projects import DEFAULT_MAX_ITEMS
 from scantailor.core.stage_sequence import FilterStage
+from tests.ui.conftest import RENDER_TIMEOUT_MS
 
 if TYPE_CHECKING:
     from conftest import FileDialogStub, PageImages, SavePromptScript
 
-RENDER_TIMEOUT_MS = 60_000
 DESKEW_ANGLE = 1.5
 
 

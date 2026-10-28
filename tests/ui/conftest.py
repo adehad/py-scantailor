@@ -11,7 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import numpy as np
 import pytest
 import shiboken6
-from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import QtCore, QtGui, QtTest, QtWidgets
 from pytestqt.qtbot import QtBot
 
 from scantailor.app._ui import resources_rc
@@ -31,6 +31,61 @@ BLOB_HEIGHT = 14
 MIN_WORD_WIDTH = 20
 # 300 dpi; the default Qt writes (about 100 dpi) would open the Fix DPI dialog.
 SCAN_DOTS_PER_METER = 11811
+# Bounds a wait for renders; a test that reaches it has hung, not run slowly.
+RENDER_TIMEOUT_MS = 60_000
+
+
+def flush_events() -> None:
+    """Deliver every posted event and queued signal now, without waiting."""
+    QtCore.QCoreApplication.sendPostedEvents()
+    QtWidgets.QApplication.processEvents()
+
+
+def settle(
+    window: MainWindowManager | None = None,
+    *timers: QtCore.QTimer,
+    timeout_ms: int = RENDER_TIMEOUT_MS,
+) -> None:
+    """Wait until nothing is pending, then deliver what finished.
+
+    Pending means a render or thumbnail job of ``window`` still running, the
+    window still waiting for the page it shows, or one of ``timers`` active.
+    Delivering results can start more work, such as thumbnails requested as
+    the list paints, so the wait ends only when a round of delivery leaves
+    nothing pending.
+
+    Args:
+        window (MainWindowManager | None): Window whose workers to wait for.
+        *timers (QtCore.QTimer): Timers to wait out, such as a view's delayed
+            full-quality redraw.
+        timeout_ms (int): Longest wait in all; reaching it fails the test.
+    """
+    deadline = QtCore.QDeadlineTimer(timeout_ms)
+
+    def pending() -> bool:
+        if any(timer.isActive() for timer in timers):
+            return True
+        return window is not None and (
+            window.render_pending
+            or not window.renderer.wait_for_done(0)
+            or not window.thumbnails.model.wait_for_idle(0)
+        )
+
+    while True:
+        if window is not None:
+            assert window.renderer.wait_for_done(deadline.remainingTime()), (
+                "a render is still running"
+            )
+            assert window.thumbnails.model.wait_for_idle(deadline.remainingTime()), (
+                "thumbnail workers still busy"
+            )
+        for timer in timers:
+            if timer.isActive():
+                QtTest.QTest.qWait(max(1, timer.remainingTime()))
+        flush_events()
+        if not pending():
+            return
+        assert not deadline.hasExpired(), "still pending after the timeout"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -432,25 +487,9 @@ def project_window(
     respond_to_modal(accept=True)
     main_window.actionNewProject.trigger()
     assert main_window.project is not None
-    _wait_until_no_scan_is_open(main_window)
+    # Windows will not move or delete a scan a worker still holds open.
+    settle(main_window)
     return main_window
-
-
-def _wait_until_no_scan_is_open(window: MainWindowManager) -> None:
-    """Wait until no render or thumbnail worker reads a scan.
-
-    Windows will not move or delete a scan a worker still holds open. Thumbnails
-    are requested as the list paints, so draining the event loop can start new
-    renders; the wait ends only when a drain starts none.
-    """
-    model = window.thumbnails.model
-    deadline = QtCore.QDeadlineTimer(10_000)
-    while True:
-        assert window.renderer.wait_for_done(deadline.remainingTime())
-        assert model.wait_for_idle(deadline.remainingTime())
-        QtWidgets.QApplication.processEvents()
-        if window.renderer.wait_for_done(0) and model.wait_for_idle(0):
-            return
 
 
 @dataclasses.dataclass

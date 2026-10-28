@@ -17,12 +17,12 @@ from scantailor.core.stage_sequence import FilterStage
 from scantailor.core.transformation import ImageTransformation
 from scantailor.filters.output.params import ColorMode
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
+from tests.ui.conftest import RENDER_TIMEOUT_MS
 
 IMAGE_WIDTH = 600
 IMAGE_HEIGHT = 800
 LEFT = QtCore.Qt.MouseButton.LeftButton
 MESSAGE = "Picture zones are only available in Mixed mode."
-RENDER_TIMEOUT_MS = 60_000
 
 
 def _triangle() -> ViewZone:
