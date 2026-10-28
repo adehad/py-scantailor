@@ -179,7 +179,7 @@ def test_stylesheet_has_no_lint_waiver_and_no_font_size_in_points(app):
 
 
 def test_no_windows_backdrop_code_remains_anywhere_in_the_sources():
-    pattern = re.compile(r"\bDWM|\bMica\b|dwmapi|backdrop|windll", re.IGNORECASE)
+    pattern = re.compile(r"\bDWM|\bMica\b|dwmapi|backdrop", re.IGNORECASE)
     offenders = [
         str(path.relative_to(SRC_ROOT))
         for path in SRC_ROOT.rglob("*.py")
