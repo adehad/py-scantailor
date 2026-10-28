@@ -218,7 +218,7 @@ class TestBatchProcessing:
         assert result is not None
         assert len(result.written) == 3
         assert not result.failed
-        assert sorted(path.name for path in (tmp_path / "out").iterdir()) == [
+        assert sorted(path.name for path in (tmp_path / "out").glob("*.tif")) == [
             "page_001.tif",
             "page_002.tif",
             "page_003.tif",

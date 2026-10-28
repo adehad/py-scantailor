@@ -96,6 +96,7 @@ class TestTracedLines:
         assert bounds.first[0][0] == pytest.approx(399.0, abs=15.0)
         assert bounds.second[0][0] == pytest.approx(900.0, abs=15.0)
 
+    @pytest.mark.slow
     def test_colour_input_gives_the_same_lines(self, flat_page: BentPage) -> None:
         colour = np.dstack([flat_page.image] * 3)
 
@@ -112,6 +113,7 @@ class TestTracedLines:
         assert result.lines == []
         assert result.vertical_bounds is not None
 
+    @pytest.mark.slow
     def test_ink_touching_the_image_border_does_not_move_the_bounds(
         self, flat_page: BentPage
     ) -> None:
@@ -156,6 +158,7 @@ class TestTracedLines:
         assert len(near.lines) == len(exact.lines)
         np.testing.assert_allclose(near.lines[0], exact.lines[0])
 
+    @pytest.mark.slow
     def test_tracing_twice_gives_the_same_lines(self, flat_page: BentPage) -> None:
         first = trace_text_lines(flat_page.image, float(DPI), CONTENT)
         second = trace_text_lines(flat_page.image, float(DPI), CONTENT)

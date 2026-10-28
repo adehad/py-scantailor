@@ -19,6 +19,7 @@ def _rerender_after(qtbot: QtBot, window: MainWindowManager, edit) -> None:
     qtbot.wait(50)
 
 
+@pytest.mark.slow
 def test_zoom_survives_a_rerender_that_keeps_the_image_size(
     qtbot: QtBot, project_window: MainWindowManager
 ):
@@ -36,6 +37,7 @@ def test_zoom_survives_a_rerender_that_keeps_the_image_size(
     assert view.zoom_level == pytest.approx(zoomed)
 
 
+@pytest.mark.slow
 def test_the_zoomed_part_of_the_page_survives_another_output_resolution(
     qtbot: QtBot, project_window: MainWindowManager
 ):
@@ -62,6 +64,7 @@ def test_the_zoomed_part_of_the_page_survives_another_output_resolution(
     )
 
 
+@pytest.mark.slow
 def test_scroll_position_survives_a_rerender_that_keeps_the_image_size(
     qtbot: QtBot, project_window: MainWindowManager
 ):

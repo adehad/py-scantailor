@@ -163,8 +163,8 @@ class TestWorkerThreads:
         assert seen == {1: 11, 2: 12}
 
 
-@pytest.mark.slow
 class TestRunPool:
+    @pytest.mark.slow
     def test_failing_job_is_reported_and_others_complete(self):
         outcomes: dict[int, tuple[int | None, BaseException | None]] = {}
 
@@ -185,6 +185,7 @@ class TestRunPool:
         assert isinstance(error, ValueError)
         assert "three is not allowed" in str(error)
 
+    @pytest.mark.slow
     def test_cancel_after_first_result_stops_scheduling(self):
         cancel = Event()
         finished: list[int] = []
@@ -252,8 +253,8 @@ def stages(sources: list[PageId]) -> StageSequence:
     return sequence
 
 
-@pytest.mark.slow
 class TestRunBatch:
+    @pytest.mark.slow
     def test_four_pages_are_written_with_cpp_names_and_output_dpi(
         self, tmp_path: Path, sources: list[PageId], stages: StageSequence
     ):
@@ -282,6 +283,7 @@ class TestRunBatch:
                 )
                 assert image.size[0] > 0 and image.size[1] > 0
 
+    @pytest.mark.slow
     def test_detection_and_render_report_each_source_size_as_decoded(
         self, tmp_path: Path, sources: list[PageId], stages: StageSequence
     ):
@@ -297,6 +299,7 @@ class TestRunBatch:
         assert {e.source_size for e in detected} == {(300, 400)}
         assert {e.info.source_size for e in done if e.info is not None} == {(300, 400)}
 
+    @pytest.mark.slow
     def test_outputs_share_one_page_size(
         self, tmp_path: Path, sources: list[PageId], stages: StageSequence
     ):
@@ -307,6 +310,7 @@ class TestRunBatch:
         }
         assert len(sizes) == 1
 
+    @pytest.mark.slow
     def test_missing_source_is_reported_and_others_complete(
         self, tmp_path: Path, sources: list[PageId], stages: StageSequence
     ):
@@ -339,6 +343,7 @@ class TestRunBatch:
         assert result == BatchResult(cancelled=sources)
         assert not (tmp_path / "out").exists()
 
+    @pytest.mark.slow
     def test_cancel_from_progress_callback_skips_remaining_pages(
         self, tmp_path: Path, sources: list[PageId], stages: StageSequence
     ):

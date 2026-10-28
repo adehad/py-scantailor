@@ -302,7 +302,6 @@ class TestReduction:
         assert np.all(result == 255)
 
 
-@pytest.mark.slow
 class TestAgainstUpstream:
     """The reduction against a NumPy port of upstream's transformGeneric."""
 
