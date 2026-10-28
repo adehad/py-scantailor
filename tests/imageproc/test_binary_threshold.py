@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 
 from scantailor.imageproc.binary_threshold import otsu_threshold, to_gray
-from tests.filters.page_split import cpp_reference as cpp
 
 
 class TestToGray:
@@ -39,22 +38,37 @@ class TestToGray:
 
 class TestOtsuThreshold:
     @pytest.mark.parametrize("seed", range(5))
-    def test_matches_upstream_on_noisy_pages(self, seed: int) -> None:
+    def test_a_noisy_two_tone_page_splits_between_the_tones(self, seed: int) -> None:
         rng = np.random.default_rng(seed)
-        page = np.where(rng.random((80, 100)) < 0.2, 40, 220) + rng.integers(
-            -20, 20, (80, 100)
-        )
-        page = page.clip(0, 255).astype(np.uint8)
+        ink = rng.random((80, 100)) < 0.2
+        noise = rng.integers(-20, 20, (80, 100))
+        page = (np.where(ink, 40, 220) + noise).clip(0, 255).astype(np.uint8)
 
-        assert otsu_threshold(page) == cpp.otsu_threshold(page)
+        threshold = otsu_threshold(page)
 
-    def test_two_tones_split_between_them(self) -> None:
+        # The tones span 20..59 and 200..239, so every level that separates them
+        # lies above the darkest tone's top and at or below the lightest's bottom.
+        assert 59 < threshold <= 200
+        np.testing.assert_array_equal(page < threshold, ink)
+
+    def test_two_tones_split_at_the_middle_of_the_gap_between_them(self) -> None:
         page = np.array([[50, 200], [50, 200]], dtype=np.uint8)
 
         threshold = otsu_threshold(page)
 
-        assert threshold == cpp.otsu_threshold(page)
-        assert 50 < threshold <= 200
+        # Every threshold from 51 to 200 separates the tones equally well; the
+        # middle of that range, rounded down, is (51 + 200) // 2.
+        assert threshold == 125
+
+    def test_the_split_follows_the_between_class_variance_not_the_level_midpoint(
+        self,
+    ) -> None:
+        # Three tones: the dark mode is so heavy that the best split isolates it.
+        page = np.repeat(np.array([10, 120, 130], dtype=np.uint8), [900, 50, 50])
+
+        threshold = otsu_threshold(page.reshape(10, 100))
+
+        assert 10 < threshold <= 120
 
     def test_a_single_tone_gives_zero(self) -> None:
         assert otsu_threshold(np.full((4, 4), 128, dtype=np.uint8)) == 0

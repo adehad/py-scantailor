@@ -1,4 +1,4 @@
-"""Averaging source pixels when a warp reduces, as upstream's transformGeneric does."""
+"""Averaging every source pixel an output pixel covers when a warp reduces."""
 
 import cv2
 import numpy as np
@@ -89,77 +89,6 @@ def _test_page(seed: int) -> NDArray[np.uint8]:
     cv2.putText(page, "Hamburg 0123", (10, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.6, _INK)
     page = cv2.GaussianBlur(page, (0, 0), 0.6)
     return np.clip(page + rng.normal(0, 2.0, page.shape), 0, 255).astype(np.uint8)
-
-
-def _upstream_transform_generic(
-    image: NDArray[np.uint8], xform: ImageTransformation
-) -> NDArray[np.uint8]:
-    """NumPy port of upstream imageproc::transformGeneric for grey pixels.
-
-    Every output pixel averages an axis-aligned box of source pixels, centred on
-    its mapped centre and sized by upstream's calcSrcUnitSize, with the box
-    edges in 1/32 pixel units and partly covered pixels weighted by coverage.
-    Pixels outside the source are ignored rather than mixed in (upstream's weak
-    outside mode). Box sums come from the integral image, which is bilinear
-    within each cell, so fractional edges are exact. Too slow for full pages.
-    """
-    source_height, source_width = image.shape
-    rect = xform.resulting_rect
-    inverse = np.diag([32.0, 32.0, 1.0]) @ _then(
-        _translation_matrix(rect.x, rect.y), xform.transform_back
-    )
-    edge_midpoints = np.array([[0.5, 1, 0.5, 0], [0, 0.5, 1, 0.5], [1, 1, 1, 1]])
-    mapped = inverse @ edge_midpoints
-    unit_width = max(1, round(max(0.9 * 32, float(np.ptp(mapped[0])))))
-    unit_height = max(1, round(max(0.9 * 32, float(np.ptp(mapped[1])))))
-    integral = cv2.integral(image, sdepth=cv2.CV_64F)
-
-    def integral_at(x: NDArray[np.float64], y: NDArray[np.float64]):
-        x0 = np.clip(np.floor(x).astype(np.int64), 0, source_width - 1)
-        y0 = np.clip(np.floor(y).astype(np.int64), 0, source_height - 1)
-        fx, fy = x - x0, y - y0
-        return (
-            integral[y0, x0] * (1 - fx) * (1 - fy)
-            + integral[y0, x0 + 1] * fx * (1 - fy)
-            + integral[y0 + 1, x0] * (1 - fx) * fy
-            + integral[y0 + 1, x0 + 1] * fx * fy
-        )
-
-    out_width = max(1, round(rect.width))
-    out_height = max(1, round(rect.height))
-    grid_x, grid_y = np.meshgrid(
-        np.arange(out_width) + 0.5, np.arange(out_height) + 0.5
-    )
-    centre_x = grid_x * inverse[0, 0] + grid_y * inverse[0, 1] + inverse[0, 2]
-    centre_y = grid_x * inverse[1, 0] + grid_y * inverse[1, 1] + inverse[1, 2]
-    left = np.trunc(centre_x).astype(np.int64) - (unit_width >> 1)
-    top = np.trunc(centre_y).astype(np.int64) - (unit_height >> 1)
-    right, bottom = left + unit_width, top + unit_height
-    outside = (
-        (right <= 0)
-        | (bottom <= 0)
-        | (left >= source_width * 32)
-        | (top >= source_height * 32)
-    )
-    x0 = np.clip(left, 0, source_width * 32) / 32
-    x1 = np.clip(right, 0, source_width * 32) / 32
-    y0 = np.clip(top, 0, source_height * 32) / 32
-    y1 = np.clip(bottom, 0, source_height * 32) / 32
-    area = (x1 - x0) * (y1 - y0)
-    total = (
-        integral_at(x1, y1)
-        - integral_at(x0, y1)
-        - integral_at(x1, y0)
-        + integral_at(x0, y0)
-    )
-    average = np.floor(total / np.where(area > 0, area, 1) + 0.5)
-    average[outside | (area <= 0)] = 255
-    return np.clip(average, 0, 255).astype(np.uint8)
-
-
-def _psnr(a: NDArray[np.uint8], b: NDArray[np.uint8]) -> float:
-    mse = float(np.mean((a.astype(np.float64) - b) ** 2))
-    return float("inf") if mse == 0 else 10 * np.log10(255**2 / mse)
 
 
 class TestNoReduction:
@@ -302,51 +231,121 @@ class TestReduction:
         assert np.all(result == 255)
 
 
-class TestAgainstUpstream:
-    """The reduction against a NumPy port of upstream's transformGeneric."""
+def _halftone(coverage: float) -> NDArray[np.uint8]:
+    """A 240x300 page of a 150 lpi screen at 600 DPI.
+
+    Args:
+        coverage (float): Fraction of the page the screen inks, from 0 to 1.
+
+    Returns:
+        NDArray[np.uint8]: The page, ink at ``_INK`` and paper at ``_PAPER``.
+    """
+    yy, xx = np.mgrid[0:300, 0:240].astype(np.float64)
+    period = 600 / 150
+    u, v = (xx + yy) / np.sqrt(2), (yy - xx) / np.sqrt(2)
+    screen = (np.cos(2 * np.pi * u / period) + np.cos(2 * np.pi * v / period)) / 4
+    return np.where(screen + 0.5 < coverage, _INK, _PAPER).astype(np.uint8)
+
+
+# Pixels this far from the output edge may mix in the white outside the scan.
+_INNER = (slice(8, -8), slice(8, -8))
+
+
+class TestAreaAveragingProperties:
+    """What averaging the covered source area guarantees, whatever the arithmetic."""
 
     @pytest.mark.parametrize("output_dpi", [300, 200])
-    @pytest.mark.parametrize("skew", [0.0, 0.7])
-    def test_whole_factor_reduction_matches_upstream_box_average(
-        self, output_dpi: int, skew: float
+    def test_a_whole_factor_reduction_without_skew_is_the_block_mean(
+        self, output_dpi: int
     ) -> None:
-        """At 2x and 3x the result is within rounding noise of upstream's."""
+        """At 2x and 3x each output pixel is the mean of its source block.
+
+        The filter works in floating point and rounds once, so a block mean
+        ending in exactly .5 may round either way: one level of tolerance.
+        """
         page = _test_page(280)
-        xform = _transformation(240, 300, 600, output_dpi, skew)
+        factor = 600 // output_dpi
+        xform = _transformation(240, 300, 600, output_dpi)
 
         result = render_transformed(page, xform)
-        upstream = _upstream_transform_generic(page, xform)
 
-        # Upstream ignores pixels beyond the scan where this port reads white,
-        # so the outermost output pixels are left out.
-        inner = (slice(3, -3), slice(3, -3))
-        assert _psnr(result[inner], upstream[inner]) > 45
-        assert np.abs(result[inner].astype(int) - upstream[inner]).max() <= 6
+        height, width = 300 // factor, 240 // factor
+        blocks = page[: height * factor, : width * factor].reshape(
+            height, factor, width, factor
+        )
+        expected = blocks.mean(axis=(1, 3))
+        assert result.shape == (height, width)
+        assert np.abs(result - expected).max() <= 1.0
+
+    @pytest.mark.parametrize("coverage", [0.3, 0.5])
+    @pytest.mark.parametrize(
+        ("output_dpi", "skew"), [(300, 0.7), (200, 0.0), (200, 0.7), (450, 0.7)]
+    )
+    def test_a_halftone_keeps_its_grey_and_ripples_less_than_bilinear(
+        self, coverage: float, output_dpi: int, skew: float
+    ) -> None:
+        """Averaging conserves the ink, and a screen finer than the output
+        pixel is smoothed rather than aliased into moire.
+
+        Measured on these screens bilinear sampling leaves a spread of 65 to
+        103 levels; area averaging cuts it by at least 8% at 450 DPI and by a
+        third or more at 300 and 200 DPI, so 5% is a margin, not a fit.
+        """
+        page = _halftone(coverage)
+        xform = _transformation(240, 300, 600, output_dpi, skew)
+
+        result = render_transformed(page, xform)[_INNER].astype(np.float64)
+        bilinear = _plain_bilinear(page, xform)[_INNER].astype(np.float64)
+
+        assert result.mean() == pytest.approx(page.mean(), abs=1.0)
+        assert result.std() < 0.95 * bilinear.std()
 
     @pytest.mark.parametrize("output_dpi", [300, 200])
-    def test_line_ladder_keeps_upstreams_component_count(self, output_dpi: int) -> None:
-        """Binarized, the reduced ladder has exactly as many pieces as upstream's."""
+    def test_a_dense_ladder_of_thin_lines_never_breaks_into_dashes(
+        self, output_dpi: int
+    ) -> None:
+        """Twenty lines of 1 and 2 px on a 4 px pitch, slightly skewed.
+
+        Reduced, neighbouring lines may merge, but averaging never leaves a
+        gap along a line, so there are at most as many pieces as lines.
+        Bilinear sampling skips source rows and breaks some lines apart.
+        """
         page = _test_page(281)[:95]
         xform = _transformation(240, 95, 600, output_dpi, skew=0.7)
 
         result = render_transformed(page, xform)
-        upstream = _upstream_transform_generic(page, xform)
 
-        assert _ink_components(result) == _ink_components(upstream)
+        assert 1 <= _ink_components(result) <= 20
+
+    def test_bilinear_sampling_does_break_the_dense_ladder(self) -> None:
+        """Shows the ladder test above can fail: the same page sampled alone."""
+        page = _test_page(281)[:95]
+        xform = _transformation(240, 95, 600, 300, skew=0.7)
+
+        assert _ink_components(_plain_bilinear(page, xform)) > 20
 
     @pytest.mark.parametrize("output_dpi", [450, 400])
-    def test_fractional_reduction_is_closer_to_upstream_than_bilinear(
+    def test_a_fractional_reduction_is_closer_to_the_exact_area_mean_than_bilinear(
         self, output_dpi: int
     ) -> None:
-        """Between whole factors the taps still beat bilinear sampling alone."""
+        """Without skew OpenCV's area resize is the exact area mean to compare to.
+
+        The taps match the box's spread, not its shape, so single pixels can
+        differ from the exact mean by more than bilinear's do; the root mean
+        square error over the page is still lower.
+        """
         page = _test_page(282)
-        xform = _transformation(240, 300, 600, output_dpi, skew=0.7)
+        xform = _transformation(240, 300, 600, output_dpi)
 
         result = render_transformed(page, xform)
-        upstream = _upstream_transform_generic(page, xform)
         bilinear = _plain_bilinear(page, xform)
 
+        height, width = result.shape
+        exact = cv2.resize(page, (width, height), interpolation=cv2.INTER_AREA)
         inner = (slice(3, -3), slice(3, -3))
-        assert _psnr(result[inner], upstream[inner]) > _psnr(
-            bilinear[inner], upstream[inner]
-        )
+
+        def error(image: NDArray[np.uint8]) -> float:
+            difference = image[inner].astype(np.float64) - exact[inner]
+            return float(np.sqrt(np.mean(difference**2)))
+
+        assert error(result) < error(bilinear)

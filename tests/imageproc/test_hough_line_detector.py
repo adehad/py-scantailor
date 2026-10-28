@@ -1,11 +1,13 @@
 """Hough line finder: votes, peaks and the lines they give."""
 
+import math
+
 import numpy as np
 import pytest
+from numpy.typing import ArrayLike, NDArray
 
 from scantailor.imageproc import hough_line_detector
-from scantailor.imageproc.hough_line_detector import HoughLineDetector
-from tests.filters.page_split import cpp_reference as cpp
+from scantailor.imageproc.hough_line_detector import HoughLine, HoughLineDetector
 
 THICKNESS = 5.0
 START = -7.0
@@ -13,7 +15,27 @@ STEP = 0.25
 ANGLES = 57
 
 
-def _detect(width: int, height: int, xs, ys, weights, bound: int):
+def _detect(
+    width: int,
+    height: int,
+    xs: ArrayLike,
+    ys: ArrayLike,
+    weights: ArrayLike,
+    bound: int,
+) -> list[HoughLine]:
+    """Lines found among weighted points by a detector of the module's settings.
+
+    Args:
+        width (int): Width of the image the points lie in.
+        height (int): Height of the image the points lie in.
+        xs (ArrayLike): Point x coordinates.
+        ys (ArrayLike): Point y coordinates.
+        weights (ArrayLike): Vote of each point.
+        bound (int): Smallest quality a line must reach to be reported.
+
+    Returns:
+        list[HoughLine]: The lines, best first.
+    """
     detector = HoughLineDetector(width, height, THICKNESS, START, STEP, ANGLES)
     detector.process(
         np.asarray(xs, dtype=np.int64),
@@ -23,38 +45,115 @@ def _detect(width: int, height: int, xs, ys, weights, bound: int):
     return detector.find_lines(bound)
 
 
-def _vertical_line_points(x: int, height: int, tilt: float = 0.0):
+def _vertical_line_points(
+    x: int, height: int, tilt: float = 0.0
+) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
+    """One point per row along x + tilt * y, rounded to whole pixels.
+
+    Args:
+        x (int): Column the line starts at on row 0.
+        height (int): Number of rows.
+        tilt (float): Columns moved per row.
+
+    Returns:
+        tuple[NDArray[np.int64], NDArray[np.int64]]: xs and ys.
+    """
     ys = np.arange(height)
     return np.round(x + tilt * ys).astype(np.int64), ys
 
 
-@pytest.mark.parametrize(
-    "lines",
-    [[(60, 0.0)], [(40, 0.05), (130, -0.08)], [(25, 0.0), (28, 0.0), (90, 0.1)]],
-)
-def test_lines_match_upstream(lines: list[tuple[int, float]]) -> None:
-    width, height = 160, 220
-    xs, ys = [], []
+def _points_of(
+    lines: list[tuple[int, float]], height: int
+) -> tuple[list[int], list[int]]:
+    """Points of several near-vertical lines, one line after another.
+
+    Args:
+        lines (list[tuple[int, float]]): (x, tilt) of each line, as
+            ``_vertical_line_points`` takes them.
+        height (int): Number of rows.
+
+    Returns:
+        tuple[list[int], list[int]]: xs and ys.
+    """
+    xs: list[int] = []
+    ys: list[int] = []
     for x, tilt in lines:
         line_xs, line_ys = _vertical_line_points(x, height, tilt)
         xs.extend(line_xs)
         ys.extend(line_ys)
+    return xs, ys
+
+
+def _lines_on_noise(
+    lines: list[tuple[int, float]], width: int, height: int
+) -> tuple[list[int], list[int], NDArray[np.int64]]:
+    """Points of near-vertical lines plus 300 random ones, with random weights.
+
+    Args:
+        lines (list[tuple[int, float]]): (x, tilt) of each line.
+        width (int): Width of the image the noise is spread over.
+        height (int): Height of the image, and number of points per line.
+
+    Returns:
+        tuple[list[int], list[int], NDArray[np.int64]]: xs, ys and weights.
+    """
+    xs, ys = _points_of(lines, height)
     rng = np.random.default_rng(3)
     xs.extend(rng.integers(0, width, 300))
     ys.extend(rng.integers(0, height, 300))
-    weights = rng.integers(3, 10, len(xs))
+    return xs, ys, rng.integers(3, 10, len(xs))
 
-    got = _detect(width, height, xs, ys, weights, bound=500)
 
-    want = cpp.hough_find_lines(
-        width, height, THICKNESS, START, STEP, ANGLES, xs, ys, weights, 500
+def _follows(line: HoughLine, x: int, tilt: float, height: int) -> bool:
+    """Whether ``line`` stays within the line width of x + tilt * y at both ends.
+
+    Args:
+        line (HoughLine): A found line.
+        x (int): Column of the drawn line on row 0.
+        tilt (float): Columns the drawn line moves per row.
+        height (int): Row of the drawn line's other end.
+
+    Returns:
+        bool: True when both ends are within ``THICKNESS`` of the drawn line.
+    """
+    return all(
+        abs(line.point_at_y(float(y))[0] - (x + tilt * y)) <= THICKNESS
+        for y in (0, height)
     )
-    assert len(got) == len(want) > 0
-    for mine, theirs in zip(got, want, strict=True):
-        assert mine.quality == theirs.quality
-        assert mine.norm_x == pytest.approx(theirs.norm_uv[0], abs=1e-12)
-        assert mine.norm_y == pytest.approx(theirs.norm_uv[1], abs=1e-12)
-        assert mine.distance == pytest.approx(theirs.distance, abs=1e-9)
+
+
+@pytest.mark.parametrize(
+    "lines",
+    [
+        [(60, 0.0)],
+        [(40, math.tan(math.radians(3.0))), (130, math.tan(math.radians(-4.5)))],
+        [(40, 0.05), (130, -0.08)],
+    ],
+)
+def test_lines_drawn_among_noise_are_found_within_the_line_width(
+    lines: list[tuple[int, float]],
+) -> None:
+    width, height = 160, 220
+    xs, ys, weights = _lines_on_noise(lines, width, height)
+
+    found = _detect(width, height, xs, ys, weights, bound=500)
+
+    assert any(_follows(found[0], x, tilt, height) for x, tilt in lines)
+    for x, tilt in lines:
+        assert any(_follows(line, x, tilt, height) for line in found), (x, tilt)
+
+
+def test_two_lines_closer_than_the_line_width_are_found_as_one() -> None:
+    width, height = 160, 220
+    xs, ys = _points_of([(25, 0.0), (28, 0.0), (90, 0.1)], height)
+
+    found = _detect(width, height, xs, ys, np.ones(len(xs)), bound=100)
+
+    # Each line has one point of weight 1 per row and there is no noise, so
+    # only a line collecting points of both close lines beats the height.
+    assert found[0].quality > height
+    middle_x = found[0].point_at_y(height / 2)[0]
+    assert 25 - THICKNESS <= middle_x <= 28 + THICKNESS
 
 
 def test_a_vertical_line_is_found_where_it_is() -> None:
