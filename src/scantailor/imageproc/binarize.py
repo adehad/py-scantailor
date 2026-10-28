@@ -18,7 +18,6 @@ agree with it to the last bit.
 """
 
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 
 import cv2
 import numpy as np
@@ -26,6 +25,7 @@ from numpy.typing import NDArray
 
 from .background_color import otsu_threshold
 from .filters import gray_histogram
+from .row_bands import RowBand, map_row_bands
 
 _GRAY_LEVELS = 256
 # Divisor of the local deviation in Sauvola's formula.
@@ -36,6 +36,11 @@ _WINDOW_COEF_SCALE = 3.0
 _GRAD_ROUNDING = 0.5
 # Page-wide level of Grad when no pixel differs from its local mean.
 _GRAD_FLAT_PAGE_LEVEL = 127.5
+
+# Bytes of float64 temporaries per pixel of a band of window statistics: the
+# pixels, their squares, the two window sums, the reciprocal areas, the mean,
+# the variance and the threshold.
+_WINDOW_BYTES_PER_PIXEL = 64
 
 # Side of a square window, or (width, height) of a rectangular one.
 WindowSize = int | tuple[int, int]
@@ -239,9 +244,18 @@ def binarize_sauvola(
     Returns:
         NDArray[np.uint8]: New array, 0 for ink and 255 for background.
     """
-    mean, deviation = _window_statistics(image, window_size)
-    contrast = deviation / _SAUVOLA_RANGE + delta / _SAUVOLA_RANGE
-    return _ink_below(image, mean * (1.0 - k * (1.0 - contrast)))
+    ink = np.empty(image.shape, dtype=np.uint8)
+
+    def threshold(
+        rows: RowBand, mean: NDArray[np.float64], deviation: NDArray[np.float64]
+    ) -> None:
+        contrast = deviation / _SAUVOLA_RANGE + delta / _SAUVOLA_RANGE
+        ink[rows.rows] = _ink_below(
+            image[rows.rows], mean * (1.0 - k * (1.0 - contrast))
+        )
+
+    _map_window_statistics(image, window_size, threshold)
+    return ink
 
 
 def binarize_wolf(
@@ -274,23 +288,38 @@ def binarize_wolf(
     Returns:
         NDArray[np.uint8]: New array, 0 for ink and 255 for background.
     """
-    mean, deviation = _window_statistics(image, window_size)
-    max_deviation = float(deviation.max())
+    # C++ keeps the statistics in float32, so storing them that way loses
+    # nothing; only the page's largest deviation needs float64.
+    mean32 = np.empty(image.shape, dtype=np.float32)
+    deviation32 = np.empty(image.shape, dtype=np.float32)
+
+    def store(
+        rows: RowBand, mean: NDArray[np.float64], deviation: NDArray[np.float64]
+    ) -> float:
+        mean32[rows.rows] = mean
+        deviation32[rows.rows] = deviation
+        return float(deviation.max(initial=0.0))
+
+    max_deviation = max(_map_window_statistics(image, window_size, store))
     if max_deviation <= 0.0:
         max_deviation = 1.0
     darkest = float(image.min())
     ink = np.empty(image.shape, dtype=np.uint8)
 
-    def band(first: int, stop: int) -> None:
-        rows = slice(first, stop)
-        base = _single_precision(mean[rows]) - darkest
+    def threshold(rows: RowBand) -> None:
+        base = mean32[rows.rows].astype(np.float64) - darkest
         contrast = (
-            _single_precision(deviation[rows]) / max_deviation + delta / _SAUVOLA_RANGE
+            deviation32[rows.rows].astype(np.float64) / max_deviation
+            + delta / _SAUVOLA_RANGE
         )
-        threshold = base * (1.0 - k * (1.0 - contrast)) + darkest
-        ink[rows] = _ink_within_bounds(image[rows], threshold, lower_bound, upper_bound)
+        level = base * (1.0 - k * (1.0 - contrast)) + darkest
+        ink[rows.rows] = _ink_within_bounds(
+            image[rows.rows], level, lower_bound, upper_bound
+        )
 
-    run_in_row_bands(image.shape[0], band)
+    map_row_bands(
+        image.shape[0], 0, image.shape[1] * _WINDOW_BYTES_PER_PIXEL, threshold
+    )
     return ink
 
 
@@ -478,21 +507,44 @@ def binarize_window(
     _require_window(window_size)
     if image.size == 0:
         return image.copy()
-    mean, deviation = _window_statistics(image, window_size)
+    mean = np.empty(image.shape, dtype=np.float64)
+    deviation = np.empty(image.shape, dtype=np.float64)
+
+    def store(
+        rows: RowBand,
+        band_mean: NDArray[np.float64],
+        band_deviation: NDArray[np.float64],
+    ) -> None:
+        mean[rows.rows] = band_mean
+        deviation[rows.rows] = band_deviation
+
+    _map_window_statistics(image, window_size, store)
     # Summed exactly: a 32-bit sum wraps on pages beyond about 16 megapixels.
     mean_full = float(int(image.sum(dtype=np.uint64)) // image.size)
     deviation_min = float(deviation.min())
     deviation_range = float(deviation.max()) - deviation_min
 
-    md = (mean + 1.0 - delta) / (mean_full + deviation + 1.0)
-    kdm = (mean_full + mean_full + 1.0) / (deviation + 1.0)
-    if deviation_range > 0.0:
-        kds = (deviation - deviation_min) / deviation_range
-    else:
-        kds = np.ones_like(deviation)
-    kd = 1.0 + kdm * kds
-    threshold = mean * (1.0 - k * _WINDOW_COEF_SCALE * md / kd)
-    return _ink_within_bounds(image, threshold, lower_bound, upper_bound)
+    ink = np.empty(image.shape, dtype=np.uint8)
+
+    def threshold(rows: RowBand) -> None:
+        band_mean = mean[rows.rows]
+        band_deviation = deviation[rows.rows]
+        md = (band_mean + 1.0 - delta) / (mean_full + band_deviation + 1.0)
+        kdm = (mean_full + mean_full + 1.0) / (band_deviation + 1.0)
+        if deviation_range > 0.0:
+            kds = (band_deviation - deviation_min) / deviation_range
+        else:
+            kds = np.ones_like(band_deviation)
+        kd = 1.0 + kdm * kds
+        level = band_mean * (1.0 - k * _WINDOW_COEF_SCALE * md / kd)
+        ink[rows.rows] = _ink_within_bounds(
+            image[rows.rows], level, lower_bound, upper_bound
+        )
+
+    map_row_bands(
+        image.shape[0], 0, image.shape[1] * _WINDOW_BYTES_PER_PIXEL, threshold
+    )
+    return ink
 
 
 def binarize_grad(
@@ -555,11 +607,6 @@ def _require_window(window_size: int) -> None:
         raise ValueError("window_size must be >= 1")
 
 
-def _single_precision(values: NDArray[np.float64]) -> NDArray[np.float64]:
-    """Round to the nearest float32 and widen again."""
-    return values.astype(np.float32).astype(np.float64)
-
-
 def _ink_within_bounds(
     image: NDArray[np.uint8],
     threshold: NDArray[np.floating],
@@ -579,65 +626,42 @@ def _ink_below(
     return np.where(image < threshold, np.uint8(0), np.uint8(255))
 
 
-# Fewest rows worth a thread of their own in the banded window statistics.
-_MIN_BAND_ROWS = 128
-
-
-def run_in_row_bands(rows: int, band: Callable[[int, int], None]) -> None:
-    """Call ``band(first, stop)`` for consecutive row ranges, on threads.
-
-    Args:
-        rows (int): Number of rows to cover.
-        band (Callable[[int, int], None]): Handles rows ``first`` up to ``stop``;
-            ranges are disjoint, so it may write its own rows of shared arrays.
-    """
-    count = max(1, min(cv2.getNumThreads(), rows // _MIN_BAND_ROWS))
-    edges = np.linspace(0, rows, count + 1).astype(int)
-    if count == 1:
-        band(0, rows)
-        return
-    with ThreadPoolExecutor(max_workers=count) as pool:
-        list(pool.map(lambda i: band(edges[i], edges[i + 1]), range(count)))
-
-
-def _window_statistics(
+def _map_window_statistics[T](
     image: NDArray[np.uint8],
     window_size: WindowSize,
-) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    """Mean and standard deviation over a window clipped at the image border.
+    kernel: Callable[[RowBand, NDArray[np.float64], NDArray[np.float64]], T],
+) -> list[T]:
+    """Hand each band's window mean and deviation to ``kernel``.
+
+    The window is clipped at the image border. Sums of whole numbers are exact
+    in any order, so a band that reads a window's height of rows beyond its own
+    gets the values of the whole image.
 
     Args:
         image (NDArray[np.uint8]): 2-D gray image.
         window_size (int | tuple[int, int]): Window side, or ``(width,
             height)``, in pixels.
+        kernel (Callable): Takes the band and its float64 mean and standard
+            deviation, both of the band's rows by the image's columns.
 
     Returns:
-        tuple[NDArray[np.float64], NDArray[np.float64]]: Local mean and standard
-            deviation, both float64 and of the image's shape.
+        list[T]: The kernel's results in band order.
     """
     rows, columns = image.shape
-    mean = np.empty(image.shape, dtype=np.float64)
-    deviation = np.empty(image.shape, dtype=np.float64)
     window_width, window_height = _window_shape(window_size)
     row_extent = _window_extent(rows, window_height)
     column_extent = _window_extent(columns, window_width)
 
-    def band(first: int, stop: int) -> None:
-        # Sums of whole numbers are exact in any order, so a band that reads a
-        # window's reach of rows beyond its own matches the whole image.
-        top = max(0, first - window_height)
-        bottom = min(rows, stop + window_height)
-        gray = image[top:bottom].astype(np.float64)
-        inside = slice(first - top, stop - top)
-        reciprocal = 1.0 / np.multiply.outer(row_extent[first:stop], column_extent)
-        band_mean = _window_sum(gray, window_size)[inside] * reciprocal
+    def band(band_rows: RowBand) -> T:
+        gray = image[band_rows.padded].astype(np.float64)
+        inside = band_rows.inside
+        reciprocal = 1.0 / np.multiply.outer(row_extent[band_rows.rows], column_extent)
+        mean = _window_sum(gray, window_size)[inside] * reciprocal
         squares = _window_sum(gray * gray, window_size)[inside]
-        variance = squares * reciprocal - band_mean * band_mean
-        mean[first:stop] = band_mean
-        deviation[first:stop] = np.sqrt(np.abs(variance))
+        variance = squares * reciprocal - mean * mean
+        return kernel(band_rows, mean, np.sqrt(np.abs(variance)))
 
-    run_in_row_bands(rows, band)
-    return mean, deviation
+    return map_row_bands(rows, window_height, columns * _WINDOW_BYTES_PER_PIXEL, band)
 
 
 def _window_mean(image: NDArray[np.uint8], window_size: int) -> NDArray[np.float64]:

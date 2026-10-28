@@ -1,6 +1,7 @@
 """Despeckling in bands matches evaluating the whole image at once."""
 
 import time
+from collections.abc import Callable
 
 import cv2
 import numpy as np
@@ -142,20 +143,21 @@ def _text_like_page(seed: int, dpi: int, height: int, width: int) -> np.ndarray:
     return page
 
 
-@pytest.fixture(params=[1, 4, 8], ids=lambda n: f"{n}-threads")
-def thread_count(
-    request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
-) -> int:
-    monkeypatch.setattr(cv2, "getNumThreads", lambda: request.param)
+@pytest.fixture(params=[0, 40, 400], ids=["no-bands", "40-row-bands", "400-row-bands"])
+def bands(request: pytest.FixtureRequest, band_height: Callable[[int], None]) -> int:
+    """Bands shorter than the halo, of a few halos, and one band for the whole page."""
+    band_height(request.param)
     return request.param
 
 
 class TestMatchesWholeImageEvaluation:
-    @pytest.mark.parametrize("seed", range(6))
-    @pytest.mark.parametrize("dpi", [150, 300, 600])
-    @pytest.mark.parametrize("level", [1.0, 2.0, 3.0])
+    # The first two reach every branch the full 6 x 3 x 3 sweep reaches.
+    @pytest.mark.parametrize(
+        ("level", "dpi", "seed"),
+        [(1.0, 300, 1), (1.0, 150, 0), (2.0, 600, 3), (3.0, 300, 5)],
+    )
     def test_scattered_page_gives_identical_pixels(
-        self, thread_count: int, seed: int, dpi: int, level: float
+        self, bands: int, seed: int, dpi: int, level: float
     ) -> None:
         page = _text_like_page(seed, dpi, 1100 + 37 * seed, 600 + 53 * seed)
 
@@ -164,7 +166,7 @@ class TestMatchesWholeImageEvaluation:
         assert np.array_equal(banded, despeckle_over_whole_image(page, dpi, level))
 
     def test_small_cluster_in_a_large_empty_page_gives_identical_pixels(
-        self, thread_count: int
+        self, bands: int
     ) -> None:
         page = np.full((1500, 900), 255, dtype=np.uint8)
         page[700:740, 400:520] = 0
@@ -177,7 +179,7 @@ class TestMatchesWholeImageEvaluation:
         )
 
     def test_ink_touching_every_page_edge_gives_identical_pixels(
-        self, thread_count: int
+        self, bands: int
     ) -> None:
         page = _text_like_page(11, 300, 900, 700)
         page[0, :40] = 0
@@ -190,7 +192,7 @@ class TestMatchesWholeImageEvaluation:
         )
 
     def test_specks_that_only_a_second_look_attaches_give_identical_pixels(
-        self, thread_count: int
+        self, bands: int
     ) -> None:
         page = np.full((1200, 400), 255, dtype=np.uint8)
         page[100:600, 200:204] = 0

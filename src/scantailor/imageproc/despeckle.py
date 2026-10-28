@@ -17,13 +17,12 @@ extra pass is deliberate: it keeps the dots of Arabic letters, the dots of i and
 j and full stops, which the stricter C++ result removes.
 """
 
-from concurrent.futures import ThreadPoolExecutor
-
 import cv2
 import numpy as np
 from numpy.typing import NDArray
 
 from scantailor.core.debug_images import DebugImages
+from scantailor.imageproc.row_bands import RowBand, map_row_bands
 
 # Vertical offsets count double so that marks beside a word are preferred over
 # marks above or below it.
@@ -33,11 +32,11 @@ _VERTICAL_SCALE = 2
 # of marks near the page edge extend into it.
 _BORDER_RADII = 2
 
-# Most threads that share the cell assignment of one image.
-_MAX_BAND_THREADS = 8
-# A band of rows is only worth a thread when it is this many times taller than
-# the rows it shares with its neighbours.
-_MIN_BAND_HEIGHT_IN_BORDERS = 2
+# Bytes of temporaries per pixel of a band: the twice-stretched uint8 image and
+# its int32 labels, the int32 cells and nodes, and the boolean masks.
+_BAND_BYTES_PER_PIXEL = 24
+# Rows of node ids looked up at once while padding them.
+_PAD_ROWS = 256
 
 _REFERENCE_DPI = 300.0
 _DEFAULT_DPI = 300
@@ -106,6 +105,7 @@ def despeckle(
     count, component_map, stats, _ = cv2.connectedComponentsWithStats(
         np.ascontiguousarray(ink[box]).view(np.uint8), connectivity=8
     )
+    del ink
     labels: NDArray[np.int32] = np.asarray(component_map, dtype=np.int32)
 
     # Every big component becomes node 0; small ones get nodes 1..m.
@@ -134,7 +134,8 @@ def despeckle(
     node_pixels[1:] = stats[small_labels, cv2.CC_STAT_AREA]
 
     nodes = _pad_with_background(
-        node_of_label[labels],
+        node_of_label,
+        labels,
         binary.shape,
         box,
         _BORDER_RADII * thresholds.attach_radius,
@@ -168,6 +169,7 @@ def despeckle(
             node_pixels.size,
         )
 
+    del nodes
     keep = _reachable_from_big(lo, hi, sq_dist, node_pixels, thresholds)
     return _paste(binary, box, _remove_unkept(cropped, node_of_label, labels, keep))
 
@@ -259,17 +261,20 @@ def _paste(
 
 
 def _pad_with_background(
-    nodes: NDArray[np.int32],
+    node_of_label: NDArray[np.int32],
+    labels: NDArray[np.int32],
     image_shape: tuple[int, ...],
     box: tuple[slice, slice],
     border: int,
 ) -> NDArray[np.int32]:
-    """Surround the nodes of ``box`` with the background the image has there.
+    """Node ids of the pixels of ``box``, surrounded by the image's background.
 
     Args:
-        nodes (NDArray[np.int32]): Node ids of the pixels of ``box``.
+        node_of_label (NDArray[np.int32]): Node id of each component label.
+        labels (NDArray[np.int32]): Component label of each pixel of ``box``.
         image_shape (tuple[int, ...]): Shape of the whole image.
-        box (tuple[slice, slice]): Rows and columns of the image that ``nodes`` cover.
+        box (tuple[slice, slice]): Rows and columns of the image that ``labels``
+            cover.
         border (int): Most background pixels to add on each side; fewer where the
             image ends sooner.
 
@@ -277,11 +282,24 @@ def _pad_with_background(
         NDArray[np.int32]: Node ids with -1 for background in the padding.
     """
     rows, cols = box
-    pad = (
-        (min(border, rows.start), min(border, image_shape[0] - rows.stop)),
-        (min(border, cols.start), min(border, image_shape[1] - cols.stop)),
+    top = min(border, rows.start)
+    left = min(border, cols.start)
+    padded = np.full(
+        (
+            top + labels.shape[0] + min(border, image_shape[0] - rows.stop),
+            left + labels.shape[1] + min(border, image_shape[1] - cols.stop),
+        ),
+        -1,
+        dtype=np.int32,
     )
-    return np.pad(nodes, pad, constant_values=-1)
+    # Filled a few rows at a time, so no page-sized copy of the node ids is made
+    # besides ``padded``; ``np.take`` with a strided ``out`` buffers the whole.
+    inside = padded[top : top + labels.shape[0], left : left + labels.shape[1]]
+    for first in range(0, labels.shape[0], _PAD_ROWS):
+        inside[first : first + _PAD_ROWS] = node_of_label[
+            labels[first : first + _PAD_ROWS]
+        ]
+    return padded
 
 
 def _remove_unkept(
@@ -313,8 +331,8 @@ def _nearest_neighbour_distances(
     different components, the squared plain Euclidean distance between their
     two source pixels is a candidate for the distance between those components.
 
-    The rows are cut into bands that threads work on side by side. Each band
-    sees ``halo`` rows beyond its own, which settles the cells of every pixel
+    The rows are cut into bands by ``map_row_bands``. Each band sees ``halo``
+    rows beyond its own, which settles the cells of every pixel
     that has a source within twice that many pixels; borders farther from their
     sources than that are not seen.
 
@@ -330,21 +348,13 @@ def _nearest_neighbour_distances(
         tuple: ``(lo, hi, sq_dist)`` with one entry per component pair, node
             ids ``lo < hi`` and the minimum squared distance found.
     """
-    rows = nodes.shape[0]
-    workers = min(cv2.getNumThreads(), _MAX_BAND_THREADS)
-    band_count = max(1, min(workers, rows // (_MIN_BAND_HEIGHT_IN_BORDERS * halo)))
-    edges = np.linspace(0, rows, band_count + 1).astype(int)
 
-    def band(index: int) -> tuple[NDArray[np.int64], ...]:
-        return _band_pairs(
-            nodes, claims, rest_is_fixed, halo, edges[index], edges[index + 1]
-        )
+    def band(rows: RowBand) -> tuple[NDArray[np.int64], ...]:
+        return _band_pairs(nodes, claims, rest_is_fixed, halo, rows.first, rows.stop)
 
-    if band_count == 1:
-        parts = [band(0)]
-    else:
-        with ThreadPoolExecutor(max_workers=band_count) as pool:
-            parts = list(pool.map(band, range(band_count)))
+    parts = map_row_bands(
+        nodes.shape[0], halo, nodes.shape[1] * _BAND_BYTES_PER_PIXEL, band
+    )
     return _min_per_pair(
         np.concatenate([part[0] for part in parts]),
         np.concatenate([part[1] for part in parts]),
@@ -374,12 +384,16 @@ def _band_pairs(
     # Stretching rows makes the Euclidean transform use the scaled metric. Row
     # r of the stretched grid shows row r // scale of the image.
     stretched = np.repeat(np.where(sources, np.uint8(0), np.uint8(255)), scale, 0)
-    _, label_image = cv2.distanceTransformWithLabels(
+    # Indexing drops the distances as soon as the transform returns.
+    label_image = cv2.distanceTransformWithLabels(
         stretched, cv2.DIST_L2, 3, labelType=cv2.DIST_LABEL_PIXEL
-    )
+    )[1]
+    del stretched
     # Only the first stretched copy of each image row is looked at, so the
-    # neighbours compared are the 4-connected pixels of the image.
-    cells: NDArray[np.int32] = np.asarray(label_image, dtype=np.int32)[::scale]
+    # neighbours compared are the 4-connected pixels of the image. The copy
+    # lets the stretched labels go.
+    cells = np.ascontiguousarray(label_image[::scale], dtype=np.int32)
+    del label_image
     source_flat, source_node = _sources_by_label(window, sources, scale)
 
     lo, hi, sq_dist = _border_pairs(
