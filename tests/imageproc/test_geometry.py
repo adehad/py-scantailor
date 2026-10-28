@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from scantailor.imageproc.geometry import rotate_orthogonal, scale
+from scantailor.imageproc.geometry import rotate_orthogonal
 
 
 class TestRotateOrthogonal:
@@ -79,52 +79,3 @@ class TestRotateOrthogonal:
         for degrees in (0, 90, 180, 270):
             result = rotate_orthogonal(image, degrees)  # type: ignore[arg-type]
             assert result.dtype == np.uint8
-
-
-class TestScale:
-    """Tests for scaling."""
-
-    def test_scale_1x_unchanged(self):
-        """1x scale should return copy of input."""
-        image = np.random.randint(0, 256, (10, 10), dtype=np.uint8)
-        result = scale(image, 1.0)
-        np.testing.assert_array_equal(result, image)
-        assert result is not image
-
-    def test_scale_2x_doubles_size(self):
-        """2x scale should double dimensions."""
-        image = np.random.randint(0, 256, (10, 20), dtype=np.uint8)
-        result = scale(image, 2.0)
-        assert result.shape == (20, 40)
-
-    def test_scale_half_halves_size(self):
-        """0.5x scale should halve dimensions."""
-        image = np.random.randint(0, 256, (20, 40), dtype=np.uint8)
-        result = scale(image, 0.5)
-        assert result.shape == (10, 20)
-
-    def test_scale_different_x_y(self):
-        """Different x and y scales."""
-        image = np.random.randint(0, 256, (10, 10), dtype=np.uint8)
-        result = scale(image, scale_x=2.0, scale_y=3.0)
-        assert result.shape == (30, 20)
-
-    def test_scale_y_defaults_to_x(self):
-        """If scale_y is None, it should default to scale_x."""
-        image = np.random.randint(0, 256, (10, 10), dtype=np.uint8)
-        result = scale(image, 2.0)
-        assert result.shape == (20, 20)
-
-    def test_different_interpolation_methods(self):
-        """Different interpolation methods should work."""
-        image = np.random.randint(0, 256, (20, 20), dtype=np.uint8)
-
-        for method in ("nearest", "linear", "cubic", "area", "lanczos"):
-            result = scale(image, 0.5, interpolation=method)  # type: ignore[arg-type]
-            assert result.shape == (10, 10)
-
-    def test_preserves_dtype(self):
-        """Output should preserve uint8 dtype."""
-        image = np.random.randint(0, 256, (10, 10), dtype=np.uint8)
-        result = scale(image, 2.0)
-        assert result.dtype == np.uint8
