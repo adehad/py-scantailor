@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, reopened, synchronize, edited]
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled]
 
 permissions:
   contents: read
@@ -26,9 +26,38 @@ jobs:
   autolabel:
     name: Label the pull request
     # A fork's pull request gets a read-only token, so labelling would fail.
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    # A label change re-runs the workflow; labelling again then would undo a
+    # maintainer's removal of a label the branch name implies.
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.action != 'labeled'
+      && github.event.action != 'unlabeled'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
     steps:
       - uses: release-drafter/release-drafter/autolabeler@978bb0b30c5ee8cdd332ced253758157150d43f0  # v7.10.0
+
+  require-label:
+    name: Require a release notes label
+    # Runs after the autolabeler, which a fork's pull request skips, so it checks
+    # the labels the pull request has now rather than those in the event.
+    needs: autolabel
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Check for a label release-drafter.yml sorts by
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          ACCEPTED: >-
+            enhancement parity ui bug upstream-bug performance translations
+            packaging documentation tests tech-debt skip-changelog
+        run: |
+          gh pr view "$PR" -R "$GITHUB_REPOSITORY" --json labels -q '.labels[].name' |
+            grep -Fxq -f <(printf '%s\n' $ACCEPTED) && exit 0
+          echo "::error::Add one of these labels so the release notes list this pull request: $ACCEPTED"
+          exit 1
