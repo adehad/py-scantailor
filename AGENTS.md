@@ -54,6 +54,7 @@ docs/                        - Sphinx user guide and API reference
 ### MUST DO
 - Type hints on all functions
 - Google-style docstrings with type info (Args must include types, not just param names)
+- In tests, the two rules above cover helpers only: page builders, conftest functions and shared assertions. Fixtures count as helpers. A `test_*` function or method takes no annotations and no Args section, and its name states the scenario and expected outcome. Give it a one-line docstring saying what it tests when the name alone doesn't make that clear, and keep existing ones. `tests/ruff.toml` turns off ruff's `D` rules, so docstring formatting in tests is not checked.
 - Pydantic for data models
 - JSON for persistence (NOT XML)
 - loguru for logging
@@ -112,7 +113,7 @@ Examples:
 
 ## Code Review Focus
 
-CI/pre-commit already enforces: formatting, imports, type hint presence, docstring presence.
+CI/pre-commit already enforces: formatting, imports, docstring presence, and types in `src/` (pyrefly checks only `src/`). Don't ask for annotations, Args sections or docstring formatting on `test_*` functions; see Code Rules.
 
 **Reviewers should focus on what linters can't catch:**
 
