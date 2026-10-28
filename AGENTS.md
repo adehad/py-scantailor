@@ -74,6 +74,14 @@ docs/                        - Sphinx user guide and API reference
 - Keep deprecated/dead code (rely on git for rollback)
 - Add numba, SciPy or scikit-image to the application: it ships NumPy, OpenCV, Pillow and the stdlib only, so there is one OpenBLAS and no compiler in the build
 
+## Memory and dtypes in pixel code
+
+- **Dtypes.** Anchor `np.where`, `np.select` and `np.full` with NumPy scalars such as `np.uint8(0)`, because Python ints make an int64 array. Give reductions over an image a `dtype=`. Widen a full page to float64 or int64 only when the maths needs it, and then work in bands. `tools/check_numpy_dtypes.py` checks this in pre-commit; silence a deliberate case with `# npd: ok <reason>`.
+- **Lifetimes.** Python frees an array when its last reference goes, so a helper cannot release its caller's variable. Split a long pixel function into phase functions that return only what the next phase needs, and `del` a full-page array right after its last use inside a phase. The stage memory budgets in `tests/core/test_memory_budget.py` catch regressions.
+- **Bands.** Run windowed kernels through `imageproc/row_bands.py`. It sizes bands by rows and memory, never by thread count.
+- **Inputs.** Never mutate an input array, and don't defend it with `.copy()`, since inputs may be read-only views.
+- **Tests.** Never pass or fail on time. Count calls or passes, use a spy, or set a memory budget. Compare one thread with N threads, not a grid of thread counts.
+
 ## Library Choices
 
 | Upstream C++  | Python                                       |
@@ -130,7 +138,7 @@ CI/pre-commit already enforces: formatting, imports, docstring presence, and typ
 
 ### Image Processing (imageproc/)
 - Check dtype handling (uint8, float32, bool)
-- Avoid mutating input arrays - make copies when needed
+- Never mutate input arrays, and don't copy them defensively: inputs may be read-only views
 - Memory usage for large images
 - Document expected input/output dtypes in docstrings
 
