@@ -823,6 +823,26 @@ def render_skewed_page(degrees: float) -> NDArray[np.uint8]:
     return _skew(canvas, lines, degrees)[0]
 
 
+def render_folio_only_page(folio: int) -> tuple[NDArray[np.uint8], TextLine]:
+    """Render a sheet that holds nothing but its page number, at the usual place.
+
+    Not part of the book: tests use it to check that Select Content keeps a lone
+    page number.
+
+    Args:
+        folio (int): Page number printed at the foot.
+
+    Returns:
+        tuple[NDArray[np.uint8], TextLine]: The (H, W, 3) RGB scan and the page
+        number in image pixels.
+    """
+    paper = _blank_paper()
+    lines: list[TextLine] = []
+    _set_folio(paper, folio, lines)
+    canvas, placed = _single_canvas(_Sheet(paper, tuple(lines)))
+    return canvas, placed[0]
+
+
 def render_shadowed_edge_page(side: str) -> NDArray[np.uint8]:
     """Render ``01_single_page`` with a dark shadow along one side edge.
 

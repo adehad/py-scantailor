@@ -1,11 +1,13 @@
 """Tests for the content box finder, including gutter shadows along a page edge."""
 
+import cv2
 import numpy as np
 import pytest
 
 from scantailor.filters.select_content.content_box import ContentBox
 from scantailor.filters.select_content.content_box_finder import (
     Rect,
+    _is_line_or_speck,
     find_content_rect,
 )
 from scantailor.filters.select_content.content_finder import find_content_box
@@ -245,6 +247,53 @@ class TestNoContent:
         page[:, :10] = 30
 
         assert find_content_box(page, dpi=150.0).content_box.is_empty()
+
+    def test_a_lone_stroke_too_long_for_a_glyph_is_no_content(self):
+        """A 3 px wide stroke 40 px tall is a line, not a page number."""
+        page = np.full((300, 200), 230, dtype=np.uint8)
+        page[200:240, 100:103] = 30
+
+        assert find_content_box(page, dpi=150.0).content_box.is_empty()
+
+    def test_a_lone_speck_under_8_px_each_way_is_no_content(self):
+        page = np.full((300, 200), 230, dtype=np.uint8)
+        page[200:206, 100:106] = 30
+
+        assert find_content_box(page, dpi=150.0).content_box.is_empty()
+
+
+@pytest.mark.parametrize(
+    ("width", "height", "dropped"),
+    [(7, 7, True), (7, 8, False), (7, 28, False), (7, 29, True), (29, 7, True)],
+)
+def test_a_box_under_8_px_wide_is_dropped_only_as_a_speck_or_a_line(
+    width, height, dropped
+):
+    """Under 8 px both ways is a speck; one side over 4 times the other is a line."""
+    assert _is_line_or_speck(Rect(0, 0, width - 1, height - 1)) is dropped
+
+
+# One pixel of slack on each side, plus a pixel of the folio's anti-aliased
+# edge that the binarisation may take as ink.
+_FOLIO_TOLERANCE_PX = 2
+
+
+class TestLonePageNumber:
+    """A page that holds only its page number keeps the number as its content."""
+
+    @pytest.mark.parametrize("folio", [1, 7, 42, 123])
+    def test_the_box_hugs_the_page_number(self, sample_book_tool, folio):
+        """The folio is 6 px wide for 1 and 29 px for 123, at 150 dpi."""
+        rgb, _ = sample_book_tool.render_folio_only_page(folio)
+        page = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+        rows, columns = np.nonzero(page < 128)
+
+        box = find_content_box(page, dpi=150.0).content_box
+
+        assert box.x == pytest.approx(columns.min(), abs=_FOLIO_TOLERANCE_PX)
+        assert box.y == pytest.approx(rows.min(), abs=_FOLIO_TOLERANCE_PX)
+        assert box.right == pytest.approx(columns.max() + 1, abs=_FOLIO_TOLERANCE_PX)
+        assert box.bottom == pytest.approx(rows.max() + 1, abs=_FOLIO_TOLERANCE_PX)
 
 
 class TestFindContentRect:
