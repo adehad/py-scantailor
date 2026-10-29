@@ -721,6 +721,7 @@ def render_transformed(
     size: tuple[int, int] | None = None,
     *,
     invert: bool = False,
+    source_scale: tuple[float, float] = (1.0, 1.0),
 ) -> NDArray[np.uint8]:
     """Resample an image through a transformation in a single pass.
 
@@ -733,7 +734,8 @@ def render_transformed(
 
     Args:
         image (numpy.ndarray of numpy.uint8): Source image, (H, W) or (H, W, C) with at
-            most 4 channels. Its size must match transformation.orig_rect.
+            most 4 channels. Its size must match transformation.orig_rect
+            times ``source_scale``.
         transformation (ImageTransformation): Maps source to resulting
             coordinates.
         size (tuple[int, int] | None): Width and height of the result. It
@@ -743,6 +745,9 @@ def render_transformed(
         invert (bool): Render ``255 - image`` without building it: the pixels
             are those of the inverted image resampled, and the area with no
             source pixel is still white.
+        source_scale (tuple[float, float]): Width and height of ``image`` over
+            those of the source the transformation was made for, when
+            ``image`` is a shrunk copy of it.
 
     Returns:
         numpy.ndarray of numpy.uint8:
@@ -768,6 +773,7 @@ def render_transformed(
         _scale_matrix(*scale),
         _translation_matrix(rect.x, rect.y),
         transformation.transform_back,
+        _scale_matrix(*source_scale),
         _translation_matrix(-0.5, -0.5),
     )
 

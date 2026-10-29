@@ -41,9 +41,10 @@ from scantailor.core.models import Dpi, ImageId, PageId, SubPage, page_name
 from scantailor.core.output_reuse import build_record, is_reusable, output_params_hash
 from scantailor.core.page_source import DpiOverrides, load_page
 from scantailor.core.pipeline import (
+    DETECTION_DPI,
     PipelineOptions,
     PipelineResult,
-    fix_aggregate_page_size,
+    detect_geometry,
     process_page,
 )
 from scantailor.core.project import (
@@ -763,13 +764,8 @@ def _worker_stages_for(config: _PhaseConfig) -> StageSequence:
     return _worker_stages
 
 
-def _source_size(pixels: NDArray) -> tuple[int, int]:
-    height, width = pixels.shape[:2]
-    return width, height
-
-
 def _detect_page(job: _PageJob) -> tuple[StageParamsData, tuple[int, int]]:
-    """Detect one page's geometry in a worker.
+    """Detect one page's geometry in a worker, from a decode shrunk for detection.
 
     Returns:
         tuple[StageParamsData, tuple[int, int]]: The page's parameters as data,
@@ -778,15 +774,22 @@ def _detect_page(job: _PageJob) -> tuple[StageParamsData, tuple[int, int]]:
     with logger.contextualize(page=page_name(job.page)):
         stages = _worker_stages_for(job.config)
         overrides = {job.page.image_id: job.dpi_override} if job.dpi_override else None
-        loaded = load_page(job.page.image_id, overrides)
+        loaded = load_page(
+            job.page.image_id,
+            overrides,
+            min_dpi=DETECTION_DPI,
+            default_dpi=job.config.default_dpi,
+        )
         options = PipelineOptions(
             dpi=loaded.resolution(job.config.default_dpi),
             end_stage=job.config.end_stage,
             black_on_white_detection=job.config.black_on_white_detection,
         )
-        fix_aggregate_page_size([(loaded.pixels, job.page)], stages, options)
+        detect_geometry(
+            loaded.pixels, job.page, stages, options, full_size=loaded.full_size
+        )
         params = _dump_entries(collect_stage_params(stages, [job.page]))
-        return params, _source_size(loaded.pixels)
+        return params, loaded.size
 
 
 def _detect_geometry(
@@ -918,7 +921,7 @@ def _render_page(job: _PageJob) -> tuple[Path, RenderInfo, tuple[Path, ...]]:
             auto_picture_zones=rendered.auto_picture_zones,
             black_on_white=rendered.metadata.get("OUTPUT", {}).get("black_on_white"),
             seconds=time.perf_counter() - started,
-            source_size=_source_size(loaded.pixels),
+            source_size=loaded.size,
         )
         return job.output_path, info, tuple(written)
 

@@ -8,7 +8,13 @@ import numpy as np
 from numpy.typing import NDArray
 
 from scantailor.core.models import Dpi, ImageId, OrthogonalDegrees
-from scantailor.core.page_source import DpiOverrides, LoadedPage, load_page
+from scantailor.core.page_source import (
+    DpiOverrides,
+    LoadedPage,
+    load_page,
+    shrink_page,
+)
+from scantailor.core.pipeline import DETECTION_DPI
 from scantailor.core.result_memo import ResultMemo
 from scantailor.imageproc.geometry import rotate_orthogonal
 
@@ -25,6 +31,9 @@ class SourceCache:
     threads that ask while it is being decoded wait for that decode. The pixels
     are shared, so they are read-only.
 
+    Each page is also kept as ``for_detection`` shrinks it, at a quarter of
+    the pixels or less.
+
     The page last asked for through ``oriented`` is also kept turned by Fix
     Orientation's rotation, so that it is turned once per page and rotation
     rather than once per render and view.
@@ -36,6 +45,7 @@ class SourceCache:
     def __init__(self, capacity: int = _CAPACITY) -> None:
         """Create an empty cache; arguments are described on the class."""
         self._memo = ResultMemo[LoadedPage](capacity)
+        self._shrunk = ResultMemo[LoadedPage](capacity)
         self._turn_lock = threading.Lock()
         self._turned: _Turned | None = None
 
@@ -70,6 +80,42 @@ class SourceCache:
             )
         cached = self._memo.peek(key)
         return cached if cached is not None else _decode(image_id, dpi_overrides)
+
+    def for_detection(
+        self,
+        image_id: ImageId,
+        decoded: LoadedPage,
+        dpi_overrides: DpiOverrides | None = None,
+        *,
+        keep: bool = True,
+    ) -> LoadedPage:
+        """Return a page as the batch geometry pass decodes it, at most 300 dpi.
+
+        Args:
+            image_id (ImageId): File and page.
+            decoded (LoadedPage): The page from ``load``, shrunk as
+                ``shrink_page`` does.
+            dpi_overrides (DpiOverrides | None): Project resolutions, as for ``load``.
+            keep (bool): Whether a page shrunk here is remembered, as for ``load``.
+
+        Returns:
+            LoadedPage: Read-only pixels, ``decoded`` itself when there is
+                nothing to shrink.
+
+        Raises:
+            ImageLoadError: If the file cannot be decoded.
+        """
+        key = _key(image_id, dpi_overrides)
+
+        def shrink() -> LoadedPage:
+            page = shrink_page(decoded, image_id, dpi_overrides, DETECTION_DPI)
+            page.pixels.flags.writeable = False
+            return page
+
+        if keep:
+            return self._shrunk.get_or_compute(key, shrink)
+        cached = self._shrunk.peek(key)
+        return cached if cached is not None else shrink()
 
     def peek(
         self, image_id: ImageId, dpi_overrides: DpiOverrides | None = None
@@ -127,6 +173,7 @@ class SourceCache:
     def clear(self) -> None:
         """Forget every cached page."""
         self._memo.clear()
+        self._shrunk.clear()
         with self._turn_lock:
             self._turned = None
 
