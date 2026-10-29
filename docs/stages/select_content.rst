@@ -41,7 +41,8 @@ down to the image.
      - Finds the box from the page's content, or from the paper edge for the page box.
        A page with no content, such as a blank page or one with only the edge of the
        book, gets no content box: Margins centres it, and with **Fill margins** on
-       Output leaves it white.
+       Output leaves it white. A page that holds only its page number keeps the
+       number as its content.
    * - **Manual**
      - Uses the box you drew by hand.
 

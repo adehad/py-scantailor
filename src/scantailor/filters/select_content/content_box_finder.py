@@ -55,6 +55,10 @@ _TEXT_INFLUENCE_PIXELS = 5000
 # Distance reported when there is nothing to measure the distance to.
 _INFINITE_DISTANCE = 65536.0
 _MIN_CONTENT_SIDE = 8
+# A box narrower than _MIN_CONTENT_SIDE may still hold a lone glyph, such as a
+# page number "1", which is about twice as tall as it is wide. Past this ratio it
+# is a stroke of a rule or a page edge.
+_MAX_NARROW_ASPECT = 4
 _MAX_THIN_ASPECT = 20
 _THIN_CONTENT_WIDTH = 30
 
@@ -764,14 +768,34 @@ def _trim_until_stable(
             if trimmed != rect:
                 sides.update(retry_after[side])
             rect = trimmed
-        if rect.width < _MIN_CONTENT_SIDE or rect.height < _MIN_CONTENT_SIDE:
-            return _EMPTY
-        if (
-            rect.width < _THIN_CONTENT_WIDTH
-            and rect.height > rect.width * _MAX_THIN_ASPECT
-        ):
+        if _is_line_or_speck(rect):
             return _EMPTY
     return rect
+
+
+def _is_line_or_speck(rect: Rect) -> bool:
+    """Check whether a trimmed box is too small or too thin to be content.
+
+    Both sides under ``_MIN_CONTENT_SIDE`` make a speck. One side under it makes
+    a line once the other is more than ``_MAX_NARROW_ASPECT`` times as long, and
+    a box under ``_THIN_CONTENT_WIDTH`` wide is a vertical line once it is more
+    than ``_MAX_THIN_ASPECT`` times as tall.
+
+    Args:
+        rect (Rect): The box left after trimming, in 150 dpi pixels.
+
+    Returns:
+        bool: True when the box should be dropped and the page left without
+        content.
+    """
+    narrow, long = sorted((rect.width, rect.height))
+    if long < _MIN_CONTENT_SIDE:
+        return True
+    if narrow < _MIN_CONTENT_SIDE and long > narrow * _MAX_NARROW_ASPECT:
+        return True
+    return (
+        rect.width < _THIN_CONTENT_WIDTH and rect.height > rect.width * _MAX_THIN_ASPECT
+    )
 
 
 def _trim_side(
