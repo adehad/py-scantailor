@@ -43,6 +43,7 @@ def find_content_box(
     outside: NDArray[np.bool_] | Callable[[], NDArray[np.bool_]] | None = None,
     outside_key: Hashable | None = None,
     dbg: DebugImages | None = None,
+    frame_size: tuple[int, int] | None = None,
 ) -> ContentDetectionResult:
     """Detect content boundaries in an image.
 
@@ -53,9 +54,10 @@ def find_content_box(
 
     Args:
         image (numpy.ndarray of numpy.uint8): Gray or BGR image, dark content on a light
-            page. Not modified.
-        dpi (float): Image resolution in DPI.
-        page_box (ContentBox | None): Area of the page in pixels of ``image``;
+            page. Not modified. It may be the frame shrunk ahead, ideally to
+            150 dpi, which spares resizing it.
+        dpi (float): Resolution of the frame in DPI.
+        page_box (ContentBox | None): Area of the page in pixels of the frame;
             anything outside it counts as shadow.
         outside (numpy.ndarray of numpy.bool | None): Pixels of ``image`` with no source
             pixel behind them, such as the corners exposed by a rotation. They
@@ -69,9 +71,13 @@ def find_content_box(
         dbg (DebugImages | None): Receives the finder's intermediate images.
             The finder then runs even when its result is remembered, since a
             remembered result has no images.
+        frame_size (tuple[int, int] | None): Width and height of the view the
+            box is given in, which ``image`` shows whole; None when that is
+            ``image`` itself.
 
     Returns:
-        ContentDetectionResult: The detected box and a confidence from 0 to 1.
+        ContentDetectionResult: The detected box in pixels of the frame and a
+            confidence from 0 to 1.
             When no content is found, the box is empty and the confidence 0, as
             upstream; Page Layout then centres the page and Output leaves it blank.
     """
@@ -86,20 +92,23 @@ def find_content_box(
     else:
         mask = outside
     h, w = gray.shape[:2]
+    frame_w, frame_h = (w, h) if frame_size is None else frame_size
 
-    scaled_w = max(1, round(w * _TARGET_DPI / dpi))
-    scaled_h = max(1, round(h * _TARGET_DPI / dpi))
+    scaled_w = max(1, round(frame_w * _TARGET_DPI / dpi))
+    scaled_h = max(1, round(frame_h * _TARGET_DPI / dpi))
     interpolation = cv2.INTER_AREA if scaled_w < w else cv2.INTER_LINEAR
 
     def scale(source: NDArray[np.uint8]) -> NDArray[np.uint8]:
+        if source.shape[:2] == (scaled_h, scaled_w):
+            return source
         return np.asarray(
             cv2.resize(source, (scaled_w, scaled_h), interpolation=interpolation),
             dtype=np.uint8,
         )
 
     scaled = scale(gray)
-    x_scale = w / scaled_w
-    y_scale = h / scaled_h
+    x_scale = frame_w / scaled_w
+    y_scale = frame_h / scaled_h
 
     page_rect = None
     if page_box is not None:
@@ -146,12 +155,12 @@ def find_content_box(
 
     left = max(0.0, found.left * x_scale)
     top = max(0.0, found.top * y_scale)
-    right = min(float(w), (found.right + 1) * x_scale)
-    bottom = min(float(h), (found.bottom + 1) * y_scale)
+    right = min(float(frame_w), (found.right + 1) * x_scale)
+    bottom = min(float(frame_h), (found.bottom + 1) * y_scale)
     content_box = ContentBox(x=left, y=top, width=right - left, height=bottom - top)
 
     # Content should be substantial but not the entire image
-    area_ratio = content_box.width * content_box.height / (w * h)
+    area_ratio = content_box.width * content_box.height / (frame_w * frame_h)
     if 0.1 <= area_ratio <= 0.95:
         confidence = 1.0
     elif area_ratio < 0.1:

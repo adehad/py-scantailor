@@ -59,6 +59,7 @@ def find_page_box(
     tolerance: float = 0.1,
     outside: NDArray[np.bool_] | None = None,
     dbg: DebugImages | None = None,
+    frame_size: tuple[int, int] | None = None,
 ) -> PageBox | None:
     """Find the paper in a scan that shows background around it.
 
@@ -71,8 +72,9 @@ def find_page_box(
 
     Args:
         image (numpy.ndarray of numpy.uint8): Gray or BGR image, dark content
-            on a light page. Not modified.
-        dpi (float): Image resolution in DPI.
+            on a light page. Not modified. It may be the frame shrunk ahead,
+            ideally to 150 dpi, which spares resizing it.
+        dpi (float): Resolution of the frame in DPI.
         fine_tune (bool): Also move each corner of the box diagonally inward
             while it lies on background, which trims the dark wedges left at
             the corners of a page lying slightly crooked.
@@ -85,10 +87,13 @@ def find_page_box(
             rotation. They count as background.
         dbg (DebugImages | None): Receives the 150 dpi gray page and every
             binarisation of it, including those an unknown size leaves unused.
+        frame_size (tuple[int, int] | None): Width and height of the view the
+            box is given in, which ``image`` shows whole; None when that is
+            ``image`` itself.
 
     Returns:
-        PageBox | None: The page in pixels of ``image``, or None when no box was
-            found, or none came near the expected size.
+        PageBox | None: The page in pixels of the frame, or None when no box
+            was found, or none came near the expected size.
     """
     source = bgr_to_gray(image)
     gray = source
@@ -97,12 +102,17 @@ def find_page_box(
             return None
         gray = paint_outside_darkest(source, outside)
     h, w = gray.shape[:2]
-    scaled_w = max(1, round(w * _DETECTION_DPI / dpi))
-    scaled_h = max(1, round(h * _DETECTION_DPI / dpi))
+    frame_w, frame_h = (w, h) if frame_size is None else frame_size
+    scaled_w = max(1, round(frame_w * _DETECTION_DPI / dpi))
+    scaled_h = max(1, round(frame_h * _DETECTION_DPI / dpi))
     interpolation = cv2.INTER_AREA if scaled_w < w else cv2.INTER_LINEAR
-    scaled = np.asarray(
-        cv2.resize(gray, (scaled_w, scaled_h), interpolation=interpolation),
-        dtype=np.uint8,
+    scaled = (
+        gray
+        if gray.shape[:2] == (scaled_h, scaled_w)
+        else np.asarray(
+            cv2.resize(gray, (scaled_w, scaled_h), interpolation=interpolation),
+            dtype=np.uint8,
+        )
     )
     width_mm, height_mm = expected_size_mm
     sized = width_mm > 0 and height_mm > 0
@@ -124,14 +134,22 @@ def find_page_box(
         return None
     if rect == Rect(0, 0, scaled_w - 1, scaled_h - 1):
         logger.debug("dark-bed finder found the whole image; line-edge fallback")
-        return _find_line_edges(source, dpi)
+        lines = _find_line_edges(source, dpi * w / frame_w)
+        if lines is None:
+            return None
+        return PageBox(
+            x=lines.x * frame_w / w,
+            y=lines.y * frame_h / h,
+            width=lines.width * frame_w / w,
+            height=lines.height * frame_h / h,
+        )
 
-    x_scale = w / scaled_w
-    y_scale = h / scaled_h
+    x_scale = frame_w / scaled_w
+    y_scale = frame_h / scaled_h
     left = rect.left * x_scale
     top = rect.top * y_scale
-    right = min(float(w), (rect.right + 1) * x_scale)
-    bottom = min(float(h), (rect.bottom + 1) * y_scale)
+    right = min(float(frame_w), (rect.right + 1) * x_scale)
+    bottom = min(float(frame_h), (rect.bottom + 1) * y_scale)
     return PageBox(x=left, y=top, width=right - left, height=bottom - top)
 
 
@@ -305,12 +323,9 @@ def _find_line_edges(gray: NDArray[np.uint8], dpi: float) -> PageBox | None:
     """
     h, w = gray.shape[:2]
     scale = _DETECTION_DPI / dpi
-    if scale < 1.0:
-        scaled = cv2.resize(
-            gray,
-            (max(1, int(w * scale)), max(1, int(h * scale))),
-            interpolation=cv2.INTER_AREA,
-        )
+    size = (max(1, round(w * scale)), max(1, round(h * scale)))
+    if scale < 1.0 and size != (w, h):
+        scaled = cv2.resize(gray, size, interpolation=cv2.INTER_AREA)
     else:
         scaled = gray
         scale = 1.0
