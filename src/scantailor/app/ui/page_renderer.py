@@ -4,7 +4,7 @@ import hashlib
 import threading
 import weakref
 from collections.abc import Callable, Hashable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import cv2
 import numpy as np
@@ -28,6 +28,7 @@ from scantailor.core.page_source import (
     DpiOverrides,
     LoadedPage,
     load_page,
+    shrink_page,
 )
 from scantailor.core.pipeline import OutputExtras
 from scantailor.core.settings import ApplicationSettings
@@ -197,12 +198,68 @@ def render_page_with_model(
         # Thumbnails of other pages must not push out the page on screen.
         orient=sources.oriented if sources is not None and keep_source else None,
     )
+    if _detect_on_shrunk_page(
+        page, page_id, sequence, options, dpi_overrides, sources, keep_source
+    ):
+        options = replace(options, debug_images=None)
     result = pipeline.process_page(page.pixels, page_id, sequence, options)
     if on_extras is not None and result.output_extras is not None:
         on_extras(result.output_extras)
     if not pixels:
         return np.empty((0, 0), dtype=np.uint8), result.distortion_model
     return _bgr_to_rgb(result.image), result.distortion_model
+
+
+def _detect_on_shrunk_page(
+    page: LoadedPage,
+    page_id: PageId,
+    sequence: StageSequence,
+    options: pipeline.PipelineOptions,
+    dpi_overrides: DpiOverrides | None,
+    sources: SourceCache | None,
+    keep_source: bool,
+) -> bool:
+    """Settle the page's geometry from the page the batch geometry pass reads.
+
+    The batch detects from a decode shrunk to ``pipeline.DETECTION_DPI``, so
+    detecting here from the same pixels, through the same ``detect_geometry``,
+    gives the page on screen the batch's parameters at every resolution. The
+    full-size run that follows finds them stored and only renders.
+
+    A page that is not shrunk is left to the full-size run, which then
+    detects from the same pixels the batch reads.
+
+    Returns:
+        bool: True when this run recorded the debug images of the stage on
+            screen, which the full-size run must then not record again.
+    """
+    if options.end_stage <= FilterStage.FIX_ORIENTATION:
+        return False
+    if sources is None:
+        shrunk = shrink_page(
+            page, page_id.image_id, dpi_overrides, pipeline.DETECTION_DPI
+        )
+    else:
+        shrunk = sources.for_detection(
+            page_id.image_id, page, dpi_overrides, keep=keep_source
+        )
+    if shrunk.full_size is None:
+        return False
+    on_screen = options.end_stage < FilterStage.OUTPUT
+    pipeline.detect_geometry(
+        shrunk.pixels,
+        page_id,
+        sequence,
+        replace(
+            options,
+            debug_images=options.debug_images if on_screen else None,
+            # The cache keeps one turned copy; the shrunk page would evict
+            # the full-size one the render needs next.
+            orient=None,
+        ),
+        full_size=shrunk.full_size,
+    )
+    return on_screen
 
 
 def _bgr_to_rgb(image: NDArray[np.uint8]) -> NDArray[np.uint8]:

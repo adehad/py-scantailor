@@ -79,6 +79,11 @@ from scantailor.imageproc.filters import bgr_to_gray
 
 from .stage_sequence import FilterStage, StageSequence
 
+# The finest resolution any detection step reads: Deskew's view is capped at
+# it, Page Split reduces to it and below, Select Content to 150 dpi. A source
+# shrunk to it still holds every detail detection looks at.
+DETECTION_DPI = 300.0
+
 
 class PipelineCancelled(Exception):
     """Raised between stages when ``PipelineOptions.should_cancel`` says to stop."""
@@ -208,18 +213,36 @@ class _PageState:
     transformation changes, and so are the views detection works on, which are
     rendered from the source's gray straight at the size a finder needs.
     The gray is converted once per source, as upstream's ``FilterData`` does.
+
+    The pixels may be a shrunk copy of the decoded image, as long as no step
+    asks for more detail than they hold: the transformation, and every
+    coordinate the stages store, still refer to the full-size image.
     """
 
     def __init__(
-        self, source: NDArray[np.uint8], dpi: Dpi | float, rotation_degrees: int = 0
+        self,
+        source: NDArray[np.uint8],
+        dpi: Dpi | float,
+        rotation_degrees: int = 0,
+        full_size: tuple[int, int] | None = None,
     ) -> None:
         """Start from pixels that Fix Orientation turned by ``rotation_degrees``.
 
         Args:
             source (NDArray[np.uint8]): The pixels.
-            dpi (Dpi | float): Resolution of the image as decoded, unturned.
+            dpi (Dpi | float): Resolution of the full-size image as decoded,
+                unturned.
             rotation_degrees (int): Orthogonal rotation already applied.
+            full_size (tuple[int, int] | None): Width and height of the image
+                ``source`` was shrunk from, turned as ``source`` is; None when
+                ``source`` is that image.
         """
+        height, width = source.shape[:2]
+        turned = rotation_degrees % 180 != 0
+        full_width, full_height = full_size or (width, height)
+        self._decoded_size = (
+            (full_height, full_width) if turned else (full_width, full_height)
+        )
         self._decoded_dpi = dpi
         self._source_dpi = transformation_dpi(dpi, rotation_degrees)
         self._view: NDArray[np.uint8] | None = None
@@ -231,7 +254,8 @@ class _PageState:
         self._black_on_white: bool | None = None
         self._polarity_recorded = False
         self.source = source
-        self.xform = self._new_transformation(source)
+        self.full_size = (full_width, full_height)
+        self.xform = self._new_transformation()
         # Content rectangle in source coordinates, set by the page layout stage;
         # kept there because the later transformation changes the view's frame.
         # Without content it is Page Layout's stand-in, a speck at the page's
@@ -240,13 +264,19 @@ class _PageState:
         # Region Fix Orientation's manual trim keeps, in source coordinates.
         self.trim_area: NDArray[np.float64] | None = None
 
-    def _new_transformation(self, source: NDArray[np.uint8]) -> ImageTransformation:
-        height, width = source.shape[:2]
+    def _new_transformation(self) -> ImageTransformation:
+        width, height = self.full_size
         return ImageTransformation.from_size(width, height, self._source_dpi)
 
     @property
+    def source_scale(self) -> tuple[float, float]:
+        """Width and height of ``source`` over those of the full-size image."""
+        height, width = self.source.shape[:2]
+        return width / self.full_size[0], height / self.full_size[1]
+
+    @property
     def source_dpi(self) -> Dpi:
-        """Resolution of ``source``; its axes may differ."""
+        """Resolution of the full-size image ``source`` shows; its axes may differ."""
         return self._source_dpi
 
     @property
@@ -263,8 +293,10 @@ class _PageState:
             rotation_degrees (int): Orthogonal rotation applied to the pixels.
         """
         self._source_dpi = transformation_dpi(self._decoded_dpi, rotation_degrees)
+        width, height = self._decoded_size
+        self.full_size = (height, width) if rotation_degrees % 180 else (width, height)
         self.source = source
-        self.xform = self._new_transformation(source)
+        self.xform = self._new_transformation()
         self.content_polygon_source = None
         self.trim_area = None
         self._forget_views()
@@ -280,7 +312,14 @@ class _PageState:
         return self._source_gray
 
     def view(self) -> NDArray[np.uint8]:
-        """Return the source resampled through the current transformation."""
+        """Return the source resampled through the current transformation.
+
+        Raises:
+            ValueError: If ``source`` is a shrunk copy, which lacks the detail.
+        """
+        if self.source_scale != (1.0, 1.0):
+            msg = "a shrunk source cannot give the full-size view"
+            raise ValueError(msg)
         if self._view is None:
             self._view = render_transformed(self.source, self.xform)
         return self._view
@@ -325,9 +364,17 @@ class _PageState:
         """
         record = dbg is not None and not self._polarity_recorded
         if self._black_on_white is None or record:
-            self._black_on_white = is_black_on_white(self.source_gray, self.xform, dbg)
+            self._black_on_white = is_black_on_white(
+                self.source_gray, self.xform, dbg, self.source_scale
+            )
             self._polarity_recorded = self._polarity_recorded or record
         return self._black_on_white
+
+    def dpi_at(self, dpi: float | None) -> Dpi:
+        """Return the resolution of a view of ``size_at(dpi)``."""
+        if dpi is None or dpi >= self.dpi.horizontal:
+            return self.dpi
+        return Dpi.uniform(round(dpi))
 
     def detection_view(
         self,
@@ -355,7 +402,11 @@ class _PageState:
         key = (invert, self.size_at(dpi))
         if key not in self._detection_views:
             view = render_transformed(
-                self.source_gray, self.xform, key[1], invert=invert
+                self.source_gray,
+                self.xform,
+                key[1],
+                invert=invert,
+                source_scale=self.source_scale,
             )
             view.flags.writeable = False
             self._detection_views[key] = view
@@ -384,9 +435,8 @@ class _PageState:
         full_width, full_height = self.view_size()
         rect = self.xform.resulting_rect
         to_pixels = np.array([width / full_width, height / full_height])
-        source_height, source_width = self.source.shape[:2]
         source_outline = self.xform.map_polygon(
-            Rect.from_size(source_width, source_height).to_polygon()
+            Rect.from_size(*self.full_size).to_polygon()
         )
         painted = np.zeros((height, width), dtype=np.uint8)
         for polygon in (source_outline, self.xform.resulting_pre_crop_area):
@@ -593,6 +643,7 @@ def _run_stages(
     options: PipelineOptions,
     detect_from: FilterStage,
     render: bool = True,
+    full_size: tuple[int, int] | None = None,
 ) -> PipelineResult:
     """Run every stage up to options.end_stage, detecting only from detect_from on.
 
@@ -607,6 +658,9 @@ def _run_stages(
         options: Pipeline options.
         detect_from: First stage allowed to run detection.
         render: If False, skip resampling; the result image is the source.
+        full_size: Width and height of the decoded image ``image`` was shrunk
+            from; None when ``image`` is that image. Only a run that stops
+            before Output and does not render can take a shrunk image.
 
     Returns:
         PipelineResult for the stages from options.start_stage on.
@@ -615,7 +669,7 @@ def _run_stages(
     # for a copy of the caller's page.
     source = image.view()
     source.flags.writeable = False
-    state = _PageState(source, options.dpi)
+    state = _PageState(source, options.dpi, full_size=full_size)
     stages_completed: list[FilterStage] = []
     metadata: dict = {}
     output_image: NDArray[np.uint8] | None = None
@@ -773,7 +827,7 @@ def _apply_trim(
     Returns:
         The trimmed region in oriented source pixels, or None without a trim.
     """
-    height, width = state.source.shape[:2]
+    width, height = state.full_size
     trim_area = sequence.fix_orientation_filter.trim_crop_area(
         page_id.image_id, (width, height)
     )
@@ -797,7 +851,7 @@ def _process_page_split(
         page_id.image_id
     ).degrees
 
-    height, width = state.source.shape[:2]
+    width, height = state.full_size
     detected = False
     if detect and not filter_.keeps_stored_layout(
         page_id, (width, height), rotation_degrees, state.trim_area
@@ -809,6 +863,7 @@ def _process_page_split(
             rotation_degrees=rotation_degrees,
             trim_area=state.trim_area,
             dbg=dbg,
+            full_size=state.full_size,
         ).detected
     if dbg is not None and not detected:
         filter_.detect_split(
@@ -819,6 +874,7 @@ def _process_page_split(
             rotation_degrees=rotation_degrees,
             trim_area=state.trim_area,
             dbg=dbg,
+            full_size=state.full_size,
         )
 
     params = filter_.get_params(page_id)
@@ -878,18 +934,18 @@ def _process_deskew(
     skew = None
     if detect and filter_.needs_detection(page_id, dependencies):
         skew = filter_.detect_skew(
-            state.detection_view(options.black_on_white_detection, dbg),
+            state.detection_view(options.black_on_white_detection, dbg, DETECTION_DPI),
             page_id,
             dependencies=dependencies,
-            dpi=state.dpi,
+            dpi=state.dpi_at(DETECTION_DPI),
             dbg=dbg,
         )
     elif dbg is not None:
         filter_.detect_skew(
-            state.detection_view(options.black_on_white_detection, dbg),
+            state.detection_view(options.black_on_white_detection, dbg, DETECTION_DPI),
             page_id,
             store_result=False,
-            dpi=state.dpi,
+            dpi=state.dpi_at(DETECTION_DPI),
             dbg=dbg,
         )
 
@@ -915,7 +971,7 @@ def _outside_source_key(state: _PageState) -> tuple:
     xform = state.xform
     rect = xform.resulting_rect
     return (
-        state.source.shape,
+        state.full_size,
         xform.transform.tobytes(),
         np.asarray(xform.resulting_pre_crop_area).tobytes(),
         (rect.x, rect.y, rect.width, rect.height),
@@ -1145,7 +1201,7 @@ def _process_output(
     page_outline = _polygon_points(
         state.xform.resulting_pre_crop_area - [rect.x, rect.y]
     )
-    height, width = state.source.shape[:2]
+    width, height = state.full_size
     source_outline = _polygon_points(
         state.to_view(
             np.array([(0, 0), (width, 0), (width, height), (0, height)], dtype=float)
@@ -1482,14 +1538,39 @@ def fix_aggregate_page_size(
     known once every page has been measured. Pixels from this pass are discarded.
     Detection stops at ``options.end_stage`` when it comes before Margins.
     """
-    end_stage = min(options.end_stage, FilterStage.PAGE_LAYOUT)
-    geometry_options = replace(options, end_stage=end_stage)
     for image, page_id in images:
-        _run_stages(
-            image,
-            page_id,
-            sequence,
-            geometry_options,
-            detect_from=options.start_stage,
-            render=False,
-        )
+        detect_geometry(image, page_id, sequence, options)
+
+
+def detect_geometry(
+    image: NDArray[np.uint8],
+    page_id: PageId,
+    sequence: StageSequence,
+    options: PipelineOptions,
+    full_size: tuple[int, int] | None = None,
+) -> None:
+    """Run one page's stages up to Margins, storing what detection settles.
+
+    Nothing is rendered, so ``image`` may be the decoded image shrunk to
+    ``DETECTION_DPI``: every stage then settles as it does on the full-size
+    image, within the difference the shrinking makes to the pixels.
+
+    Args:
+        image (NDArray[np.uint8]): The decoded image, before Fix Orientation.
+        page_id (PageId): The page.
+        sequence (StageSequence): Stages that store the page's parameters.
+        options (PipelineOptions): ``dpi`` is the full-size image's resolution;
+            detection stops at ``end_stage`` when it comes before Margins.
+        full_size (tuple[int, int] | None): Width and height of the decoded
+            image ``image`` was shrunk from; None when ``image`` is that image.
+    """
+    end_stage = min(options.end_stage, FilterStage.PAGE_LAYOUT)
+    _run_stages(
+        image,
+        page_id,
+        sequence,
+        replace(options, end_stage=end_stage),
+        detect_from=options.start_stage,
+        render=False,
+        full_size=full_size,
+    )

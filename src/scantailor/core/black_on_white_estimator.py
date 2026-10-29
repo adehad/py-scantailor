@@ -30,6 +30,7 @@ def is_black_on_white(
     pixels: NDArray[np.uint8],
     xform: ImageTransformation,
     dbg: DebugImages | None = None,
+    source_scale: tuple[float, float] = (1.0, 1.0),
 ) -> bool:
     """Tell whether a page has dark content on a light background.
 
@@ -47,6 +48,9 @@ def is_black_on_white(
         xform (ImageTransformation): The page's transformation. Not modified.
         dbg (DebugImages | None): Receives the refining pass's images when the
             page is looked at again.
+        source_scale (tuple[float, float]): Width and height of ``pixels``
+            over those of the image ``xform`` was made for, when ``pixels`` is
+            a shrunk copy of it.
 
     Returns:
         bool: True for dark content on a light background, and for a page
@@ -54,9 +58,10 @@ def is_black_on_white(
     """
     page_xform = _pre_crop_only(xform)
     gray = _gray(pixels)
-    if is_black_on_white_in_area(gray, _source_pre_crop_mask(page_xform, gray.shape)):
+    area = _source_pre_crop_mask(page_xform, gray.shape, source_scale)
+    if is_black_on_white_in_area(gray, area):
         return True
-    return is_black_on_white_refining(gray, page_xform, dbg)
+    return is_black_on_white_refining(gray, page_xform, dbg, source_scale)
 
 
 def is_black_on_white_in_area(gray: NDArray[np.uint8], area: NDArray[np.bool_]) -> bool:
@@ -88,6 +93,7 @@ def is_black_on_white_refining(
     pixels: NDArray[np.uint8],
     xform: ImageTransformation,
     dbg: DebugImages | None = None,
+    source_scale: tuple[float, float] = (1.0, 1.0),
 ) -> bool:
     """Tell the polarity from the areas where a page has strokes.
 
@@ -103,12 +109,14 @@ def is_black_on_white_refining(
         xform (ImageTransformation): Maps the image to the page. Not modified.
         dbg (DebugImages | None): Receives the cleaned 150 dpi page and the
             content area; True, drawn black, is content.
+        source_scale (tuple[float, float]): Width and height of ``pixels``
+            over those of the image ``xform`` was made for.
 
     Returns:
         bool: True for dark content on a light background, and for a page with
             no area at 150 dpi.
     """
-    page = render_page_at_dpi(pixels, xform, REFINING_DPI)
+    page = render_page_at_dpi(pixels, xform, REFINING_DPI, source_scale=source_scale)
     if page is None:
         return True
     gray = page.gray.copy()
@@ -182,11 +190,13 @@ def _pre_crop_only(xform: ImageTransformation) -> ImageTransformation:
 
 
 def _source_pre_crop_mask(
-    xform: ImageTransformation, shape: tuple[int, ...]
+    xform: ImageTransformation,
+    shape: tuple[int, ...],
+    source_scale: tuple[float, float],
 ) -> NDArray[np.bool_]:
     """Mark the pixels of the source image inside the pre-crop area."""
     mask = np.zeros(shape[:2], dtype=np.uint8)
-    area = xform.map_polygon_back(xform.resulting_pre_crop_area)
+    area = xform.map_polygon_back(xform.resulting_pre_crop_area) * source_scale
     if len(area) < 3:
         mask[:] = 1
     else:

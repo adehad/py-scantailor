@@ -138,6 +138,7 @@ def render_page_at_dpi(
     dpi: int,
     *,
     black_on_white: bool = True,
+    source_scale: tuple[float, float] = (1.0, 1.0),
 ) -> LowResolutionPage | None:
     """Resample the page an image transformation describes, at ``dpi``.
 
@@ -148,6 +149,9 @@ def render_page_at_dpi(
         dpi (int): Resolution of the result.
         black_on_white (bool): False inverts the image before resampling, so
             that the area with no source pixel stays white.
+        source_scale (tuple[float, float]): Width and height of ``pixels``
+            over those of the image ``xform`` was made for, when ``pixels`` is
+            a shrunk copy of it.
 
     Returns:
         LowResolutionPage | None: The page, or None when its area is empty.
@@ -162,6 +166,7 @@ def render_page_at_dpi(
     to_page = np.eye(3)
     to_page[0, 2], to_page[1, 2] = -rect.x, -rect.y
     to_page = to_page @ scaled.transform
+    to_page = to_page @ np.diag([1 / source_scale[0], 1 / source_scale[1], 1.0])
 
     gray = np.ascontiguousarray(bgr_to_gray(pixels))
     if not black_on_white:

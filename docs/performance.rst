@@ -101,6 +101,38 @@ white page takes about 0.35 s to encode at 300 dpi and 1.1 s at 600 dpi, 1.5 and
 1.1 times a compiled coder. Pages with fine dither patterns have few runs and
 take up to five times as long as with a compiled coder.
 
+Detection resolution
+====================
+
+No detection step reads a page finer than 300 dpi. Deskew measures the page at
+300 dpi at most, Page Split works at 300 dpi and below, and Select Content at
+150 dpi. A batch run therefore decodes each page shrunk to at least 300 dpi for
+its first pass, which measures every page's geometry, and decodes it in full
+only to render it:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Format
+     - First pass
+   * - JPEG
+     - Decoded straight at a half, a quarter or an eighth of its size, so the
+       pass decodes and holds a quarter of the pixels at 600 dpi.
+   * - Every other format
+     - Decoded in full, then averaged down before detection, so the decode
+       itself costs as much as a full one. Detection, and the memory it holds
+       afterwards, shrink as for a JPEG.
+
+The factor is a whole number, so a page between 300 and 599 dpi is decoded and
+detected at its own resolution.
+
+The page on screen detects from the same shrunk page, so the window and a batch
+run settle on the same geometry at every resolution. The view itself, and
+Output, still come from the full decode. A JPEG is therefore decoded twice the
+first time it is shown, the second time at a quarter of the pixels; any other
+format is shrunk from the full decode already in memory.
+
 Why there is no GPU build
 =========================
 

@@ -180,6 +180,7 @@ class Filter:
         bw_threshold: int | None = None,
         trim_area: NDArray[np.float64] | None = None,
         dbg: DebugImages | None = None,
+        full_size: tuple[int, int] | None = None,
     ) -> SplitResult:
         """Detect how to split an image.
 
@@ -193,24 +194,42 @@ class Filter:
                 recorded so a later rotation change invalidates the result.
             bw_threshold: Gray level below which a pixel is black, when the page
                 has a stored one; otherwise Otsu's threshold of the analysed part.
-            trim_area: Corners, in pixels of ``image``, of the region a manual
+            trim_area: Corners, in full-size pixels, of the region a manual
                 trim keeps. Only that region is analysed and a change of it
                 invalidates the result.
             dbg (DebugImages | None): Receives the estimator's intermediate
                 images.
+            full_size (tuple[int, int] | None): Width and height of the image
+                ``image`` was shrunk from, whose pixels ``dpi``, the trim and
+                the layout are in; None when ``image`` is that image.
 
         Returns:
-            SplitResult with the detected layout, in the pixels of ``image``.
+            SplitResult with the detected layout, in full-size pixels.
         """
         params = self.get_params(page_id)
         layout_type = params.layout_type
-        trim = _trim_rect(trim_area, image.shape)
+        height, width = image.shape[:2]
+        full_width, full_height = full_size or (width, height)
+        full_shape = (full_height, full_width)
+        trim = _trim_rect(trim_area, full_shape)
+        x_scale, y_scale = width / full_width, height / full_height
 
-        result = detect_split(image, layout_type, dpi, bw_threshold, trim, dbg=dbg)
+        result = detect_split(
+            image,
+            layout_type,
+            _scaled_dpi(dpi, x_scale, y_scale),
+            bw_threshold,
+            _scaled_rect(trim, x_scale, y_scale),
+            dbg=dbg,
+        )
+        if (x_scale, y_scale) != (1.0, 1.0):
+            layout = result.layout.scaled(full_width / width, full_height / height)
+            outline = (0.0, 0.0, float(full_width), float(full_height))
+            result = SplitResult(layout.model_copy(update={"outline": outline}))
 
         if store_result:
             dependencies = self._dependencies_of(
-                params.layout_type, image.shape, rotation_degrees, trim
+                params.layout_type, full_shape, rotation_degrees, trim
             )
             new_params = params.with_auto_layout(result.layout).model_copy(
                 update={"dependencies": dependencies}
@@ -446,6 +465,7 @@ class Filter:
         bw_threshold: int | None = None,
         trim_area: NDArray[np.float64] | None = None,
         dbg: DebugImages | None = None,
+        full_size: tuple[int, int] | None = None,
     ) -> Settled:
         """Make the stored layout fit the image and tell whether it detected.
 
@@ -467,6 +487,9 @@ class Filter:
                 is no trim.
             dbg (DebugImages | None): Receives the estimator's intermediate
                 images when it runs.
+            full_size (tuple[int, int] | None): Width and height of the image
+                ``image`` was shrunk from, whose pixels ``dpi``, the trim and
+                the layout are in; None when ``image`` is that image.
 
         Returns:
             Settled: The updated parameters and whether the estimator ran. When
@@ -476,26 +499,28 @@ class Filter:
         params = self.get_params(page_id)
         layout = params.page_layout
         requested = params.layout_type
+        height, width = image.shape[:2]
+        full_width, full_height = full_size or (width, height)
+        full_shape = (full_height, full_width)
 
         def detect() -> Settled:
-            return Settled(
-                self._detect(
-                    image,
-                    page_id,
-                    dpi,
-                    rotation_degrees,
-                    bw_threshold,
-                    trim_area,
-                    dbg,
-                ),
-                detected=True,
+            self.detect_split(
+                image,
+                page_id,
+                dpi=dpi,
+                rotation_degrees=rotation_degrees,
+                bw_threshold=bw_threshold,
+                trim_area=trim_area,
+                dbg=dbg,
+                full_size=(full_width, full_height),
             )
+            return Settled(self.get_params(page_id), detected=True)
 
         if layout is None or _conflicts(requested, layout):
             return detect()
 
         current = self._dependencies_of(
-            requested, image.shape, rotation_degrees, _trim_rect(trim_area, image.shape)
+            requested, full_shape, rotation_degrees, _trim_rect(trim_area, full_shape)
         )
         if _keeps_layout(params, current):
             return Settled(params, detected=False)
@@ -506,8 +531,7 @@ class Filter:
         elif requested == LayoutType.AUTO_LAYOUT_TYPE:
             return detect()
         else:
-            height, width = image.shape[:2]
-            outline = (0.0, 0.0, float(width), float(height))
+            outline = (0.0, 0.0, float(full_width), float(full_height))
             new_layout = adapt_page_layout(layout, outline)
 
         new_type = new_layout.to_layout_type()
@@ -553,27 +577,6 @@ class Filter:
         )
         return _keeps_layout(params, current)
 
-    def _detect(
-        self,
-        image: NDArray[np.uint8],
-        page_id: PageId,
-        dpi: Dpi | float,
-        rotation_degrees: int,
-        bw_threshold: int | None,
-        trim_area: NDArray[np.float64] | None,
-        dbg: DebugImages | None,
-    ) -> Params:
-        self.detect_split(
-            image,
-            page_id,
-            dpi=dpi,
-            rotation_degrees=rotation_degrees,
-            bw_threshold=bw_threshold,
-            trim_area=trim_area,
-            dbg=dbg,
-        )
-        return self.get_params(page_id)
-
     def get_sub_page_count(self, page_id: PageId) -> int:
         """Get the number of sub-pages for an image.
 
@@ -608,6 +611,33 @@ def _dependencies_for(
         image_size=(round(width), round(height)),
         rotation_degrees=rotation_degrees,
         layout_type=layout_type,
+    )
+
+
+def _scaled_dpi(dpi: Dpi | float, x_scale: float, y_scale: float) -> Dpi | float:
+    """Resolution of an image shrunk by ``x_scale`` and ``y_scale``."""
+    if (x_scale, y_scale) == (1.0, 1.0):
+        return dpi
+    if not isinstance(dpi, Dpi):
+        dpi = Dpi.uniform(round(dpi))
+    return Dpi(
+        horizontal=round(dpi.horizontal * x_scale),
+        vertical=round(dpi.vertical * y_scale),
+    )
+
+
+def _scaled_rect(
+    rect: tuple[int, int, int, int] | None, x_scale: float, y_scale: float
+) -> tuple[int, int, int, int] | None:
+    """An ``(x, y, width, height)`` box in the pixels of an image shrunk so."""
+    if rect is None or (x_scale, y_scale) == (1.0, 1.0):
+        return rect
+    x, y, width, height = rect
+    return (
+        round(x * x_scale),
+        round(y * y_scale),
+        max(1, round(width * x_scale)),
+        max(1, round(height * y_scale)),
     )
 
 

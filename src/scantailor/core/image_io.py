@@ -429,23 +429,37 @@ def _to_array(image: Image.Image) -> NDArray[np.uint8]:
 
 
 def load_image(
-    image_id: ImageId, dpi: Dpi | None = None
+    image_id: ImageId,
+    dpi: Dpi | None = None,
+    min_dpi: float | None = None,
+    unknown_dpi: float = 300.0,
 ) -> tuple[NDArray[np.uint8], ImageMetadata]:
     """Decode one page of an image file, upright according to its EXIF orientation.
 
     A 90 or 270 degree orientation swaps the width and height, and the
     horizontal and vertical DPI, of the stored image.
 
+    With ``min_dpi`` the pixels come shrunk by the largest whole factor that
+    keeps at least ``min_dpi`` on both axes. A JPEG is decoded straight at a
+    half, a quarter or an eighth of its size, the largest such step within
+    the factor, which spares decoding the rest; any other image is decoded in
+    full and then averaged down by the factor.
+
     Args:
         image_id (ImageId): File and page; ``page`` is 1-based for multi-page
             TIFFs and 0 (or 1) for single-page files.
         dpi (Dpi | None): Resolution that replaces the one in the file; ignored
             when None or null. Given for the upright image.
+        min_dpi (float | None): Least resolution the pixels must keep; None
+            decodes in full.
+        unknown_dpi (float): Resolution ``min_dpi`` is measured against when
+            neither ``dpi`` nor the file gives one.
 
     Returns:
         tuple[NDArray[np.uint8], ImageMetadata]: Pixels as ``(H, W)`` gray
             (including bilevel as 0/255) or ``(H, W, 3)`` BGR ``uint8``, and the
-            size and DPI. DPI is null when the file carries none.
+            size and DPI of the full-size image. DPI is null when the file
+            carries none.
 
     Raises:
         FileNotFoundError: If the file does not exist.
@@ -456,9 +470,14 @@ def load_image(
     with _open(path) as image:
         _select_page(image, path, image_id.zero_based_page())
         try:
-            image.load()
             metadata = _metadata_of(image)
+            if dpi is not None and not dpi.is_null():
+                metadata = metadata.model_copy(update={"dpi": dpi})
+            factor = shrink_factor(metadata.dpi, min_dpi, unknown_dpi)
+            drafted = _draft(image, factor)
+            image.load()
             pixels = _to_array(_upright(image))
+            pixels = shrink_decoded(pixels, factor // drafted)
         except (
             OSError,
             SyntaxError,
@@ -467,12 +486,90 @@ def load_image(
             Image.DecompressionBombError,
         ) as exc:
             raise ImageLoadError(f"Cannot decode {path}: {exc}") from exc
-    if dpi is not None and not dpi.is_null():
-        metadata = metadata.model_copy(update={"dpi": dpi})
     logger.debug(
-        "Loaded {} page {}: {}x{}", path, image_id.page, metadata.width, metadata.height
+        "Loaded {} page {}: {}x{} as {}x{}",
+        path,
+        image_id.page,
+        metadata.width,
+        metadata.height,
+        pixels.shape[1],
+        pixels.shape[0],
     )
     return pixels, metadata
+
+
+def shrink_factor(dpi: Dpi, min_dpi: float | None, unknown_dpi: float) -> int:
+    """Return the largest whole factor that leaves at least ``min_dpi`` on both axes.
+
+    Args:
+        dpi (Dpi): Resolution of the image; null when unknown.
+        min_dpi (float | None): Least resolution to keep; None keeps the size.
+        unknown_dpi (float): Resolution assumed when ``dpi`` is null.
+
+    Returns:
+        int: The factor ``load_image`` shrinks by, 1 for none.
+    """
+    if min_dpi is None:
+        return 1
+    finest = unknown_dpi if dpi.is_null() else min(dpi.horizontal, dpi.vertical)
+    return max(1, math.floor(finest / min_dpi))
+
+
+def _draft(image: Image.Image, factor: int) -> int:
+    """Have a JPEG decode at the largest of 1/2, 1/4 and 1/8 within ``factor``.
+
+    Returns:
+        int: The factor the decoder shrinks by; 1 for other formats.
+    """
+    if image.format != "JPEG" or factor < 2:
+        return 1
+    step = 1 << min(3, factor.bit_length() - 1)
+    width, height = image.size
+    # Pillow takes the largest of 8, 4, 2 and 1 that is at most the requested
+    # size divided into the image's with floor division, so a rounded-up size
+    # would lose a step on an odd width or height.
+    image.draft(image.mode, (max(1, width // step), max(1, height // step)))
+    return round(width / image.size[0])
+
+
+def decodes_shrunk(image_id: ImageId) -> bool:
+    """Tell whether ``load_image`` shrinks this file in the decoder, not after it.
+
+    Only the header is read. A JPEG decodes straight at a power-of-two
+    fraction of its size; every other format is decoded in full first, so its
+    shrunk pixels are ``shrink_decoded`` of the full decode.
+
+    Args:
+        image_id (ImageId): File and page.
+
+    Returns:
+        bool: True for a JPEG.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        UnsupportedImageFormatError: If the format is not recognised.
+    """
+    with _open(Path(image_id.file_path)) as image:
+        return image.format == "JPEG"
+
+
+def shrink_decoded(pixels: NDArray[np.uint8], factor: int) -> NDArray[np.uint8]:
+    """Average decoded pixels down by a whole factor, as ``load_image`` does.
+
+    Args:
+        pixels (NDArray[np.uint8]): ``(H, W)`` or ``(H, W, 3)`` pixels; only read.
+        factor (int): Whole factor to shrink by.
+
+    Returns:
+        NDArray[np.uint8]: New pixels, or ``pixels`` itself for a factor of 1.
+    """
+    if factor <= 1:
+        return pixels
+    height, width = pixels.shape[:2]
+    size = (max(1, round(width / factor)), max(1, round(height / factor)))
+    return np.asarray(
+        cv2.resize(pixels, size, interpolation=cv2.INTER_AREA), dtype=np.uint8
+    )
 
 
 @contextmanager
