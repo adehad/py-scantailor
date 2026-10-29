@@ -5,9 +5,16 @@ at least 0.42 mm of the page at any scan resolution. A gray-level detector then
 keeps dark features that are thin horizontally but tall. A Hough transform over
 a few degrees either side of vertical votes for lines, and lines whose
 horizontal extents overlap are merged into one.
+
+The detector responds where a column is darker than its neighbours a few pixels
+away, which on a wide shadow, such as the one round a book's spine, is its
+steepest flank rather than its darkest column. Each line is therefore moved
+sideways down the brightness slope to the bottom of the valley it lies on,
+when that valley is a clear dip with brighter page on both sides.
 """
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import cv2
@@ -37,6 +44,16 @@ _TALL_WINDOW = np.ones((11, 1), np.uint8)
 _GAP_CLOSING_HEIGHT = 19
 _MIN_QUALITY_FACTOR = 1.8
 _MIN_WEIGHTED_LEVEL = 1
+# Farthest the middle of a line moves while it descends into its valley, and
+# again while it is centred on the valley's floor, so up to twice this in all;
+# more than half the width of a dark spine shadow. Its ends may move up to
+# twice as far again while the line turns.
+_VALLEY_REACH_MM = 15.0
+# Gray levels the column means must rise on both sides of a valley bottom for
+# it to count as a dip; a flat scanner bed varies by well under one level.
+_MIN_VALLEY_DEPTH = 8.0
+# Column means within this many gray levels of the lowest form the bottom.
+_VALLEY_FLOOR_TOLERANCE = 0.5
 # Width in pixels of upstream's red lines in the debug image.
 _VECTOR_LINE_WIDTH = 3.0
 
@@ -103,6 +120,7 @@ def find_lines(
         list[tuple[tuple[float, float], tuple[float, float]]]:
             Lines as ``((x1, y1), (x2, y2))`` in ``gray`` pixels, each
         running from top to bottom of the page, the point with the smaller x first.
+        Two lines that settle in the same valley are reported once.
     """
     gray100 = _reduce_to_working_dpi(gray, dpi)
     if dbg is not None:
@@ -135,16 +153,157 @@ def find_lines(
         dbg.add(canvas, "vector_lines")
 
     scale = dpi / _WORKING_DPI
+    reach = math.floor(0.5 + _VALLEY_REACH_MM / _MM_PER_INCH * _WORKING_DPI)
     lines: list[Line] = []
+    centers: list[float] = []
     for group in groups[:max_lines]:
-        left, right = group.leader.left, group.leader.right
-        lines.append(
-            (
-                (left[0] * scale, left[1] * scale),
-                (right[0] * scale, right[1] * scale),
-            )
+        (x1, y1), (x2, y2) = _to_valley_bottom(
+            gray100, group.leader.left, group.leader.right, reach
         )
+        center = 0.5 * (x1 + x2)
+        if any(abs(center - other) < _LINE_THICKNESS for other in centers):
+            continue
+        centers.append(center)
+        lines.append(((x1 * scale, y1 * scale), (x2 * scale, y2 * scale)))
     return lines
+
+
+def _to_valley_bottom(
+    gray100: NDArray[np.uint8],
+    first: tuple[float, float],
+    second: tuple[float, float],
+    reach: int,
+) -> Line:
+    """Move a line sideways to the darkest part of the valley it lies on.
+
+    Each end of the line moves a whole pixel at a time, alone or with the
+    other, while that lowers the mean brightness along the line, so the line
+    can turn to follow the valley. ``reach`` limits how far the middle of the
+    line moves and how much its ends move apart; it does not limit each end,
+    because the detector can find a line on the flank of a wide shadow at its
+    steepest angle, and an end of it then lies more than ``reach`` from the
+    bottom. The bottom of the valley is then the middle
+    of the parallel shifts whose means lie within ``_VALLEY_FLOOR_TOLERANCE``
+    of the lowest. A line on the edge of the scanner bed, where the dark side
+    runs flat to the image border or past ``reach``, is not in a valley and
+    stays where it is.
+
+    Args:
+        gray100 (numpy.ndarray of numpy.uint8): (H, W) page at 100 dpi.
+        first (tuple[float, float]): One end of the line, in ``gray100`` pixels.
+        second (tuple[float, float]): The other end, at a different y.
+        reach (int): Farthest the middle of the line may move while it
+            descends, and again while it is centred on the floor, in pixels.
+
+    Returns:
+        tuple[tuple[float, float], tuple[float, float]]: The moved line with
+        its ends at the same y as before; the line unchanged when the valley
+        is shallower than ``_MIN_VALLEY_DEPTH``.
+    """
+    rows = np.arange(gray100.shape[0])
+
+    def mean_along(shift1: int, shift2: int) -> float:
+        return _line_means(gray100, rows, first, second, np.array([[shift1, shift2]]))[
+            0
+        ]
+
+    shift1, shift2 = _descend(mean_along, reach)
+    parallel = np.arange(-reach, reach + 1)
+    profile = _line_means(
+        gray100,
+        rows,
+        first,
+        second,
+        np.stack([parallel + shift1, parallel + shift2], axis=1),
+    )
+    center = reach
+    if not np.isfinite(profile[center]):
+        return first, second
+    floor = profile[center] + _VALLEY_FLOOR_TOLERANCE
+    low, high = center, center
+    while low > 0 and profile[low - 1] <= floor:
+        low -= 1
+    while high < len(profile) - 1 and profile[high + 1] <= floor:
+        high += 1
+    on_image = np.where(np.isfinite(profile), profile, -np.inf)
+    rise_before = np.max(on_image[:low], initial=-np.inf) - profile[center]
+    rise_after = np.max(on_image[high + 1 :], initial=-np.inf) - profile[center]
+    if min(rise_before, rise_after) < _MIN_VALLEY_DEPTH:
+        return first, second
+    offset = 0.5 * (low + high) - center
+    return (
+        (first[0] + shift1 + offset, first[1]),
+        (second[0] + shift2 + offset, second[1]),
+    )
+
+
+def _descend(mean_along: Callable[[int, int], float], reach: int) -> tuple[int, int]:
+    """Shifts of the two line ends at the local minimum reached from no shift.
+
+    Args:
+        mean_along (Callable[[int, int], float]): Mean brightness of the line
+            with its ends shifted by the given pixels; infinite off the image.
+        reach (int): Largest shift of the line's middle, and half the largest
+            difference between the shifts of its ends.
+
+    Returns:
+        tuple[int, int]: The shifts of the first and second end.
+    """
+    means: dict[tuple[int, int], float] = {}
+
+    def mean(shifts: tuple[int, int]) -> float:
+        if shifts not in means:
+            means[shifts] = mean_along(*shifts)
+        return means[shifts]
+
+    current = (0, 0)
+    while True:
+        neighbours = [
+            (current[0] + step1, current[1] + step2)
+            for step1 in (-1, 0, 1)
+            for step2 in (-1, 0, 1)
+            if (step1, step2) != (0, 0)
+            and abs(current[0] + step1 + current[1] + step2) <= 2 * reach
+            and abs(current[0] + step1 - current[1] - step2) <= 2 * reach
+        ]
+        best = min(neighbours, key=mean)
+        if mean(best) >= mean(current):
+            return current
+        current = best
+
+
+def _line_means(
+    gray100: NDArray[np.uint8],
+    rows: NDArray[np.int64],
+    first: tuple[float, float],
+    second: tuple[float, float],
+    shifts: NDArray[np.int64],
+) -> NDArray[np.float64]:
+    """Mean brightness along the line with its ends shifted sideways.
+
+    Args:
+        gray100 (numpy.ndarray of numpy.uint8): (H, W) page at 100 dpi.
+        rows (numpy.ndarray of numpy.int64): ``arange(H)``.
+        first (tuple[float, float]): One end of the line.
+        second (tuple[float, float]): The other end, at a different y.
+        shifts (numpy.ndarray of numpy.int64): (N, 2) shifts of the first and
+            second end.
+
+    Returns:
+        numpy.ndarray of numpy.float64: N means, infinite for a shift that takes
+        any part of the line outside the image.
+    """
+    width = gray100.shape[1]
+    (x1, y1), (x2, y2) = first, second
+    along = (rows + 0.5 - y1) / (y2 - y1)
+    xs1 = x1 + shifts[:, :1]
+    xs2 = x2 + shifts[:, 1:]
+    columns = np.rint(xs1 + (xs2 - xs1) * along[None, :]).astype(np.int64)
+    inside = (columns >= 0).all(axis=1) & (columns < width).all(axis=1)
+    means = np.full(len(shifts), np.inf, dtype=np.float64)
+    if inside.any():
+        means[inside] = gray100[rows, columns[inside]].mean(axis=1, dtype=np.float64)
+    return means
 
 
 def _group_lines(hough_lines: list[HoughLine], height: int) -> list[_LineGroup]:
