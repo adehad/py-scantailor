@@ -17,6 +17,35 @@ def _axis_basis(num_values: int, degree: int) -> NDArray[np.float64]:
     return np.vander(positions, degree + 1, increasing=True)
 
 
+def _separable_normal_matrix(
+    vert_basis: NDArray[np.float64],
+    hor_basis: NDArray[np.float64],
+    weights: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Return ``D.T @ diag(w) @ D`` for the design matrix ``D`` of a surface fit.
+
+    Row ``y * width + x`` of ``D`` is ``outer(V[y], H[x]).ravel()``, so entry
+    ``((i, j), (k, l))`` is ``sum over y, x of V[y,i] V[y,k] w[y,x] H[x,j] H[x,l]``.
+    That sum factors into two small matrix products, and ``D`` itself, which
+    has one row per pixel, is never built.
+
+    Args:
+        vert_basis (NDArray[np.float64]): ``V``, shape (height, p).
+        hor_basis (NDArray[np.float64]): ``H``, shape (width, q).
+        weights (NDArray[np.float64]): ``w``, shape (height, width).
+
+    Returns:
+        NDArray[np.float64]: Shape (p * q, p * q), indexed row-major over
+        (y power, x power) like ``PolynomialSurface.coeffs.reshape(-1)``.
+    """
+    height, p = vert_basis.shape
+    width, q = hor_basis.shape
+    vert_pairs = (vert_basis[:, :, None] * vert_basis[:, None, :]).reshape(height, -1)
+    hor_pairs = (hor_basis[:, :, None] * hor_basis[:, None, :]).reshape(width, -1)
+    by_pairs = (vert_pairs.T @ weights @ hor_pairs).reshape(p, p, q, q)
+    return by_pairs.transpose(0, 2, 1, 3).reshape(p * q, p * q)
+
+
 @dataclass(frozen=True)
 class PolynomialSurface:
     """Polynomial of two variables over the unit square.
@@ -90,18 +119,20 @@ class PolynomialSurface:
 
         vert_basis = _axis_basis(height, vert_degree)
         hor_basis = _axis_basis(width, hor_degree)
-        # Row-major over (y power, x power): matches coeffs.reshape(-1).
-        design = (vert_basis[:, None, :, None] * hor_basis[None, :, None, :]).reshape(
-            height * width, -1
+        weights = (
+            np.ones((height, width), np.float64)
+            if mask is None
+            else mask.astype(np.float64)
         )
-        target = image.reshape(-1).astype(np.float64) / 255.0
-        if mask is not None:
-            selected = mask.reshape(-1)
-            design = design[selected]
-            target = target[selected]
-
-        normal = design.T @ design + _RIDGE * np.eye(design.shape[1])
-        solution = np.linalg.solve(normal, design.T @ target)
+        normal = _separable_normal_matrix(vert_basis, hor_basis, weights)
+        # In place, so the page holds one float64 array: the weights become
+        # the masked target once the normal matrix no longer needs them.
+        weighted_target = weights
+        weighted_target *= image
+        weighted_target /= 255.0
+        rhs = (vert_basis.T @ weighted_target @ hor_basis).reshape(-1)
+        normal += _RIDGE * np.eye(normal.shape[0])
+        solution = np.linalg.solve(normal, rhs)
         grid = np.asarray(solution, dtype=np.float64).reshape(
             vert_degree + 1, hor_degree + 1
         )

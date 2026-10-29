@@ -4,7 +4,11 @@ import numpy as np
 import pytest
 
 from scantailor.imageproc.polynomial_line import fit_polynomial_lines
-from scantailor.imageproc.polynomial_surface import PolynomialSurface
+from scantailor.imageproc.polynomial_surface import (
+    _RIDGE,
+    PolynomialSurface,
+    _axis_basis,
+)
 
 
 class TestPolynomialSurface:
@@ -91,6 +95,26 @@ class TestPolynomialSurface:
             PolynomialSurface.fit(
                 np.zeros((4, 4), np.uint8), 1, 1, np.ones((3, 3), bool)
             )
+
+    @pytest.mark.parametrize("masked", [False, True])
+    def test_fit_matches_least_squares_on_the_pixel_design_matrix(self, masked):
+        rng = np.random.default_rng(5)
+        image = rng.integers(0, 256, (37, 52), dtype=np.uint8)
+        mask = rng.random(image.shape) < 0.6 if masked else None
+        selected = np.ones(image.shape, bool) if mask is None else mask
+        design = np.einsum(
+            "yi,xj->yxij", _axis_basis(37, 2), _axis_basis(52, 3)
+        ).reshape(37 * 52, -1)[selected.ravel()]
+        ridge_rows = np.sqrt(_RIDGE) * np.eye(design.shape[1])
+        expected = np.linalg.lstsq(
+            np.vstack([design, ridge_rows]),
+            np.concatenate([image[selected] / 255.0, np.zeros(design.shape[1])]),
+            rcond=None,
+        )[0].reshape(3, 4)
+
+        surface = PolynomialSurface.fit(image, 3, 2, mask)
+
+        np.testing.assert_allclose(surface.coeffs, expected, rtol=1e-9, atol=1e-12)
 
     def test_render_of_empty_shape_is_empty(self):
         surface = PolynomialSurface.fit(np.full((4, 4), 9, np.uint8), 1, 1)

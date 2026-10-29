@@ -20,6 +20,7 @@ from scantailor.imageproc import row_bands
 from scantailor.imageproc.binary_threshold import to_gray
 from scantailor.imageproc.despeckle import despeckle
 from scantailor.imageproc.filters import bgr_to_gray, savgol_filter_2d, wiener_filter
+from scantailor.imageproc.polynomial_surface import PolynomialSurface
 
 _SLACK = 64 << 10
 _BAND_BYTES = 1 << 20
@@ -140,3 +141,21 @@ def test_despeckle_keeps_eleven_bytes_a_pixel_plus_one_band(
     peak = _peak_bytes(lambda: despeckle(page, dpi, level))
 
     assert peak <= 11 * height * width + _BAND_ALLOWANCE + _SLACK
+
+
+def test_surface_fit_keeps_eight_bytes_a_pixel_beside_its_axis_products() -> None:
+    # The float64 weights are the only image-sized array. The products of basis
+    # pairs per row and per column, and their contraction with the weights,
+    # grow with height and width; twice their size covers matmul's copies.
+    height, width, hor_degree, vert_degree = 225, 300, 8, 5
+    page = _text_page(height, width)
+    mask = page > 128
+    axis_products = 8 * (
+        height * (vert_degree + 1) ** 2 + width * (hor_degree + 1) ** 2
+    )
+
+    peak = _peak_bytes(
+        lambda: PolynomialSurface.fit(page, hor_degree, vert_degree, mask)
+    )
+
+    assert peak <= 8 * height * width + 2 * axis_products + _SLACK
