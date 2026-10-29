@@ -376,12 +376,29 @@ def _bradley_mean(image: NDArray[np.uint8], size: int) -> NDArray[np.uint8]:
     return binarize_bradley(image, size, 0.0)
 
 
+def _edge_div_blur_only(image: NDArray[np.uint8], size: int) -> NDArray[np.uint8]:
+    """``binarize_edge_div`` with blur division alone.
+
+    A pixel of 100 whose window holds one brighter pixel has a higher window
+    mean, so it is divided by a larger factor: it comes out near 144 where the
+    other pixels of 100 come out at 200, and Otsu calls it ink.
+
+    Args:
+        image (NDArray[np.uint8]): (H, W) gray page.
+        size (int): Window size.
+
+    Returns:
+        NDArray[np.uint8]: The page binarized to ``INK`` and ``BACKGROUND``.
+    """
+    return binarize_edge_div(image, size, kep=0.0, kbd=1.0)
+
+
 # With k = 0 each of these compares the pixel with the plain window mean.
 _MEAN_THRESHOLD = [_fox_mean, _window_mean, _wolf_mean, _sauvola_mean, _bradley_mean]
 
 
-@pytest.mark.parametrize("method", _MEAN_THRESHOLD)
 class TestWindow:
+    @pytest.mark.parametrize("method", _MEAN_THRESHOLD)
     def test_border_windows_are_clipped_to_the_image(self, method: Binarize) -> None:
         """Pixel (0, 1) is 170 beside a black corner on paper of 200.
 
@@ -396,10 +413,15 @@ class TestWindow:
 
         assert result[0, 1] == INK
 
+    @pytest.mark.parametrize("method", [*_MEAN_THRESHOLD, _edge_div_blur_only])
     def test_an_even_window_reaches_one_pixel_further_before_the_centre(
         self, method: Binarize
     ) -> None:
-        """A window of 8 spans the 4 pixels before the centre and 3 after."""
+        """A window of 8 spans the 4 pixels before the centre and 3 after.
+
+        Pixel 10 sees the bright pixel at 6 but not the one at 14, so only
+        the first raises its window mean and makes it ink.
+        """
         bright_before = _flat_with(100, {(0, 6): 255}, shape=(1, 21))
         bright_after = _flat_with(100, {(0, 14): 255}, shape=(1, 21))
 
