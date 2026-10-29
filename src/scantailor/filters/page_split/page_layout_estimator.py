@@ -75,6 +75,24 @@ _OFFCUT_MAX_WIDTH_FRACTION = 4
 _MIN_OFFCUT_GUTTER = 20
 _OFFCUT_GUTTER_RATIO = 2
 _SKEW_ACCURACY = 0.5
+_MM_PER_INCH = 25.4
+# Text set beside a rule comes within this distance of it; a page's own edge
+# has a wider blank margin.
+_CONTENT_REACH_MM = 2.0
+# How far either side of a found line its dark core is looked for. The finder
+# places a line up to about 1 mm off the mark it found.
+_LINE_SEARCH_MM = 1.5
+# Rows are measured in bands this tall, over which a found line's error in tilt
+# shifts it by well under a pixel.
+_BAND_MM = 5.0
+# In a band, a column belongs to a line's core when it is ink on this share of
+# the rows, and holds content when it is ink on this share: a letter stroke at
+# least 0.5 mm tall.
+_LINE_CORE_COVERAGE = 0.8
+_BAND_CONTENT_COVERAGE = 0.1
+# A side of a line holds content when this share of the bands has content
+# there. A column through a paragraph has it in most bands, a speck in one.
+_MIN_CONTENT_BAND_SHARE = 0.05
 # Opacity of upstream's red tint over the spans in the debug image.
 _SPAN_ALPHA = 0x50 / 0xFF
 
@@ -125,7 +143,7 @@ def estimate_page_layout(
     if layout_type == LayoutType.SINGLE_PAGE_UNCUT:
         return PageLayout.single_page_uncut(full_width, full_height)
 
-    folding = _try_cut_at_folding_line(layout_type, analysed, dpi, dbg)
+    folding = _try_cut_at_folding_line(layout_type, analysed, dpi, dbg, bw_threshold)
     if folding is not None:
         layout = _to_page_layout(folding, width, height)
     else:
@@ -230,6 +248,7 @@ def _try_cut_at_folding_line(
     gray: NDArray[np.uint8],
     dpi: float,
     dbg: DebugImages | None = None,
+    bw_threshold: int | None = None,
 ) -> _Cutters | None:
     """Cut at the folding lines found in the image, if there are usable ones."""
     height, width = gray.shape
@@ -240,6 +259,7 @@ def _try_cut_at_folding_line(
 
     if num_pages == 1:
         lines = _keep_one_sided_lines_apart(lines, center)
+        lines = _drop_edge_strips(lines, gray, dpi, bw_threshold)
         return _single_page_from_lines(layout_type, lines, width, height)
 
     limit = _TWO_PAGE_EDGE_LIMIT * center
@@ -264,6 +284,156 @@ def _keep_one_sided_lines_apart(lines: list[Line], center: float) -> list[Line]:
     if left_dist < threshold or right_dist < threshold:
         return lines
     return [left if left_dist < right_dist else right]
+
+
+def _drop_edge_strips(
+    lines: list[Line],
+    gray: NDArray[np.uint8],
+    dpi: float,
+    bw_threshold: int | None,
+) -> list[Line]:
+    """Drop outer lines that only fence off a narrow strip at an edge of the scan.
+
+    A single page lies between two lines. When a third line or more is found,
+    an outer line closer to its inner neighbour than a quarter of the image
+    width may bound a strip beside the page, such as a neighbouring page's
+    offcut, and the inner line is then the page's edge. A page edge has blank
+    margin on at least one side, so an inner line with content close on both
+    sides, such as a margin rule through the text, ends the dropping. The two
+    lines nearest the page always stay, so the page keeps both edges.
+
+    Args:
+        lines (list[Line]): Lines sorted by their centre column.
+        gray (numpy.ndarray of numpy.uint8): (H, W) gray image the lines were
+            found in.
+        dpi (float): Resolution of ``gray``.
+        bw_threshold (int | None): Gray level below which a pixel is ink. By
+            default Otsu's threshold of ``gray``, computed only when a line
+            could be dropped.
+
+    Returns:
+        list[Line]: The lines without those that bound edge strips.
+    """
+    max_strip = gray.shape[1] / _OFFCUT_MAX_WIDTH_FRACTION
+    threshold = bw_threshold
+    first, last = 0, len(lines) - 1
+    while last - first > 1:
+        left_strip = _center_x(lines[first + 1]) - _center_x(lines[first])
+        right_strip = _center_x(lines[last]) - _center_x(lines[last - 1])
+        if min(left_strip, right_strip) >= max_strip:
+            break
+        if threshold is None:
+            threshold = otsu_threshold(gray)
+        inner = lines[first + 1] if left_strip < right_strip else lines[last - 1]
+        if _runs_through_content(gray, threshold, inner, dpi):
+            break
+        if left_strip < right_strip:
+            first += 1
+        else:
+            last -= 1
+    return lines[first : last + 1]
+
+
+def _runs_through_content(
+    gray: NDArray[np.uint8], threshold: int, line: Line, dpi: float
+) -> bool:
+    """Whether content lies within 2 mm of a line on both of its sides.
+
+    Pixels are sampled along the line, in bands of rows 5 mm tall. In each
+    band, the line's own dark core, the run of columns near its centre that are
+    ink on nearly every row, is skipped, and the columns just beyond it on each
+    side are checked for content. A line lighter than the ink threshold has no
+    core.
+
+    Args:
+        gray (numpy.ndarray of numpy.uint8): (H, W) gray image.
+        threshold (int): Gray level below which a pixel is ink.
+        line (Line): The line, in ``gray`` pixels.
+        dpi (float): Resolution of ``gray``.
+
+    Returns:
+        bool: True when both sides have content close to the line.
+    """
+    search = round(_mm_to_px(_LINE_SEARCH_MM, dpi))
+    reach = max(1, round(_mm_to_px(_CONTENT_REACH_MM, dpi)))
+    band = max(1, round(_mm_to_px(_BAND_MM, dpi)))
+    half_width = search + reach + 1
+    samples = _samples_along(gray, line, half_width) < threshold
+    num_bands = max(1, samples.shape[0] // band)
+    coverage = (
+        samples[: num_bands * band]
+        .reshape(num_bands, -1, samples.shape[1])
+        .mean(axis=1, dtype=np.float64)
+    )
+    left_bands = right_bands = 0
+    for row in coverage:
+        core_left, core_right = _line_core(row, half_width, search)
+        content = row >= _BAND_CONTENT_COVERAGE
+        left_bands += bool(content[core_left - reach : core_left].any())
+        right_bands += bool(content[core_right : core_right + reach].any())
+    needed = _MIN_CONTENT_BAND_SHARE * num_bands
+    return left_bands >= needed and right_bands >= needed
+
+
+def _line_core(
+    coverage: NDArray[np.float64], centre: int, search: int
+) -> tuple[int, int]:
+    """Find the columns of a line's dark core in one band.
+
+    Args:
+        coverage (numpy.ndarray of numpy.float64): Ink share of each sampled
+            column, the line in column ``centre``.
+        centre (int): Column of the line.
+        search (int): Columns either side of the line where the core may lie.
+
+    Returns:
+        tuple[int, int]: The core and a column beside it on each side, as a
+        half-open range of columns; empty at the centre when no column near it
+        is covered on nearly every row.
+    """
+    is_core = coverage >= _LINE_CORE_COVERAGE
+    first, last = centre - search, centre + search
+    candidates = np.flatnonzero(is_core[first : last + 1]) + first
+    if candidates.size == 0:
+        return centre, centre
+    nearest = int(candidates[np.argmin(np.abs(candidates - centre))])
+    left, right = nearest, nearest + 1
+    while left > first and is_core[left - 1]:
+        left -= 1
+    while right <= last and is_core[right]:
+        right += 1
+    # Within a band the sampled columns step sideways by one pixel where the
+    # line's rounded position changes, which half covers the column beside it.
+    return left - 1, right + 1
+
+
+def _samples_along(
+    gray: NDArray[np.uint8], line: Line, half_width: int
+) -> NDArray[np.uint8]:
+    """Sample the image in columns that run parallel to a line.
+
+    Args:
+        gray (numpy.ndarray of numpy.uint8): (H, W) gray image.
+        line (Line): The line the columns run along.
+        half_width (int): Columns to sample on each side of the line.
+
+    Returns:
+        numpy.ndarray of numpy.uint8: (H, 2 * half_width + 1) samples, the
+        line in the middle column; pixels outside the image are white.
+    """
+    height, width = gray.shape
+    (x1, y1), (x2, y2) = line
+    rows = np.arange(height)
+    slope = 0.0 if y1 == y2 else (x2 - x1) / (y2 - y1)
+    centres = np.rint(x1 + (rows - y1) * slope).astype(np.int64)
+    columns = centres[:, None] + np.arange(-half_width, half_width + 1)
+    inside = (columns >= 0) & (columns < width)
+    samples = gray[rows[:, None], np.clip(columns, 0, width - 1)]
+    return np.where(inside, samples, np.uint8(255))
+
+
+def _mm_to_px(mm: float, dpi: float) -> float:
+    return mm / _MM_PER_INCH * dpi
 
 
 def _single_page_from_lines(

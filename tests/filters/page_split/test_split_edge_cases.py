@@ -245,12 +245,6 @@ class TestSinglePages:
             assert _mid_x(layout.cutter1) <= paper_left + tolerance
             assert _mid_x(layout.cutter2) >= paper_right - tolerance
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="Folding lines are found at the paper edge, the page edge and the "
-        "strip edge; the single page rule pairs the outermost two and keeps the "
-        "strip (#382).",
-    )
     @pytest.mark.parametrize(
         "layout_type", [LayoutType.AUTO_LAYOUT_TYPE, LayoutType.PAGE_PLUS_OFFCUT]
     )

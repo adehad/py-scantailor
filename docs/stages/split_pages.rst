@@ -48,6 +48,13 @@ along the edge of a single-page scan when all of these hold:
 A strip that fails any of the three tests stays in the page. Text of the page itself
 that runs off the scan is not a strip, so ScanTailor leaves it alone.
 
+Dark lines can also mark a strip. When a single-page scan shows three or more
+folding lines or page edges, and the outermost one is less than a quarter of the
+image width from the next, the page is cut at that next line. A line with text
+within 2 mm on both sides, such as a margin rule through the text, is not a page
+edge, so the cut stays at the outer line. This works under **Auto** and **Single
+page with an offcut**.
+
 Choosing a layout by hand
 =========================
 
