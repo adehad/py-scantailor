@@ -312,12 +312,6 @@ class TestSinglePages:
             else:
                 assert right >= width - shadow - tolerance
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="The indented first lines reach past a word gap wider than the "
-        "8 px whitespace minimum; dropping insignificant edge spans removes them "
-        "as garbage and the cut runs through their last words (#383).",
-    )
     def test_two_pages_forced_on_a_single_page_cut_just_clear_of_its_text(
         self, sample_gray: dict[str, NDArray[np.uint8]]
     ) -> None:
