@@ -1,10 +1,16 @@
 """Decoded source images shared by everything that shows or renders a page."""
 
+import threading
 from collections.abc import Hashable
+from dataclasses import dataclass
 
-from scantailor.core.models import Dpi, ImageId
+import numpy as np
+from numpy.typing import NDArray
+
+from scantailor.core.models import Dpi, ImageId, OrthogonalDegrees
 from scantailor.core.page_source import DpiOverrides, LoadedPage, load_page
 from scantailor.core.result_memo import ResultMemo
+from scantailor.imageproc.geometry import rotate_orthogonal
 
 __all__ = ["SourceCache"]
 
@@ -19,6 +25,10 @@ class SourceCache:
     threads that ask while it is being decoded wait for that decode. The pixels
     are shared, so they are read-only.
 
+    The page last asked for through ``oriented`` is also kept turned by Fix
+    Orientation's rotation, so that it is turned once per page and rotation
+    rather than once per render and view.
+
     Args:
         capacity (int): Most pages kept.
     """
@@ -26,6 +36,8 @@ class SourceCache:
     def __init__(self, capacity: int = _CAPACITY) -> None:
         """Create an empty cache; arguments are described on the class."""
         self._memo = ResultMemo[LoadedPage](capacity)
+        self._turn_lock = threading.Lock()
+        self._turned: _Turned | None = None
 
     def load(
         self,
@@ -73,9 +85,66 @@ class SourceCache:
         """
         return self._memo.peek(_key(image_id, dpi_overrides))
 
+    def oriented(
+        self, pixels: NDArray[np.uint8], degrees: OrthogonalDegrees
+    ) -> NDArray[np.uint8]:
+        """Return pixels turned clockwise by ``degrees``, turning them only once.
+
+        One turned copy is kept, for the pixels and rotation asked for last;
+        asking for other pixels, at any rotation, lets it go. The copy is keyed
+        by the pixels' buffer, and the cache holds those pixels while it keeps
+        the copy, so no other image can take over the buffer and be served a
+        stale copy. A thread asking while another turns the same pixels waits
+        for that copy.
+
+        Args:
+            pixels (NDArray[np.uint8]): A decoded page, or a view of one; only
+                read.
+            degrees (OrthogonalDegrees): Clockwise rotation.
+
+        Returns:
+            NDArray[np.uint8]: Read-only pixels; a view of ``pixels`` when
+                ``degrees`` is 0.
+        """
+        key = _buffer_key(pixels)
+        with self._turn_lock:
+            turned = self._turned
+            if turned is not None and turned.key == key:
+                if turned.degrees == degrees:
+                    return turned.pixels
+            else:
+                # Keep the copy only for the page being worked on.
+                self._turned = None
+            if degrees == 0:
+                unturned = pixels.view()
+                unturned.flags.writeable = False
+                return unturned
+            result = rotate_orthogonal(pixels, degrees)
+            result.flags.writeable = False
+            self._turned = _Turned(key, pixels, degrees, result)
+            return result
+
     def clear(self) -> None:
         """Forget every cached page."""
         self._memo.clear()
+        with self._turn_lock:
+            self._turned = None
+
+
+@dataclass(frozen=True)
+class _Turned:
+    """A turned copy and the pixels it was turned from, which it keeps alive."""
+
+    key: Hashable
+    source: NDArray[np.uint8]
+    degrees: OrthogonalDegrees
+    pixels: NDArray[np.uint8]
+
+
+def _buffer_key(pixels: NDArray[np.uint8]) -> Hashable:
+    """Identify the memory an array reads, so views of one page share a key."""
+    address = pixels.__array_interface__["data"][0]
+    return (address, pixels.shape, pixels.strides, pixels.dtype.str)
 
 
 def _decode(image_id: ImageId, dpi_overrides: DpiOverrides | None) -> LoadedPage:

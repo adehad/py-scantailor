@@ -50,6 +50,7 @@ from scantailor.core.models import (
     Dpi,
     ImageId,
     Margins,
+    OrthogonalDegrees,
     OrthogonalRotation,
     PageId,
     SubPage,
@@ -785,7 +786,7 @@ class StagePanels(QtCore.QObject):
 
         if self._already_shown((self.stage, source.image_id, rotation.degrees), source):
             return
-        oriented = rotate_orthogonal(source.pixels, rotation.degrees)
+        oriented = self._turned(source.pixels, rotation.degrees)
         oriented_size = (oriented.shape[1], oriented.shape[0])
         if isinstance(view, DeskewImageView):
             through = FilterStage.PAGE_SPLIT
@@ -871,7 +872,7 @@ class StagePanels(QtCore.QObject):
                 return None
             cached = panels._content_mask
             if cached is None or cached[0] != key:
-                oriented = rotate_orthogonal(source.pixels, rotation)
+                oriented = panels._turned(source.pixels, rotation)
                 detection = ApplicationSettings.get_instance().polarity_detection
                 black_on_white = not detection.enabled or is_black_on_white(
                     oriented, xform
@@ -881,6 +882,14 @@ class StagePanels(QtCore.QObject):
             return cached[1]
 
         return provide
+
+    def _turned(
+        self, pixels: NDArray[np.uint8], degrees: OrthogonalDegrees
+    ) -> NDArray[np.uint8]:
+        """Return source pixels turned as Fix Orientation turns them; read-only."""
+        if self._sources is None:
+            return rotate_orthogonal(pixels, degrees)
+        return self._sources.oriented(pixels, degrees)
 
     def _oriented_size(self, page: PageId, source: _Source) -> tuple[int, int]:
         height, width = source.pixels.shape[:2]
