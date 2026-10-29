@@ -19,9 +19,9 @@ _OUTPUT_DPI = 200
 
 # (colour mode, binarisation) -> first 16 hex digits of the SHA-256 of the output.
 _REFERENCES = {
-    (ColorMode.BLACK_AND_WHITE, BinarizationMethod.OTSU): "0243c5c360d748e7",
-    (ColorMode.BLACK_AND_WHITE, BinarizationMethod.WOLF): "9d03ab9a327f1a32",
-    (ColorMode.COLOR_GRAYSCALE, BinarizationMethod.OTSU): "ddd377a7b9e15086",
+    (ColorMode.BLACK_AND_WHITE, BinarizationMethod.OTSU): "01e6e99c8d8a142e",
+    (ColorMode.BLACK_AND_WHITE, BinarizationMethod.WOLF): "e38d3e9963debb64",
+    (ColorMode.COLOR_GRAYSCALE, BinarizationMethod.OTSU): "b3a6e63bf13b4c6c",
 }
 
 

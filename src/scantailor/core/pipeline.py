@@ -72,6 +72,9 @@ from scantailor.filters.page_layout.page_rect import (
 )
 from scantailor.filters.page_layout.params import ContentRect, ContentSize
 from scantailor.filters.page_split.page_layout import PageLayout
+from scantailor.filters.select_content.content_box_finder import (
+    PROCESSING_DPI as SELECT_CONTENT_DPI,
+)
 from scantailor.imageproc.filters import bgr_to_gray
 
 from .stage_sequence import FilterStage, StageSequence
@@ -202,8 +205,9 @@ class _PageState:
     """Oriented source pixels plus the transformation accumulated so far.
 
     The transformed view is rendered on demand and cached until the
-    transformation changes. Detection works on the source's gray, converted
-    once per source, as upstream's ``FilterData`` does.
+    transformation changes, and so are the views detection works on, which are
+    rendered from the source's gray straight at the size a finder needs.
+    The gray is converted once per source, as upstream's ``FilterData`` does.
     """
 
     def __init__(
@@ -219,6 +223,10 @@ class _PageState:
         self._decoded_dpi = dpi
         self._source_dpi = transformation_dpi(dpi, rotation_degrees)
         self._view: NDArray[np.uint8] | None = None
+        self._detection_views: dict[
+            tuple[bool, tuple[int, int]], NDArray[np.uint8]
+        ] = {}
+        self._outside_masks: dict[tuple[int, int], NDArray[np.bool_]] = {}
         self._source_gray: NDArray[np.uint8] | None = None
         self._black_on_white: bool | None = None
         self._polarity_recorded = False
@@ -259,7 +267,7 @@ class _PageState:
         self.xform = self._new_transformation(source)
         self.content_polygon_source = None
         self.trim_area = None
-        self._view = None
+        self._forget_views()
         self._source_gray = None
         self._black_on_white = None
         self._polarity_recorded = False
@@ -276,6 +284,33 @@ class _PageState:
         if self._view is None:
             self._view = render_transformed(self.source, self.xform)
         return self._view
+
+    def _forget_views(self) -> None:
+        """Drop every view rendered through the transformation, which changed."""
+        self._view = None
+        self._detection_views.clear()
+        self._outside_masks.clear()
+
+    def size_at(self, dpi: float | None) -> tuple[int, int]:
+        """Return the (width, height) of ``view`` resampled to ``dpi``.
+
+        Sizes round as the finders round theirs, so that a view of this size
+        reaches a finder already at the resolution it works at. The view's
+        resolution is ``xform.pre_scaled_dpi``, which holds only until
+        ``scale_to_dpi`` resamples the view for Output.
+
+        Args:
+            dpi (float | None): Resolution wanted; None, or one at or above the
+                view's, keeps the view's size.
+        """
+        width, height = self.view_size()
+        view_dpi = float(self.dpi.horizontal)
+        if dpi is None or dpi >= view_dpi:
+            return width, height
+        return (
+            max(1, round(width * dpi / view_dpi)),
+            max(1, round(height * dpi / view_dpi)),
+        )
 
     def is_black_on_white(self, dbg: DebugImages | None = None) -> bool:
         """Tell whether the page inside the pre-crop area has dark content on light.
@@ -295,17 +330,70 @@ class _PageState:
         return self._black_on_white
 
     def detection_view(
-        self, detection: BlackOnWhiteDetection, dbg: DebugImages | None = None
+        self,
+        detection: BlackOnWhiteDetection,
+        dbg: DebugImages | None = None,
+        dpi: float | None = None,
     ) -> NDArray[np.uint8]:
         """Return the gray of ``view``, inverted when it shows light content on dark.
 
-        The gray source is resampled, and inverted before that, so the area
-        with no source pixel stays white, as it is in ``view``. ``dbg``
-        receives the polarity estimator's images.
+        The gray source is resampled as if inverted first, so the area with no
+        source pixel stays white, as it is in ``view``; the renderer inverts as
+        it filters, so no full-size inverted gray is built. The result is
+        read-only and kept until the transformation changes.
+
+        Args:
+            detection (BlackOnWhiteDetection): Whether to measure the polarity.
+            dbg (DebugImages | None): Receives the polarity estimator's images.
+            dpi (float | None): Resolution to resample to, never above the
+                view's; None for the view's. See ``size_at``.
+
+        Returns:
+            NDArray[np.uint8]: (H, W) gray of ``size_at(dpi)``.
         """
-        if not detection.enabled or self.is_black_on_white(dbg):
-            return render_transformed(self.source_gray, self.xform)
-        return render_transformed(255 - self.source_gray, self.xform)
+        invert = detection.enabled and not self.is_black_on_white(dbg)
+        key = (invert, self.size_at(dpi))
+        if key not in self._detection_views:
+            view = render_transformed(
+                self.source_gray, self.xform, key[1], invert=invert
+            )
+            view.flags.writeable = False
+            self._detection_views[key] = view
+        return self._detection_views[key]
+
+    def outside_source_mask(self, dpi: float | None = None) -> NDArray[np.bool_]:
+        """Mark the pixels of a view that have no source pixel (deskew corners, crops).
+
+        Read-only and kept until the transformation changes.
+
+        Args:
+            dpi (float | None): Resolution of the view; see ``size_at``.
+
+        Returns:
+            NDArray[np.bool_]: (H, W) mask of ``size_at(dpi)``, True where a
+            pixel's centre lies outside the source or the pre-crop area, which
+            is where resampling leaves more white than source in it.
+        """
+        size = self.size_at(dpi)
+        if size not in self._outside_masks:
+            self._outside_masks[size] = self._outside_polygons(size)
+        return self._outside_masks[size]
+
+    def _outside_polygons(self, size: tuple[int, int]) -> NDArray[np.bool_]:
+        width, height = size
+        full_width, full_height = self.view_size()
+        rect = self.xform.resulting_rect
+        to_pixels = np.array([width / full_width, height / full_height])
+        source_height, source_width = self.source.shape[:2]
+        source_outline = self.xform.map_polygon(
+            Rect.from_size(source_width, source_height).to_polygon()
+        )
+        painted = np.zeros((height, width), dtype=np.uint8)
+        for polygon in (source_outline, self.xform.resulting_pre_crop_area):
+            _whiten_outside(painted, (polygon - [rect.x, rect.y]) * to_pixels)
+        mask = painted > 127
+        mask.flags.writeable = False
+        return mask
 
     def view_size(self) -> tuple[int, int]:
         """Return the (width, height) of ``view`` without resampling."""
@@ -318,24 +406,24 @@ class _PageState:
     def crop_to(self, area: NDArray[np.float64]) -> None:
         """Crop to a polygon given in source coordinates."""
         self.xform.set_pre_crop_area(self.xform.orig_polygon_to_pre_crop_space(area))
-        self._view = None
+        self._forget_views()
         self._black_on_white = None
         self._polarity_recorded = False
 
     def apply_deskew(self, filter_: DeskewFilter, params: DeskewParams) -> None:
         """Rotate by the deskew angle, then shear by the oblique angle."""
         filter_.apply_geometry(self.xform, params)
-        self._view = None
+        self._forget_views()
 
     def crop_to_page(self, area: NDArray[np.float64]) -> None:
         """Crop to a polygon given in the current transformed coordinates."""
         self.xform.set_post_crop_area(area)
-        self._view = None
+        self._forget_views()
 
     def scale_to_dpi(self, dpi: Dpi) -> None:
         """Resample the view to a resolution; pixels are still taken from the source."""
         self.xform.post_scale_to_dpi(dpi)
-        self._view = None
+        self._forget_views()
 
     def to_view(self, polygon: NDArray[np.float64]) -> NDArray[np.float64]:
         """Map a polygon from source coordinates to the view's pixel grid."""
@@ -709,8 +797,11 @@ def _process_page_split(
         page_id.image_id
     ).degrees
 
+    height, width = state.source.shape[:2]
     detected = False
-    if detect:
+    if detect and not filter_.keeps_stored_layout(
+        page_id, (width, height), rotation_degrees, state.trim_area
+    ):
         detected = filter_.settle(
             state.source_gray,
             page_id,
@@ -740,7 +831,6 @@ def _process_page_split(
         return metadata
 
     metadata["num_sub_pages"] = params.page_layout.num_sub_pages
-    height, width = state.source.shape[:2]
     metadata["page_layout"] = params.page_layout.layout_type.value
     metadata["cutters_x"] = _cutters_x(params.page_layout)
     metadata["image_width"] = width
@@ -820,20 +910,8 @@ def _process_deskew(
     }
 
 
-def _outside_source_mask(state: _PageState) -> NDArray[np.bool_]:
-    """Mark view pixels that have no source pixel (deskew corners, crops).
-
-    Returns:
-        NDArray[np.bool_]: (H, W) mask of the transformed view, True where the
-        resampling had nothing to sample.
-    """
-    # Every channel resamples alike, so one channel gives the same mask.
-    blank = np.zeros(state.source.shape[:2], dtype=np.uint8)
-    return render_transformed(blank, state.xform) > 127
-
-
 def _outside_source_key(state: _PageState) -> tuple:
-    """Identify the mask ``_outside_source_mask`` would make for this state."""
+    """Identify the mask ``outside_source_mask`` makes for this state."""
     xform = state.xform
     rect = xform.resulting_rect
     return (
@@ -862,10 +940,12 @@ def _process_select_content(
     page_detected = content_detected = False
     if detect:
         params, page_detected, content_detected = filter_.settle(
-            lambda: state.detection_view(options.black_on_white_detection, dbg),
+            lambda: state.detection_view(
+                options.black_on_white_detection, dbg, SELECT_CONTENT_DPI
+            ),
             page_id,
             dpi=float(state.dpi.horizontal),
-            outside=lambda: _outside_source_mask(state),
+            outside=lambda: state.outside_source_mask(SELECT_CONTENT_DPI),
             outside_key=_outside_source_key(state),
             page_outline=_polygon_points(state.xform.resulting_pre_crop_area),
             view_transform=state.xform.transform,
@@ -917,12 +997,21 @@ def _debug_select_content(
 ) -> None:
     """Run the finders that did not run for their images, storing nothing."""
     filter_ = sequence.select_content_filter
-    view = state.detection_view(options.black_on_white_detection, dbg)
+    view = state.detection_view(
+        options.black_on_white_detection, dbg, SELECT_CONTENT_DPI
+    )
     dpi = float(state.dpi.horizontal)
-    outside = _outside_source_mask(state)
+    outside = state.outside_source_mask(SELECT_CONTENT_DPI)
+    frame = state.view_size()
     if page:
         filter_.detect_page(
-            view, page_id, dpi=dpi, store_result=False, outside=outside, dbg=dbg
+            view,
+            page_id,
+            dpi=dpi,
+            store_result=False,
+            outside=outside,
+            dbg=dbg,
+            frame_size=frame,
         )
     if content:
         filter_.detect_content(
@@ -933,6 +1022,7 @@ def _debug_select_content(
             outside=outside,
             page_box=filter_.get_params(page_id).page_box.to_content_box(),
             dbg=dbg,
+            frame_size=frame,
         )
 
 

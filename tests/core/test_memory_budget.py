@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
-from scantailor.core import batch
+from scantailor.core import batch, pipeline
 from scantailor.core.batch import (
     PAGE_BYTES_PER_PIXEL,
     WORKER_BASE_BYTES,
@@ -20,9 +20,11 @@ from scantailor.core.batch import (
 from scantailor.core.image_io import write_image
 from scantailor.core.models import Dpi, ImageId, PageId, SubPage
 from scantailor.core.pipeline import PipelineOptions, process_page
-from scantailor.core.stage_sequence import StageSequence
+from scantailor.core.settings import BlackOnWhiteDetection
+from scantailor.core.stage_sequence import FilterStage, StageSequence
 from scantailor.filters.output.color_mode import ColorMode
 from scantailor.filters.output.despeckle import DespeckleLevel
+from scantailor.filters.select_content import content_finder
 
 _SLACK = 64 << 10
 _GIB = 1 << 30
@@ -127,6 +129,89 @@ def test_a_page_upscaled_to_its_output_resolution_stays_within_its_price(
 
     assert price == PAGE_BYTES_PER_PIXEL[ColorMode.MIXED] * height * width * 4
     assert peak - before <= price + _SLACK
+
+
+def _select_content_peak(
+    image: NDArray[np.uint8], dpi: float, monkeypatch: pytest.MonkeyPatch
+) -> int:
+    """Bytes Select Content allocates at most beyond what it starts with."""
+    peaks: dict[FilterStage, int] = {}
+    process_stage = pipeline._process_stage
+
+    def measured(state, page_id, sequence, stage, options, detect):
+        before, _ = tracemalloc.get_traced_memory()
+        tracemalloc.reset_peak()
+        result = process_stage(state, page_id, sequence, stage, options, detect)
+        peaks[stage] = tracemalloc.get_traced_memory()[1] - before
+        return result
+
+    monkeypatch.setattr(pipeline, "_process_stage", measured)
+    content_finder._CONTENT_MEMO.clear()
+    tracemalloc.start()
+    try:
+        process_page(
+            image,
+            _page_id(),
+            StageSequence(),
+            PipelineOptions(
+                dpi=dpi, end_stage=FilterStage.SELECT_CONTENT, render_image=False
+            ),
+        )
+    finally:
+        tracemalloc.stop()
+    return peaks[FilterStage.SELECT_CONTENT]
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("black_on_white", [True, False])
+def test_select_content_needs_no_more_memory_at_600_dpi_than_at_150_dpi(
+    one_opencv_thread: None, monkeypatch: pytest.MonkeyPatch, black_on_white: bool
+) -> None:
+    """Select Content detects at 150 dpi, so a finer scan must not cost it more."""
+    height, width = 4000, 2800
+    page = _book_page(height, width)
+    monkeypatch.setattr(
+        pipeline._PageState, "is_black_on_white", lambda self, dbg=None: black_on_white
+    )
+    at_150_dpi = cv2.resize(
+        page, (width // 4, height // 4), interpolation=cv2.INTER_AREA
+    )
+
+    at_600 = _select_content_peak(page, 600.0, monkeypatch)
+    at_150 = _select_content_peak(at_150_dpi, 150.0, monkeypatch)
+
+    assert at_600 <= at_150 + _SLACK
+
+
+def _detection_view_peak(
+    page: NDArray[np.uint8], black_on_white: bool, monkeypatch: pytest.MonkeyPatch
+) -> int:
+    """Bytes building the 150 dpi detection view of a 600 dpi page allocates at most.
+
+    The gray is converted beforehand, as the stages before Select Content do.
+    """
+    state = pipeline._PageState(page, 600.0)
+    monkeypatch.setattr(state, "is_black_on_white", lambda dbg=None: black_on_white)
+    assert state.source_gray.shape == page.shape[:2]
+    tracemalloc.start()
+    try:
+        before, _ = tracemalloc.get_traced_memory()
+        state.detection_view(BlackOnWhiteDetection(), dpi=150.0)
+        return tracemalloc.get_traced_memory()[1] - before
+    finally:
+        tracemalloc.stop()
+
+
+def test_a_light_on_dark_detection_view_costs_no_more_memory_than_a_dark_on_light_one(
+    one_opencv_thread: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The inverted view is filtered from the gray itself, not an inverted copy."""
+    page = _book_page(2000, 1400)
+
+    dark_on_light = _detection_view_peak(page, True, monkeypatch)
+    light_on_dark = _detection_view_peak(255 - page, False, monkeypatch)
+
+    assert light_on_dark <= dark_on_light + _SLACK
 
 
 class TestMemoryWorkerLimit:

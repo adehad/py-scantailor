@@ -157,22 +157,25 @@ class Filter:
         page_box: ContentBox | None = None,
         outside_key: Hashable | None = None,
         dbg: DebugImages | None = None,
+        frame_size: tuple[int, int] | None = None,
     ) -> ContentDetectionResult:
         """Detect content boundaries in an image.
 
         Args:
-            image: Grayscale or color image.
+            image: Grayscale or color image; may be the frame shrunk ahead.
             page_id: Page identifier.
-            dpi: Image resolution.
+            dpi: Resolution of the frame.
             store_result: Whether to store the result in settings, unless the
                 page's parameters changed while it was being detected.
             outside: Mask of the pixels that have no source pixel behind them
                 (corners exposed by a rotation); they are treated as shadow.
-            page_box: Area of the page in pixels of ``image``.
+            page_box: Area of the page in pixels of the frame.
             outside_key: Identifies a callable ``outside`` so that it is only
                 called when the detection is not already remembered.
             dbg (DebugImages | None): Receives the content finder's
                 intermediate images.
+            frame_size (tuple[int, int] | None): Width and height of the view
+                the boxes are given in; None when that is ``image`` itself.
 
         Returns:
             ContentDetectionResult with detected box and confidence.
@@ -185,6 +188,7 @@ class Filter:
             outside=outside,
             outside_key=outside_key,
             dbg=dbg,
+            frame_size=frame_size,
         )
 
         if store_result:
@@ -203,6 +207,7 @@ class Filter:
         store_result: bool = True,
         outside: NDArray[np.bool_] | Callable[[], NDArray[np.bool_]] | None = None,
         dbg: DebugImages | None = None,
+        frame_size: tuple[int, int] | None = None,
     ) -> PageBox:
         """Detect page boundaries in an image.
 
@@ -210,9 +215,10 @@ class Filter:
         tolerance from the filter settings.
 
         Args:
-            image (numpy.ndarray of numpy.uint8): Grayscale or color image.
+            image (numpy.ndarray of numpy.uint8): Grayscale or color image;
+                may be the frame shrunk ahead.
             page_id (PageId): Page identifier.
-            dpi (float): Image resolution.
+            dpi (float): Resolution of the frame.
             store_result (bool): Whether to store the result in settings,
                 unless the page's parameters changed while it was being detected.
             outside (numpy.ndarray of numpy.bool | None): Pixels of ``image``
@@ -220,9 +226,11 @@ class Filter:
                 they count as background around the paper.
             dbg (DebugImages | None): Receives the page finder's intermediate
                 images.
+            frame_size (tuple[int, int] | None): Width and height of the view
+                the box is given in; None when that is ``image`` itself.
 
         Returns:
-            PageBox: The detected page, or the whole image when none was found.
+            PageBox: The detected page, or the whole frame when none was found.
         """
         params = self.get_params(page_id)
         page_box = find_page_box(
@@ -233,10 +241,11 @@ class Filter:
             tolerance=self._settings.get_page_detection_tolerance(),
             outside=outside() if callable(outside) else outside,
             dbg=dbg,
+            frame_size=frame_size,
         )
         if page_box is None:
             h, w = image.shape[:2]
-            page_box = PageBox.from_image_size(w, h)
+            page_box = PageBox.from_image_size(*(frame_size or (w, h)))
 
         if store_result:
             new_params = params.with_page_box(page_box, PageDetectionMode.AUTO)
@@ -338,7 +347,8 @@ class Filter:
         Args:
             image (NDArray[np.uint8] | Callable[[], NDArray[np.uint8]]):
                 Grayscale or color image, or a function making it. A function
-                is only called when detection must run.
+                is only called when detection must run. The image may be the
+                view shrunk ahead; see ``image_size``.
             page_id (PageId): Page identifier.
             dpi (float): Image resolution.
             outside (NDArray[np.bool_] | Callable[[], NDArray[np.bool_]] | None):
@@ -354,9 +364,9 @@ class Filter:
             view_transform (NDArray[np.float64] | None): 3x3 matrix from the
                 source image's pixels to those of ``image``; remembered so that
                 hand-drawn boxes can follow a later change of view.
-            image_size (tuple[int, int] | None): (width, height) of the image a
-                function ``image`` makes; required with a function, ignored
-                with an array.
+            image_size (tuple[int, int] | None): (width, height) of the view
+                the boxes are given in. None means the size of ``image``, so it
+                is required when ``image`` is a function.
             dbg (DebugImages | None): Receives the finders' intermediate
                 images when they run.
 
@@ -370,11 +380,11 @@ class Filter:
         """
         started = self.get_params(page_id)
         params = started
-        if callable(image):
-            if image_size is None:
-                msg = "image_size is required when image is a function"
-                raise ValueError(msg)
+        if image_size is not None:
             w, h = image_size
+        elif callable(image):
+            msg = "image_size is required when image is a function"
+            raise ValueError(msg)
         else:
             h, w = image.shape[:2]
         outline = [] if page_outline is None else list(page_outline)
@@ -394,6 +404,7 @@ class Filter:
                     store_result=False,
                     outside=outside,
                     dbg=dbg,
+                    frame_size=(w, h),
                 )
                 params = params.with_page_box(page_box, PageDetectionMode.AUTO)
                 update_content = update_content or not _content_within_page(params)
@@ -426,6 +437,7 @@ class Filter:
                     page_box=params.page_box.to_content_box(),
                     outside_key=outside_key,
                     dbg=dbg,
+                    frame_size=(w, h),
                 )
                 params = params.with_content_box(
                     result.content_box, ContentDetectionMode.AUTO

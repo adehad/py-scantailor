@@ -716,7 +716,11 @@ _FILL_SHIFT_BITS = 4
 
 
 def render_transformed(
-    image: NDArray[np.uint8], transformation: ImageTransformation
+    image: NDArray[np.uint8],
+    transformation: ImageTransformation,
+    size: tuple[int, int] | None = None,
+    *,
+    invert: bool = False,
 ) -> NDArray[np.uint8]:
     """Resample an image through a transformation in a single pass.
 
@@ -732,12 +736,19 @@ def render_transformed(
             most 4 channels. Its size must match transformation.orig_rect.
         transformation (ImageTransformation): Maps source to resulting
             coordinates.
+        size (tuple[int, int] | None): Width and height of the result. It
+            covers the same area as the full-size result, so each of its pixels
+            spans ``full / size`` full-size pixels along each axis and averages
+            the source under them. None gives the full size.
+        invert (bool): Render ``255 - image`` without building it: the pixels
+            are those of the inverted image resampled, and the area with no
+            source pixel is still white.
 
     Returns:
         numpy.ndarray of numpy.uint8:
             New array with the same channel layout as the input
-        and the size of transformation.resulting_rect, rounded to whole pixels
-        and at least 1x1. The input is not modified.
+        and ``size``, or the size of transformation.resulting_rect rounded to
+        whole pixels and at least 1x1. The input is not modified.
 
     Raises:
         TypeError: If the image is not uint8.
@@ -745,13 +756,17 @@ def render_transformed(
     if image.dtype != np.uint8:
         raise TypeError(f"render_transformed needs a uint8 image, got {image.dtype}")
     rect = transformation.resulting_rect
-    out_width = max(1, round(rect.width))
-    out_height = max(1, round(rect.height))
+    full_width = max(1, round(rect.width))
+    full_height = max(1, round(rect.height))
+    out_width, out_height = (full_width, full_height) if size is None else size
+    scale = (full_width / out_width, full_height / out_height)
 
     # OpenCV addresses pixel centres at integer coordinates while the
     # transformation addresses pixel corners, hence the half pixel shifts.
     dst_to_src = _then(
-        _translation_matrix(rect.x + 0.5, rect.y + 0.5),
+        _translation_matrix(0.5, 0.5),
+        _scale_matrix(*scale),
+        _translation_matrix(rect.x, rect.y),
         transformation.transform_back,
         _translation_matrix(-0.5, -0.5),
     )
@@ -759,15 +774,17 @@ def render_transformed(
     shift = _whole_pixel_shift(dst_to_src)
     window = _crop_window(image, shift, out_width, out_height) if shift else None
     if window is not None:
-        result = window
+        result = np.subtract(_WHITE, window, out=window) if invert else window
     else:
-        result = warp_area_averaged(image, dst_to_src, (out_width, out_height))
+        result = warp_area_averaged(
+            image, dst_to_src, (out_width, out_height), invert=invert
+        )
 
     if result.ndim < image.ndim:
         # cv2.warpAffine drops a trailing singleton channel axis.
         result = result.reshape(out_height, out_width, 1)
 
-    crop_area = transformation.resulting_pre_crop_area - [rect.x, rect.y]
+    crop_area = (transformation.resulting_pre_crop_area - [rect.x, rect.y]) / scale
     _whiten_outside(result, crop_area)
     return result
 
@@ -776,6 +793,8 @@ def warp_area_averaged(
     image: NDArray[np.uint8],
     dst_to_src: NDArray[np.float64],
     size: tuple[int, int],
+    *,
+    invert: bool = False,
 ) -> NDArray[np.uint8]:
     """Warp an image bilinearly, averaging every source pixel an output pixel covers.
 
@@ -786,7 +805,8 @@ def warp_area_averaged(
     average as much as upstream's box does.
 
     An output pixel that covers at most one source pixel along both axes skips
-    the filter, so 1:1 and enlarging warps are plain ``cv2.warpAffine``.
+    the filter, so 1:1 and enlarging warps are plain ``cv2.warpAffine``, unless
+    ``invert`` asks for the one-tap filter that inverts the window.
 
     Args:
         image (numpy.ndarray of numpy.uint8): Source, (H, W) or (H, W, C) with
@@ -795,6 +815,9 @@ def warp_area_averaged(
             output pixel centres to source pixel centres, both with OpenCV's
             convention that pixel (0, 0) is centred on (0, 0).
         size (tuple[int, int]): Output width and height.
+        invert (bool): Warp ``255 - image``. The filter inverts the window it
+            reads as it filters, by negating its taps and adding 255, so no
+            inverted copy of the whole image is made.
 
     Returns:
         numpy.ndarray of numpy.uint8: The warped image. Points that map outside
@@ -802,13 +825,14 @@ def warp_area_averaged(
         axis, so an (H, W, 1) input comes back as (H, W).
     """
     taps_x, taps_y = (_box_taps(width) for width in _source_footprint(dst_to_src))
-    if taps_x is None and taps_y is None:
+    if taps_x is None and taps_y is None and not invert:
         return _warp_bilinear(image, dst_to_src, size)
     taps_x = taps_x or _SINGLE_TAP
     taps_y = taps_y or _SINGLE_TAP
     margin = max(len(taps_x.weights), len(taps_y.weights)) + 2
     window = _sampled_window(image.shape[:2], dst_to_src, size, margin)
     if window is None:
+        # Every output pixel lies outside the source, so it is white either way.
         return _warp_bilinear(image, dst_to_src, size)
     left, top, right, bottom = window
     # ddepth -1 makes OpenCV round and saturate to uint8 itself, so the
@@ -818,8 +842,9 @@ def warp_area_averaged(
             image[top:bottom, left:right],
             -1,
             taps_x.weights,
-            taps_y.weights,
+            -taps_y.weights if invert else taps_y.weights,
             anchor=(taps_x.anchor, taps_y.anchor),
+            delta=_WHITE if invert else 0,
             borderType=cv2.BORDER_REPLICATE,
         ),
         dtype=np.uint8,
