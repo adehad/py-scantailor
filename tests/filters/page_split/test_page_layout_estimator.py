@@ -372,6 +372,38 @@ class TestRemoveInsignificantEdgeSpans:
 
         assert spans == [Span(0, 20), Span(100, 400)]
 
+    def test_a_small_edge_span_a_word_gap_from_the_text_is_kept(self) -> None:
+        # The 22 columns are within the 39 allowed, but only 11 columns of
+        # whitespace part them from the text.
+        spans = [Span(133, 706), Span(717, 739)]
+
+        estimator._remove_insignificant_edge_spans(spans)
+
+        assert spans == [Span(133, 706), Span(717, 739)]
+
+    @pytest.mark.parametrize(
+        ("gap", "dropped"), [(19, False), (20, True)], ids=["19_kept", "20_dropped"]
+    )
+    def test_an_edge_span_is_garbage_only_from_20_columns_of_whitespace(
+        self, gap, dropped
+    ) -> None:
+        """20 columns at 150 dpi is 3.4 mm, wider than a word gap."""
+        text, speck = Span(100, 500), Span(500 + gap, 500 + gap + 6)
+        spans = [text, speck]
+
+        estimator._remove_insignificant_edge_spans(spans)
+
+        assert spans == ([text] if dropped else [text, speck])
+
+    def test_a_kept_edge_span_leaves_the_other_edge_free_to_be_dropped(
+        self,
+    ) -> None:
+        spans = [Span(0, 5), Span(10, 300), Span(380, 390)]
+
+        estimator._remove_insignificant_edge_spans(spans)
+
+        assert spans == [Span(0, 5), Span(10, 300)]
+
     def test_the_last_span_is_never_dropped(self) -> None:
         spans = [Span(0, 3)]
 

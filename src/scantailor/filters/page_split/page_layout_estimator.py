@@ -69,6 +69,11 @@ _MIN_WHITESPACE_WIDTH = 8
 _MIN_BALANCE_RATIO = 0.25
 _ACCEPTABLE_BALANCE_FRACTION = 0.90
 _EDGE_SPAN_FRACTION = 15
+# Columns of whitespace, blank on every line, that must part an edge span from
+# the rest of the content for the span to count as garbage. Where a few long
+# lines end past the others, their ends form a span only a word gap away:
+# 11 columns on the sample book's 01_single_page.
+_MIN_GARBAGE_GAP = 20
 _SINGLE_SPAN_CLEARANCE = 15
 _OFFCUT_CUT_MARGIN = 20
 _OFFCUT_MAX_WIDTH_FRACTION = 4
@@ -706,22 +711,38 @@ def _cut_at_whitespace_deskewed_150(
 
 
 def _remove_insignificant_edge_spans(spans: list[Span]) -> None:
-    """Drop small outer spans while together they stay under 1/15 of the content."""
+    """Drop small outer spans that stand apart from the rest of the content.
+
+    An outer span may go when whitespace at least ``_MIN_GARBAGE_GAP`` wide
+    separates it from its neighbour, and while the spans dropped stay under
+    1/15 of the content's width. Of the two outer spans, the narrower one that
+    may go goes first. A span closer to its neighbour than that is the end of
+    a few long lines of text, not garbage on an empty page.
+
+    Args:
+        spans (list[Span]): Content spans in column order; changed in place.
+    """
     if not spans:
         return
     may_be_removed = sum(span.width for span in spans) // _EDGE_SPAN_FRACTION
+
     while len(spans) > 1:
-        first, last = spans[0], spans[-1]
-        if first.width < last.width:
-            if first.width > may_be_removed:
-                break
-            may_be_removed -= first.width
-            spans.pop(0)
-        else:
-            if last.width > may_be_removed:
-                break
-            may_be_removed -= last.width
-            spans.pop()
+        first_gap = Span.between(spans[0], spans[1])
+        last_gap = Span.between(spans[-2], spans[-1])
+        # On equal widths the last span goes first.
+        ends = [
+            (span.width, index)
+            for span, gap, index in (
+                (spans[0], first_gap, 0),
+                (spans[-1], last_gap, -1),
+            )
+            if span.width <= may_be_removed and gap.width >= _MIN_GARBAGE_GAP
+        ]
+        if not ends:
+            break
+        width, index = min(ends)
+        may_be_removed -= width
+        spans.pop(index)
 
 
 def _vert_line(x: float) -> Line:
