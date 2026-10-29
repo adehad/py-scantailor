@@ -30,7 +30,8 @@ How the layout is detected
 ==========================
 
 **Auto** looks for a folding line or a dark spine first, and otherwise for the
-white gap between two pages of text. A tilted spread gets a tilted split line. The
+white gap between two pages of text. A spine casts a shadow, and the split goes
+through the darkest part of it. A tilted spread gets a tilted split line. The
 detection code is in :mod:`scantailor.filters.page_split.page_layout_estimator`.
 
 With **Single page with an offcut**, the page is cut where its text starts, or at

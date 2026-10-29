@@ -165,6 +165,65 @@ def test_lines_close_together_are_reported_once() -> None:
     assert len(find_lines(page, 300.0)) == 1
 
 
+def test_lines_on_both_flanks_of_one_shadow_are_reported_once_at_its_bottom() -> None:
+    """The detector finds a line on each steep flank, 23 mm apart, of a shadow
+    centred on column 1200; both settle at the bottom of the same valley."""
+    columns = np.arange(2400)
+    shadow = 225.0 - 100.0 * np.exp(-(((columns - 1200) / 150.0) ** 4))
+    page = np.tile(shadow, (1800, 1)).astype(np.uint8)
+
+    lines = find_lines(page, 300.0)
+
+    assert len(lines) == 1
+    assert _x_at(lines[0], 900.0) == pytest.approx(1200.0, abs=_tolerance(300.0))
+
+
+def test_a_steep_line_on_the_flank_of_a_wide_shadow_ends_upright_at_its_bottom():
+    """The detector finds this shadow's line leaning 7 degrees, with one end
+    more than 15 mm from the bottom at column 1200."""
+    columns = np.arange(2400)
+    shadow = 225.0 - 180.0 * np.exp(-(((columns - 1200) / 300.0) ** 2))
+    page = np.tile(shadow, (1800, 1)).astype(np.uint8)
+
+    lines = find_lines(page, 300.0)
+
+    line = min(lines, key=lambda line: abs(_x_at(line, 900.0) - 1200.0))
+    for y in (0.0, 1800.0):
+        assert _x_at(line, y) == pytest.approx(1200.0, abs=_tolerance(300.0))
+
+
+def _bed_band_page(far_side_level: int) -> NDArray[np.uint8]:
+    """Paper, then a band of scanner bed from column 900 to 1050, then a lid.
+
+    Args:
+        far_side_level (int): Gray level of the lid beyond the band; the bed is
+            120 and the paper 225.
+
+    Returns:
+        numpy.ndarray of numpy.uint8: (1800, 2400) page at 300 dpi.
+    """
+    columns = np.full(2400, 225, dtype=np.uint8)
+    columns[900:1050] = 120
+    columns[1050:] = far_side_level
+    return np.tile(columns, (1800, 1))
+
+
+def test_a_band_4_levels_below_its_far_side_is_no_valley_so_its_edges_stay():
+    lines = sorted(find_lines(_bed_band_page(124), 300.0), key=lambda line: line[0][0])
+
+    assert [_x_at(line, 900.0) for line in lines] == [
+        pytest.approx(900.0, abs=_tolerance(300.0)),
+        pytest.approx(1050.0, abs=_tolerance(300.0)),
+    ]
+
+
+def test_a_band_20_levels_below_both_sides_is_a_valley_with_one_line_in_its_middle():
+    lines = find_lines(_bed_band_page(140), 300.0)
+
+    assert len(lines) == 1
+    assert _x_at(lines[0], 900.0) == pytest.approx(975.0, abs=_tolerance(300.0))
+
+
 def test_a_short_dark_mark_is_not_a_line() -> None:
     page = pages.blank(700, 500)
     pages.add_vertical_band(page, 300, 306, 45, y0=100, y1=170)

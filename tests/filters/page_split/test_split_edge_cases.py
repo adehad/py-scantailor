@@ -154,11 +154,6 @@ class TestSpreads:
         for end in layout.cutter1:
             assert left_text_end < end[0] < right_text_start
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="The folding line finder reports the side of the spine shadow, "
-        "5.3 mm (light) and 7 mm (black) left of the spine, and its line wins (#381).",
-    )
     @pytest.mark.parametrize("gutter", list(SPREADS))
     def test_a_spread_is_cut_within_3_mm_of_its_spine(
         self,
@@ -174,20 +169,7 @@ class TestSpreads:
         assert abs(_mm(offset, SAMPLE_DPI)) <= SPINE_TOLERANCE_MM
 
     @pytest.mark.slow
-    @pytest.mark.parametrize(
-        "gutter",
-        [
-            pytest.param(
-                "light",
-                marks=pytest.mark.xfail(
-                    strict=True,
-                    reason="At 300 and 600 dpi the folding line finder picks the other "
-                    "side of the light spine shadow, 10.7 mm to the right (#381).",
-                ),
-            ),
-            "black",
-        ],
-    )
+    @pytest.mark.parametrize("gutter", list(SPREADS))
     def test_a_spread_splits_at_the_same_place_in_mm_at_any_resolution(
         self, sample_book_tool: ModuleType, gutter: str
     ) -> None:
