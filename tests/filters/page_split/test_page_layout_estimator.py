@@ -134,6 +134,32 @@ class TestLayoutKinds:
         assert _mid_x(layout.cutter1) == pytest.approx(81.0, abs=15.0)
         assert _mid_x(layout.cutter2) == pytest.approx(919.0, abs=15.0)
 
+    def test_lines_fencing_blank_strips_on_both_sides_leave_the_two_nearest_the_page(
+        self,
+    ) -> None:
+        layout = estimate_page_layout(
+            pages.single_page_with_fenced_edge_strips(),
+            LayoutType.AUTO_LAYOUT_TYPE,
+            300.0,
+        )
+
+        assert layout.layout_type is PageLayoutType.SINGLE_PAGE_CUT
+        assert _mid_x(layout.cutter1) == pytest.approx(160.0, abs=15.0)
+        assert _mid_x(layout.cutter2) == pytest.approx(840.0, abs=15.0)
+
+    def test_a_margin_rule_through_the_text_near_an_edge_is_not_taken_for_its_edge(
+        self,
+    ) -> None:
+        """Text runs on both sides of the rule, so the rule is not a page edge."""
+        layout = estimate_page_layout(
+            pages.single_page_with_margin_rule(), LayoutType.AUTO_LAYOUT_TYPE, 300.0
+        )
+
+        assert layout.layout_type is PageLayoutType.SINGLE_PAGE_CUT
+        # The text spans x = 130 to 870; the cut may not enter it at all.
+        assert _mid_x(layout.cutter1) <= 130.0
+        assert _mid_x(layout.cutter2) >= 870.0
+
     def test_one_edge_line_is_paired_with_the_far_image_edge(self) -> None:
         layout = estimate_page_layout(
             pages.single_page_with_right_edge_line(), LayoutType.AUTO_LAYOUT_TYPE, 300.0

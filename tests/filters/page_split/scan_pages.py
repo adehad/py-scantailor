@@ -189,6 +189,37 @@ def single_page_with_edge_lines(
     return page
 
 
+MARGIN_RULE_X = 300
+
+
+def single_page_with_margin_rule(
+    width: int = 1000, height: int = 1400
+) -> NDArray[np.uint8]:
+    """A page with edge lines and a ruled line through its text near the left edge.
+
+    The rule lies within a quarter of the width of the left edge line, and the
+    page's text runs on both sides of it, from x = 130 to x = width - 130.
+    """
+    page = single_page_with_edge_lines(width, height)
+    add_vertical_band(page, MARGIN_RULE_X, MARGIN_RULE_X + 3, 120)
+    return page
+
+
+def single_page_with_fenced_edge_strips(
+    width: int = 1000, height: int = 1400
+) -> NDArray[np.uint8]:
+    """A page between two lines, with a blank strip fenced by a line outside each.
+
+    The page edges are at x = 160 and x = width - 160; the strips end at lines
+    at x = 60 and x = width - 60.
+    """
+    page = blank(width, height)
+    add_text(page, 200, width - 200, 130, height - 130, seed=3)
+    for x in (60, 160, width - 160, width - 60):
+        add_vertical_band(page, x - 3, x + 3, 45)
+    return page
+
+
 def single_page_with_right_edge_line(
     width: int = 1000, height: int = 1400
 ) -> NDArray[np.uint8]:
