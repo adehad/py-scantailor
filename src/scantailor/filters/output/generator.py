@@ -1284,7 +1284,7 @@ def _morphological_smooth(
     black = binary == 0
     for pattern in _EDGE_SMOOTHING_PATTERNS:
         black = hit_miss_replace_all_directions(black, pattern)
-    smoothed = np.where(black, 0, 255).astype(np.uint8)
+    smoothed = np.where(black, np.uint8(0), np.uint8(255))
     if dbg is not None:
         dbg.add(smoothed, "edges_smoothed")
     return smoothed
