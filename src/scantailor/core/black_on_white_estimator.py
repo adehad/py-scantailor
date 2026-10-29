@@ -15,7 +15,7 @@ from scantailor.core.transformation import ImageTransformation
 from scantailor.imageproc.background_color import otsu_threshold
 from scantailor.imageproc.binarize import binarize_otsu
 from scantailor.imageproc.despeckle import despeckle
-from scantailor.imageproc.filters import gray_histogram
+from scantailor.imageproc.filters import bgr_to_gray, gray_histogram
 
 REFINING_DPI = 150
 _NORMAL_DESPECKLE_LEVEL = 2.0
@@ -168,9 +168,7 @@ def _morphology(
 
 
 def _gray(pixels: NDArray[np.uint8]) -> NDArray[np.uint8]:
-    if pixels.ndim == 3 and pixels.shape[2] == 3:
-        return np.asarray(cv2.cvtColor(pixels, cv2.COLOR_BGR2GRAY), dtype=np.uint8)
-    return np.ascontiguousarray(pixels)
+    return np.ascontiguousarray(bgr_to_gray(pixels))
 
 
 def _pre_crop_only(xform: ImageTransformation) -> ImageTransformation:

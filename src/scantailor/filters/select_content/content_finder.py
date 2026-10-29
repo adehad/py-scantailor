@@ -9,6 +9,7 @@ from numpy.typing import NDArray
 
 from scantailor.core.debug_images import DebugImages
 from scantailor.core.result_memo import ResultMemo, array_digest
+from scantailor.imageproc.filters import bgr_to_gray
 
 from .content_box import ContentBox
 from .content_box_finder import PROCESSING_DPI, Rect, find_content_rect
@@ -74,10 +75,7 @@ def find_content_box(
             When no content is found, the box is empty and the confidence 0, as
             upstream; Page Layout then centres the page and Output leaves it blank.
     """
-    gray = np.asarray(
-        cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image,
-        dtype=np.uint8,
-    )
+    gray = bgr_to_gray(image)
     deferred: Callable[[], NDArray[np.bool_]] | None = None
     mask: NDArray[np.bool_] | None = None
     if callable(outside):

@@ -15,6 +15,7 @@ from scantailor.core.models import Dpi
 from scantailor.core.transformation import ImageTransformation
 from scantailor.imageproc.binarize import binarize_wolf
 from scantailor.imageproc.despeckle import despeckle
+from scantailor.imageproc.filters import bgr_to_gray
 
 MASK_DPI = 150
 _WOLF_WINDOW = 51
@@ -162,11 +163,7 @@ def render_page_at_dpi(
     to_page[0, 2], to_page[1, 2] = -rect.x, -rect.y
     to_page = to_page @ scaled.transform
 
-    gray = (
-        cv2.cvtColor(pixels, cv2.COLOR_BGR2GRAY)
-        if pixels.ndim == 3 and pixels.shape[2] == 3
-        else np.ascontiguousarray(pixels)
-    )
+    gray = np.ascontiguousarray(bgr_to_gray(pixels))
     if not black_on_white:
         gray = cv2.bitwise_not(gray)
     page = np.asarray(

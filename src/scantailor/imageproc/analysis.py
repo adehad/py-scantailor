@@ -10,6 +10,8 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from scantailor.imageproc.filters import bgr_to_gray
+
 
 @dataclass(frozen=True)
 class SkewResult:
@@ -92,11 +94,7 @@ def find_skew(
         >>> abs(result.angle) < 1.0  # Should detect near-zero skew
         True
     """
-    # Ensure image is grayscale
-    if len(image.shape) == 3:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    else:
-        gray = image
+    gray = bgr_to_gray(image)
 
     # Convert to binary if not already
     if gray.max() > 1:

@@ -23,6 +23,7 @@ from scantailor.imageproc.binarize import (
     binarize_wolf,
     peak_threshold,
 )
+from scantailor.imageproc.filters import bgr_to_gray
 
 from .content_box import PageBox
 from .content_box_finder import Rect
@@ -89,10 +90,7 @@ def find_page_box(
         PageBox | None: The page in pixels of ``image``, or None when no box was
             found, or none came near the expected size.
     """
-    source = np.asarray(
-        cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image,
-        dtype=np.uint8,
-    )
+    source = bgr_to_gray(image)
     gray = source
     if outside is not None and outside.any():
         if outside.all():

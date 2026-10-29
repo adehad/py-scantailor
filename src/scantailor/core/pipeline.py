@@ -195,7 +195,8 @@ class _PageState:
     """Oriented source pixels plus the transformation accumulated so far.
 
     The transformed view is rendered on demand and cached until the
-    transformation changes.
+    transformation changes. Detection works on the source's gray, converted
+    once per source, as upstream's ``FilterData`` does.
     """
 
     def __init__(
@@ -211,6 +212,7 @@ class _PageState:
         self._decoded_dpi = dpi
         self._source_dpi = transformation_dpi(dpi, rotation_degrees)
         self._view: NDArray[np.uint8] | None = None
+        self._source_gray: NDArray[np.uint8] | None = None
         self._black_on_white: bool | None = None
         self._polarity_recorded = False
         self.source = source
@@ -251,8 +253,16 @@ class _PageState:
         self.content_polygon_source = None
         self.trim_area = None
         self._view = None
+        self._source_gray = None
         self._black_on_white = None
         self._polarity_recorded = False
+
+    @property
+    def source_gray(self) -> NDArray[np.uint8]:
+        """``source`` in gray, converted on first use and kept for the source."""
+        if self._source_gray is None:
+            self._source_gray = bgr_to_gray(self.source)
+        return self._source_gray
 
     def view(self) -> NDArray[np.uint8]:
         """Return the source resampled through the current transformation."""
@@ -273,22 +283,22 @@ class _PageState:
         """
         record = dbg is not None and not self._polarity_recorded
         if self._black_on_white is None or record:
-            self._black_on_white = is_black_on_white(self.source, self.xform, dbg)
+            self._black_on_white = is_black_on_white(self.source_gray, self.xform, dbg)
             self._polarity_recorded = self._polarity_recorded or record
         return self._black_on_white
 
     def detection_view(
         self, detection: BlackOnWhiteDetection, dbg: DebugImages | None = None
     ) -> NDArray[np.uint8]:
-        """Return ``view``, inverted when it shows light content on a dark page.
+        """Return the gray of ``view``, inverted when it shows light content on dark.
 
-        The source is inverted before it is resampled, so the area with no
-        source pixel stays white, as it is in ``view``. ``dbg`` receives the
-        polarity estimator's images.
+        The gray source is resampled, and inverted before that, so the area
+        with no source pixel stays white, as it is in ``view``. ``dbg``
+        receives the polarity estimator's images.
         """
         if not detection.enabled or self.is_black_on_white(dbg):
-            return self.view()
-        return render_transformed(255 - self.source, self.xform)
+            return render_transformed(self.source_gray, self.xform)
+        return render_transformed(255 - self.source_gray, self.xform)
 
     def view_size(self) -> tuple[int, int]:
         """Return the (width, height) of ``view`` without resampling."""
@@ -692,7 +702,7 @@ def _process_page_split(
     detected = False
     if detect:
         detected = filter_.settle(
-            state.source,
+            state.source_gray,
             page_id,
             dpi=state.source_dpi,
             rotation_degrees=rotation_degrees,
@@ -701,7 +711,7 @@ def _process_page_split(
         ).detected
     if dbg is not None and not detected:
         filter_.detect_split(
-            state.source,
+            state.source_gray,
             page_id,
             dpi=state.source_dpi,
             store_result=False,
@@ -1204,7 +1214,7 @@ def _detected_model(
         [[1.0, 0.0, rect.x], [0.0, 1.0, rect.y], [0.0, 0.0, 1.0]]
     )
     to_source = state.xform.transform_back @ view_to_resulting
-    source_gray = bgr_to_gray(state.source)
+    source_gray = state.source_gray
     detected = detect_distortion_model(
         gray,
         dpi,
