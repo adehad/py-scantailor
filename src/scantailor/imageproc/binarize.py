@@ -237,7 +237,7 @@ def binarize_sauvola(
         image (NDArray[np.uint8]): 2-D gray image. Not modified.
         window_size (int | tuple[int, int]): Side of a square local window, or
             its ``(width, height)``, clipped at the image border. An even size
-            reaches one pixel further after the centre than before.
+            reaches one pixel further before the centre than after.
         k (float): Sensitivity, typically 0.1 to 0.5.
         delta (float): Threshold adjustment; positive means more ink.
 
@@ -279,7 +279,7 @@ def binarize_wolf(
         image (NDArray[np.uint8]): 2-D gray image. Not modified.
         window_size (int | tuple[int, int]): Side of a square local window, or
             its ``(width, height)``, clipped at the image border. An even size
-            reaches one pixel further after the centre than before.
+            reaches one pixel further before the centre than after.
         k (float): Sensitivity, typically 0.3 to 0.5.
         delta (float): Threshold adjustment; positive means more ink.
         lower_bound (int): Gray levels below this are ink whatever the threshold.
@@ -340,8 +340,8 @@ def binarize_edge_div(
     Args:
         image (NDArray[np.uint8]): 2-D gray image. Not modified.
         window_size (int): Side of the local window, clipped at the image
-            border. An even size reaches one pixel further after the centre than
-            before.
+            border. An even size reaches one pixel further before the centre
+            than after.
         kep (float): Edge enhancement weight (0-1). Higher = more edge enhancement.
         kbd (float): Blur division weight (0-1). Higher = more illumination
             normalization.
@@ -402,8 +402,8 @@ def binarize_bradley(
     Args:
         image (NDArray[np.uint8]): 2-D gray image. Not modified.
         window_size (int): Side of the local window, clipped at the image
-            border. An even size reaches one pixel further after the centre than
-            before.
+            border. An even size reaches one pixel further before the centre
+            than after.
         k (float): Sensitivity (0-1). Higher values make it easier for pixels to
             be classified as ink. Typically 0.1-0.2.
         delta (float): Threshold adjustment; positive means more ink.
@@ -703,7 +703,8 @@ def _window_sum(
 ) -> NDArray[np.float64]:
     """Sum over a window around each pixel, zero outside the image.
 
-    An even window reaches one pixel further after the centre than before.
+    An even window reaches one pixel further before the centre than after,
+    as ``cv2.boxFilter``'s default anchor sits at ``size // 2``.
     """
     summed = cv2.boxFilter(
         values,
