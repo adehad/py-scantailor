@@ -71,3 +71,5 @@ autolabeler:
     branch: ['/^test\//']
   - labels: [translations]
     branch: ['/^translations?\//']
+  - labels: [skip-changelog]
+    branch: ['/^pre-commit-ci-update-config$/']
