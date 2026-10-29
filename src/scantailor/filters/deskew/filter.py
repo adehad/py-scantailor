@@ -24,6 +24,7 @@ from scantailor.filters.deskew.shadow_cleanup import remove_horizontal_shadows
 from scantailor.filters.deskew.top_edge import find_skew_from_top_edge
 from scantailor.imageproc.analysis import SkewResult, find_skew
 from scantailor.imageproc.binarize import binarize_otsu
+from scantailor.imageproc.filters import bgr_to_gray
 
 
 class Filter:
@@ -198,11 +199,7 @@ class Filter:
         if accuracy is None:
             accuracy = self.DEFAULT_ACCURACY
 
-        # Convert to grayscale if needed
-        if len(image.shape) == 3:
-            gray = np.asarray(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), dtype=np.uint8)
-        else:
-            gray = image
+        gray = bgr_to_gray(image)
 
         # Binarize for better skew detection
         binary = binarize_otsu(gray)

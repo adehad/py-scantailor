@@ -18,7 +18,6 @@ from pathlib import Path
 from threading import Event
 from typing import Final
 
-import cv2
 import numpy as np
 import pypdfium2 as pdfium
 from loguru import logger
@@ -28,6 +27,7 @@ from scantailor.core.batch import pool_size
 from scantailor.core.image_io import write_image
 from scantailor.core.models import Dpi
 from scantailor.core.pdf_pool import PdfCancelled, map_pool_progress
+from scantailor.imageproc.filters import qgray
 
 _POINTS_PER_INCH: Final = 72.0
 # Largest per-pixel channel spread, in grey levels, still treated as neutral;
@@ -73,7 +73,7 @@ def _render_pages(
                 bgr = np.ascontiguousarray(bitmap.to_numpy()[..., :3])
             finally:
                 page.close()
-            pixels = bgr if _has_colour(bgr) else cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+            pixels = bgr if _has_colour(bgr) else qgray(bgr)
             path = Path(job.out_dir) / f"page_{index + 1:04d}.png"
             write_image(path, pixels, resolution)
             written.append(str(path))

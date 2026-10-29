@@ -2,4 +2,5 @@ extend = "../pyproject.toml"
 [lint]
 ignore = [
     "D", # Allow undocumented test functions
+    "TID251", # Tests may compare against OpenCV's own gray conversion
 ]
