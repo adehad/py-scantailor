@@ -14,10 +14,12 @@ from scantailor.app.ui.page_renderer import PageRenderer, render_thumbnail
 from scantailor.app.ui.source_cache import SourceCache
 from scantailor.app.ui.stage_panels import StagePanels
 from scantailor.core.image_io import write_image
-from scantailor.core.models import Dpi, ImageId, PageId
+from scantailor.core.models import Dpi, ImageId, OrthogonalRotation, PageId
 from scantailor.core.stage_sequence import FilterStage, StageSequence
+from scantailor.filters.fix_orientation import filter as fix_orientation_filter
 from scantailor.filters.page_split.layout_type import LayoutType
 from scantailor.filters.select_content.content_box import ContentBox
+from scantailor.imageproc import geometry
 from tests.ui.conftest import RENDER_TIMEOUT_MS
 
 
@@ -110,6 +112,46 @@ def test_stage_panels_decode_through_the_cache_the_renderer_then_reuses(
     _render(qtbot, renderer, page, stages, FilterStage.DESKEW)
 
     assert decodes == [page.image_id]
+
+
+@pytest.fixture
+def turns(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    """Every orthogonal turn of a source, wherever it is made."""
+    seen: list[int] = []
+    real = geometry.rotate_orthogonal
+
+    def counting(pixels, degrees):
+        seen.append(degrees)
+        return real(pixels, degrees)
+
+    for module in (source_cache, stage_panels, fix_orientation_filter):
+        monkeypatch.setattr(module, "rotate_orthogonal", counting)
+    return seen
+
+
+def test_a_turned_page_is_turned_once_for_every_stage_render_and_view(
+    qtbot: QtBot,
+    tmp_path: Path,
+    turns: list[int],
+    make_stage_panels: Callable[[FilterStage, StageSequence], StagePanels],
+) -> None:
+    page = _page(tmp_path / "a.tif")
+    stages = _stages(page)
+    stages.fix_orientation_filter.set_rotation(
+        page.image_id, OrthogonalRotation(degrees=90)
+    )
+    renderer = PageRenderer()
+
+    for stage in (FilterStage.PAGE_SPLIT, FilterStage.DESKEW, FilterStage.OUTPUT):
+        panels = make_stage_panels(stage, stages)
+        panels.set_source_cache(renderer.sources)
+        panels.set_page(page)
+        panels.show_image(_render(qtbot, renderer, page, stages, stage))
+        qtbot.waitUntil(
+            lambda: panels.view.image is not None, timeout=RENDER_TIMEOUT_MS
+        )
+
+    assert turns == [90]
 
 
 def test_a_render_without_pixels_delivers_an_empty_image(

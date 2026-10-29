@@ -187,3 +187,107 @@ def test_threads_loading_one_page_decode_it_once(
     assert len(decodes) == 1
     assert len(results) == 3
     assert all(pixels is results[0] for pixels in results)
+
+
+@pytest.fixture
+def turns(monkeypatch: pytest.MonkeyPatch) -> list[int]:
+    """The rotation of every turn the cache makes."""
+    seen: list[int] = []
+    real = source_cache.rotate_orthogonal
+
+    def counting(pixels, degrees):
+        seen.append(degrees)
+        return real(pixels, degrees)
+
+    monkeypatch.setattr(source_cache, "rotate_orthogonal", counting)
+    return seen
+
+
+class TestTurnedPages:
+    def test_a_page_is_turned_once_however_often_it_is_asked_for(
+        self, tmp_path: Path, turns: list[int]
+    ) -> None:
+        cache = SourceCache()
+        pixels = cache.load(_image(tmp_path / "a.tif")).pixels
+
+        first = cache.oriented(pixels, 90)
+        second = cache.oriented(pixels.view(), 90)
+
+        assert second is first
+        assert turns == [90]
+        assert first.shape == (60, 80)
+        assert np.array_equal(first, np.rot90(pixels, k=-1))
+
+    def test_turned_pixels_cannot_be_modified(self, tmp_path: Path) -> None:
+        cache = SourceCache()
+        pixels = cache.load(_image(tmp_path / "a.tif")).pixels
+
+        turned = cache.oriented(pixels, 270)
+
+        with pytest.raises(ValueError, match="read-only"):
+            turned[0, 0] = 1
+
+    def test_an_unturned_page_is_the_decoded_pixels_without_a_copy(
+        self, tmp_path: Path, turns: list[int]
+    ) -> None:
+        cache = SourceCache()
+        pixels = cache.load(_image(tmp_path / "a.tif")).pixels
+
+        unturned = cache.oriented(pixels, 0)
+
+        assert np.shares_memory(unturned, pixels)
+        assert not unturned.flags.writeable
+        assert turns == []
+
+    def test_another_rotation_turns_the_page_again(
+        self, tmp_path: Path, turns: list[int]
+    ) -> None:
+        cache = SourceCache()
+        pixels = cache.load(_image(tmp_path / "a.tif")).pixels
+
+        quarter = cache.oriented(pixels, 90)
+        half = cache.oriented(pixels, 180)
+
+        assert turns == [90, 180]
+        assert half.shape == pixels.shape
+        assert quarter.shape == pixels.shape[::-1]
+
+    def test_a_file_that_changed_on_disk_is_turned_from_its_new_pixels(
+        self, tmp_path: Path, turns: list[int]
+    ) -> None:
+        cache = SourceCache()
+        path = tmp_path / "a.tif"
+        image = _image(path, level=40)
+        before = cache.oriented(cache.load(image).pixels, 90)
+
+        _image(path, level=90)
+        after = cache.oriented(cache.load(image).pixels, 90)
+
+        assert turns == [90, 90]
+        assert before[30, 39] == 40
+        assert after[30, 39] == 90
+
+    def test_another_page_lets_the_turned_copy_go(
+        self, tmp_path: Path, turns: list[int]
+    ) -> None:
+        cache = SourceCache()
+        first = cache.load(_image(tmp_path / "a.tif")).pixels
+        second = cache.load(_image(tmp_path / "b.tif")).pixels
+        cache.oriented(first, 90)
+
+        cache.oriented(second, 0)
+        cache.oriented(first, 90)
+
+        assert turns == [90, 90]
+
+    def test_clear_forgets_the_turned_copy(
+        self, tmp_path: Path, turns: list[int]
+    ) -> None:
+        cache = SourceCache()
+        pixels = cache.load(_image(tmp_path / "a.tif")).pixels
+        cache.oriented(pixels, 90)
+
+        cache.clear()
+        cache.oriented(pixels, 90)
+
+        assert turns == [90, 90]

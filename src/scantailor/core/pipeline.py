@@ -26,7 +26,7 @@ from numpy.typing import NDArray
 
 from scantailor.core.black_on_white_estimator import is_black_on_white
 from scantailor.core.debug_images import DebugImages
-from scantailor.core.models import Dpi, PageId, SubPage, page_name
+from scantailor.core.models import Dpi, OrthogonalDegrees, PageId, SubPage, page_name
 from scantailor.core.page_geometry import (
     page_crop_area,
     page_polygon,
@@ -171,6 +171,10 @@ class PipelineOptions:
             as upstream's debug mode records just the stage on screen. A
             detecting stage whose parameters are already stored detects once
             more without storing the result, so that its images are recorded.
+        orient: Turns the image clockwise by Fix Orientation's rotation in
+            place of ``rotate_orthogonal``, so that a caller can hand out a
+            turned copy it keeps. It must return what ``rotate_orthogonal``
+            would, read-only.
     """
 
     start_stage: FilterStage = FilterStage.FIX_ORIENTATION
@@ -185,6 +189,9 @@ class PipelineOptions:
         default_factory=BlackOnWhiteDetection
     )
     debug_images: DebugImages | None = None
+    orient: (
+        Callable[[NDArray[np.uint8], OrthogonalDegrees], NDArray[np.uint8]] | None
+    ) = None
 
     def debug_images_for(self, stage: FilterStage) -> DebugImages | None:
         """Return where ``stage`` records its intermediate images, or None."""
@@ -658,9 +665,12 @@ def _process_fix_orientation(
     metadata: dict[str, object] = {"rotation_degrees": rotation.degrees}
 
     if not options.detect_only:
-        state.replace_source(
-            filter_.process_image(state.source, page_id.image_id), rotation.degrees
+        oriented = (
+            filter_.process_image(state.source, page_id.image_id)
+            if options.orient is None
+            else options.orient(state.source, rotation.degrees)
         )
+        state.replace_source(oriented, rotation.degrees)
         trim_area = _apply_trim(state, page_id, sequence)
         if trim_area is not None:
             metadata["trim_area"] = trim_area.tolist()

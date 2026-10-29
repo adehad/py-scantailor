@@ -194,6 +194,8 @@ def render_page_with_model(
         render_image=pixels,
         black_on_white_detection=ApplicationSettings.get_instance().polarity_detection,
         debug_images=debug_images,
+        # Thumbnails of other pages must not push out the page on screen.
+        orient=sources.oriented if sources is not None and keep_source else None,
     )
     result = pipeline.process_page(page.pixels, page_id, sequence, options)
     if on_extras is not None and result.output_extras is not None:
