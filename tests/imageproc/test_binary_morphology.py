@@ -153,7 +153,16 @@ def test_seed_fill_of_an_empty_image_is_empty():
 
 
 def _speckled(height: int, width: int, seed: int) -> np.ndarray:
-    """Half the pixels black at random, so matches crowd and overlap."""
+    """Make half the pixels black at random, so matches crowd and overlap.
+
+    Args:
+        height (int): Rows.
+        width (int): Columns.
+        seed (int): Seed for the random generator, so a failure repeats.
+
+    Returns:
+        np.ndarray: (height, width) bool image, True for black.
+    """
     return np.random.default_rng(seed).random((height, width)) < 0.5
 
 

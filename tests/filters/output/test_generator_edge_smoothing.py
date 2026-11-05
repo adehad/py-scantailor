@@ -60,7 +60,14 @@ def _picture(rows: tuple[str, ...], quarter_turns: int) -> np.ndarray:
 
 
 def _strokes(width: int) -> np.ndarray:
-    """Vertical, horizontal and diagonal strokes ``width`` pixels wide; 0 is ink."""
+    """Draw a vertical, a horizontal and a diagonal stroke of one width.
+
+    Args:
+        width (int): Stroke width in pixels.
+
+    Returns:
+        np.ndarray: (80, 80) uint8 page, 0 for ink and 255 for paper.
+    """
     page = np.full((80, 80), 255, dtype=np.uint8)
     page[10:70, 20 : 20 + width] = 0
     page[50 : 50 + width, 30:75] = 0
@@ -69,17 +76,33 @@ def _strokes(width: int) -> np.ndarray:
     return page
 
 
-def _ink_components(page: np.ndarray) -> int:
-    """Count the 8-connected pieces of ink on a page where 0 is ink.
+def _ink_pieces_match_one_to_one(before: np.ndarray, after: np.ndarray) -> bool:
+    """Tell whether every piece of ink overlaps exactly one piece on the other page.
+
+    A split and a join elsewhere leave the number of pieces unchanged, so the
+    pieces are matched by the pixels they share rather than counted.
 
     Args:
-        page (np.ndarray): (H, W) uint8 binary page.
+        before (np.ndarray): (H, W) uint8 binary page, 0 for ink.
+        after (np.ndarray): Page of the same shape and encoding.
 
     Returns:
-        int: Number of separate pieces of ink.
+        bool: True when the 8-connected pieces of ink pair up one to one.
     """
-    count, _ = cv2.connectedComponents((page == 0).astype(np.uint8), connectivity=8)
-    return count - 1
+    count_before, labels_before = cv2.connectedComponents(
+        (before == 0).astype(np.uint8), connectivity=8
+    )
+    count_after, labels_after = cv2.connectedComponents(
+        (after == 0).astype(np.uint8), connectivity=8
+    )
+    shared = (labels_before > 0) & (labels_after > 0)
+    pairs = np.unique(np.stack([labels_before[shared], labels_after[shared]]), axis=1)
+    return (
+        count_before == count_after
+        and pairs.shape[1] == count_before - 1
+        and len(np.unique(pairs[0])) == pairs.shape[1]
+        and len(np.unique(pairs[1])) == pairs.shape[1]
+    )
 
 
 def _edge_length(page: np.ndarray) -> int:
@@ -161,7 +184,8 @@ def test_black_and_white_output_keeps_a_two_pixel_stroke():
 
     result = generate_output(gray, _black_and_white(morphological_smoothing=True))
 
-    assert (result.image[10:90, 47:51] == 0).any(axis=1).all()
+    ink_per_row = (result.image[10:90, 46:52] == 0).sum(axis=1, dtype=np.int64)
+    assert (ink_per_row >= 2).all()
 
 
 def test_smoothing_a_book_page_shortens_its_edges_without_splitting_or_joining_ink(
@@ -181,7 +205,7 @@ def test_smoothing_a_book_page_shortens_its_edges_without_splitting_or_joining_i
     rough = generate_output(gray, _black_and_white(morphological_smoothing=False))
     smooth = generate_output(gray, _black_and_white(morphological_smoothing=True))
 
-    assert _ink_components(smooth.image) == _ink_components(rough.image)
+    assert _ink_pieces_match_one_to_one(rough.image, smooth.image)
     assert _edge_length(smooth.image) < 0.98 * _edge_length(rough.image)
     ink = np.count_nonzero(rough.image == 0)
     assert abs(np.count_nonzero(smooth.image == 0) - ink) < 0.02 * ink
